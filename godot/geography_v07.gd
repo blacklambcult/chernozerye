@@ -37,6 +37,7 @@ var field_track := PackedVector2Array([
     Vector2(-223, -156), Vector2(-110, -176), Vector2(6, -217)
 ])
 var lake_center := Vector2(730, -760)
+var lake_outline := PackedVector2Array()
 var river_path := PackedVector2Array([
     Vector2(1050, 235), Vector2(935, 205), Vector2(800, 200),
     Vector2(670, 145), Vector2(540, 80), Vector2(465, 20),
@@ -65,6 +66,9 @@ func _ready() -> void:
             Vector2(880, 535), Vector2(905, 425), Vector2(730, 280)
         ])
     ]
+
+    _build_lake_outline()
+    _smooth_river_path()
 
     var data := JSON.parse_string(FileAccess.get_file_as_string(SOURCE))
     if data is Dictionary:
@@ -99,7 +103,9 @@ func _is_housing(p: Vector2) -> bool:
     return false
 
 func _is_water(p: Vector2) -> bool:
-    if p.distance_to(lake_center) < 150.0:
+    if p.x < 340.0:
+        return false
+    if _is_in_poly(p, lake_outline):
         return true
     for i in range(river_path.size() - 1):
         if p.distance_to(Geometry2D.get_closest_point_to_segment(p, river_path[i], river_path[i + 1])) < 21.0:
@@ -197,13 +203,33 @@ func _draw_field_scrub() -> void:
 func _draw_river() -> void:
     _draw_strip(river_path, 32.0, Color("#273f46"), 0.045)
 
+func _build_lake_outline() -> void:
+    # An asymmetrical stylized lake. Not a surveyed shoreline.
+    lake_outline.clear()
+    for i in range(64):
+        var theta := float(i) * TAU / 64.0
+        var factor := 1.0 + 0.11 * sin(theta * 3.0 + 0.55) + 0.06 * cos(theta * 5.0 - 0.2)
+        var x := cos(theta) * 124.0 * factor
+        var y := sin(theta) * 96.0 * (factor + 0.07 * sin(theta + 0.5))
+        lake_outline.append(lake_center + Vector2(x, y))
+
+func _smooth_river_path() -> void:
+    # Round off the visual corners between rough river waypoints.
+    if river_path.size() < 3:
+        return
+    var smooth := PackedVector2Array()
+    for i in range(river_path.size() - 1):
+        var a: Vector2 = river_path[i]
+        var b: Vector2 = river_path[i + 1]
+        var previous: Vector2 = river_path[maxi(i - 1, 0)]
+        var following: Vector2 = river_path[mini(i + 2, river_path.size() - 1)]
+        for sample in range(4):
+            smooth.append(a.cubic_interpolate(b, previous, following, float(sample) / 4.0))
+    smooth.append(river_path[river_path.size() - 1])
+    river_path = smooth
+
 func _draw_lake() -> void:
-    var edge := PackedVector2Array()
-    for i in range(40):
-        var theta := float(i) * TAU / 40.0
-        var ripple := 1.0 + 0.08 * sin(theta * 5.0)
-        edge.append(lake_center + Vector2(cos(theta) * 125.0, sin(theta) * 92.0) * ripple)
-    _draw_flat_polygon(edge, Color("#233b42"), 0.052)
+    _draw_flat_polygon(lake_outline, Color("#233b42"), 0.052)
 
 func _add_street_details() -> void:
     # Supplementary streets approximated from the user's marked-up road network.
