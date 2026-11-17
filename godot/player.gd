@@ -42,6 +42,9 @@ func _matches(event: InputEventKey, latin: int, cyrillic: String) -> bool:
 
 func _input(event: InputEvent) -> void:
     if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+        # GUI buttons need the click; never capture mouse before their pressed event.
+        if get_viewport().gui_get_hovered_control() is Button:
+            return
         var map_overlay := get_parent().get_node_or_null("MapOverlay") as CanvasLayer
         if map_overlay != null and map_overlay.visible:
             return # Let the on-map buttons receive clicks without capturing the pointer.
