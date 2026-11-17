@@ -40,6 +40,15 @@ jobs:
       - name: Import project
         run: godot --headless --path godot --editor --quit
 
+      - name: Validate GDScript sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          for script in world.gd player.gd geography_v07.gd live_map_v08.gd; do
+            echo "Checking ${script}"
+            godot --headless --path godot --check-only --script "res://${script}"
+          done
+
       - name: Export Web build
         shell: bash
         run: |
