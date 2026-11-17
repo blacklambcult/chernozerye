@@ -1,0 +1,77 @@
+/* GEO LAB 2.0 / local geography constructor */
+.editor-panel{background:#111c21;border-left:3px solid #d79155;padding:20px 19px 21px}
+.editor-heading{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.editor-total{color:#ffbf82;background:#332920;padding:6px 8px;font-weight:700;font-size:10px;white-space:nowrap}
+.editor-intro{font-size:11px;margin:13px 0 17px}
+.editor-tool-group{display:grid;gap:0}
+.editor-tool-group h4{font-size:10px;text-transform:uppercase;letter-spacing:1.3px;color:#93a5a5;font-weight:700;margin:16px 0 8px}
+.editor-tool-group h4:first-child{margin-top:2px}
+.editor-tools{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px}
+.editor-tool{display:flex;gap:9px;align-items:center;text-align:left;background:#17242a;border:1px solid #394b51;padding:10px 7px;min-height:41px;color:#e8eeeb;border-radius:3px;font-weight:600;font-size:11px;line-height:1.25}
+.editor-tool:hover{background:#23343b;border-color:#779191}
+.editor-tool.is-active{border-color:#ffc187;background:#493325;color:#ffdfbe;box-shadow:inset 0 0 0 1px #d99c66}
+.editor-tool:focus-visible{outline-offset:1px}
+.tool-dot{flex-shrink:0;display:block;width:12px;height:12px;border:2px solid currentColor;border-radius:2px}
+.tool-road{background:#efb568;border-color:#efb568;height:5px;border-radius:0}
+.tool-path{background:#e6d786;border-color:#e6d786;height:5px;border-radius:0}
+.tool-water{background:#50bdde;border-color:#50bdde}
+.tool-forest{background:#60b887;border-color:#60b887}
+.tool-plot{border:2px dashed #c3a5f1}
+.tool-object{background:#c1c8bf;border-color:#c1c8bf}
+.tool-house{background:#ef986e;border-color:#ef986e}
+.tool-shed{background:#c6a174;border-color:#c6a174}
+.tool-sauna{background:#e36f7b;border-color:#e36f7b}
+.tool-car{background:#79b9eb;border-color:#79b9eb}
+.draw-hint{margin-top:16px;border:1px solid #57553c;border-left:3px solid #d8a064;background:#26281f;color:#f6ddae;line-height:1.5;padding:11px;font-size:11px;min-height:53px}
+.editor-draw-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.editor-action{border:1px solid #526368;background:#25343a;color:#e8f1ed;padding:9px 10px;line-height:1.2;border-radius:2px;font-weight:650;font-size:11px;text-align:center;min-height:36px}
+.editor-action:hover{background:#34454b;border-color:#83938d}
+.editor-action.primary{background:#e6a16b;color:#201b17;border-color:#e6a16b}
+.editor-action.primary:hover{background:#ffc093;border-color:#ffc093}
+.editor-action.danger{border-color:#72524d;color:#e6b2a5;background:#2e2323}
+.editor-action.danger:hover{background:#56342e}
+.editor-action:disabled{opacity:.4;cursor:not-allowed}
+.editor-action.is-active{background:#574733;border-color:#ffbc82}
+.shortcut{font-size:9px;opacity:.65;font-weight:500;margin-left:3px}
+.editor-section-divider{height:1px;background:#314046;margin:20px 0 17px}
+.editor-check{display:flex;align-items:center;gap:8px;cursor:pointer;color:#d0dfd7;font-size:12px;margin-bottom:13px}
+.editor-check input{accent-color:#edaf78;width:16px;height:16px}
+.editor-object-list{max-height:242px;overflow:auto;scrollbar-color:#50666d #152126;border:1px solid #34454b;background:#101c21}
+.editor-empty{color:#8ea3a3;padding:14px;margin:0;font-size:11px;line-height:1.5}
+.editor-list-item{display:flex;align-items:center;gap:8px;width:100%;border:0;border-bottom:1px solid #293a41;background:transparent;padding:10px 9px;text-align:left;color:#e3ebe7;min-height:36px;font-size:11px}
+.editor-list-item:last-child{border:0}
+.editor-list-item:hover{background:#1f3036}
+.editor-list-item.is-selected{background:#39443c}
+.editor-list-swatch{width:9px;height:9px;flex-shrink:0;border-radius:2px}
+.editor-list-title{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.editor-list-metric{color:#9eb3b1;white-space:nowrap;font-size:10px}
+.editor-inspector{margin-top:14px;background:#14242a;border:1px solid #536b70;padding:13px;display:grid;gap:8px}
+.editor-inspector[hidden]{display:none!important}
+.editor-inspector>.eyebrow{margin-bottom:2px}
+.editor-inspector label{font-size:10px;color:#b1c3bf;font-weight:600}
+.editor-inspector input,.editor-inspector select,.editor-inspector textarea{width:100%;border:1px solid #49616a;color:#f1f4ee;background:#101b20;padding:10px;min-width:0;border-radius:2px;outline-offset:1px}
+.editor-inspector input:focus,.editor-inspector select:focus,.editor-inspector textarea:focus{border-color:#e1a66f}
+.editor-inspector select option{background:#0e1b21}
+.editor-inspector-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:6px}
+.editor-inspector-actions .editor-action:first-child,.editor-inspector-actions .editor-action:last-child{grid-column:1/-1}
+.editor-inspector .helper{line-height:1.45;font-size:10px;margin-top:1px}
+.editor-export-title{margin:0 0 12px!important}
+.editor-file-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.editor-file-actions .editor-action:first-child{grid-column:1/-1;min-height:40px}
+.editor-import{display:flex;align-items:center;justify-content:center;cursor:pointer}
+.editor-save-status{font-size:11px;color:#b3cba3;line-height:1.5;background:#203025;padding:9px;margin:13px 0 0}
+.editor-save-status.warning{background:#372826;color:#ffd0ae}
+.editor-share-note{color:#d2dfd5;font-size:11px;line-height:1.55;margin:12px 0}
+.editor-rights{font-size:10px;line-height:1.5;color:#819698}
+#map.is-drawing{cursor:crosshair!important}
+#map.is-drawing .leaflet-interactive{cursor:crosshair!important}
+.editor-vertex{width:15px;height:15px;border:2px solid #f8f2d9;border-radius:50%;background:#ed9957;box-shadow:0 1px 0 #0e1b23,0 0 0 2px #101a1d77}
+.editor-vertex.is-selected{background:#f4d86e;border-color:#fffae2;transform:scale(1.18)}
+@media(max-width:850px){
+  .editor-panel{grid-column:1/-1;border-left:0;border-top:3px solid #d79155}
+  .editor-tools{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .editor-object-list{max-height:180px}
+}
+@media(max-width:530px){
+  .editor-tools{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
