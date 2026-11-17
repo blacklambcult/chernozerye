@@ -3,7 +3,7 @@
 Low-poly atmospheric 3D exploration game in Godot 4. A 2 × 2 km prototype based on the real geography of Черноозерский Кордон (Уфа, Башкортостан), with a fixed dusk atmosphere.
 
 ## Status
-Migration to GitHub is underway. The Godot project and its geodata will live in `godot/`. No web deployment is live yet.
+Godot sources are versioned in `godot/`; GitHub Actions builds the Web export for GitHub Pages. Online deployment is configured at https://blacklambcult.github.io/chernozerye/ (check Actions for the latest build status).
 
 ## Design constraints
 - Geographical scale: 1 world unit = 1 meter.
@@ -45,3 +45,16 @@ This overhead view is a **blockout assessment tool**, not a reproduction of sate
 - While the map is open press **H** (same physical key as Russian **Р**) to show/hide *provisional* houses and inspect the OSM road geometry independently.
 
 These homes are artist-generated placeholders, **not a confirmed building inventory** or accurate individual footprints. Use permissively licensed sources or independently verified placement data for further correction. The public site needs the GitHub Actions workflow to finish before updates are visible.
+
+## Prototype 1.0 — landscape blockout
+
+This update completes the first review cycle of user-provided visual references for sectors A, B, C, the river, Lake Chyornoye, the southern field and highway M5. See the review notes under `docs/geography/`.
+
+Changes:
+- Larger, more natural-looking **approximate field** silhouette and forest island in both 3D and the live M map.
+- Sparse low-poly shrubs and a provisional field track in the open ground.
+- Softer river polyline and asymmetrical lake outline, kept in sync between 3D and the overview.
+- The existing **OSM trunk M5** gets a distinct asphalt colour from the dirt/settlement roads.
+- Existing house layer toggle, player movement, project scale and Godot web build are preserved.
+
+**Important:** 1:1 refers to the intended terrain *scale*, not verified per-house or per-shoreline accuracy. The added landforms are illustrative, not traced from Google Maps. Visual source images are not distributed in the repository; for precise asset placement use appropriately licensed geodata or independently measured coordinates.
