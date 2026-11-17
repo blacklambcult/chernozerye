@@ -100,6 +100,11 @@ jobs:
           python -m pip install --disable-pip-version-check 'pyproj>=3.6,<4'
           python -m py_compile scripts/build_geo_viewer.py
           node --check site/map/app.js
+          node --check site/map/editor-core.js
+          node --check site/map/editor.js
+          node --test tests/editor-core.test.cjs
+          grep -q 'editor.js?v=20' site/map/index.html
+          grep -q 'editor-core.js?v=20' site/map/index.html
           mkdir -p build/web/map
           cp -a site/map/. build/web/map/
           python scripts/build_geo_viewer.py
