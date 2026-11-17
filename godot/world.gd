@@ -78,12 +78,14 @@ func _add_road(feature: Dictionary) -> void:
     if pts.size() < 2: return
     var tags: Dictionary = feature.get("tags", {})
     var road_type: String = str(tags.get("highway", ""))
-    var width := 5.0
-    if road_type in ["footway", "path", "track", "cycleway"]: width = 2.0
+    var width := 6.0
+    if road_type in ["footway", "path", "cycleway"]: width = 2.0
+    elif road_type == "track": width = 3.5
     elif road_type in ["primary", "trunk", "motorway"]: width = 11.0
     elif road_type == "secondary": width = 8.0
     var vertices := PackedVector3Array()
     var shoulders := PackedVector3Array()
+    var wheel_ruts := PackedVector3Array()
     for i in range(pts.size() - 1):
         var a := _coord(pts[i], 0.055)
         var b := _coord(pts[i+1], 0.055)
@@ -91,6 +93,16 @@ func _add_road(feature: Dictionary) -> void:
         var normal := Vector3(-(b.z-a.z), 0, b.x-a.x).normalized()
         var offset := normal * width * 0.5
         vertices.append_array(PackedVector3Array([a-offset, a+offset, b+offset, a-offset, b+offset, b-offset]))
+        if road_type in ["residential", "service", "unclassified", "track"]:
+            for lane in [-1.0, 1.0]:
+                var center_offset := normal * (lane * width * 0.22)
+                var half_rut := normal * 0.12
+                var lifted := Vector3.UP * 0.024
+                wheel_ruts.append_array(PackedVector3Array([
+                    a+center_offset-half_rut+lifted, a+center_offset+half_rut+lifted,
+                    b+center_offset+half_rut+lifted, a+center_offset-half_rut+lifted,
+                    b+center_offset+half_rut+lifted, b+center_offset-half_rut+lifted
+                ]))
         if road_type not in ["trunk", "motorway", "primary"]:
             var wide := normal * (width * 0.5 + 1.4)
             var low_a := a - Vector3.UP * 0.035
@@ -122,6 +134,16 @@ func _add_road(feature: Dictionary) -> void:
         edge.mesh = edge_mesh
         edge.material_override = _material(Color("#55554b"))
         add_child(edge)
+    if not wheel_ruts.is_empty():
+        var rut_arrays := []
+        rut_arrays.resize(Mesh.ARRAY_MAX)
+        rut_arrays[Mesh.ARRAY_VERTEX] = wheel_ruts
+        var rut_mesh := ArrayMesh.new()
+        rut_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, rut_arrays)
+        var rut_node := MeshInstance3D.new()
+        rut_node.mesh = rut_mesh
+        rut_node.material_override = _material(Color("#645d4f"))
+        add_child(rut_node)
 
 func _add_building(feature: Dictionary) -> void:
     var pts: Array = feature.get("points", [])
@@ -167,7 +189,7 @@ func _create_player() -> void:
 func _create_label() -> void:
     var layer := CanvasLayer.new()
     var label := Label.new()
-    label.text = "ЧЕРНОЗЁРЬЕ 1.3 VILLAGE ROADS  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
+    label.text = "ЧЕРНОЗЁРЬЕ 1.4 FOREST EDGE  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
     label.position = Vector2(16, 16)
     layer.add_child(label)
     add_child(layer)
