@@ -11,6 +11,7 @@ const HOUSE_LIMIT := 420
 const TREE_LIMIT := 7800
 
 var rng := RandomNumberGenerator.new()
+var material_cache: Dictionary = {}
 var roads: Array = []
 var sketch_roads: Array = [] # Only manually approximated streets; OSM roads remain distinct.
 var house_positions: Array[Vector2] = []
@@ -89,10 +90,15 @@ func _ready() -> void:
     _draw_undergrowth()
 
 func _mat(tint: Color) -> StandardMaterial3D:
+    # Reuse palette materials: thousands of unique materials would hurt Web performance.
+    var key := tint.to_html()
+    if material_cache.has(key):
+        return material_cache[key]
     var mat := StandardMaterial3D.new()
     mat.albedo_color = tint
     mat.roughness = 1.0
     mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+    material_cache[key] = mat
     return mat
 
 func _is_in_poly(p: Vector2, poly: PackedVector2Array) -> bool:
