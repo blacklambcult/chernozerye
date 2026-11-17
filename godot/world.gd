@@ -137,7 +137,7 @@ func _create_player() -> void:
 func _create_label() -> void:
     var layer := CanvasLayer.new()
     var label := Label.new()
-    label.text = "ЧЕРНОЗЁРЬЕ 0.4  |  WASD — ходьба  |  Shift — бег  |  M — карта  |  Esc — курсор"
+    label.text = "ЧЕРНОЗЁРЬЕ 0.5  |  Клик мышью — осмотр  |  WASD/ЦФЫВ — ходьба  |  Shift — бег  |  M/Ь — карта  |  Esc — курсор"
     label.position = Vector2(16, 16)
     layer.add_child(label)
     add_child(layer)
@@ -305,7 +305,7 @@ func _create_overview_map() -> void:
     panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     overview_layer.add_child(panel)
 
-func _unhandled_input(event: InputEvent) -> void:
-    if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M:
+func _input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_M:
         overview_layer.visible = not overview_layer.visible
         get_viewport().set_input_as_handled()
