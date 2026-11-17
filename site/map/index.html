@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d1316">
+  <meta name="description" content="Чернозёрье: спутниковая географическая проверка дорог и зданий по открытым геоданным.">
+  <title>Чернозёрье / GEO LAB 1.9</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="./style.css?v=19">
+</head>
+<body>
+  <main class="workspace">
+    <aside class="sidebar" aria-label="Управление картой">
+      <header class="brand">
+        <div class="brand-mark">Ч</div>
+        <div>
+          <div class="brand-overline">GEO LAB <span class="version">01.9</span></div>
+          <h1>ЧЕРНОЗЁРЬЕ</h1>
+          <p>Географическая лаборатория</p>
+        </div>
+      </header>
+      <div class="sidebar-inner">
+        <div class="lead">
+          <span class="eyebrow">01 / ПРОВЕРКА МЕСТНОСТИ</span>
+          <h2>Сначала реальная карта.<br>Потом — игровой мир.</h2>
+          <p>Сравниваем координаты зданий и улиц со спутниковым снимком. Без случайно расставленных домов.</p>
+        </div>
+        <section class="group">
+          <h3>Показать территорию</h3>
+          <div class="view-selector" role="group" aria-label="Масштаб исследования">
+            <button id="view-all" class="view-button" type="button" data-view="all">Весь участок <span>2 × 2 км</span></button>
+            <button id="view-a" class="view-button is-active" type="button" data-view="a">Сектор A <span>680 × 680 м</span></button>
+            <button id="view-street" class="view-button" type="button" data-view="a-street">Квартал A <span>300 × 300 м</span></button>
+          </div>
+        </section>
+        <section class="group">
+          <h3>Подложка</h3>
+          <div class="segmented" role="group" aria-label="Тип карты">
+            <button id="base-imagery" class="segmented-button active" type="button" aria-pressed="true">Спутник</button>
+            <button id="base-street" class="segmented-button" type="button" aria-pressed="false">Схема</button>
+          </div>
+          <p class="helper">Спутниковые снимки Esri используются для визуального сравнения, а не извлечения объектов.</p>
+        </section>
+        <section class="group">
+          <div class="group-heading"><h3>Географические слои</h3><span class="small-tag">НЕЗАВИСИМЫЕ</span></div>
+          <label class="layer-toggle">
+            <input id="layer-overture" type="checkbox" checked>
+            <span class="swatch swatch-overture"></span>
+            <span class="layer-name">Контуры зданий Overture <small>Автоматические кандидаты, не проверены</small></span>
+            <strong id="count-overture">—</strong>
+          </label>
+          <label class="layer-toggle">
+            <input id="layer-osm-roads" type="checkbox" checked>
+            <span class="swatch swatch-road"></span>
+            <span class="layer-name">Дороги OpenStreetMap <small>Сопоставляем с видимыми дорогами</small></span>
+            <strong id="count-roads">—</strong>
+          </label>
+          <label class="layer-toggle">
+            <input id="layer-osm-buildings" type="checkbox">
+            <span class="swatch swatch-osm"></span>
+            <span class="layer-name">Здания OSM <small>Дополнительный независимый слой</small></span>
+            <strong id="count-osm">—</strong>
+          </label>
+          <label class="layer-toggle">
+            <input id="layer-nature" type="checkbox">
+            <span class="swatch swatch-nature"></span>
+            <span class="layer-name">Природные объекты OSM <small>Только нанесённые в базе</small></span>
+            <strong id="count-nature">—</strong>
+          </label>
+          <label class="layer-toggle">
+            <input id="layer-study-area" type="checkbox" checked>
+            <span class="swatch swatch-area"></span>
+            <span class="layer-name">Границы исследования <small>Сектор A / квартал</small></span>
+          </label>
+          <div class="range-row">
+            <label for="fill-opacity">Плотность заливки зданий</label>
+            <output id="opacity-value">25%</output>
+          </div>
+          <input id="fill-opacity" type="range" min="0" max="85" step="5" value="25" aria-label="Непрозрачность контуров зданий">
+        </section>
+        <section class="group">
+          <h3>Что проверяем</h3>
+          <div class="checks">
+            <div><span>01</span> Совпадают ли здания со спутником?</div>
+            <div><span>02</span> Все ли улицы отмечены в OSM?</div>
+            <div><span>03</span> Где граница домов и леса?</div>
+          </div>
+          <div class="selected" id="selection" aria-live="polite">
+            <span class="eyebrow">ВЫБРАННЫЙ ОБЪЕКТ</span>
+            <p>Нажми на розовый контур здания — покажу его площадь, источник и координаты.</p>
+          </div>
+        </section>
+        <footer class="sidebar-footer">
+          <a href="../v18/" target="_blank" rel="noopener">Открыть текущий 3D-прототип <span aria-hidden="true">↗</span></a>
+          <div class="footer-note">В 3D пока остаётся версия 1.8. Перенос исправленной географии — следующий этап.</div>
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>
+          <a href="https://docs.overturemaps.org/" target="_blank" rel="noopener">Данные: Overture Maps Foundation и участники</a>
+        </footer>
+      </div>
+    </aside>
+    <section class="map-shell" aria-label="Спутниковая карта Чернозёрья">
+      <div id="map" role="application" aria-label="Интерактивная спутниковая карта"></div>
+      <div class="map-top-left" aria-hidden="true"><span class="map-bullet"></span> CHERNOZERYE <span class="map-slash">/</span> GEOGRAPHIC REVIEW</div>
+      <div class="map-top-right">
+        <div class="mode-label"><span class="mode-dot"></span><span id="active-area-title">СЕКТОР A</span></div>
+        <div id="map-status" class="map-status" role="status">Подключаю карту и геоданные…</div>
+      </div>
+      <div class="map-bottom-left">
+        <div class="coordinate-readout">ЦЕНТР КАРТЫ <span id="map-coords">54.672897, 55.852815</span></div>
+        <div class="source-note">Спутник: Esri и поставщики снимков. Геометрия: Overture / OSM. Источники имеют разную актуальность.</div>
+      </div>
+      <noscript>Для отображения карты нужен JavaScript.</noscript>
+      <div id="fatal" class="fatal" hidden>Не удалось загрузить картографический модуль. Проверь подключение к интернету и обнови страницу.</div>
+    </section>
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/esri-leaflet@3.0.14/dist/esri-leaflet.js"></script>
+  <script src="./app.js?v=19"></script>
+</body>
+</html>
