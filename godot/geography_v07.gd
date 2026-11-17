@@ -88,6 +88,7 @@ func _ready() -> void:
     _draw_houses()
     _draw_forests()
     _draw_undergrowth()
+    _draw_grass_tufts()
 
 func _mat(tint: Color) -> StandardMaterial3D:
     # Reuse palette materials: thousands of unique materials would hurt Web performance.
@@ -553,6 +554,49 @@ func _seed_forest_edges(positions: Array[Vector3]) -> int:
                         positions.append(Vector3(p.x, 0.0, -p.y))
                         added += 1
     return added
+
+func _draw_grass_tufts() -> void:
+    # Small crossed triangular grass tufts break up the bare single-colour
+    # plane. One MultiMesh keeps the Web draw-call cost low.
+    var grass_vertices := PackedVector3Array([
+        Vector3(-0.29, 0.0, 0.0), Vector3(0.29, 0.0, 0.0), Vector3(0.0, 0.6, 0.03),
+        Vector3(0.0, 0.0, -0.24), Vector3(0.0, 0.0, 0.24), Vector3(0.03, 0.53, 0.0),
+        Vector3(-0.22, 0.0, -0.17), Vector3(0.22, 0.0, 0.17), Vector3(0.0, 0.44, 0.0)
+    ])
+    var arrays := []
+    arrays.resize(Mesh.ARRAY_MAX)
+    arrays[Mesh.ARRAY_VERTEX] = grass_vertices
+    var blade_mesh := ArrayMesh.new()
+    blade_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+    var locations := PackedVector3Array()
+    for house_pos in house_positions:
+        for j in range(15):
+            var patch_pos := house_pos + Vector2(rng.randf_range(-17.0, 17.0), rng.randf_range(-17.0, 17.0))
+            if not _is_housing(patch_pos) or _is_water(patch_pos):
+                continue
+            if patch_pos.distance_to(house_pos) < 5.0 or _close_to_road(patch_pos, 5.5):
+                continue
+            locations.append(Vector3(patch_pos.x, 0.06, -patch_pos.y))
+    for j in range(6800):
+        var field_pos := Vector2(rng.randf_range(-575.0, 155.0), rng.randf_range(-555.0, -110.0))
+        if _is_in_poly(field_pos, meadow) and not _is_in_poly(field_pos, meadow_island):
+            if not _close_to_road(field_pos, 5.0):
+                locations.append(Vector3(field_pos.x, 0.06, -field_pos.y))
+    if locations.is_empty():
+        return
+    var multi := MultiMesh.new()
+    multi.transform_format = MultiMesh.TRANSFORM_3D
+    multi.mesh = blade_mesh
+    multi.instance_count = locations.size()
+    for i in range(locations.size()):
+        var scale := rng.randf_range(0.75, 1.6)
+        var rotate := rng.randf_range(-PI, PI)
+        multi.set_instance_transform(i, Transform3D(Basis(Vector3.UP, rotate).scaled(Vector3.ONE * scale), locations[i]))
+    var clumps := MultiMeshInstance3D.new()
+    clumps.multimesh = multi
+    clumps.material_override = _mat(Color("#677459"))
+    clumps.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    add_child(clumps)
 
 func _draw_forests() -> void:
     # Populate forests outside housing, meadow, water and road envelopes.
