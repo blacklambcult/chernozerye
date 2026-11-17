@@ -143,7 +143,7 @@ func _draw() -> void:
             _line(path, Color("#c58e66"), 1.7)
     draw_rect(Rect2(nw, se - nw), Color("#d7dbcf"), false, 2.0)
     var marks := [
-        [Vector2(90, 20), "START"],
+        [Vector2(130, 82), "START"],
         [Vector2(100, 720), "CAMP"],
         [Vector2(715, -800), "LAKE BASE"],
         [Vector2(975, 120), "EXIT?"]
@@ -156,7 +156,7 @@ func _draw() -> void:
         var p := _map_pos(Vector2(player.position.x, -player.position.z))
         draw_circle(p, 7.0, Color("#ff9149"))
         draw_arc(p, 9.0, 0.0, TAU, 24, Color("#191d1b"), 2.0)
-    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 1.2", Color("#f2ead8"), 20)
+    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 1.3", Color("#f2ead8"), 20)
     _text(Vector2(18, 49), "2 x 2 km  |  N UP  |  M = close  |  H = toggle houses", Color("#c2cfc0"))
     var house_status := "ДОМА НА СХЕМЕ: ПОКАЗАНЫ" if show_houses else "ДОМА НА СХЕМЕ: СКРЫТЫ"
     _text(Vector2(18, 77), house_status, Color("#ffce80") if show_houses else Color("#c0c7c0"), 16)
