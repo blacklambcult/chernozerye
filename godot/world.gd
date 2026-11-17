@@ -315,13 +315,13 @@ func _create_overview_map() -> void:
     map_panel.initialize(self, get_node("GeographyBlockoutV07"), get_node("Player"), features)
     houses_button = Button.new()
     houses_button.text = "ПОКАЗАТЬ УСЛОВНЫЕ ДОМА"
+    map_root.add_child(houses_button)
     houses_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
     houses_button.offset_left = -292.0
     houses_button.offset_top = 16.0
     houses_button.offset_right = -16.0
     houses_button.offset_bottom = 58.0
     houses_button.pressed.connect(_toggle_houses)
-    map_root.add_child(houses_button)
 
 func _toggle_houses() -> void:
     var show := not bool(map_panel.get("show_houses"))
