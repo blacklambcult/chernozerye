@@ -49,6 +49,17 @@ jobs:
             godot --headless --path godot --check-only --script "res://${script}"
           done
 
+      - name: Smoke-test actual scene startup
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Script validation alone cannot catch a Web scene frozen in _ready.
+          timeout 45s godot --headless --path godot --quit-after 20 2>&1 | tee /tmp/world-smoke.log
+          grep -q "WORLD_READY: geometry complete" /tmp/world-smoke.log
+          if grep -E "SCRIPT ERROR|FATAL ERROR|out of memory" /tmp/world-smoke.log; then
+            exit 1
+          fi
+
       - name: Export Web build
         shell: bash
         run: |
