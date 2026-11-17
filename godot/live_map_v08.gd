@@ -64,11 +64,7 @@ func _draw() -> void:
         _poly(geo.meadow_island, Color("#365644"))
         _line(geo.field_track, Color("#d0b992"), 1.5)
         _line(geo.river_path, Color("#6fbbdc"), 11.0)
-        var lake := PackedVector2Array()
-        for i in range(36):
-            var a := float(i) * TAU / 36.0
-            lake.append(geo.lake_center + Vector2(cos(a) * 125.0, sin(a) * 92.0))
-        _poly(lake, Color("#477f9b"))
+        _poly(geo.lake_outline, Color("#477f9b"))
         if show_houses:
             var meters_to_pixels := (_map_pos(Vector2(1.0, 0.0)) - _map_pos(Vector2.ZERO)).x
             for house in geo.house_footprints:
