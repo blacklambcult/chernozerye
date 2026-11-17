@@ -223,7 +223,7 @@ func _draw_houses() -> void:
     # Random selection prevents the house cap favoring the first OSM road.
     var used := {}
     var accepted := 0
-    const CELL := 24.0
+    const CELL = 24.0
     while not candidates.is_empty() and accepted < HOUSE_LIMIT:
         var candidate_index := rng.randi_range(0, candidates.size() - 1)
         var candidate: Dictionary = candidates[candidate_index]
