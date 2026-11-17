@@ -93,3 +93,19 @@ The previous build spawned in an empty clearing. The prototype now starts at a n
 **Geographic disclaimer:** garden fences, facade and forest details remain stylized placeholders. A 2×2 km scale is retained, but this is not yet a property-accurate 1:1 reconstruction. Visual comparison with screenshots is qualitative only.
 
 **Review checklist:** after the latest Actions job passes, hard-refresh the browser. Walk along the road immediately after spawning; check the dirt shoulder, gates, windows, mixed tree outlines and smooth mouse controls. Use M to confirm that the START marker is now located at the player's spawn; H toggles approximate house footprints.
+
+## Prototype 1.4 — inhabited forest edge
+
+This iteration addresses the 1.3 ground-level screenshot showing a largely empty plane, widely spaced houses, very few visible treetops, and hard-to-read roads.
+
+- More provisional buildings along existing roads: cap 540, closer spacing and a higher chance of occupied garden lots. These are still **not surveyed real building coordinates**.
+- Forest belts just **outside** the village blockout polygons, keeping streets, open meadow and mapped water clear. This makes the tree line visible from street level instead of sprinkling all trees evenly over 4 km².
+- Up to 1,050 garden trees (conditional on enough free space), and an overall tree cap of 13,500. Existing low-poly mixed forest uses shared MultiMeshes for Web.
+- Small cross-triangle grass tufts added to empty garden spaces and the meadow using a single MultiMesh. No interaction/collisions.
+- Better unclassified/residential road legibility: 6 m base width, earth shoulders and wheel ruts. Highway retains a distinct appearance.
+- Labels updated to `ЧЕРНОЗЁРЬЕ 1.4 FOREST EDGE` and `CHERNOZERYE / LIVE MAP 1.4`.
+- GitHub Actions now checks script parsing for all gameplay/map GDScript sources before export.
+
+**Important:** Landscape tree belts, houses and meadow are **artistic geometry** informed by general visual references, not a precise 1:1 terrain survey. The map still distinguishes OSM-mapped forest from unknown/unmapped cover. Existing movement, M overview and house layer button remain unchanged.
+
+**Review:** when the build is green, hard-refresh GitHub Pages, inspect the 3D street from the spawn and walk around the village. Specifically look for visible woodland close to buildings, more enclosed roads and recognizable grass at walking height. Check performance in the browser.
