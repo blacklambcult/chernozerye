@@ -180,6 +180,7 @@
       records.push(...features);
       message("Восстановлен черновик: " + countLabel(features.length) + " · доступен в этом браузере.");
     } catch (error) {
+      localStorageAvailable = false;
       console.warn("Geo Lab local data restore failed", error);
       message("Не удалось прочитать сохранённый черновик. Проверь скачанные GeoJSON-файлы.", true);
     }
@@ -264,8 +265,9 @@
   }
 
   function selectFeature(id, pan = false) {
-    if (selectedId && rendered.has(selectedId)) redrawFeature(selectedId);
+    const previous = selectedId;
     selectedId = id;
+    if (previous && rendered.has(previous)) redrawFeature(previous);
     editingVertices = false;
     insertingVertex = false;
     selectedVertex = null;
@@ -330,6 +332,10 @@
     $("draw-actions").hidden = true;
     document.querySelectorAll(".editor-tool").forEach((button) => button.classList.remove("is-active"));
     map.getContainer().classList.remove("is-drawing");
+    for (const paneName of ["overture", "osm", "nature", "study", "road"]) {
+      const pane = map.getPane(paneName);
+      if (pane) pane.style.pointerEvents = "";
+    }
     if (!insertingVertex) map.doubleClickZoom.enable();
     $("draw-hint").textContent = "Выбери тип объекта. Точки ставятся щелчками по карте.";
   }
@@ -352,6 +358,11 @@
     map.doubleClickZoom.disable();
     map.closePopup();
     map.getContainer().classList.add("is-drawing");
+    // Reference layers remain visible but must not steal clicks from drawing.
+    for (const paneName of ["overture", "osm", "nature", "study", "road"]) {
+      const pane = map.getPane(paneName);
+      if (pane) pane.style.pointerEvents = "none";
+    }
     const label = core.TYPES[category].label;
     $("draw-hint").textContent = geometry === "Point"
       ? "МЕТКА «" + label + "»: щёлкни место на карте."
@@ -462,6 +473,7 @@
       const geometry = button.dataset.geometry;
       if (activeTool && activeTool.category === type && activeTool.geometry === geometry) cancelDrawing();
       else startDrawing(type, geometry);
+      button.blur(); // Enter should finish drawing, not reactivate a focused tool.
     });
   });
   $("draw-finish").addEventListener("click", finishDrawing);
