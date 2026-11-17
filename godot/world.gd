@@ -147,7 +147,7 @@ func _create_player() -> void:
 func _create_label() -> void:
     var layer := CanvasLayer.new()
     var label := Label.new()
-    label.text = "ЧЕРНОЗЁРЬЕ 1.0 LANDSCAPE  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
+    label.text = "ЧЕРНОЗЁРЬЕ 1.2 DACHA BLOCKOUT  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
     label.position = Vector2(16, 16)
     layer.add_child(label)
     add_child(layer)
