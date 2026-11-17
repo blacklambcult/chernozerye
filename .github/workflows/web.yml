@@ -98,7 +98,18 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check 'pyproj>=3.6,<4'
-          python -m py_compile scripts/build_geo_viewer.py
+          python -m py_compile scripts/build_geo_viewer.py scripts/convert_editor_geojson.py
+          python scripts/convert_editor_geojson.py tests/geo_lab_sample.geojson --output /tmp/chernozerye-manual-test.json
+          python - <<'PY'
+          import json
+          doc = json.load(open('/tmp/chernozerye-manual-test.json', encoding='utf-8'))
+          assert doc['metadata']['projection'] == 'EPSG:32640'
+          assert len(doc['features']) == 3
+          assert doc['metadata']['type_counts'] == {'road': 1, 'plot': 1, 'car': 1}
+          center = next(x for x in doc['features'] if x['type'] == 'car')['points'][0]
+          assert abs(center[0]) < .02 and abs(center[1]) < .02, center
+          print('MANUAL_GODOT_IMPORT_OK:', len(doc['features']))
+          PY
           node --check site/map/app.js
           node --check site/map/editor-core.js
           node --check site/map/editor.js
