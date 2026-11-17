@@ -7,8 +7,8 @@ extends Node3D
 
 const SOURCE := "res://world_data.json"
 const MAP_HALF := 995.0
-const HOUSE_LIMIT := 420
-const TREE_LIMIT := 7800
+const HOUSE_LIMIT := 540
+const TREE_LIMIT := 13500
 
 var rng := RandomNumberGenerator.new()
 var material_cache: Dictionary = {}
@@ -375,7 +375,7 @@ func _draw_houses() -> void:
     # Provisional houses, not measured footprints. Fewer homes with breathing room,
     # spread across all street networks (instead of filling early roads first).
     var candidates: Array[Dictionary] = []
-    var spacing := 32.0
+    var spacing := 27.0
     for route in roads:
         for i in range(route.size() - 1):
             var start := Vector2(float(route[i][0]), float(route[i][1]))
@@ -389,7 +389,7 @@ func _draw_houses() -> void:
             var count := maxi(1, int(length / spacing))
             for j in range(count):
                 for direction in [-1.0, 1.0]:
-                    if rng.randf() < 0.26:
+                    if rng.randf() < 0.20:
                         continue # unbuilt lots, gardens and open plots
                     var p := start + delta * ((float(j) + 0.5) / float(count))
                     p += tangent * rng.randf_range(-2.5, 2.5)
@@ -423,7 +423,7 @@ func _draw_houses() -> void:
                 var nearby_cell := cell + Vector2i(dx, dy)
                 if used.has(nearby_cell):
                     for neighbor in used[nearby_cell]:
-                        if p.distance_to(neighbor) < 26.0:
+                        if p.distance_to(neighbor) < 23.0:
                             overlaps = true
                             break
                 if overlaps:
@@ -521,6 +521,39 @@ func _draw_undergrowth() -> void:
     bushes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     add_child(bushes)
 
+func _seed_forest_edges(positions: Array[Vector3]) -> int:
+    # Dense forest belts immediately OUTSIDE the approximate housing polygons.
+    # This repairs the empty-horizon problem in the 1.3 first-person screenshot.
+    # These belts are artistic massing, not measured tree/woodland boundaries.
+    var added := 0
+    for zone in settlements:
+        var boundary: PackedVector2Array = zone
+        for edge_index in range(boundary.size()):
+            var a: Vector2 = boundary[edge_index]
+            var b: Vector2 = boundary[(edge_index + 1) % boundary.size()]
+            var tangent := (b - a).normalized()
+            var perp := Vector2(-tangent.y, tangent.x)
+            var samples := maxi(1, ceili(a.distance_to(b) / 6.5))
+            for sample in range(samples):
+                var along := (float(sample) + 0.5) / float(samples)
+                var base := a.lerp(b, along)
+                # Test both sides; a point is accepted only outside ALL housing.
+                for side in [-1.0, 1.0]:
+                    for distance in [8.0, 20.0, 34.0]:
+                        if rng.randf() < 0.28:
+                            continue
+                        var p := base + perp * side * (distance + rng.randf_range(-2.2, 2.2))
+                        p += tangent * rng.randf_range(-2.4, 2.4)
+                        if absf(p.x) > MAP_HALF or absf(p.y) > MAP_HALF:
+                            continue
+                        if _is_housing(p) or _is_water(p) or _is_in_poly(p, meadow):
+                            continue
+                        if _close_to_road(p, 8.0):
+                            continue
+                        positions.append(Vector3(p.x, 0.0, -p.y))
+                        added += 1
+    return added
+
 func _draw_forests() -> void:
     # Populate forests outside housing, meadow, water and road envelopes.
     # This fills OSM gaps, but is NOT an exact tree-by-tree reconstruction.
@@ -530,11 +563,13 @@ func _draw_forests() -> void:
         var island_p := Vector2(rng.randf_range(-374.0, -224.0), rng.randf_range(-495.0, -348.0))
         if _is_in_poly(island_p, meadow_island):
             positions.append(Vector3(island_p.x, 0.0, -island_p.y))
+    # Treetops just outside the settlement form the missing wooded horizon.
+    var forest_edge_count := _seed_forest_edges(positions)
     # Tree groups inside dacha gardens: the old broad settlement masks left
     # the entire village unnaturally bare, unlike wooded rural neighbourhoods.
     var yard_count := 0
     for j in range(13000):
-        if yard_count >= 550:
+        if yard_count >= 1050:
             break
         var yard_p := Vector2(rng.randf_range(-960.0, 930.0), rng.randf_range(30.0, 720.0))
         if not _is_housing(yard_p) or _is_water(yard_p):
@@ -550,7 +585,7 @@ func _draw_forests() -> void:
             continue
         positions.append(Vector3(yard_p.x, 0.0, -yard_p.y))
         yard_count += 1
-    for i in range(42000):
+    for i in range(58000):
         if positions.size() >= TREE_LIMIT:
             break
         var p := Vector2(rng.randf_range(-MAP_HALF, MAP_HALF), rng.randf_range(-MAP_HALF, MAP_HALF))
@@ -602,7 +637,7 @@ func _draw_forests() -> void:
     _add_tree_instances(fir_lower, lower_firs, Color("#314a3c"))
     _add_tree_instances(fir_upper, upper_firs, Color("#3f5744"))
     _add_tree_instances(leaves, leaf_crowns, Color("#50634a"))
-    print("Чернозёрье 1.3: деревьев ", positions.size(), " (садовых ", yard_count, ")")
+    print("Чернозёрье 1.4: деревьев ", positions.size(), " (на опушках ", forest_edge_count, ", садовых ", yard_count, ")")
 
 func _add_tree_instances(mesh: Mesh, transforms: Array[Transform3D], tint: Color) -> void:
     if transforms.is_empty():
