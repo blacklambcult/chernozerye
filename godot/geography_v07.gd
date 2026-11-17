@@ -86,6 +86,7 @@ func _ready() -> void:
     _draw_lake()
     _draw_houses()
     _draw_forests()
+    _draw_undergrowth()
 
 func _mat(tint: Color) -> StandardMaterial3D:
     var mat := StandardMaterial3D.new()
@@ -320,6 +321,30 @@ func _add_dacha_yard(p: Vector2, yaw: float, size_factor: float, palette_index: 
     patch.material_override = _mat(greens[palette_index % greens.size()])
     add_child(patch)
 
+# Very simple wooden fences to make the provisional plots visible from
+# street level. These are decorative game objects, NOT surveyed property lines.
+func _add_low_fence(p: Vector2, yaw: float, road_side: float, index: int) -> void:
+    if index % 4 == 0:
+        return
+    var fence_root := Node3D.new()
+    fence_root.position = Vector3(p.x, 0.0, -p.y)
+    fence_root.rotation.y = yaw
+    add_child(fence_root)
+    var pale := Color("#867c68") if index % 3 != 0 else Color("#6a705f")
+    var parts := [
+        [Vector3(-5.7, 0.56, road_side * 10.0), Vector3(7.0, 1.12, 0.15)],
+        [Vector3(5.7, 0.56, road_side * 10.0), Vector3(7.0, 1.12, 0.15)],
+        [Vector3(-9.1, 0.55, 0.0), Vector3(0.16, 1.10, 17.0)]
+    ]
+    for item in parts:
+        var panel := MeshInstance3D.new()
+        var board := BoxMesh.new()
+        board.size = item[1]
+        panel.mesh = board
+        panel.position = item[0]
+        panel.material_override = _mat(pale)
+        fence_root.add_child(panel)
+
 func _draw_houses() -> void:
     # Provisional houses, not measured footprints. Fewer homes with breathing room,
     # spread across all street networks (instead of filling early roads first).
@@ -351,7 +376,8 @@ func _draw_houses() -> void:
                         continue
                     candidates.append({
                         "point": p,
-                        "angle": -atan2(tangent.y, tangent.x)
+                        "angle": atan2(tangent.y, tangent.x),
+                        "front": direction
                     })
 
     # A spatial hash makes this deterministic and prevents overlapping buildings.
@@ -409,6 +435,7 @@ func _draw_houses() -> void:
         house.add_child(wall_body)
         # Individual garden pads and pitched roofs replace anonymous box-only silhouettes.
         _add_dacha_yard(p, house.rotation.y, rng.randf_range(0.86, 1.14), accepted)
+        _add_low_fence(p, house.rotation.y, float(candidate["front"]), accepted)
         var roof_colors := [
             Color("#784d43"), Color("#575f69"), Color("#80695c"),
             Color("#6c4b47"), Color("#586774"), Color("#675e54")
@@ -429,10 +456,43 @@ func _draw_houses() -> void:
             "center": p,
             "width": width,
             "depth": depth,
-            "angle": float(candidate["angle"])
+            "angle": -float(candidate["angle"])
         })
         accepted += 1
     print("Чернозёрье 1.2: условных домов с крышами ", accepted, " (пока не реальные контуры зданий)")
+
+func _draw_undergrowth() -> void:
+    # A few shared low-poly instances around the gardens. No collisions,
+    # negligible draw calls, and clear walking space along the roads.
+    var brush := SphereMesh.new()
+    brush.radius = 0.75
+    brush.height = 0.90
+    brush.radial_segments = 5
+    brush.rings = 3
+    var plants := PackedVector3Array()
+    for house_pos in house_positions:
+        for j in range(3):
+            var p := house_pos + Vector2(rng.randf_range(-14.0, 14.0), rng.randf_range(-14.0, 14.0))
+            if not _is_housing(p) or _is_water(p) or _close_to_road(p, 6.5):
+                continue
+            if p.distance_to(house_pos) < 7.0:
+                continue
+            plants.append(Vector3(p.x, 0.42, -p.y))
+    if plants.is_empty():
+        return
+    var multimesh := MultiMesh.new()
+    multimesh.transform_format = MultiMesh.TRANSFORM_3D
+    multimesh.mesh = brush
+    multimesh.instance_count = plants.size()
+    for i in range(plants.size()):
+        var scale := rng.randf_range(0.6, 1.25)
+        multimesh.set_instance_transform(i, Transform3D(
+            Basis.IDENTITY.scaled(Vector3(scale, scale, scale)), plants[i]))
+    var bushes := MultiMeshInstance3D.new()
+    bushes.multimesh = multimesh
+    bushes.material_override = _mat(Color("#485842"))
+    bushes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    add_child(bushes)
 
 func _draw_forests() -> void:
     # Populate forests outside housing, meadow, water and road envelopes.
