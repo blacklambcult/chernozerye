@@ -345,6 +345,26 @@ func _add_low_fence(p: Vector2, yaw: float, road_side: float, index: int) -> voi
         panel.material_override = _mat(pale)
         fence_root.add_child(panel)
 
+# A small visible door and windows help read houses at walking distance.
+# All openings are decorative and deliberately not tied to real property plans.
+func _add_simple_facade(house: MeshInstance3D, width: float, depth: float, height: float, front: float, index: int) -> void:
+    var door := MeshInstance3D.new()
+    var door_mesh := BoxMesh.new()
+    door_mesh.size = Vector3(1.25, 2.0, 0.13)
+    door.mesh = door_mesh
+    door.position = Vector3(0.0, -height * 0.5 + 1.0, front * (depth * 0.5 + 0.09))
+    door.material_override = _mat(Color("#514b47"))
+    house.add_child(door)
+    for side in [-1.0, 1.0]:
+        var window := MeshInstance3D.new()
+        var glass := BoxMesh.new()
+        glass.size = Vector3(1.20, 1.00, 0.12)
+        window.mesh = glass
+        window.position = Vector3(side * width * 0.29, -height * 0.5 + 2.3, front * (depth * 0.5 + 0.09))
+        var window_tint := Color("#9b875a") if index % 6 == 0 else Color("#34464c")
+        window.material_override = _mat(window_tint)
+        house.add_child(window)
+
 func _draw_houses() -> void:
     # Provisional houses, not measured footprints. Fewer homes with breathing room,
     # spread across all street networks (instead of filling early roads first).
@@ -442,6 +462,7 @@ func _draw_houses() -> void:
         ]
         house.add_child(_create_pitched_roof(width, depth, height,
             roof_colors[rng.randi_range(0, roof_colors.size() - 1)]))
+        _add_simple_facade(house, width, depth, height, float(candidate["front"]), accepted)
         if rng.randf() < 0.24:
             # Small secondary outbuilding at a few properties, never every house.
             var shed := MeshInstance3D.new()
