@@ -287,9 +287,17 @@ func _create_pitched_roof(width: float, depth: float, wall_height: float, roof_t
         left_front, right_front, peak_front,
         left_back, peak_back, right_back
     ])
+    var normals := PackedVector3Array()
+    for triangle_index in range(0, vertices.size(), 3):
+        var v0: Vector3 = vertices[triangle_index]
+        var v1: Vector3 = vertices[triangle_index + 1]
+        var v2: Vector3 = vertices[triangle_index + 2]
+        var face_normal := (v1 - v0).cross(v2 - v0).normalized()
+        normals.append_array(PackedVector3Array([face_normal, face_normal, face_normal]))
     var arrays := []
     arrays.resize(Mesh.ARRAY_MAX)
     arrays[Mesh.ARRAY_VERTEX] = vertices
+    arrays[Mesh.ARRAY_NORMAL] = normals
     var mesh := ArrayMesh.new()
     mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
     roof.mesh = mesh
@@ -388,6 +396,14 @@ func _draw_houses() -> void:
         ]
         house.material_override = _mat(palette[rng.randi_range(0, palette.size() - 1)])
         add_child(house)
+        # Keep building walls physical; otherwise the prototype player walks through homes.
+        var wall_body := StaticBody3D.new()
+        var wall_collision := CollisionShape3D.new()
+        var wall_shape := BoxShape3D.new()
+        wall_shape.size = Vector3(width, height, depth)
+        wall_collision.shape = wall_shape
+        wall_body.add_child(wall_collision)
+        house.add_child(wall_body)
         # Individual garden pads and pitched roofs replace anonymous box-only silhouettes.
         _add_dacha_yard(p, house.rotation.y, rng.randf_range(0.86, 1.14), accepted)
         var roof_colors := [
