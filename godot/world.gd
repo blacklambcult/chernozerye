@@ -394,9 +394,9 @@ func _create_overview_map() -> void:
     map_root.add_child(houses_button)
     houses_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
     houses_button.offset_left = 16.0
-    houses_button.offset_top = 16.0
+    houses_button.offset_top = 151.0
     houses_button.offset_right = 235.0
-    houses_button.offset_bottom = 58.0
+    houses_button.offset_bottom = 191.0
     houses_button.pressed.connect(_toggle_houses)
 
     sector_button = Button.new()
@@ -404,9 +404,9 @@ func _create_overview_map() -> void:
     map_root.add_child(sector_button)
     sector_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
     sector_button.offset_left = 16.0
-    sector_button.offset_top = 66.0
+    sector_button.offset_top = 199.0
     sector_button.offset_right = 235.0
-    sector_button.offset_bottom = 108.0
+    sector_button.offset_bottom = 239.0
     sector_button.pressed.connect(_toggle_sector_a)
 
     osm_button = Button.new()
@@ -414,9 +414,9 @@ func _create_overview_map() -> void:
     map_root.add_child(osm_button)
     osm_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
     osm_button.offset_left = 16.0
-    osm_button.offset_top = 116.0
+    osm_button.offset_top = 247.0
     osm_button.offset_right = 235.0
-    osm_button.offset_bottom = 158.0
+    osm_button.offset_bottom = 287.0
     osm_button.pressed.connect(_toggle_osm_buildings)
 
     overture_button = Button.new()
@@ -424,9 +424,9 @@ func _create_overview_map() -> void:
     map_root.add_child(overture_button)
     overture_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
     overture_button.offset_left = 16.0
-    overture_button.offset_top = 166.0
+    overture_button.offset_top = 295.0
     overture_button.offset_right = 235.0
-    overture_button.offset_bottom = 208.0
+    overture_button.offset_bottom = 335.0
     overture_button.pressed.connect(_toggle_overture_buildings)
 
     # Walk the mapped real-world footprint zone immediately, without a 700 m hike.
@@ -436,8 +436,8 @@ func _create_overview_map() -> void:
     sector_a_visit_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
     sector_a_visit_button.offset_left = 16.0
     sector_a_visit_button.offset_right = 280.0
-    sector_a_visit_button.offset_top = 216.0
-    sector_a_visit_button.offset_bottom = 258.0
+    sector_a_visit_button.offset_top = 343.0
+    sector_a_visit_button.offset_bottom = 391.0
     sector_a_visit_button.pressed.connect(_visit_sector_a)
 
 func _create_quick_navigation() -> void:
