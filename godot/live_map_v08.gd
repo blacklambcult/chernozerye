@@ -5,6 +5,7 @@ var world: Node3D
 var geo
 var player: Node3D
 var osm_features: Array = []
+var show_houses := true
 
 func initialize(world_node: Node3D, geo_node: Node3D, player_node: Node3D, features: Array) -> void:
     world = world_node
@@ -66,9 +67,17 @@ func _draw() -> void:
             var a := float(i) * TAU / 36.0
             lake.append(geo.lake_center + Vector2(cos(a) * 125.0, sin(a) * 92.0))
         _poly(lake, Color("#477f9b"))
-        for h in geo.house_positions:
-            var c := _map_pos(h)
-            draw_rect(Rect2(c - Vector2(1.3, 1.3), Vector2(2.6, 2.6)), Color("#dfbc9e"))
+        if show_houses:
+            var meters_to_pixels := (_map_pos(Vector2(1.0, 0.0)) - _map_pos(Vector2.ZERO)).x
+            for house in geo.house_footprints:
+                var center: Vector2 = _map_pos(house["center"])
+                var footprint := Vector2(
+                    maxf(3.0, float(house["width"]) * meters_to_pixels),
+                    maxf(3.0, float(house["depth"]) * meters_to_pixels)
+                )
+                draw_set_transform(center, float(house["angle"]), Vector2.ONE)
+                draw_rect(Rect2(-footprint * 0.5, footprint), Color("#dfbc9e"))
+            draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
     for feature in osm_features:
         if not feature is Dictionary or feature.get("type", "") != "road":
             continue
@@ -97,7 +106,7 @@ func _draw() -> void:
         var p := _map_pos(Vector2(player.position.x, -player.position.z))
         draw_circle(p, 7.0, Color("#ff9149"))
         draw_arc(p, 9.0, 0.0, TAU, 24, Color("#191d1b"), 2.0)
-    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 0.8", Color("#f2ead8"), 20)
-    _text(Vector2(18, 49), "2 x 2 km  |  N UP  |  M = close", Color("#c2cfc0"))
+    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 0.9", Color("#f2ead8"), 20)
+    _text(Vector2(18, 49), "2 x 2 km  |  N UP  |  M = close  |  H = hide/show placeholder houses", Color("#c2cfc0"))
     _text(Vector2(18, size.y - 27), "Beige: settlements/roads  |  Green: field/forest  |  Blue: water  |  Orange: player", Color("#c9d3c8"), 12)
-    _text(Vector2(18, size.y - 10), "Roads: OSM + rough sketches; houses/forest/water: provisional artistic blockout", Color("#d3b4a0"), 11)
+    _text(Vector2(18, size.y - 10), "Roads: OSM + rough sketches; pale houses are provisional, not surveyed", Color("#d3b4a0"), 11)
