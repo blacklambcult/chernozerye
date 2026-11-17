@@ -76,6 +76,12 @@ def main():
         subprocess.run(cmd, check=True, timeout=480)
         raw = read_geojson(geojson)
 
+    def project_local(x, y, z=None):
+        east, north = forward.transform(x, y)
+        if isinstance(east, (float, int)):
+            return east - cx, north - cy
+        return [v - cx for v in east], [v - cy for v in north]
+
     boundary = box(-half, -half, half, half)
     records = []
     seen = set()
@@ -84,10 +90,7 @@ def main():
         if not geom:
             continue
         try:
-            projected = transform(
-                lambda x, y, z=None: tuple(v - o for v, o in zip(forward.transform(x, y), (cx, cy))),
-                shape(geom),
-            )
+            projected = transform(project_local, shape(geom))
         except Exception:
             continue
         if projected.is_empty:
