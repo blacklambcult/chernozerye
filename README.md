@@ -109,3 +109,14 @@ This iteration addresses the 1.3 ground-level screenshot showing a largely empty
 **Important:** Landscape tree belts, houses and meadow are **artistic geometry** informed by general visual references, not a precise 1:1 terrain survey. The map still distinguishes OSM-mapped forest from unknown/unmapped cover. Existing movement, M overview and house layer button remain unchanged.
 
 **Review:** when the build is green, hard-refresh GitHub Pages, inspect the 3D street from the spawn and walk around the village. Specifically look for visible woodland close to buildings, more enclosed roads and recognizable grass at walking height. Check performance in the browser.
+
+## Prototype 1.5 — sector A geographic audit
+
+Version 1.4.1 starts in the browser, but the 3D houses remain procedurally generated and cannot be trusted as a 1:1 reconstruction. To avoid adding more false detail, version 1.5 adds **a map inspection mode only**. The gameplay and 3D performance safeguards remain unchanged.
+
+In the in-game overview (M), use the new buttons:
+
+- **СЕКТОР A: ПРИБЛИЗИТЬ** to show a 680×680 m north-up inspection window covering western settlement polygon, forest boundary, and approaches. Click again to return to the entire 2×2 km map.
+- **КОНТУРЫ OSM: ПОКАЗАТЬ** to draw OpenStreetMap building footprints in cyan, separate from the yellow *generated game-house* footprints toggled by **ДОМА: ПОКАЗАТЬ** (or H). The source data has only 63 mapped building ways **across the whole 2×2 km area**, and their individual accuracy has not been validated.
+
+Use the two layers to observe incompleteness and discrepancies. This mode does **not** change or verify real house positions. Once we have reliably licensed building and road geometries (or independent survey), replace provisional building positions in sector A in a traceable, data-driven manner. Google Maps imagery in prior chat is visual context only; no coordinates or outline geometries are extracted from it into the repository.
