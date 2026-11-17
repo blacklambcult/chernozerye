@@ -12,6 +12,7 @@ const TREE_LIMIT := 7800
 
 var rng := RandomNumberGenerator.new()
 var roads: Array = []
+var sketch_roads: Array = [] # Only manually approximated streets; OSM roads remain distinct.
 var house_positions: Array[Vector2] = []
 var house_footprints: Array[Dictionary] = []
 var settlements: Array = []
@@ -258,6 +259,7 @@ func _add_street_details() -> void:
     ]
     for points in extras:
         roads.append(points)
+        sketch_roads.append(points)
         var path := PackedVector2Array()
         for p in points:
             path.append(Vector2(float(p[0]), float(p[1])))
