@@ -88,6 +88,41 @@ jobs:
           HTML
           touch build/web/.nojekyll
 
+      - name: Prepare the satellite geography viewer
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build satellite overlay data and audit frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'pyproj>=3.6,<4'
+          python -m py_compile scripts/build_geo_viewer.py
+          node --check site/map/app.js
+          mkdir -p build/web/map
+          cp -a site/map/. build/web/map/
+          python scripts/build_geo_viewer.py
+          test -s build/web/map/index.html
+          test -s build/web/map/data/overture.geojson
+          test -s build/web/map/data/roads.geojson
+          test -s build/web/map/data/study-areas.geojson
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path("build/web/map/data")
+          features = json.loads((root/"overture.geojson").read_text())["features"]
+          roads = json.loads((root/"roads.geojson").read_text())["features"]
+          assert len(features) >= 1000, "Unexpected building count"
+          assert len(roads) >= 10, "No roads"
+          for feature in features:
+              geom = feature["geometry"]
+              assert geom["type"] == "Polygon"
+              for lon, lat in geom["coordinates"][0]:
+                  assert 55.7 < lon < 56.0 and 54.5 < lat < 54.9, "Invalid WGS84 coordinate"
+          print("MAP_GEO_AUDIT_OK:", len(features), "building footprints,", len(roads), "roads")
+          PY
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
         with:
