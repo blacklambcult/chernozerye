@@ -362,6 +362,7 @@ var houses_button: Button
 var sector_button: Button
 var osm_button: Button
 var overture_button: Button
+var sector_a_visit_button: Button
 
 func _create_overview_map() -> void:
     overview_layer = CanvasLayer.new()
@@ -426,6 +427,27 @@ func _create_overview_map() -> void:
     overture_button.offset_right = -16.0
     overture_button.offset_bottom = 208.0
     overture_button.pressed.connect(_toggle_overture_buildings)
+
+    # Walk the mapped real-world footprint zone immediately, without a 700 m hike.
+    sector_a_visit_button = Button.new()
+    sector_a_visit_button.text = "ПЕРЕЙТИ К ДОМАМ СЕКТОРА A"
+    map_root.add_child(sector_a_visit_button)
+    sector_a_visit_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+    sector_a_visit_button.offset_left = -280.0
+    sector_a_visit_button.offset_right = -16.0
+    sector_a_visit_button.offset_top = 216.0
+    sector_a_visit_button.offset_bottom = 258.0
+    sector_a_visit_button.pressed.connect(_visit_sector_a)
+
+func _visit_sector_a() -> void:
+    # Location sampled from a residential OSM road away from mapped rooftops.
+    var character := get_node_or_null("Player") as CharacterBody3D
+    if character == null:
+        return
+    character.velocity = Vector3.ZERO
+    character.global_position = Vector3(-769.2, 0.22, -331.7)
+    overview_layer.visible = false
+    Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func _toggle_overture_buildings() -> void:
     var visible := not bool(map_panel.get("show_overture_buildings"))
