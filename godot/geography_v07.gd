@@ -7,13 +7,16 @@ extends Node3D
 
 const SOURCE := "res://world_data.json"
 const MAP_HALF := 995.0
-const HOUSE_LIMIT := 540
-const TREE_LIMIT := 13500
+const HOUSE_LIMIT := 460
+const TREE_LIMIT := 7200
 
 var rng := RandomNumberGenerator.new()
 var material_cache: Dictionary = {}
 var roads: Array = []
 var sketch_roads: Array = [] # Only manually approximated streets; OSM roads remain distinct.
+const ROAD_CELL_M := 64.0
+var road_index: Dictionary = {}
+var generated_ready := false
 var house_positions: Array[Vector2] = []
 var house_footprints: Array[Dictionary] = []
 var settlements: Array = []
@@ -81,14 +84,25 @@ func _ready() -> void:
                     roads.append(feature.get("points", []))
 
     _add_street_details()
+    _build_road_index()
     _draw_meadow()
     _draw_field_scrub()
     _draw_river()
     _draw_lake()
+    # Creating thousands of objects synchronously here leaves Web on a grey screen.
+    # Let the camera and HUD from world.gd appear before decorating the landscape.
+    call_deferred("_build_decorations")
+
+func _build_decorations() -> void:
+    await get_tree().process_frame
     _draw_houses()
+    await get_tree().process_frame
     _draw_forests()
+    await get_tree().process_frame
     _draw_undergrowth()
     _draw_grass_tufts()
+    generated_ready = true
+    print("WORLD_READY: geometry complete")
 
 func _mat(tint: Color) -> StandardMaterial3D:
     # Reuse palette materials: thousands of unique materials would hurt Web performance.
@@ -121,13 +135,31 @@ func _is_water(p: Vector2) -> bool:
             return true
     return false
 
+# Precompute compact 64-m road cells once. Without this each of tens of
+# thousands of trees scanned every road segment and stalled Web startup.
+func _build_road_index() -> void:
+    road_index.clear()
+    for route in roads:
+        for i in range(route.size() - 1):
+            var a := Vector2(float(route[i][0]), float(route[i][1]))
+            var b := Vector2(float(route[i + 1][0]), float(route[i + 1][1]))
+            var x0 := floori((minf(a.x, b.x) - 15.0) / ROAD_CELL_M)
+            var x1 := floori((maxf(a.x, b.x) + 15.0) / ROAD_CELL_M)
+            var y0 := floori((minf(a.y, b.y) - 15.0) / ROAD_CELL_M)
+            var y1 := floori((maxf(a.y, b.y) + 15.0) / ROAD_CELL_M)
+            for ix in range(x0, x1 + 1):
+                for iy in range(y0, y1 + 1):
+                    var key := Vector2i(ix, iy)
+                    if not road_index.has(key):
+                        road_index[key] = []
+                    road_index[key].append([a, b])
+
 func _close_to_road(p: Vector2, clearance: float) -> bool:
-    for pts in roads:
-        for i in range(pts.size() - 1):
-            var a := Vector2(float(pts[i][0]), float(pts[i][1]))
-            var b := Vector2(float(pts[i + 1][0]), float(pts[i + 1][1]))
-            if p.distance_to(Geometry2D.get_closest_point_to_segment(p, a, b)) < clearance:
-                return true
+    var key := Vector2i(floori(p.x / ROAD_CELL_M), floori(p.y / ROAD_CELL_M))
+    var candidates: Array = road_index.get(key, [])
+    for segment in candidates:
+        if p.distance_to(Geometry2D.get_closest_point_to_segment(p, segment[0], segment[1])) < clearance:
+            return true
     return false
 
 func _draw_flat_polygon(coords: PackedVector2Array, tint: Color, height: float) -> void:
@@ -577,7 +609,7 @@ func _draw_grass_tufts() -> void:
             if patch_pos.distance_to(house_pos) < 5.0 or _close_to_road(patch_pos, 5.5):
                 continue
             locations.append(Vector3(patch_pos.x, 0.06, -patch_pos.y))
-    for j in range(6800):
+    for j in range(2800):
         var field_pos := Vector2(rng.randf_range(-575.0, 155.0), rng.randf_range(-555.0, -110.0))
         if _is_in_poly(field_pos, meadow) and not _is_in_poly(field_pos, meadow_island):
             if not _close_to_road(field_pos, 5.0):
@@ -612,8 +644,8 @@ func _draw_forests() -> void:
     # Tree groups inside dacha gardens: the old broad settlement masks left
     # the entire village unnaturally bare, unlike wooded rural neighbourhoods.
     var yard_count := 0
-    for j in range(13000):
-        if yard_count >= 1050:
+    for j in range(7600):
+        if yard_count >= 580:
             break
         var yard_p := Vector2(rng.randf_range(-960.0, 930.0), rng.randf_range(30.0, 720.0))
         if not _is_housing(yard_p) or _is_water(yard_p):
@@ -629,7 +661,7 @@ func _draw_forests() -> void:
             continue
         positions.append(Vector3(yard_p.x, 0.0, -yard_p.y))
         yard_count += 1
-    for i in range(58000):
+    for i in range(19500):
         if positions.size() >= TREE_LIMIT:
             break
         var p := Vector2(rng.randf_range(-MAP_HALF, MAP_HALF), rng.randf_range(-MAP_HALF, MAP_HALF))
@@ -681,7 +713,7 @@ func _draw_forests() -> void:
     _add_tree_instances(fir_lower, lower_firs, Color("#314a3c"))
     _add_tree_instances(fir_upper, upper_firs, Color("#3f5744"))
     _add_tree_instances(leaves, leaf_crowns, Color("#50634a"))
-    print("Чернозёрье 1.4: деревьев ", positions.size(), " (на опушках ", forest_edge_count, ", садовых ", yard_count, ")")
+    print("Чернозёрье 1.4.1: деревьев ", positions.size(), " (на опушках ", forest_edge_count, ", садовых ", yard_count, ")")
 
 func _add_tree_instances(mesh: Mesh, transforms: Array[Transform3D], tint: Color) -> void:
     if transforms.is_empty():
