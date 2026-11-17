@@ -534,36 +534,61 @@ func _draw_forests() -> void:
         positions.append(Vector3(p.x, 0.0, -p.y))
     if positions.is_empty():
         return
-    var trunk_mesh := CylinderMesh.new()
-    trunk_mesh.top_radius = 0.14
-    trunk_mesh.bottom_radius = 0.24
-    trunk_mesh.height = 3.4
-    trunk_mesh.radial_segments = 5
-    var crown_mesh := CylinderMesh.new()
-    crown_mesh.top_radius = 0.0
-    crown_mesh.bottom_radius = 1.5
-    crown_mesh.height = 7.1
-    crown_mesh.radial_segments = 5
-    var stem := MultiMesh.new()
-    stem.transform_format = MultiMesh.TRANSFORM_3D
-    stem.mesh = trunk_mesh
-    stem.instance_count = positions.size()
-    var canopy := MultiMesh.new()
-    canopy.transform_format = MultiMesh.TRANSFORM_3D
-    canopy.mesh = crown_mesh
-    canopy.instance_count = positions.size()
-    for i in range(positions.size()):
-        var scale := rng.randf_range(0.78, 1.28)
-        var point := positions[i]
+    # Mixed forest: broadleaf silhouettes + two-tier low-poly firs.
+    # Shared MultiMeshes keep the forest inexpensive for the Web renderer.
+    var trunks: Array[Transform3D] = []
+    var lower_firs: Array[Transform3D] = []
+    var upper_firs: Array[Transform3D] = []
+    var leaf_crowns: Array[Transform3D] = []
+    for point in positions:
+        var scale := rng.randf_range(0.74, 1.18)
         var basis := Basis.IDENTITY.scaled(Vector3.ONE * scale)
-        stem.set_instance_transform(i, Transform3D(basis, point + Vector3.UP * (1.7 * scale)))
-        canopy.set_instance_transform(i, Transform3D(basis, point + Vector3.UP * (5.1 * scale)))
-    var trunks := MultiMeshInstance3D.new()
-    trunks.multimesh = stem
-    trunks.material_override = _mat(Color("#534235"))
-    add_child(trunks)
-    var crowns := MultiMeshInstance3D.new()
-    crowns.multimesh = canopy
-    crowns.material_override = _mat(Color("#273b30"))
-    add_child(crowns)
-    print("Чернозёрье 1.2: деревьев ", positions.size(), " (садовых ", yard_count, ")")
+        trunks.append(Transform3D(basis, point + Vector3.UP * 1.45 * scale))
+        if rng.randf() < 0.28:
+            leaf_crowns.append(Transform3D(basis, point + Vector3.UP * 4.45 * scale))
+        else:
+            lower_firs.append(Transform3D(basis, point + Vector3.UP * 4.0 * scale))
+            upper_firs.append(Transform3D(basis, point + Vector3.UP * 6.25 * scale))
+
+    var bark := CylinderMesh.new()
+    bark.height = 2.9
+    bark.bottom_radius = 0.25
+    bark.top_radius = 0.15
+    bark.radial_segments = 5
+    var fir_lower := CylinderMesh.new()
+    fir_lower.height = 4.2
+    fir_lower.bottom_radius = 1.65
+    fir_lower.top_radius = 0.38
+    fir_lower.radial_segments = 6
+    var fir_upper := CylinderMesh.new()
+    fir_upper.height = 3.4
+    fir_upper.bottom_radius = 1.05
+    fir_upper.top_radius = 0.06
+    fir_upper.radial_segments = 6
+    var leaves := SphereMesh.new()
+    leaves.radius = 2.2
+    leaves.height = 3.9
+    leaves.radial_segments = 7
+    leaves.rings = 4
+
+    _add_tree_instances(bark, trunks, Color("#51463c"))
+    _add_tree_instances(fir_lower, lower_firs, Color("#314a3c"))
+    _add_tree_instances(fir_upper, upper_firs, Color("#3f5744"))
+    _add_tree_instances(leaves, leaf_crowns, Color("#50634a"))
+    print("Чернозёрье 1.3: деревьев ", positions.size(), " (садовых ", yard_count, ")")
+
+func _add_tree_instances(mesh: Mesh, transforms: Array[Transform3D], tint: Color) -> void:
+    if transforms.is_empty():
+        return
+    var instances := MultiMesh.new()
+    instances.transform_format = MultiMesh.TRANSFORM_3D
+    instances.mesh = mesh
+    instances.instance_count = transforms.size()
+    for i in range(transforms.size()):
+        instances.set_instance_transform(i, transforms[i])
+    var node := MultiMeshInstance3D.new()
+    node.multimesh = instances
+    node.material_override = _mat(tint)
+    # Dynamic shadows from thousands of trees are prohibitive in Web/GL.
+    node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    add_child(node)
