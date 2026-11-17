@@ -9,7 +9,7 @@ func _process(_delta: float) -> void:
         return
     var geo := get_node_or_null("GeographyBlockoutV07")
     if geo != null and bool(geo.get("generated_ready")):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 1.5 GEO AUDIT  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 1.6 OVERTURE AUDIT  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
         set_process(false)
 
 func _ready() -> void:
@@ -198,7 +198,7 @@ func _create_player() -> void:
 func _create_label() -> void:
     var layer := CanvasLayer.new()
     var label := Label.new()
-    label.text = "ЧЕРНОЗЁРЬЕ 1.5 GEO AUDIT  |  Загрузка домов и леса..."
+    label.text = "ЧЕРНОЗЁРЬЕ 1.6 OVERTURE AUDIT  |  Загрузка домов и леса..."
     label.position = Vector2(16, 16)
     layer.add_child(label)
     add_child(layer)
@@ -355,6 +355,7 @@ var map_panel: Control
 var houses_button: Button
 var sector_button: Button
 var osm_button: Button
+var overture_button: Button
 
 func _create_overview_map() -> void:
     overview_layer = CanvasLayer.new()
@@ -373,7 +374,13 @@ func _create_overview_map() -> void:
     var features: Array = []
     if source is Dictionary:
         features = source.get("features", [])
-    map_panel.initialize(self, get_node("GeographyBlockoutV07"), get_node("Player"), features)
+    var overture_shapes: Array = []
+    if FileAccess.file_exists("res://overture_buildings.json"):
+        var extra = JSON.parse_string(FileAccess.get_file_as_string("res://overture_buildings.json"))
+        if extra is Dictionary:
+            overture_shapes = extra.get("buildings", [])
+    map_panel.initialize(self, get_node("GeographyBlockoutV07"), get_node("Player"), features, overture_shapes)
+    print("OVERTURE_LOADED: ", overture_shapes.size())
     houses_button = Button.new()
     houses_button.text = "ДОМА: ПОКАЗАТЬ"
     map_root.add_child(houses_button)
@@ -403,6 +410,22 @@ func _create_overview_map() -> void:
     osm_button.offset_right = -16.0
     osm_button.offset_bottom = 158.0
     osm_button.pressed.connect(_toggle_osm_buildings)
+
+    overture_button = Button.new()
+    overture_button.text = "OVERTURE: СКРЫТЬ"
+    map_root.add_child(overture_button)
+    overture_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+    overture_button.offset_left = -235.0
+    overture_button.offset_top = 166.0
+    overture_button.offset_right = -16.0
+    overture_button.offset_bottom = 208.0
+    overture_button.pressed.connect(_toggle_overture_buildings)
+
+func _toggle_overture_buildings() -> void:
+    var visible := not bool(map_panel.get("show_overture_buildings"))
+    map_panel.set("show_overture_buildings", visible)
+    overture_button.text = "OVERTURE: СКРЫТЬ" if visible else "OVERTURE: ПОКАЗАТЬ"
+    map_panel.queue_redraw()
 
 func _toggle_sector_a() -> void:
     var zoom := not bool(map_panel.get("sector_a_zoom"))
