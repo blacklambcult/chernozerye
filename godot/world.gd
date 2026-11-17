@@ -9,7 +9,7 @@ func _process(_delta: float) -> void:
         return
     var geo := get_node_or_null("GeographyBlockoutV07")
     if geo != null and bool(geo.get("generated_ready")):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 1.6 OVERTURE AUDIT  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 1.7 SECTOR A 3D  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
         set_process(false)
 
 func _ready() -> void:
@@ -31,6 +31,12 @@ func _ready() -> void:
     geographical_blockout.name = "GeographyBlockoutV07"
     geographical_blockout.set_script(preload("res://geography_v07.gd"))
     add_child(geographical_blockout)
+    # Overture footprints are initially extruded only for the audited west sector.
+    # A single batched roof/wall mesh avoids hundreds of new render nodes.
+    var precise_buildings := Node3D.new()
+    precise_buildings.name = "OvertureBuildingsSectorA"
+    precise_buildings.set_script(preload("res://overture_3d_a.gd"))
+    add_child(precise_buildings)
     _create_user_paths()
     _create_landmarks()
     _create_player()
