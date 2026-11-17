@@ -2,6 +2,15 @@ extends Node3D
 
 const PLAYER_SCRIPT = preload("res://player.gd")
 const MAP_FILE := "res://world_data.json"
+var _status_label: Label
+
+func _process(_delta: float) -> void:
+    if not is_instance_valid(_status_label):
+        return
+    var geo := get_node_or_null("GeographyBlockoutV07")
+    if geo != null and bool(geo.get("generated_ready")):
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 1.4.1  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
+        set_process(false)
 
 func _ready() -> void:
     _create_ground()
@@ -189,10 +198,11 @@ func _create_player() -> void:
 func _create_label() -> void:
     var layer := CanvasLayer.new()
     var label := Label.new()
-    label.text = "ЧЕРНОЗЁРЬЕ 1.4 FOREST EDGE  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
+    label.text = "ЧЕРНОЗЁРЬЕ 1.4.1  |  Загрузка домов и леса..."
     label.position = Vector2(16, 16)
     layer.add_child(label)
     add_child(layer)
+    _status_label = label
 
 # Trees only in OSM forest polygons, never randomly across the whole map.
 func _create_forest_from_osm(features: Array) -> void:
