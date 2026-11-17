@@ -293,6 +293,9 @@ func _create_pitched_roof(width: float, depth: float, wall_height: float, roof_t
         var v1: Vector3 = vertices[triangle_index + 1]
         var v2: Vector3 = vertices[triangle_index + 2]
         var face_normal := (v1 - v0).cross(v2 - v0).normalized()
+        # Both sloping roof faces must be lit from above regardless of winding.
+        if face_normal.y < -0.01:
+            face_normal = -face_normal
         normals.append_array(PackedVector3Array([face_normal, face_normal, face_normal]))
     var arrays := []
     arrays.resize(Mesh.ARRAY_MAX)
