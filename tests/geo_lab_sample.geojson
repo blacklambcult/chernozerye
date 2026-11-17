@@ -1,0 +1,87 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "schema": "chernozerye-geo-constructor-1",
+    "crs": "EPSG:4326"
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "test-road",
+      "properties": {
+        "id": "test-road",
+        "category": "road",
+        "name": "Проверочная улица",
+        "notes": "fixture",
+        "source": "user_manual"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            55.8528151,
+            54.6728972
+          ],
+          [
+            55.8529151,
+            54.6729972
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "test-plot",
+      "properties": {
+        "id": "test-plot",
+        "category": "plot",
+        "name": "Тестовый участок",
+        "source": "user_manual"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              55.8526,
+              54.6727
+            ],
+            [
+              55.8527,
+              54.6727
+            ],
+            [
+              55.8527,
+              54.6728
+            ],
+            [
+              55.8526,
+              54.6728
+            ],
+            [
+              55.8526,
+              54.6727
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "test-car",
+      "properties": {
+        "id": "test-car",
+        "category": "car",
+        "name": "Тестовый автомобиль",
+        "source": "user_manual"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          55.8528151,
+          54.6728972
+        ]
+      }
+    }
+  ]
+}
