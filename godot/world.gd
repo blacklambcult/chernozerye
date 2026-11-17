@@ -9,7 +9,7 @@ func _process(_delta: float) -> void:
         return
     var geo := get_node_or_null("GeographyBlockoutV07")
     if geo != null and bool(geo.get("generated_ready")):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 1.4.1  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 1.5 GEO AUDIT  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
         set_process(false)
 
 func _ready() -> void:
@@ -198,7 +198,7 @@ func _create_player() -> void:
 func _create_label() -> void:
     var layer := CanvasLayer.new()
     var label := Label.new()
-    label.text = "ЧЕРНОЗЁРЬЕ 1.4.1  |  Загрузка домов и леса..."
+    label.text = "ЧЕРНОЗЁРЬЕ 1.5 GEO AUDIT  |  Загрузка домов и леса..."
     label.position = Vector2(16, 16)
     layer.add_child(label)
     add_child(layer)
@@ -353,6 +353,8 @@ func _add_landmark(point: Vector2, title: String, tint: Color) -> void:
 var overview_layer: CanvasLayer
 var map_panel: Control
 var houses_button: Button
+var sector_button: Button
+var osm_button: Button
 
 func _create_overview_map() -> void:
     overview_layer = CanvasLayer.new()
@@ -381,6 +383,38 @@ func _create_overview_map() -> void:
     houses_button.offset_right = -16.0
     houses_button.offset_bottom = 58.0
     houses_button.pressed.connect(_toggle_houses)
+
+    sector_button = Button.new()
+    sector_button.text = "СЕКТОР A: ПРИБЛИЗИТЬ"
+    map_root.add_child(sector_button)
+    sector_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+    sector_button.offset_left = -235.0
+    sector_button.offset_top = 66.0
+    sector_button.offset_right = -16.0
+    sector_button.offset_bottom = 108.0
+    sector_button.pressed.connect(_toggle_sector_a)
+
+    osm_button = Button.new()
+    osm_button.text = "КОНТУРЫ OSM: ПОКАЗАТЬ"
+    map_root.add_child(osm_button)
+    osm_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+    osm_button.offset_left = -235.0
+    osm_button.offset_top = 116.0
+    osm_button.offset_right = -16.0
+    osm_button.offset_bottom = 158.0
+    osm_button.pressed.connect(_toggle_osm_buildings)
+
+func _toggle_sector_a() -> void:
+    var zoom := not bool(map_panel.get("sector_a_zoom"))
+    map_panel.set("sector_a_zoom", zoom)
+    sector_button.text = "ВСЯ ТЕРРИТОРИЯ 2×2 КМ" if zoom else "СЕКТОР A: ПРИБЛИЗИТЬ"
+    map_panel.queue_redraw()
+
+func _toggle_osm_buildings() -> void:
+    var show := not bool(map_panel.get("show_osm_buildings"))
+    map_panel.set("show_osm_buildings", show)
+    osm_button.text = "КОНТУРЫ OSM: СКРЫТЬ" if show else "КОНТУРЫ OSM: ПОКАЗАТЬ"
+    map_panel.queue_redraw()
 
 func _toggle_houses() -> void:
     var show := not bool(map_panel.get("show_houses"))
