@@ -293,21 +293,41 @@ func _add_landmark(point: Vector2, title: String, tint: Color) -> void:
 
 var overview_layer: CanvasLayer
 var map_panel: Control
+var houses_button: Button
 
 func _create_overview_map() -> void:
     overview_layer = CanvasLayer.new()
+    overview_layer.name = "MapOverlay"
     overview_layer.layer = 15
     overview_layer.visible = false
     add_child(overview_layer)
+    var map_root := Control.new()
+    map_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    overview_layer.add_child(map_root)
     map_panel = Control.new()
     map_panel.set_script(preload("res://live_map_v08.gd"))
-    overview_layer.add_child(map_panel)
+    map_root.add_child(map_panel)
+    map_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     var source := JSON.parse_string(FileAccess.get_file_as_string(MAP_FILE))
     var features: Array = []
     if source is Dictionary:
         features = source.get("features", [])
     map_panel.initialize(self, get_node("GeographyBlockoutV07"), get_node("Player"), features)
-    map_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    houses_button = Button.new()
+    houses_button.text = "ПОКАЗАТЬ УСЛОВНЫЕ ДОМА"
+    houses_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+    houses_button.offset_left = -292.0
+    houses_button.offset_top = 16.0
+    houses_button.offset_right = -16.0
+    houses_button.offset_bottom = 58.0
+    houses_button.pressed.connect(_toggle_houses)
+    map_root.add_child(houses_button)
+
+func _toggle_houses() -> void:
+    var show := not bool(map_panel.get("show_houses"))
+    map_panel.set("show_houses", show)
+    houses_button.text = "СКРЫТЬ УСЛОВНЫЕ ДОМА" if show else "ПОКАЗАТЬ УСЛОВНЫЕ ДОМА"
+    map_panel.queue_redraw()
 
 func _input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
@@ -317,6 +337,5 @@ func _input(event: InputEvent) -> void:
                 Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
             get_viewport().set_input_as_handled()
         elif overview_layer.visible and (event.physical_keycode == KEY_H or event.keycode == KEY_H or (event.unicode != 0 and char(event.unicode).to_lower() == "р")):
-            map_panel.set("show_houses", not bool(map_panel.get("show_houses")))
-            map_panel.queue_redraw()
+            _toggle_houses()
             get_viewport().set_input_as_handled()
