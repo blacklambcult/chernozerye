@@ -97,7 +97,11 @@ func _add_road(feature: Dictionary) -> void:
     var instance := MeshInstance3D.new()
     instance.mesh = mesh
     # Distinguish the existing georeferenced M5 trunk road from earth tracks.
-    var road_color := Color("#505758") if road_type in ["primary", "trunk", "motorway"] else Color("#918779") if road_type in ["residential", "service", "secondary"] else Color("#786d57")
+    var road_color := Color("#786d57")
+    if road_type in ["primary", "trunk", "motorway"]:
+        road_color = Color("#505758")
+    elif road_type in ["residential", "service", "secondary"]:
+        road_color = Color("#918779")
     instance.material_override = _material(road_color)
     add_child(instance)
 
