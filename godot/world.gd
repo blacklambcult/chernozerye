@@ -9,7 +9,7 @@ func _process(_delta: float) -> void:
         return
     var geo := get_node_or_null("GeographyBlockoutV07")
     if geo != null and bool(geo.get("generated_ready")):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 1.7 SECTOR A 3D  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 1.8 АДРЕСНАЯ ГЕОГРАФИЯ  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
         set_process(false)
 
 func _ready() -> void:
@@ -42,6 +42,7 @@ func _ready() -> void:
     _create_player()
     _create_label()
     _create_overview_map()
+    _create_quick_navigation()
 
 func _material(color: Color) -> StandardMaterial3D:
     var m := StandardMaterial3D.new()
@@ -204,7 +205,7 @@ func _create_player() -> void:
 func _create_label() -> void:
     var layer := CanvasLayer.new()
     var label := Label.new()
-    label.text = "ЧЕРНОЗЁРЬЕ 1.6 OVERTURE AUDIT  |  Загрузка домов и леса..."
+    label.text = "ЧЕРНОЗЁРЬЕ 1.8  |  Загрузка домов и леса..."
     label.position = Vector2(16, 16)
     layer.add_child(label)
     add_child(layer)
@@ -391,53 +392,67 @@ func _create_overview_map() -> void:
     houses_button = Button.new()
     houses_button.text = "ДОМА: ПОКАЗАТЬ"
     map_root.add_child(houses_button)
-    houses_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-    houses_button.offset_left = -200.0
+    houses_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
+    houses_button.offset_left = 16.0
     houses_button.offset_top = 16.0
-    houses_button.offset_right = -16.0
+    houses_button.offset_right = 235.0
     houses_button.offset_bottom = 58.0
     houses_button.pressed.connect(_toggle_houses)
 
     sector_button = Button.new()
-    sector_button.text = "СЕКТОР A: ПРИБЛИЗИТЬ"
+    sector_button.text = "СЕКТОР A: 680 М"
     map_root.add_child(sector_button)
-    sector_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-    sector_button.offset_left = -235.0
+    sector_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
+    sector_button.offset_left = 16.0
     sector_button.offset_top = 66.0
-    sector_button.offset_right = -16.0
+    sector_button.offset_right = 235.0
     sector_button.offset_bottom = 108.0
     sector_button.pressed.connect(_toggle_sector_a)
 
     osm_button = Button.new()
     osm_button.text = "КОНТУРЫ OSM: ПОКАЗАТЬ"
     map_root.add_child(osm_button)
-    osm_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-    osm_button.offset_left = -235.0
+    osm_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
+    osm_button.offset_left = 16.0
     osm_button.offset_top = 116.0
-    osm_button.offset_right = -16.0
+    osm_button.offset_right = 235.0
     osm_button.offset_bottom = 158.0
     osm_button.pressed.connect(_toggle_osm_buildings)
 
     overture_button = Button.new()
     overture_button.text = "OVERTURE: СКРЫТЬ"
     map_root.add_child(overture_button)
-    overture_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-    overture_button.offset_left = -235.0
+    overture_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
+    overture_button.offset_left = 16.0
     overture_button.offset_top = 166.0
-    overture_button.offset_right = -16.0
+    overture_button.offset_right = 235.0
     overture_button.offset_bottom = 208.0
     overture_button.pressed.connect(_toggle_overture_buildings)
 
     # Walk the mapped real-world footprint zone immediately, without a 700 m hike.
     sector_a_visit_button = Button.new()
-    sector_a_visit_button.text = "ПЕРЕЙТИ К ДОМАМ СЕКТОРА A"
+    sector_a_visit_button.text = "ПЕРЕЙТИ В 3D СЕКТОРА A"
     map_root.add_child(sector_a_visit_button)
-    sector_a_visit_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-    sector_a_visit_button.offset_left = -280.0
-    sector_a_visit_button.offset_right = -16.0
+    sector_a_visit_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
+    sector_a_visit_button.offset_left = 16.0
+    sector_a_visit_button.offset_right = 280.0
     sector_a_visit_button.offset_top = 216.0
     sector_a_visit_button.offset_bottom = 258.0
     sector_a_visit_button.pressed.connect(_visit_sector_a)
+
+func _create_quick_navigation() -> void:
+    # A second, always-visible entry point avoids hunting for a map-only control.
+    var action_layer := CanvasLayer.new()
+    action_layer.name = "SectorAQuickNav"
+    action_layer.layer = 8
+    add_child(action_layer)
+    var action_button := Button.new()
+    action_button.text = "ПЕРЕЙТИ В СЕКТОР A (3D)"
+    action_button.position = Vector2(16.0, 75.0)
+    action_button.size = Vector2(246.0, 38.0)
+    action_button.tooltip_text = "Переместиться на нанесённую в OSM улицу рядом с новыми контурами зданий"
+    action_button.pressed.connect(_visit_sector_a)
+    action_layer.add_child(action_button)
 
 func _visit_sector_a() -> void:
     # Location sampled from a residential OSM road away from mapped rooftops.
@@ -456,9 +471,19 @@ func _toggle_overture_buildings() -> void:
     map_panel.queue_redraw()
 
 func _toggle_sector_a() -> void:
-    var zoom := not bool(map_panel.get("sector_a_zoom"))
-    map_panel.set("sector_a_zoom", zoom)
-    sector_button.text = "ВСЯ ТЕРРИТОРИЯ 2×2 КМ" if zoom else "СЕКТОР A: ПРИБЛИЗИТЬ"
+    var zoom := bool(map_panel.get("sector_a_zoom"))
+    var detailed := bool(map_panel.get("neighborhood_zoom"))
+    if not zoom:
+        map_panel.set("sector_a_zoom", true)
+        map_panel.set("neighborhood_zoom", false)
+        sector_button.text = "УЛИЦЫ A: 300 М"
+    elif not detailed:
+        map_panel.set("neighborhood_zoom", true)
+        sector_button.text = "ВСЯ КАРТА 2×2 КМ"
+    else:
+        map_panel.set("sector_a_zoom", false)
+        map_panel.set("neighborhood_zoom", false)
+        sector_button.text = "СЕКТОР A: 680 М"
     map_panel.queue_redraw()
 
 func _toggle_osm_buildings() -> void:
