@@ -15,7 +15,11 @@ var material_cache: Dictionary = {}
 var roads: Array = []
 var sketch_roads: Array = [] # Only manually approximated streets; OSM roads remain distinct.
 const ROAD_CELL_M := 64.0
+const OVERTURE_CELL_M := 75.0
+const SECTOR_A_CENTER := Vector2(-660.0, 390.0)
+const SECTOR_A_HALF := 340.0
 var road_index: Dictionary = {}
+var sector_a_building_cells: Dictionary = {}
 var generated_ready := false
 var house_positions: Array[Vector2] = []
 var house_footprints: Array[Dictionary] = []
@@ -84,6 +88,7 @@ func _ready() -> void:
                     roads.append(feature.get("points", []))
 
     _add_street_details()
+    _load_sector_a_building_exclusions()
     _build_road_index()
     _draw_meadow()
     _draw_field_scrub()
@@ -118,6 +123,58 @@ func _mat(tint: Color) -> StandardMaterial3D:
 
 func _is_in_poly(p: Vector2, poly: PackedVector2Array) -> bool:
     return Geometry2D.is_point_in_polygon(p, poly)
+
+func _is_sector_a(p: Vector2) -> bool:
+    return absf(p.x - SECTOR_A_CENTER.x) <= SECTOR_A_HALF and absf(p.y - SECTOR_A_CENTER.y) <= SECTOR_A_HALF
+
+func _load_sector_a_building_exclusions() -> void:
+    # Keep fake shrubs and trees from growing through Overture roofs.
+    # Index only approximate AABB + margin for a conservative, cheap test.
+    sector_a_building_cells.clear()
+    if not FileAccess.file_exists("res://overture_buildings.json"):
+        return
+    var source = JSON.parse_string(FileAccess.get_file_as_string("res://overture_buildings.json"))
+    if not source is Dictionary:
+        return
+    for building in source.get("buildings", []):
+        if not building is Dictionary:
+            continue
+        var raw_points: Array = building.get("points", [])
+        if raw_points.size() < 3:
+            continue
+        var center := Vector2.ZERO
+        var bounds_min := Vector2(INF, INF)
+        var bounds_max := Vector2(-INF, -INF)
+        for coords in raw_points:
+            var p := Vector2(float(coords[0]), float(coords[1]))
+            center += p
+            bounds_min.x = minf(bounds_min.x, p.x)
+            bounds_min.y = minf(bounds_min.y, p.y)
+            bounds_max.x = maxf(bounds_max.x, p.x)
+            bounds_max.y = maxf(bounds_max.y, p.y)
+        center /= float(raw_points.size())
+        if not _is_sector_a(center):
+            continue
+        var rect := Rect2(bounds_min - Vector2.ONE * 3.0, bounds_max - bounds_min + Vector2.ONE * 6.0)
+        var min_cell := Vector2i(floori(rect.position.x / OVERTURE_CELL_M), floori(rect.position.y / OVERTURE_CELL_M))
+        var max_pos := rect.position + rect.size
+        var max_cell := Vector2i(floori(max_pos.x / OVERTURE_CELL_M), floori(max_pos.y / OVERTURE_CELL_M))
+        for ix in range(min_cell.x, max_cell.x + 1):
+            for iy in range(min_cell.y, max_cell.y + 1):
+                var key := Vector2i(ix, iy)
+                if not sector_a_building_cells.has(key):
+                    sector_a_building_cells[key] = []
+                sector_a_building_cells[key].append(rect)
+
+func _near_real_sector_a_building(p: Vector2) -> bool:
+    if not _is_sector_a(p):
+        return false
+    var key := Vector2i(floori(p.x / OVERTURE_CELL_M), floori(p.y / OVERTURE_CELL_M))
+    var possible: Array = sector_a_building_cells.get(key, [])
+    for bounds in possible:
+        if bounds.has_point(p):
+            return true
+    return false
 
 func _is_housing(p: Vector2) -> bool:
     for zone in settlements:
@@ -429,6 +486,9 @@ func _draw_houses() -> void:
                     p += side * direction * rng.randf_range(17.0, 24.0)
                     if absf(p.x) > MAP_HALF or absf(p.y) > MAP_HALF:
                         continue
+                    # Real Overture buildings replace fake procedural ones in A.
+                    if _is_sector_a(p):
+                        continue
                     if not _is_housing(p) or _is_water(p) or _is_in_poly(p, meadow):
                         continue
                     if _close_to_road(p, 9.5):
@@ -533,7 +593,7 @@ func _draw_undergrowth() -> void:
     for house_pos in house_positions:
         for j in range(3):
             var p := house_pos + Vector2(rng.randf_range(-14.0, 14.0), rng.randf_range(-14.0, 14.0))
-            if not _is_housing(p) or _is_water(p) or _close_to_road(p, 6.5):
+            if not _is_housing(p) or _is_water(p) or _close_to_road(p, 6.5) or _near_real_sector_a_building(p):
                 continue
             if p.distance_to(house_pos) < 7.0:
                 continue
@@ -579,7 +639,7 @@ func _seed_forest_edges(positions: Array[Vector3]) -> int:
                         p += tangent * rng.randf_range(-2.4, 2.4)
                         if absf(p.x) > MAP_HALF or absf(p.y) > MAP_HALF:
                             continue
-                        if _is_housing(p) or _is_water(p) or _is_in_poly(p, meadow):
+                        if _is_housing(p) or _is_water(p) or _is_in_poly(p, meadow) or _near_real_sector_a_building(p):
                             continue
                         if _close_to_road(p, 8.0):
                             continue
@@ -604,7 +664,7 @@ func _draw_grass_tufts() -> void:
     for house_pos in house_positions:
         for j in range(15):
             var patch_pos := house_pos + Vector2(rng.randf_range(-17.0, 17.0), rng.randf_range(-17.0, 17.0))
-            if not _is_housing(patch_pos) or _is_water(patch_pos):
+            if not _is_housing(patch_pos) or _is_water(patch_pos) or _near_real_sector_a_building(patch_pos):
                 continue
             if patch_pos.distance_to(house_pos) < 5.0 or _close_to_road(patch_pos, 5.5):
                 continue
@@ -648,7 +708,7 @@ func _draw_forests() -> void:
         if yard_count >= 580:
             break
         var yard_p := Vector2(rng.randf_range(-960.0, 930.0), rng.randf_range(30.0, 720.0))
-        if not _is_housing(yard_p) or _is_water(yard_p):
+        if not _is_housing(yard_p) or _is_water(yard_p) or _near_real_sector_a_building(yard_p):
             continue
         if _close_to_road(yard_p, 8.0):
             continue
@@ -665,7 +725,7 @@ func _draw_forests() -> void:
         if positions.size() >= TREE_LIMIT:
             break
         var p := Vector2(rng.randf_range(-MAP_HALF, MAP_HALF), rng.randf_range(-MAP_HALF, MAP_HALF))
-        if _is_housing(p) or (_is_in_poly(p, meadow) and not _is_in_poly(p, meadow_island)) or _is_water(p):
+        if _is_housing(p) or (_is_in_poly(p, meadow) and not _is_in_poly(p, meadow_island)) or _is_water(p) or _near_real_sector_a_building(p):
             continue
         if _close_to_road(p, 9.0):
             continue
