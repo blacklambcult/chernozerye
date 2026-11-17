@@ -54,19 +54,20 @@ func _create_lighting() -> void:
     var environment := WorldEnvironment.new()
     var env := Environment.new()
     env.background_mode = Environment.BG_COLOR
-    env.background_color = Color("#63636b")
+    env.background_color = Color("#575b69")
     env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    env.ambient_light_color = Color("#8d8891")
-    env.ambient_light_energy = 0.65
+    env.ambient_light_color = Color("#b0a9a4")
+    env.ambient_light_energy = 0.82
     env.fog_enabled = true
-    env.fog_light_color = Color("#676b70")
-    env.fog_density = 0.003
+    env.fog_light_color = Color("#676976")
+    env.fog_density = 0.0018
     environment.environment = env
     add_child(environment)
     var sun := DirectionalLight3D.new()
     sun.rotation_degrees = Vector3(-12, -35, 0)
-    sun.light_energy = 0.65
-    sun.light_color = Color("#e9b9a0")
+    sun.light_energy = 1.05
+    sun.shadow_enabled = true
+    sun.light_color = Color("#f0b69a")
     add_child(sun)
 
 func _coord(point: Array, height: float = 0.0) -> Vector3:
@@ -82,12 +83,19 @@ func _add_road(feature: Dictionary) -> void:
     elif road_type in ["primary", "trunk", "motorway"]: width = 11.0
     elif road_type == "secondary": width = 8.0
     var vertices := PackedVector3Array()
+    var shoulders := PackedVector3Array()
     for i in range(pts.size() - 1):
-        var a := _coord(pts[i], 0.035)
-        var b := _coord(pts[i+1], 0.035)
+        var a := _coord(pts[i], 0.055)
+        var b := _coord(pts[i+1], 0.055)
         if a.distance_to(b) < 0.001: continue
-        var offset := Vector3(-(b.z-a.z), 0, b.x-a.x).normalized() * width * 0.5
+        var normal := Vector3(-(b.z-a.z), 0, b.x-a.x).normalized()
+        var offset := normal * width * 0.5
         vertices.append_array(PackedVector3Array([a-offset, a+offset, b+offset, a-offset, b+offset, b-offset]))
+        if road_type not in ["trunk", "motorway", "primary"]:
+            var wide := normal * (width * 0.5 + 1.4)
+            var low_a := a - Vector3.UP * 0.035
+            var low_b := b - Vector3.UP * 0.035
+            shoulders.append_array(PackedVector3Array([low_a-wide, low_a+wide, low_b+wide, low_a-wide, low_b+wide, low_b-wide]))
     if vertices.is_empty(): return
     var arr := []
     arr.resize(Mesh.ARRAY_MAX)
@@ -104,6 +112,16 @@ func _add_road(feature: Dictionary) -> void:
         road_color = Color("#918779")
     instance.material_override = _material(road_color)
     add_child(instance)
+    if not shoulders.is_empty():
+        var edge_arrays := []
+        edge_arrays.resize(Mesh.ARRAY_MAX)
+        edge_arrays[Mesh.ARRAY_VERTEX] = shoulders
+        var edge_mesh := ArrayMesh.new()
+        edge_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, edge_arrays)
+        var edge := MeshInstance3D.new()
+        edge.mesh = edge_mesh
+        edge.material_override = _material(Color("#55554b"))
+        add_child(edge)
 
 func _add_building(feature: Dictionary) -> void:
     var pts: Array = feature.get("points", [])
@@ -141,13 +159,15 @@ func _create_player() -> void:
     var player := CharacterBody3D.new()
     player.name = "Player"
     player.set_script(PLAYER_SCRIPT)
-    player.position = Vector3(90, 0.2, -20)
+    # Spawn on the existing OSM village road, rather than 74 m away in an empty clearing.
+    player.position = Vector3(130, 0.2, -82)
+    player.rotation.y = deg_to_rad(-125.0)
     add_child(player)
 
 func _create_label() -> void:
     var layer := CanvasLayer.new()
     var label := Label.new()
-    label.text = "ЧЕРНОЗЁРЬЕ 1.2 DACHA BLOCKOUT  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
+    label.text = "ЧЕРНОЗЁРЬЕ 1.3 VILLAGE ROADS  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
     label.position = Vector2(16, 16)
     layer.add_child(label)
     add_child(layer)
@@ -265,11 +285,11 @@ func _inside_meadow(p: Vector2) -> bool:
     return Geometry2D.is_point_in_polygon(p, meadow)
 
 func _create_user_paths() -> void:
-    _add_road({"points": [[90.0, 20.0], [0.0, -180.0]], "tags": {"highway": "path"}})
+    _add_road({"points": [[130.0, 82.0], [55.0, -75.0], [0.0, -180.0]], "tags": {"highway": "path"}})
     _add_road({"points": [[110.0, -320.0], [430.0, -200.0]], "tags": {"highway": "path"}})
 
 func _create_landmarks() -> void:
-    _add_landmark(Vector2(90, 20), "ОСТАНОВКА / СТАРТ", Color("#e5c17a"))
+    _add_landmark(Vector2(130, 82), "ОСТАНОВКА / СТАРТ", Color("#e5c17a"))
     _add_landmark(Vector2(100, 720), "ЗАБРОШЕННЫЙ ЛАГЕРЬ", Color("#c7a0dd"))
     _add_landmark(Vector2(-260, -270), "БОЛЬШОЕ ПОЛЕ", Color("#d5d68d"))
     _add_landmark(Vector2(715, -800), "ТУРБАЗА", Color("#75c1da"))
