@@ -72,11 +72,11 @@ func _draw() -> void:
             for house in geo.house_footprints:
                 var center: Vector2 = _map_pos(house["center"])
                 var footprint := Vector2(
-                    maxf(3.0, float(house["width"]) * meters_to_pixels),
-                    maxf(3.0, float(house["depth"]) * meters_to_pixels)
+                    maxf(4.0, float(house["width"]) * meters_to_pixels),
+                    maxf(4.0, float(house["depth"]) * meters_to_pixels)
                 )
                 draw_set_transform(center, float(house["angle"]), Vector2.ONE)
-                draw_rect(Rect2(-footprint * 0.5, footprint), Color("#dfbc9e"))
+                draw_rect(Rect2(-footprint * 0.5, footprint), Color("#ffce80"))
             draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
     for feature in osm_features:
         if not feature is Dictionary or feature.get("type", "") != "road":
@@ -106,7 +106,9 @@ func _draw() -> void:
         var p := _map_pos(Vector2(player.position.x, -player.position.z))
         draw_circle(p, 7.0, Color("#ff9149"))
         draw_arc(p, 9.0, 0.0, TAU, 24, Color("#191d1b"), 2.0)
-    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 0.9", Color("#f2ead8"), 20)
-    _text(Vector2(18, 49), "2 x 2 km  |  N UP  |  M = close  |  H = show/hide approximate houses", Color("#c2cfc0"))
+    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 0.9.1", Color("#f2ead8"), 20)
+    _text(Vector2(18, 49), "2 x 2 km  |  N UP  |  M = close  |  H = toggle houses", Color("#c2cfc0"))
+    var house_status := "ДОМА НА СХЕМЕ: ПОКАЗАНЫ" if show_houses else "ДОМА НА СХЕМЕ: СКРЫТЫ"
+    _text(Vector2(18, 77), house_status, Color("#ffce80") if show_houses else Color("#c0c7c0"), 16)
     _text(Vector2(18, size.y - 27), "Beige: settlements/roads  |  Green: field/forest  |  Blue: water  |  Orange: player", Color("#c9d3c8"), 12)
     _text(Vector2(18, size.y - 10), "Roads: OSM + rough sketches; pale houses are provisional, not surveyed", Color("#d3b4a0"), 11)
