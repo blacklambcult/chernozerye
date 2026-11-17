@@ -5,7 +5,7 @@ var world: Node3D
 var geo
 var player: Node3D
 var osm_features: Array = []
-var show_houses := true
+var show_houses := false
 
 func initialize(world_node: Node3D, geo_node: Node3D, player_node: Node3D, features: Array) -> void:
     world = world_node
@@ -107,6 +107,6 @@ func _draw() -> void:
         draw_circle(p, 7.0, Color("#ff9149"))
         draw_arc(p, 9.0, 0.0, TAU, 24, Color("#191d1b"), 2.0)
     _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 0.9", Color("#f2ead8"), 20)
-    _text(Vector2(18, 49), "2 x 2 km  |  N UP  |  M = close  |  H = hide/show placeholder houses", Color("#c2cfc0"))
+    _text(Vector2(18, 49), "2 x 2 km  |  N UP  |  M = close  |  H = show/hide approximate houses", Color("#c2cfc0"))
     _text(Vector2(18, size.y - 27), "Beige: settlements/roads  |  Green: field/forest  |  Blue: water  |  Orange: player", Color("#c9d3c8"), 12)
     _text(Vector2(18, size.y - 10), "Roads: OSM + rough sketches; pale houses are provisional, not surveyed", Color("#d3b4a0"), 11)
