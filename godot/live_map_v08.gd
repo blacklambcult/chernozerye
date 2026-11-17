@@ -132,8 +132,11 @@ func _draw() -> void:
         _line(PackedVector2Array([Vector2(float(tick), -HALF), Vector2(float(tick), HALF)]), Color(1, 1, 1, 0.12), 1.0)
         _line(PackedVector2Array([Vector2(-HALF, float(tick)), Vector2(HALF, float(tick))]), Color(1, 1, 1, 0.12), 1.0)
     if is_instance_valid(geo):
-        for zone in geo.settlements:
-            _poly(zone, Color("#858576"))
+        # Historical settlement polygons are illustrative and often omit real homes.
+        # Hide these masks in sector A inspection mode; rely on Overture outlines.
+        if not sector_a_zoom:
+            for zone in geo.settlements:
+                _poly(zone, Color("#858576"))
         _poly(geo.meadow, Color("#8b9971"))
         _poly(geo.meadow_island, Color("#365644"))
         _line(geo.field_track, Color("#d0b992"), 1.5)
@@ -214,13 +217,13 @@ func _draw() -> void:
             var p := _map_pos(player_map_pos)
             draw_circle(p, 7.0, Color("#ff9149"))
             draw_arc(p, 9.0, 0.0, TAU, 24, Color("#191d1b"), 2.0)
-    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 1.6", Color("#f2ead8"), 20)
+    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 1.7", Color("#f2ead8"), 20)
     var map_scale := "СЕКТОР A / 680 x 680 м" if sector_a_zoom else "2 x 2 km"
     _text(Vector2(18, 49), map_scale + "  |  N UP  |  M = close  |  H = toggle houses", Color("#c2cfc0"))
     var house_status := "УСЛОВНЫЕ ДОМА: ПОКАЗАНЫ" if show_houses else "УСЛОВНЫЕ ДОМА: СКРЫТЫ"
     _text(Vector2(18, 77), house_status, Color("#ffce80") if show_houses else Color("#c0c7c0"), 16)
     if sector_a_zoom:
-        _text(Vector2(18, 100), "Жёлтые: условные  |  Голубые: OSM  |  Розовые: Overture", Color("#e7a9df"), 13)
+        _text(Vector2(18, 100), "Сектор A: розовые здания Overture = 3D-объёмы  |  Высоты условные", Color("#e7a9df"), 13)
     _text(Vector2(18, 119), "Overture: " + str(overture_buildings.size()) + " кандидатов  |  OSM: 63 (все 2×2 км)", Color("#bdc9c5"), 12)
     _text(Vector2(18, size.y - 27), "OSM forests: dark green  |  OSM roads: light  |  Sketched roads: orange  |  Field: pale green", Color("#c9d3c8"), 12)
-    _text(Vector2(18, size.y - 10), "Buildings: Overture Maps + contributors (open datasets) | Footprints not individually validated", Color("#d3b4a0"), 11)
+    _text(Vector2(18, size.y - 10), "Sector A 3D from Overture; other sectors still procedural | Real contours, provisional heights", Color("#d3b4a0"), 11)
