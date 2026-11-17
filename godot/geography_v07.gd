@@ -7,12 +7,13 @@ extends Node3D
 
 const SOURCE := "res://world_data.json"
 const MAP_HALF := 995.0
-const HOUSE_LIMIT := 900
+const HOUSE_LIMIT := 420
 const TREE_LIMIT := 7800
 
 var rng := RandomNumberGenerator.new()
 var roads: Array = []
 var house_positions: Array[Vector2] = []
+var house_footprints: Array[Dictionary] = []
 var settlements: Array = []
 var meadow := PackedVector2Array([
     Vector2(-480, -410), Vector2(-410, -110), Vector2(-160, -95),
@@ -185,54 +186,93 @@ func _add_street_details() -> void:
         _draw_strip(path, 3.2, Color("#847a68"), 0.068)
 
 func _draw_houses() -> void:
-    var used := {}
-    var count := 0
+    # Provisional houses, not measured footprints. Fewer homes with breathing room,
+    # spread across all street networks (instead of filling early roads first).
+    var candidates: Array[Dictionary] = []
+    var spacing := 32.0
     for route in roads:
         for i in range(route.size() - 1):
             var start := Vector2(float(route[i][0]), float(route[i][1]))
             var finish := Vector2(float(route[i + 1][0]), float(route[i + 1][1]))
             var delta := finish - start
             var length := delta.length()
-            if length < 12.0:
+            if length < 15.0:
                 continue
             var tangent := delta.normalized()
             var side := Vector2(-tangent.y, tangent.x)
-            var samples := int(length / 20.0)
-            for j in range(samples):
+            var count := maxi(1, int(length / spacing))
+            for j in range(count):
                 for direction in [-1.0, 1.0]:
-                    var p := start + delta * ((float(j) + 0.5) / float(samples))
-                    p += tangent * rng.randf_range(-3.5, 3.5)
-                    p += side * direction * rng.randf_range(13.5, 21.0)
+                    if rng.randf() < 0.26:
+                        continue # unbuilt lots, gardens and open plots
+                    var p := start + delta * ((float(j) + 0.5) / float(count))
+                    p += tangent * rng.randf_range(-2.5, 2.5)
+                    p += side * direction * rng.randf_range(17.0, 24.0)
                     if absf(p.x) > MAP_HALF or absf(p.y) > MAP_HALF:
                         continue
                     if not _is_housing(p) or _is_water(p) or _is_in_poly(p, meadow):
                         continue
-                    var key := Vector2i(roundi(p.x / 14.0), roundi(p.y / 14.0))
-                    if used.has(key):
+                    if _close_to_road(p, 9.5):
                         continue
-                    used[key] = true
-                    var width := rng.randf_range(6.0, 10.0)
-                    var depth := rng.randf_range(7.0, 13.0)
-                    var height := rng.randf_range(3.0, 5.2)
-                    var mesh := BoxMesh.new()
-                    mesh.size = Vector3(width, height, depth)
-                    var house := MeshInstance3D.new()
-                    house.mesh = mesh
-                    house.position = Vector3(p.x, height * 0.5, -p.y)
-                    house.rotation.y = -atan2(tangent.y, tangent.x)
-                    var palette := [
-                        Color("#816c60"), Color("#857b70"),
-                        Color("#a38a76"), Color("#706b65"),
-                        Color("#8c746b")
-                    ]
-                    house.material_override = _mat(palette[rng.randi_range(0, palette.size() - 1)])
-                    add_child(house)
-                    house_positions.append(p)
-                    count += 1
-                    if count >= HOUSE_LIMIT:
-                        print("Чернозёрье 0.7: условных домов ", count)
-                        return
-    print("Чернозёрье 0.7: условных домов ", count)
+                    candidates.append({
+                        "point": p,
+                        "angle": -atan2(tangent.y, tangent.x)
+                    })
+
+    # A spatial hash makes this deterministic and prevents overlapping buildings.
+    # Random selection prevents the house cap favoring the first OSM road.
+    var used := {}
+    var accepted := 0
+    const CELL := 24.0
+    while not candidates.is_empty() and accepted < HOUSE_LIMIT:
+        var candidate_index := rng.randi_range(0, candidates.size() - 1)
+        var candidate: Dictionary = candidates[candidate_index]
+        candidates.remove_at(candidate_index)
+        var p: Vector2 = candidate["point"]
+        var cell := Vector2i(floori(p.x / CELL), floori(p.y / CELL))
+        var overlaps := false
+        for dx in range(-1, 2):
+            for dy in range(-1, 2):
+                var nearby_cell := cell + Vector2i(dx, dy)
+                if used.has(nearby_cell):
+                    for neighbor in used[nearby_cell]:
+                        if p.distance_to(neighbor) < 26.0:
+                            overlaps = true
+                            break
+                if overlaps:
+                    break
+            if overlaps:
+                break
+        if overlaps:
+            continue
+        if not used.has(cell):
+            used[cell] = []
+        used[cell].append(p)
+
+        var width := rng.randf_range(6.0, 10.0)
+        var depth := rng.randf_range(8.0, 12.0)
+        var height := rng.randf_range(3.0, 5.2)
+        var mesh := BoxMesh.new()
+        mesh.size = Vector3(width, height, depth)
+        var house := MeshInstance3D.new()
+        house.mesh = mesh
+        house.position = Vector3(p.x, height * 0.5, -p.y)
+        house.rotation.y = float(candidate["angle"])
+        var palette := [
+            Color("#816c60"), Color("#857b70"),
+            Color("#a38a76"), Color("#706b65"), Color("#8c746b")
+        ]
+        house.material_override = _mat(palette[rng.randi_range(0, palette.size() - 1)])
+        add_child(house)
+        house_positions.append(p)
+        house_footprints.append({
+            "center": p,
+            "width": width,
+            "depth": depth,
+            "angle": float(candidate["angle"])
+        })
+        accepted += 1
+    print("Чернозёрье 0.9: условных домов ", accepted, " (не реальные контуры зданий)")
 
 func _draw_forests() -> void:
     # Populate forests outside housing, meadow, water and road envelopes.
