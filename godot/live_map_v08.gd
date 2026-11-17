@@ -10,6 +10,7 @@ var show_overture_buildings := true
 var show_houses := false
 var show_osm_buildings := false
 var sector_a_zoom := false
+var neighborhood_zoom := false
 
 func initialize(world_node: Node3D, geo_node: Node3D, player_node: Node3D, features: Array, overture: Array) -> void:
     world = world_node
@@ -31,9 +32,13 @@ func _process(delta: float) -> void:
             queue_redraw()
 
 func _view_center() -> Vector2:
+    if neighborhood_zoom:
+        return Vector2(-760.0, 360.0)
     return Vector2(-660.0, 390.0) if sector_a_zoom else Vector2.ZERO
 
 func _view_half() -> float:
+    if neighborhood_zoom:
+        return 150.0
     return 340.0 if sector_a_zoom else HALF
 
 func _in_view(p: Vector2) -> bool:
@@ -127,7 +132,7 @@ func _draw() -> void:
         for point in feature.get("points", []):
             forest_polygon.append(Vector2(float(point[0]), float(point[1])))
         _poly(forest_polygon, Color("#29473a"))
-    var tick_step := 100 if sector_a_zoom else 500
+    var tick_step := 50 if neighborhood_zoom else (100 if sector_a_zoom else 500)
     for tick in range(-1000, 1001, tick_step):
         _line(PackedVector2Array([Vector2(float(tick), -HALF), Vector2(float(tick), HALF)]), Color(1, 1, 1, 0.12), 1.0)
         _line(PackedVector2Array([Vector2(-HALF, float(tick)), Vector2(HALF, float(tick))]), Color(1, 1, 1, 0.12), 1.0)
@@ -165,9 +170,10 @@ func _draw() -> void:
         var kind: String = str(feature.get("tags", {}).get("highway", ""))
         var major := kind in ["trunk", "motorway", "primary"]
         _line(path, Color("#c0c5c0") if major else Color("#d3ba8a"), 3.0 if major else 2.0)
+    var visible_overbuilding_count := 0
     if show_overture_buildings:
-        # Overture building footprints: georeferenced independent open data.
-        # Styling is separate from unfinished OSM and generated placeholder layers.
+        # At neighbourhood scale, pale fills expose actual building footprints;
+        # at 2 km they are outlines to avoid unreadable overlapping pixels.
         for feature in overture_buildings:
             if not feature is Dictionary:
                 continue
@@ -175,10 +181,19 @@ func _draw() -> void:
             if shape_points.size() < 3:
                 continue
             var outline := PackedVector2Array()
+            var center := Vector2.ZERO
             for pt in shape_points:
-                outline.append(Vector2(float(pt[0]), float(pt[1])))
+                var p := Vector2(float(pt[0]), float(pt[1]))
+                outline.append(p)
+                center += p
+            center /= float(outline.size())
+            if not _in_view(center):
+                continue
+            visible_overbuilding_count += 1
+            if sector_a_zoom or neighborhood_zoom:
+                _poly(outline, Color("#d994cf"))
             outline.append(outline[0])
-            _line(outline, Color("#e6a0e2"), 1.3)
+            _line(outline, Color("#f1bee9"), 1.0 if not neighborhood_zoom else 1.8)
     if show_osm_buildings:
         # OSM outlines are real mapped contributions but can be outdated/incomplete.
         # Do not confuse them with the provisional yellow house layer.
@@ -217,13 +232,21 @@ func _draw() -> void:
             var p := _map_pos(player_map_pos)
             draw_circle(p, 7.0, Color("#ff9149"))
             draw_arc(p, 9.0, 0.0, TAU, 24, Color("#191d1b"), 2.0)
-    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 1.7", Color("#f2ead8"), 20)
-    var map_scale := "СЕКТОР A / 680 x 680 м" if sector_a_zoom else "2 x 2 km"
+    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 1.8", Color("#f2ead8"), 20)
+    var map_scale := "КВАРТАЛ СЕКТОРА A / 300 x 300 м" if neighborhood_zoom else ("СЕКТОР A / 680 x 680 м" if sector_a_zoom else "2 x 2 km")
     _text(Vector2(18, 49), map_scale + "  |  N UP  |  M = close  |  H = toggle houses", Color("#c2cfc0"))
     var house_status := "УСЛОВНЫЕ ДОМА: ПОКАЗАНЫ" if show_houses else "УСЛОВНЫЕ ДОМА: СКРЫТЫ"
     _text(Vector2(18, 77), house_status, Color("#ffce80") if show_houses else Color("#c0c7c0"), 16)
-    if sector_a_zoom:
-        _text(Vector2(18, 100), "Сектор A: розовые здания Overture = 3D-объёмы  |  Высоты условные", Color("#e7a9df"), 13)
-    _text(Vector2(18, 119), "Overture: " + str(overture_buildings.size()) + " кандидатов  |  OSM: 63 (все 2×2 км)", Color("#bdc9c5"), 12)
+    if sector_a_zoom or neighborhood_zoom:
+        _text(Vector2(18, 100), "Розовые пятна = геоданные зданий; высоты в 3D приблизительные", Color("#e7a9df"), 13)
+    _text(Vector2(18, 119), "Overture: " + str(visible_overbuilding_count) + " в кадре / " + str(overture_buildings.size()) + " всего", Color("#bdc9c5"), 12)
+    # Scale bar is tied to projected metres, not the screen width.
+    var ruler_m := 50.0 if neighborhood_zoom else (100.0 if sector_a_zoom else 250.0)
+    var ruler_px := (_map_pos(_view_center() + Vector2(ruler_m, 0.0)) - _map_pos(_view_center())).x
+    var ruler_y := se.y - 23.0
+    draw_line(Vector2(nw.x + 22.0, ruler_y), Vector2(nw.x + 22.0 + ruler_px, ruler_y), Color("#faf5e7"), 3.0)
+    draw_line(Vector2(nw.x + 22.0, ruler_y - 4.0), Vector2(nw.x + 22.0, ruler_y + 4.0), Color("#faf5e7"), 2.0)
+    draw_line(Vector2(nw.x + 22.0 + ruler_px, ruler_y - 4.0), Vector2(nw.x + 22.0 + ruler_px, ruler_y + 4.0), Color("#faf5e7"), 2.0)
+    _text(Vector2(nw.x + 28.0, ruler_y - 7.0), str(int(ruler_m)) + " м", Color("#faf5e7"), 13)
     _text(Vector2(18, size.y - 27), "OSM forests: dark green  |  OSM roads: light  |  Sketched roads: orange  |  Field: pale green", Color("#c9d3c8"), 12)
-    _text(Vector2(18, size.y - 10), "Sector A 3D from Overture; other sectors still procedural | Real contours, provisional heights", Color("#d3b4a0"), 11)
+    _text(Vector2(18, size.y - 10), "Buildings: Overture coordinates, approximate 3D heights | Google imagery not imported", Color("#d3b4a0"), 11)
