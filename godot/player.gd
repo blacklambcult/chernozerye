@@ -35,6 +35,7 @@ func _ready() -> void:
     status_label.add_theme_constant_override("shadow_offset_y", 1)
     status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
     hud.add_child(status_label)
+    status_label.visible = false
 
 func _matches(event: InputEventKey, latin: int, cyrillic: String) -> bool:
     return event.physical_keycode == latin or event.keycode == latin or (event.unicode != 0 and char(event.unicode).to_lower() == cyrillic)
@@ -57,6 +58,8 @@ func _input(event: InputEvent) -> void:
         if _matches(key, KEY_S, "ы"): pressed["s"] = key.pressed
         if _matches(key, KEY_D, "в"): pressed["d"] = key.pressed
         if _matches(key, KEY_M, "ь"): pressed["m"] = key.pressed
+        if key.pressed and not key.echo and (key.keycode == KEY_F3 or key.physical_keycode == KEY_F3):
+            status_label.visible = not status_label.visible
         if key.pressed and key.keycode == KEY_ESCAPE:
             Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
