@@ -332,5 +332,15 @@
     }
   }
 
+  // Narrow bridge for the manual constructor: existing geodata stays read-only.
+  // The editor creates its own Leaflet layer and never mutates source layers.
+  window.ChernozeryeGeoLab = Object.freeze({
+    map,
+    selectView,
+    switchBase,
+    getView: () => state.view,
+    getSourceLayers: () => state.layers
+  });
+
   loadAll();
 })();
