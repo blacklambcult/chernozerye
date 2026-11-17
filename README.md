@@ -58,3 +58,13 @@ Changes:
 - Existing house layer toggle, player movement, project scale and Godot web build are preserved.
 
 **Important:** 1:1 refers to the intended terrain *scale*, not verified per-house or per-shoreline accuracy. The added landforms are illustrative, not traced from Google Maps. Visual source images are not distributed in the repository; for precise asset placement use appropriately licensed geodata or independently measured coordinates.
+
+## Prototype 1.1 — overview clarity (live map)
+
+- All on-screen roads and filled areas are clipped to the 2×2 km study frame; OSM road ways outside it are no longer drawn past the map border.
+- The map draws OSM forest polygons in dark green **only where OSM actually has a mapped woodland polygon**. The neutral ground elsewhere indicates *unknown cover*, not necessarily open ground or forest. Source forest completeness is limited.
+- Added/sketched roads have a different colour from OSM roads and are no longer overdrawn twice.
+- The provisional field, river, lake, sector masks, houses and landmarks remain artistic approximations, not measured geometry.
+- In-game map header: `CHERNOZERYE / LIVE MAP 1.1`; press M for map and H or the top-right button for approximate houses.
+
+**Next accuracy milestone:** replace unsupported extra roads and settlement boundaries progressively with verified licensed geographic measurements, then refine each of A, B, C before detailed assets.
