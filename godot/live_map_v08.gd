@@ -6,6 +6,8 @@ var geo
 var player: Node3D
 var osm_features: Array = []
 var show_houses := false
+var show_osm_buildings := false
+var sector_a_zoom := false
 
 func initialize(world_node: Node3D, geo_node: Node3D, player_node: Node3D, features: Array) -> void:
     world = world_node
@@ -21,17 +23,32 @@ func _process(_delta: float) -> void:
     if visible:
         queue_redraw()
 
+func _view_center() -> Vector2:
+    return Vector2(-660.0, 390.0) if sector_a_zoom else Vector2.ZERO
+
+func _view_half() -> float:
+    return 340.0 if sector_a_zoom else HALF
+
+func _in_view(p: Vector2) -> bool:
+    var c := _view_center()
+    var h := _view_half()
+    return absf(p.x - c.x) <= h and absf(p.y - c.y) <= h
+
 func _map_pos(p: Vector2) -> Vector2:
     var side: float = maxf(10.0, minf(size.x - 36.0, size.y - 98.0))
     var origin := Vector2((size.x - side) * 0.5, 60.0 + maxf(0.0, (size.y - 98.0 - side) * 0.5))
-    return origin + Vector2((p.x + HALF) * side / (2.0 * HALF), (HALF - p.y) * side / (2.0 * HALF))
+    var c := _view_center()
+    var h := _view_half()
+    return origin + Vector2((p.x - c.x + h) * side / (2.0 * h), (c.y + h - p.y) * side / (2.0 * h))
 
 # Clip all geometry to the 2 x 2 km study square before drawing.
 # Source OSM ways extend beyond the square and must not appear outside its frame.
 func _bounds() -> PackedVector2Array:
+    var c := _view_center()
+    var h := _view_half()
     return PackedVector2Array([
-        Vector2(-HALF, -HALF), Vector2(HALF, -HALF),
-        Vector2(HALF, HALF), Vector2(-HALF, HALF)
+        Vector2(c.x - h, c.y - h), Vector2(c.x + h, c.y - h),
+        Vector2(c.x + h, c.y + h), Vector2(c.x - h, c.y + h)
     ])
 
 func _poly(points: PackedVector2Array, tint: Color) -> void:
@@ -39,7 +56,7 @@ func _poly(points: PackedVector2Array, tint: Color) -> void:
         return
     var all_inside := true
     for p in points:
-        if absf(p.x) > HALF or absf(p.y) > HALF:
+        if not _in_view(p):
             all_inside = false
             break
     var pieces: Array = [points] if all_inside else Geometry2D.intersect_polygons(points, _bounds())
@@ -55,7 +72,9 @@ func _clip_segment(a: Vector2, b: Vector2) -> PackedVector2Array:
     # Liang-Barsky segment clipping: returns zero or two vertices.
     var d := b - a
     var p_values := [-d.x, d.x, -d.y, d.y]
-    var q_values := [a.x + HALF, HALF - a.x, a.y + HALF, HALF - a.y]
+    var c := _view_center()
+    var h := _view_half()
+    var q_values := [a.x - (c.x - h), c.x + h - a.x, a.y - (c.y - h), c.y + h - a.y]
     var low := 0.0
     var high := 1.0
     for k in range(4):
@@ -87,8 +106,10 @@ func _text(p: Vector2, text: String, color: Color = Color.WHITE, font_size: int 
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO, size), Color(0.025, 0.036, 0.035, 0.97))
-    var nw := _map_pos(Vector2(-HALF, HALF))
-    var se := _map_pos(Vector2(HALF, -HALF))
+    var c := _view_center()
+    var h := _view_half()
+    var nw := _map_pos(c + Vector2(-h, h))
+    var se := _map_pos(c + Vector2(h, -h))
     # Unmapped territory is not automatically classified as forest.
     draw_rect(Rect2(nw, se - nw), Color("#3a403b"))
     # OpenStreetMap forest polygons are mapped evidence, but coverage is incomplete.
@@ -99,13 +120,10 @@ func _draw() -> void:
         for point in feature.get("points", []):
             forest_polygon.append(Vector2(float(point[0]), float(point[1])))
         _poly(forest_polygon, Color("#29473a"))
-    for tick in range(-1000, 1001, 500):
-        var a := _map_pos(Vector2(float(tick), -HALF))
-        var b := _map_pos(Vector2(float(tick), HALF))
-        draw_line(a, b, Color(1, 1, 1, 0.12), 1.0)
-        a = _map_pos(Vector2(-HALF, float(tick)))
-        b = _map_pos(Vector2(HALF, float(tick)))
-        draw_line(a, b, Color(1, 1, 1, 0.12), 1.0)
+    var tick_step := 100 if sector_a_zoom else 500
+    for tick in range(-1000, 1001, tick_step):
+        _line(PackedVector2Array([Vector2(float(tick), -HALF), Vector2(float(tick), HALF)]), Color(1, 1, 1, 0.12), 1.0)
+        _line(PackedVector2Array([Vector2(-HALF, float(tick)), Vector2(HALF, float(tick))]), Color(1, 1, 1, 0.12), 1.0)
     if is_instance_valid(geo):
         for zone in geo.settlements:
             _poly(zone, Color("#858576"))
@@ -117,7 +135,10 @@ func _draw() -> void:
         if show_houses:
             var meters_to_pixels := (_map_pos(Vector2(1.0, 0.0)) - _map_pos(Vector2.ZERO)).x
             for house in geo.house_footprints:
-                var center: Vector2 = _map_pos(house["center"])
+                var world_center: Vector2 = house["center"]
+                if not _in_view(world_center):
+                    continue
+                var center: Vector2 = _map_pos(world_center)
                 var footprint := Vector2(
                     maxf(4.0, float(house["width"]) * meters_to_pixels),
                     maxf(4.0, float(house["depth"]) * meters_to_pixels)
@@ -134,6 +155,18 @@ func _draw() -> void:
         var kind: String = str(feature.get("tags", {}).get("highway", ""))
         var major := kind in ["trunk", "motorway", "primary"]
         _line(path, Color("#c0c5c0") if major else Color("#d3ba8a"), 3.0 if major else 2.0)
+    if show_osm_buildings:
+        # OSM outlines are real mapped contributions but can be outdated/incomplete.
+        # Do not confuse them with the provisional yellow house layer.
+        for feature in osm_features:
+            if not feature is Dictionary or feature.get("type", "") != "building":
+                continue
+            var outline := PackedVector2Array()
+            for point in feature.get("points", []):
+                outline.append(Vector2(float(point[0]), float(point[1])))
+            if outline.size() >= 3:
+                outline.append(outline[0])
+                _line(outline, Color("#75e1e0"), 2.0)
     if is_instance_valid(geo):
         # Render only the extra sketched roads here, not the OSM lines twice.
         for route in geo.sketch_roads:
@@ -149,16 +182,23 @@ func _draw() -> void:
         [Vector2(975, 120), "EXIT?"]
     ]
     for mark in marks:
+        if not _in_view(mark[0]):
+            continue
         var p := _map_pos(mark[0])
         draw_circle(p, 4.0, Color("#f5d17e"))
         _text(p + Vector2(7, -6), str(mark[1]), Color("#f5e5bd"), 11)
     if is_instance_valid(player):
-        var p := _map_pos(Vector2(player.position.x, -player.position.z))
-        draw_circle(p, 7.0, Color("#ff9149"))
-        draw_arc(p, 9.0, 0.0, TAU, 24, Color("#191d1b"), 2.0)
-    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 1.4", Color("#f2ead8"), 20)
-    _text(Vector2(18, 49), "2 x 2 km  |  N UP  |  M = close  |  H = toggle houses", Color("#c2cfc0"))
-    var house_status := "ДОМА НА СХЕМЕ: ПОКАЗАНЫ" if show_houses else "ДОМА НА СХЕМЕ: СКРЫТЫ"
+        var player_map_pos := Vector2(player.position.x, -player.position.z)
+        if _in_view(player_map_pos):
+            var p := _map_pos(player_map_pos)
+            draw_circle(p, 7.0, Color("#ff9149"))
+            draw_arc(p, 9.0, 0.0, TAU, 24, Color("#191d1b"), 2.0)
+    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 1.5", Color("#f2ead8"), 20)
+    var map_scale := "СЕКТОР A / 680 x 680 м" if sector_a_zoom else "2 x 2 km"
+    _text(Vector2(18, 49), map_scale + "  |  N UP  |  M = close  |  H = toggle houses", Color("#c2cfc0"))
+    var house_status := "УСЛОВНЫЕ ДОМА: ПОКАЗАНЫ" if show_houses else "УСЛОВНЫЕ ДОМА: СКРЫТЫ"
     _text(Vector2(18, 77), house_status, Color("#ffce80") if show_houses else Color("#c0c7c0"), 16)
+    if sector_a_zoom:
+        _text(Vector2(18, 100), "Жёлтые: игровая генерация  |  Голубые: контуры OSM (непроверенные)", Color("#9fdad6"), 13)
     _text(Vector2(18, size.y - 27), "OSM forests: dark green  |  OSM roads: light  |  Sketched roads: orange  |  Field: pale green", Color("#c9d3c8"), 12)
     _text(Vector2(18, size.y - 10), "Unmapped areas are unknown, not necessarily forest | Field / homes / river are approximate", Color("#d3b4a0"), 11)
