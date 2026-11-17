@@ -5,23 +5,30 @@ var world: Node3D
 var geo
 var player: Node3D
 var osm_features: Array = []
+var overture_buildings: Array = []
+var show_overture_buildings := true
 var show_houses := false
 var show_osm_buildings := false
 var sector_a_zoom := false
 
-func initialize(world_node: Node3D, geo_node: Node3D, player_node: Node3D, features: Array) -> void:
+func initialize(world_node: Node3D, geo_node: Node3D, player_node: Node3D, features: Array, overture: Array) -> void:
     world = world_node
     geo = geo_node
     player = player_node
     osm_features = features
+    overture_buildings = overture
 
 func _ready() -> void:
     mouse_filter = Control.MOUSE_FILTER_IGNORE
     set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
-func _process(_delta: float) -> void:
+var elapsed_since_redraw := 0.0
+func _process(delta: float) -> void:
     if visible:
-        queue_redraw()
+        elapsed_since_redraw += delta
+        if elapsed_since_redraw >= 0.16:
+            elapsed_since_redraw = 0.0
+            queue_redraw()
 
 func _view_center() -> Vector2:
     return Vector2(-660.0, 390.0) if sector_a_zoom else Vector2.ZERO
@@ -155,6 +162,20 @@ func _draw() -> void:
         var kind: String = str(feature.get("tags", {}).get("highway", ""))
         var major := kind in ["trunk", "motorway", "primary"]
         _line(path, Color("#c0c5c0") if major else Color("#d3ba8a"), 3.0 if major else 2.0)
+    if show_overture_buildings:
+        # Overture building footprints: georeferenced independent open data.
+        # Styling is separate from unfinished OSM and generated placeholder layers.
+        for feature in overture_buildings:
+            if not feature is Dictionary:
+                continue
+            var shape_points: Array = feature.get("points", [])
+            if shape_points.size() < 3:
+                continue
+            var outline := PackedVector2Array()
+            for pt in shape_points:
+                outline.append(Vector2(float(pt[0]), float(pt[1])))
+            outline.append(outline[0])
+            _line(outline, Color("#e6a0e2"), 1.3)
     if show_osm_buildings:
         # OSM outlines are real mapped contributions but can be outdated/incomplete.
         # Do not confuse them with the provisional yellow house layer.
@@ -193,12 +214,13 @@ func _draw() -> void:
             var p := _map_pos(player_map_pos)
             draw_circle(p, 7.0, Color("#ff9149"))
             draw_arc(p, 9.0, 0.0, TAU, 24, Color("#191d1b"), 2.0)
-    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 1.5", Color("#f2ead8"), 20)
+    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 1.6", Color("#f2ead8"), 20)
     var map_scale := "СЕКТОР A / 680 x 680 м" if sector_a_zoom else "2 x 2 km"
     _text(Vector2(18, 49), map_scale + "  |  N UP  |  M = close  |  H = toggle houses", Color("#c2cfc0"))
     var house_status := "УСЛОВНЫЕ ДОМА: ПОКАЗАНЫ" if show_houses else "УСЛОВНЫЕ ДОМА: СКРЫТЫ"
     _text(Vector2(18, 77), house_status, Color("#ffce80") if show_houses else Color("#c0c7c0"), 16)
     if sector_a_zoom:
-        _text(Vector2(18, 100), "Жёлтые: игровая генерация  |  Голубые: контуры OSM (непроверенные)", Color("#9fdad6"), 13)
+        _text(Vector2(18, 100), "Жёлтые: условные  |  Голубые: OSM  |  Розовые: Overture", Color("#e7a9df"), 13)
+    _text(Vector2(18, 119), "Overture: " + str(overture_buildings.size()) + " кандидатов  |  OSM: 63 (все 2×2 км)", Color("#bdc9c5"), 12)
     _text(Vector2(18, size.y - 27), "OSM forests: dark green  |  OSM roads: light  |  Sketched roads: orange  |  Field: pale green", Color("#c9d3c8"), 12)
-    _text(Vector2(18, size.y - 10), "Unmapped areas are unknown, not necessarily forest | Field / homes / river are approximate", Color("#d3b4a0"), 11)
+    _text(Vector2(18, size.y - 10), "Buildings: Overture Maps + contributors (open datasets) | Footprints not individually validated", Color("#d3b4a0"), 11)
