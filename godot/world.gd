@@ -140,7 +140,7 @@ func _create_player() -> void:
 func _create_label() -> void:
     var layer := CanvasLayer.new()
     var label := Label.new()
-    label.text = "ЧЕРНОЗЁРЬЕ 0.8 LIVE MAP  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
+    label.text = "ЧЕРНОЗЁРЬЕ 0.9 LOWER DENSITY  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
     label.position = Vector2(16, 16)
     layer.add_child(label)
     add_child(layer)
@@ -315,4 +315,8 @@ func _input(event: InputEvent) -> void:
             overview_layer.visible = not overview_layer.visible
             if overview_layer.visible:
                 Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+            get_viewport().set_input_as_handled()
+        elif overview_layer.visible and (event.physical_keycode == KEY_H or event.keycode == KEY_H or (event.unicode != 0 and char(event.unicode).to_lower() == "р")):
+            map_panel.set("show_houses", not bool(map_panel.get("show_houses")))
+            map_panel.queue_redraw()
             get_viewport().set_input_as_handled()
