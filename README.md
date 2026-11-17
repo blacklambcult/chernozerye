@@ -68,3 +68,13 @@ Changes:
 - In-game map header: `CHERNOZERYE / LIVE MAP 1.1`; press M for map and H or the top-right button for approximate houses.
 
 **Next accuracy milestone:** replace unsupported extra roads and settlement boundaries progressively with verified licensed geographic measurements, then refine each of A, B, C before detailed assets.
+
+## Prototype 1.2 — 3D dacha neighbourhoods
+
+The previous marker-like houses were uniform cubes. The scene now renders deterministic, low-poly *provisional* houses with pitched roofs in several muted colours. Lots have modest garden pads and occasional small sheds. Physical wall colliders prevent the player walking through the houses.
+
+The previous settlement masks also excluded **all** trees; limited garden-tree groups are now allowed on empty parts of the housing blocks, at least 10 m from provisional house centres and 8 m from road centre lines. The result should better communicate a rural settlement where woodland reaches streets and gardens.
+
+**Accuracy:** none of these additions are measured house-by-house. Roofs, garden pads, shed positions and trees are illustrative game geometry. The existing OSM roads, and the user-provided conceptual sector reviews, are not altered by this cosmetic/experiential iteration.
+
+Verify the last GitHub Actions export before reviewing the browser build. In-game header is `CHERNOZERYE / LIVE MAP 1.2`. Assess the change from ground-level gameplay; map geometry changes only in presentation label.
