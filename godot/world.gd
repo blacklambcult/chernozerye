@@ -79,7 +79,8 @@ func _add_road(feature: Dictionary) -> void:
     var road_type: String = str(tags.get("highway", ""))
     var width := 5.0
     if road_type in ["footway", "path", "track", "cycleway"]: width = 2.0
-    elif road_type in ["primary", "trunk", "secondary"]: width = 9.0
+    elif road_type in ["primary", "trunk", "motorway"]: width = 11.0
+    elif road_type == "secondary": width = 8.0
     var vertices := PackedVector3Array()
     for i in range(pts.size() - 1):
         var a := _coord(pts[i], 0.035)
@@ -95,7 +96,9 @@ func _add_road(feature: Dictionary) -> void:
     mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
     var instance := MeshInstance3D.new()
     instance.mesh = mesh
-    instance.material_override = _material(Color("#918779") if road_type in ["residential", "service", "primary", "secondary", "trunk"] else Color("#786d57"))
+    # Distinguish the existing georeferenced M5 trunk road from earth tracks.
+    var road_color := Color("#505758") if road_type in ["primary", "trunk", "motorway"] else Color("#918779") if road_type in ["residential", "service", "secondary"] else Color("#786d57")
+    instance.material_override = _material(road_color)
     add_child(instance)
 
 func _add_building(feature: Dictionary) -> void:
@@ -140,7 +143,7 @@ func _create_player() -> void:
 func _create_label() -> void:
     var layer := CanvasLayer.new()
     var label := Label.new()
-    label.text = "ЧЕРНОЗЁРЬЕ 0.9 LOWER DENSITY  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
+    label.text = "ЧЕРНОЗЁРЬЕ 1.0 LANDSCAPE  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
     label.position = Vector2(16, 16)
     layer.add_child(label)
     add_child(layer)
