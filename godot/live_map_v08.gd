@@ -61,6 +61,8 @@ func _draw() -> void:
         for zone in geo.settlements:
             _poly(zone, Color("#858576"))
         _poly(geo.meadow, Color("#8b9971"))
+        _poly(geo.meadow_island, Color("#365644"))
+        _line(geo.field_track, Color("#d0b992"), 1.5)
         _line(geo.river_path, Color("#6fbbdc"), 11.0)
         var lake := PackedVector2Array()
         for i in range(36):
@@ -84,7 +86,9 @@ func _draw() -> void:
         var path := PackedVector2Array()
         for point in feature.get("points", []):
             path.append(Vector2(float(point[0]), float(point[1])))
-        _line(path, Color("#d3ba8a"), 2.0)
+        var kind: String = str(feature.get("tags", {}).get("highway", ""))
+        var major := kind in ["trunk", "motorway", "primary"]
+        _line(path, Color("#c0c5c0") if major else Color("#d3ba8a"), 3.0 if major else 2.0)
     if is_instance_valid(geo):
         for route in geo.roads:
             var path := PackedVector2Array()
@@ -106,9 +110,9 @@ func _draw() -> void:
         var p := _map_pos(Vector2(player.position.x, -player.position.z))
         draw_circle(p, 7.0, Color("#ff9149"))
         draw_arc(p, 9.0, 0.0, TAU, 24, Color("#191d1b"), 2.0)
-    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 0.9.1", Color("#f2ead8"), 20)
+    _text(Vector2(18, 29), "CHERNOZERYE / LIVE MAP 1.0", Color("#f2ead8"), 20)
     _text(Vector2(18, 49), "2 x 2 km  |  N UP  |  M = close  |  H = toggle houses", Color("#c2cfc0"))
     var house_status := "ДОМА НА СХЕМЕ: ПОКАЗАНЫ" if show_houses else "ДОМА НА СХЕМЕ: СКРЫТЫ"
     _text(Vector2(18, 77), house_status, Color("#ffce80") if show_houses else Color("#c0c7c0"), 16)
     _text(Vector2(18, size.y - 27), "Beige: settlements/roads  |  Green: field/forest  |  Blue: water  |  Orange: player", Color("#c9d3c8"), 12)
-    _text(Vector2(18, size.y - 10), "Roads: OSM + rough sketches; pale houses are provisional, not surveyed", Color("#d3b4a0"), 11)
+    _text(Vector2(18, size.y - 10), "Approximate game blockout | M5 from OSM | field, forest and houses not surveyed", Color("#d3b4a0"), 11)
