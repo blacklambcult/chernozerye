@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0d1316">
   <meta name="description" content="Чернозёрье: спутниковая географическая проверка дорог и зданий по открытым геоданным.">
-  <title>Чернозёрье / GEO LAB 1.9</title>
+  <title>Чернозёрье / GEO LAB 2.0 — Конструктор местности</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="./style.css?v=19">
+  <link rel="stylesheet" href="./editor.css?v=20">
 </head>
 <body>
   <main class="workspace">
@@ -15,17 +16,84 @@
       <header class="brand">
         <div class="brand-mark">Ч</div>
         <div>
-          <div class="brand-overline">GEO LAB <span class="version">01.9</span></div>
+          <div class="brand-overline">GEO LAB <span class="version">02.0</span></div>
           <h1>ЧЕРНОЗЁРЬЕ</h1>
           <p>Географическая лаборатория</p>
         </div>
       </header>
       <div class="sidebar-inner">
         <div class="lead">
-          <span class="eyebrow">01 / ПРОВЕРКА МЕСТНОСТИ</span>
-          <h2>Сначала реальная карта.<br>Потом — игровой мир.</h2>
-          <p>Сравниваем координаты зданий и улиц со спутниковым снимком. Без случайно расставленных домов.</p>
+          <span class="eyebrow">01 / КОНСТРУКТОР МЕСТНОСТИ</span>
+          <h2>Нарисуй свой квартал.<br>Перенесём его в игру.</h2>
+          <p>Разметь дороги, участки, лес и постройки. Твои объекты сохраняются отдельно от OSM и Overture и экспортируются в GeoJSON.</p>
         </div>
+        <section class="group editor-panel" id="editor-panel" aria-label="Конструктор местности">
+          <div class="editor-heading">
+            <span class="eyebrow">02 / РИСОВАНИЕ ГЕОГРАФИИ</span>
+            <span id="editor-count" class="editor-total">0 объектов</span>
+          </div>
+          <p class="helper editor-intro">Выбери инструмент и расставляй точки на карте. Дорога — линия, лес и участок — область, дом — контур здания.</p>
+          <div class="editor-tool-group">
+            <h4>Линии</h4>
+            <div class="editor-tools">
+              <button type="button" class="editor-tool" data-category="road" data-geometry="LineString"><span class="tool-dot tool-road"></span>Дорога</button>
+              <button type="button" class="editor-tool" data-category="path" data-geometry="LineString"><span class="tool-dot tool-path"></span>Тропинка</button>
+            </div>
+            <h4>Территория и границы</h4>
+            <div class="editor-tools">
+              <button type="button" class="editor-tool" data-category="water" data-geometry="Polygon"><span class="tool-dot tool-water"></span>Водоём</button>
+              <button type="button" class="editor-tool" data-category="forest" data-geometry="Polygon"><span class="tool-dot tool-forest"></span>Лес</button>
+              <button type="button" class="editor-tool" data-category="plot" data-geometry="Polygon"><span class="tool-dot tool-plot"></span>Граница участка</button>
+              <button type="button" class="editor-tool" data-category="object" data-geometry="Polygon"><span class="tool-dot tool-object"></span>Другой объект</button>
+            </div>
+            <h4>Постройки и объекты</h4>
+            <div class="editor-tools">
+              <button type="button" class="editor-tool" data-category="house" data-geometry="Polygon"><span class="tool-dot tool-house"></span>Дом</button>
+              <button type="button" class="editor-tool" data-category="shed" data-geometry="Polygon"><span class="tool-dot tool-shed"></span>Сарай</button>
+              <button type="button" class="editor-tool" data-category="sauna" data-geometry="Polygon"><span class="tool-dot tool-sauna"></span>Баня</button>
+              <button type="button" class="editor-tool" data-category="car" data-geometry="Polygon"><span class="tool-dot tool-car"></span>Авто · контур</button>
+              <button type="button" class="editor-tool" data-category="car" data-geometry="Point"><span class="tool-dot tool-car"></span>Авто · метка</button>
+            </div>
+          </div>
+          <div id="draw-hint" class="draw-hint" role="status">Выбери тип объекта выше. Затем нажимай на карту, отмечая вершины.</div>
+          <div id="draw-actions" class="editor-draw-actions" hidden>
+            <button type="button" id="draw-finish" class="editor-action primary">Завершить <span class="shortcut">Enter</span></button>
+            <button type="button" id="draw-undo" class="editor-action">− Точка</button>
+            <button type="button" id="draw-cancel" class="editor-action">Отмена <span class="shortcut">Esc</span></button>
+          </div>
+          <div class="editor-section-divider"></div>
+          <label class="editor-check"><input id="editor-visible" type="checkbox" checked>Показывать мою разметку</label>
+          <div id="editor-objects" class="editor-object-list" aria-live="polite"><p class="editor-empty">Объектов пока нет.</p></div>
+          <div id="editor-selected" class="editor-inspector" hidden>
+            <span class="eyebrow">03 / СВОЙСТВА ОБЪЕКТА</span>
+            <label for="editor-name">Название / номер</label>
+            <input id="editor-name" maxlength="120" placeholder="Например, Дом 12" autocomplete="off">
+            <label for="editor-type">Тип объекта</label>
+            <select id="editor-type"></select>
+            <label for="editor-notes">Примечание</label>
+            <textarea id="editor-notes" rows="2" maxlength="600" placeholder="Например, забор, одноэтажный, красная крыша"></textarea>
+            <div class="editor-inspector-actions">
+              <button id="editor-apply" type="button" class="editor-action primary">Сохранить описание</button>
+              <button id="editor-edit-points" type="button" class="editor-action">Править точки</button>
+              <button id="editor-add-point" type="button" class="editor-action" hidden>+ Вершина</button>
+              <button id="editor-remove-point" type="button" class="editor-action" hidden>− Вершина</button>
+              <button id="editor-delete" type="button" class="editor-action danger">Удалить объект</button>
+            </div>
+            <p id="editor-shape-info" class="helper"></p>
+          </div>
+          <div class="editor-section-divider"></div>
+          <h3 class="editor-export-title">Сохранение проекта</h3>
+          <div class="editor-file-actions">
+            <button id="editor-export" type="button" class="editor-action primary">↓ Скачать GeoJSON</button>
+            <label class="editor-action editor-import" for="editor-import-file">↑ Загрузить GeoJSON
+              <input id="editor-import-file" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden>
+            </label>
+            <button id="editor-clear" type="button" class="editor-action danger">Очистить разметку</button>
+          </div>
+          <p id="editor-save-status" class="editor-save-status" role="status">Разметка автоматически сохраняется в браузере.</p>
+          <p class="editor-share-note">Когда разметишь квартал, нажми «Скачать GeoJSON» и прикрепи файл в чат. Я перенесу геометрию в Godot. Не очищай данные браузера, пока не скачал файл.</p>
+          <p class="helper editor-rights">Наноси данные по собственным сведениям, измерениям или источникам с разрешением на оцифровку. Условия спутниковых подложек могут ограничивать обводку изображений.</p>
+        </section>
         <section class="group">
           <h3>Показать территорию</h3>
           <div class="view-selector" role="group" aria-label="Масштаб исследования">
@@ -101,7 +169,7 @@
     </aside>
     <section class="map-shell" aria-label="Спутниковая карта Чернозёрья">
       <div id="map" role="application" aria-label="Интерактивная спутниковая карта"></div>
-      <div class="map-top-left" aria-hidden="true"><span class="map-bullet"></span> CHERNOZERYE <span class="map-slash">/</span> GEOGRAPHIC REVIEW</div>
+      <div class="map-top-left" aria-hidden="true"><span class="map-bullet"></span> CHERNOZERYE <span class="map-slash">/</span> TERRAIN BUILDER 2.0</div>
       <div class="map-top-right">
         <div class="mode-label"><span class="mode-dot"></span><span id="active-area-title">СЕКТОР A</span></div>
         <div id="map-status" class="map-status" role="status">Подключаю карту и геоданные…</div>
@@ -116,6 +184,8 @@
   </main>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/esri-leaflet@3.0.14/dist/esri-leaflet.js"></script>
-  <script src="./app.js?v=19"></script>
+  <script src="./app.js?v=20"></script>
+  <script src="./editor-core.js?v=20"></script>
+  <script src="./editor.js?v=20"></script>
 </body>
 </html>
