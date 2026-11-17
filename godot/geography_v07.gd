@@ -265,6 +265,50 @@ func _add_street_details() -> void:
             path.append(Vector2(float(p[0]), float(p[1])))
         _draw_strip(path, 3.2, Color("#847a68"), 0.068)
 
+# Prototype roof geometry: an inexpensive pitched-roof silhouette, not an
+# individual real-world building reconstruction.
+func _create_pitched_roof(width: float, depth: float, wall_height: float, roof_tint: Color) -> MeshInstance3D:
+    var roof := MeshInstance3D.new()
+    var eave_x := width * 0.5 + 0.35
+    var eave_z := depth * 0.5 + 0.35
+    var y_low := wall_height * 0.5 + 0.20
+    var y_top := y_low + minf(2.2, width * 0.24)
+    var left_front := Vector3(-eave_x, y_low, -eave_z)
+    var left_back := Vector3(-eave_x, y_low, eave_z)
+    var right_front := Vector3(eave_x, y_low, -eave_z)
+    var right_back := Vector3(eave_x, y_low, eave_z)
+    var peak_front := Vector3(0.0, y_top, -eave_z)
+    var peak_back := Vector3(0.0, y_top, eave_z)
+    var vertices := PackedVector3Array([
+        left_front, peak_front, peak_back,
+        left_front, peak_back, left_back,
+        peak_front, right_front, right_back,
+        peak_front, right_back, peak_back,
+        left_front, right_front, peak_front,
+        left_back, peak_back, right_back
+    ])
+    var arrays := []
+    arrays.resize(Mesh.ARRAY_MAX)
+    arrays[Mesh.ARRAY_VERTEX] = vertices
+    var mesh := ArrayMesh.new()
+    mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+    roof.mesh = mesh
+    roof.material_override = _mat(roof_tint)
+    return roof
+
+func _add_dacha_yard(p: Vector2, yaw: float, size_factor: float, palette_index: int) -> void:
+    # A faint garden floor makes the housing strip read as separate plots.
+    # These plots have no collision and are entirely illustrative.
+    var patch := MeshInstance3D.new()
+    var patch_mesh := BoxMesh.new()
+    patch_mesh.size = Vector3(13.0 * size_factor, 0.018, 18.0 * size_factor)
+    patch.mesh = patch_mesh
+    patch.position = Vector3(p.x, 0.020, -p.y)
+    patch.rotation.y = yaw
+    var greens := [Color("#4b654c"), Color("#566649"), Color("#5d6a4b"), Color("#52624a")]
+    patch.material_override = _mat(greens[palette_index % greens.size()])
+    add_child(patch)
+
 func _draw_houses() -> void:
     # Provisional houses, not measured footprints. Fewer homes with breathing room,
     # spread across all street networks (instead of filling early roads first).
@@ -344,6 +388,23 @@ func _draw_houses() -> void:
         ]
         house.material_override = _mat(palette[rng.randi_range(0, palette.size() - 1)])
         add_child(house)
+        # Individual garden pads and pitched roofs replace anonymous box-only silhouettes.
+        _add_dacha_yard(p, house.rotation.y, rng.randf_range(0.86, 1.14), accepted)
+        var roof_colors := [
+            Color("#784d43"), Color("#575f69"), Color("#80695c"),
+            Color("#6c4b47"), Color("#586774"), Color("#675e54")
+        ]
+        house.add_child(_create_pitched_roof(width, depth, height,
+            roof_colors[rng.randi_range(0, roof_colors.size() - 1)]))
+        if rng.randf() < 0.24:
+            # Small secondary outbuilding at a few properties, never every house.
+            var shed := MeshInstance3D.new()
+            var shed_mesh := BoxMesh.new()
+            shed_mesh.size = Vector3(2.5, 2.3, 3.6)
+            shed.mesh = shed_mesh
+            shed.position = Vector3(0.0, -height * 0.5 + 1.15, -depth * 0.5 - 4.6)
+            shed.material_override = _mat(Color("#69645b"))
+            house.add_child(shed)
         house_positions.append(p)
         house_footprints.append({
             "center": p,
@@ -352,7 +413,7 @@ func _draw_houses() -> void:
             "angle": float(candidate["angle"])
         })
         accepted += 1
-    print("Чернозёрье 0.9: условных домов ", accepted, " (не реальные контуры зданий)")
+    print("Чернозёрье 1.2: условных домов с крышами ", accepted, " (пока не реальные контуры зданий)")
 
 func _draw_forests() -> void:
     # Populate forests outside housing, meadow, water and road envelopes.
@@ -363,6 +424,26 @@ func _draw_forests() -> void:
         var island_p := Vector2(rng.randf_range(-374.0, -224.0), rng.randf_range(-495.0, -348.0))
         if _is_in_poly(island_p, meadow_island):
             positions.append(Vector3(island_p.x, 0.0, -island_p.y))
+    # Tree groups inside dacha gardens: the old broad settlement masks left
+    # the entire village unnaturally bare, unlike wooded rural neighbourhoods.
+    var yard_count := 0
+    for j in range(13000):
+        if yard_count >= 550:
+            break
+        var yard_p := Vector2(rng.randf_range(-960.0, 930.0), rng.randf_range(30.0, 720.0))
+        if not _is_housing(yard_p) or _is_water(yard_p):
+            continue
+        if _close_to_road(yard_p, 8.0):
+            continue
+        var too_close := false
+        for built in house_positions:
+            if built.distance_squared_to(yard_p) < 10.0 * 10.0:
+                too_close = true
+                break
+        if too_close:
+            continue
+        positions.append(Vector3(yard_p.x, 0.0, -yard_p.y))
+        yard_count += 1
     for i in range(42000):
         if positions.size() >= TREE_LIMIT:
             break
@@ -406,4 +487,4 @@ func _draw_forests() -> void:
     crowns.multimesh = canopy
     crowns.material_override = _mat(Color("#273b30"))
     add_child(crowns)
-    print("Чернозёрье 0.7: деревьев ", positions.size())
+    print("Чернозёрье 1.2: деревьев ", positions.size(), " (садовых ", yard_count, ")")
