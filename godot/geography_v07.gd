@@ -72,7 +72,7 @@ func _ready() -> void:
     _build_lake_outline()
     _smooth_river_path()
 
-    var data := JSON.parse_string(FileAccess.get_file_as_string(SOURCE))
+    var data = JSON.parse_string(FileAccess.get_file_as_string(SOURCE))
     if data is Dictionary:
         for feature in data.get("features", []):
             if feature is Dictionary and feature.get("type", "") == "road":
@@ -543,7 +543,7 @@ func _seed_forest_edges(positions: Array[Vector3]) -> int:
                     for distance in [8.0, 20.0, 34.0]:
                         if rng.randf() < 0.28:
                             continue
-                        var p := base + perp * side * (distance + rng.randf_range(-2.2, 2.2))
+                        var p: Vector2 = base + perp * float(side) * (float(distance) + rng.randf_range(-2.2, 2.2))
                         p += tangent * rng.randf_range(-2.4, 2.4)
                         if absf(p.x) > MAP_HALF or absf(p.y) > MAP_HALF:
                             continue
