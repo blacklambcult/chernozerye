@@ -2,7 +2,7 @@ extends Control
 # Live, engine-drawn geographic comparison map. Illustrative polygons are not surveyed.
 const HALF := 1000.0
 var world: Node3D
-var geo: Node3D
+var geo
 var player: Node3D
 var osm_features: Array = []
 
