@@ -15,10 +15,26 @@ var roads: Array = []
 var house_positions: Array[Vector2] = []
 var house_footprints: Array[Dictionary] = []
 var settlements: Array = []
+# Provisional, artist-designed field silhouette. NOT surveyed Google contours.
 var meadow := PackedVector2Array([
-    Vector2(-480, -410), Vector2(-410, -110), Vector2(-160, -95),
-    Vector2(65, -170), Vector2(130, -270), Vector2(50, -390),
-    Vector2(-160, -480)
+    Vector2(-560, -190), Vector2(-480, -130), Vector2(-380, -112),
+    Vector2(-285, -135), Vector2(-195, -125), Vector2(-85, -156),
+    Vector2(40, -205), Vector2(126, -290), Vector2(146, -367),
+    Vector2(112, -450), Vector2(42, -520), Vector2(-65, -553),
+    Vector2(-168, -535), Vector2(-244, -564), Vector2(-335, -532),
+    Vector2(-455, -490), Vector2(-518, -420), Vector2(-501, -323),
+    Vector2(-574, -247)
+])
+# Forest island in the lower-western portion of the open ground.
+var meadow_island := PackedVector2Array([
+    Vector2(-370, -395), Vector2(-340, -356), Vector2(-285, -352),
+    Vector2(-246, -380), Vector2(-228, -435), Vector2(-270, -489),
+    Vector2(-334, -481), Vector2(-369, -441)
+])
+# A narrow, illustrative farm track along the northern meadow boundary.
+var field_track := PackedVector2Array([
+    Vector2(-515, -175), Vector2(-426, -148), Vector2(-330, -150),
+    Vector2(-223, -156), Vector2(-110, -176), Vector2(6, -217)
 ])
 var lake_center := Vector2(730, -760)
 var river_path := PackedVector2Array([
@@ -60,6 +76,7 @@ func _ready() -> void:
 
     _add_street_details()
     _draw_meadow()
+    _draw_field_scrub()
     _draw_river()
     _draw_lake()
     _draw_houses()
@@ -140,7 +157,42 @@ func _draw_strip(path: PackedVector2Array, width: float, tint: Color, height: fl
     add_child(node)
 
 func _draw_meadow() -> void:
-    _draw_flat_polygon(meadow, Color("#667451"), 0.018)
+    _draw_flat_polygon(meadow, Color("#697957"), 0.018)
+    _draw_flat_polygon(meadow_island, Color("#344d3a"), 0.031)
+    _draw_strip(field_track, 2.3, Color("#8c856a"), 0.040)
+
+func _draw_field_scrub() -> void:
+    # Low-poly shrubs are decorative. Sparse enough to preserve an open field.
+    var bush_mesh := SphereMesh.new()
+    bush_mesh.radius = 0.72
+    bush_mesh.height = 1.0
+    bush_mesh.radial_segments = 6
+    bush_mesh.rings = 3
+    var bush_positions: Array[Vector3] = []
+    for i in range(1500):
+        if bush_positions.size() >= 180:
+            break
+        var p := Vector2(rng.randf_range(-570.0, 150.0), rng.randf_range(-565.0, -110.0))
+        if not _is_in_poly(p, meadow) or _is_in_poly(p, meadow_island):
+            continue
+        if _close_to_road(p, 5.0):
+            continue
+        if rng.randf() > 0.25:
+            continue
+        bush_positions.append(Vector3(p.x, 0.42, -p.y))
+    if bush_positions.is_empty():
+        return
+    var multi := MultiMesh.new()
+    multi.transform_format = MultiMesh.TRANSFORM_3D
+    multi.mesh = bush_mesh
+    multi.instance_count = bush_positions.size()
+    for i in range(bush_positions.size()):
+        var scale := rng.randf_range(0.75, 1.55)
+        multi.set_instance_transform(i, Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * scale), bush_positions[i]))
+    var node := MultiMeshInstance3D.new()
+    node.multimesh = multi
+    node.material_override = _mat(Color("#46583d"))
+    add_child(node)
 
 func _draw_river() -> void:
     _draw_strip(river_path, 32.0, Color("#273f46"), 0.045)
@@ -278,11 +330,16 @@ func _draw_forests() -> void:
     # Populate forests outside housing, meadow, water and road envelopes.
     # This fills OSM gaps, but is NOT an exact tree-by-tree reconstruction.
     var positions: Array[Vector3] = []
+    # Dense island grove inside the otherwise open meadow.
+    for j in range(260):
+        var island_p := Vector2(rng.randf_range(-374.0, -224.0), rng.randf_range(-495.0, -348.0))
+        if _is_in_poly(island_p, meadow_island):
+            positions.append(Vector3(island_p.x, 0.0, -island_p.y))
     for i in range(42000):
         if positions.size() >= TREE_LIMIT:
             break
         var p := Vector2(rng.randf_range(-MAP_HALF, MAP_HALF), rng.randf_range(-MAP_HALF, MAP_HALF))
-        if _is_housing(p) or _is_in_poly(p, meadow) or _is_water(p):
+        if _is_housing(p) or (_is_in_poly(p, meadow) and not _is_in_poly(p, meadow_island)) or _is_water(p):
             continue
         if _close_to_road(p, 9.0):
             continue
