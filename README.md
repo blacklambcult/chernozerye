@@ -120,3 +120,16 @@ In the in-game overview (M), use the new buttons:
 - **КОНТУРЫ OSM: ПОКАЗАТЬ** to draw OpenStreetMap building footprints in cyan, separate from the yellow *generated game-house* footprints toggled by **ДОМА: ПОКАЗАТЬ** (or H). The source data has only 63 mapped building ways **across the whole 2×2 km area**, and their individual accuracy has not been validated.
 
 Use the two layers to observe incompleteness and discrepancies. This mode does **not** change or verify real house positions. Once we have reliably licensed building and road geometries (or independent survey), replace provisional building positions in sector A in a traceable, data-driven manner. Google Maps imagery in prior chat is visual context only; no coordinates or outline geometries are extracted from it into the repository.
+
+## Prototype 1.6 — Overture Maps building audit
+
+The 2×2 km study square centred on the project's UTM anchor now contains a second, independently published building-footprint source, obtained by `scripts/import_overture_buildings.py` from Overture Maps. The importer uses the public Overture `download --bbox` CLI, transforms coordinates to project-local EPSG:32640 metres, clips to the square and saves a small source-attributed `godot/overture_buildings.json`.
+
+- This import returned **1,367 candidate building polygons** for the study square (644 centroid points lie in the sector A 680×680 m inspection window). Our old OpenStreetMap source includes **63 building ways** across the whole square.
+- In the in-game map (M), **pink outlines** denote Overture candidates, **cyan outlines** are OSM, **yellow** indicates provisional generated houses. Click the top-right **OVERTURE** button to toggle the pink layer; the sector A zoom and other toggles are unchanged.
+- The **3D scene remains the existing proven 1.4.1 game blockout**. No automatic replacement of homes with unverified aerial detections has been made. We will review positional coverage first.
+- Overture has variable source data quality, including imagery-detected false positives, missing sheds, old footprints and potentially overlapping contributions. The 1,367 polygons are *not 1,367 verified residences*.
+- Overture Maps Foundation and original contributors are credited; source data has per-source open licence terms (including CDLA/ODbL where applicable). Original dataset: https://docs.overturemaps.org/getting-data/
+- Google Maps screenshots are exclusively visual reference material; no Google tiles or traced Google-derived contours have been imported.
+
+The separate `geo-data.yml` workflow can repeat the extraction, while the regular Godot Web workflow checks scripts, boots the scene, and builds GitHub Pages. New building data is committed in version control for reproducibility.
