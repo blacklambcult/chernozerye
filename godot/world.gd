@@ -1,0 +1,311 @@
+extends Node3D
+
+const PLAYER_SCRIPT = preload("res://player.gd")
+const MAP_FILE := "res://world_data.json"
+
+func _ready() -> void:
+    _create_ground()
+    _create_lighting()
+    var forest_features: Array = []
+    if FileAccess.file_exists(MAP_FILE):
+        var data = JSON.parse_string(FileAccess.get_file_as_string(MAP_FILE))
+        if data is Dictionary:
+            var features: Array = data.get("features", [])
+            forest_features = features
+            print("OSM объектов загружено: ", features.size())
+            for feature in features:
+                if feature.get("type", "") == "road": _add_road(feature)
+                elif feature.get("type", "") == "building": _add_building(feature)
+    else:
+        push_warning("world_data.json отсутствует — сначала выполните python scripts/fetch_osm.py")
+    _create_forest_from_osm(forest_features)
+    _create_user_paths()
+    _create_landmarks()
+    _create_player()
+    _create_label()
+    _create_overview_map()
+
+func _material(color: Color) -> StandardMaterial3D:
+    var m := StandardMaterial3D.new()
+    m.albedo_color = color
+    m.roughness = 1.0
+    return m
+
+func _create_ground() -> void:
+    var mesh := PlaneMesh.new()
+    mesh.size = Vector2(2000, 2000)
+    var instance := MeshInstance3D.new()
+    instance.mesh = mesh
+    instance.material_override = _material(Color("#435443"))
+    add_child(instance)
+    var ground := StaticBody3D.new()
+    ground.position.y = -0.2
+    var collider := CollisionShape3D.new()
+    var shape := BoxShape3D.new()
+    shape.size = Vector3(2000, 0.4, 2000)
+    collider.shape = shape
+    ground.add_child(collider)
+    add_child(ground)
+
+func _create_lighting() -> void:
+    var environment := WorldEnvironment.new()
+    var env := Environment.new()
+    env.background_mode = Environment.BG_COLOR
+    env.background_color = Color("#63636b")
+    env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+    env.ambient_light_color = Color("#8d8891")
+    env.ambient_light_energy = 0.65
+    env.fog_enabled = true
+    env.fog_light_color = Color("#676b70")
+    env.fog_density = 0.003
+    environment.environment = env
+    add_child(environment)
+    var sun := DirectionalLight3D.new()
+    sun.rotation_degrees = Vector3(-12, -35, 0)
+    sun.light_energy = 0.65
+    sun.light_color = Color("#e9b9a0")
+    add_child(sun)
+
+func _coord(point: Array, height: float = 0.0) -> Vector3:
+    return Vector3(float(point[0]), height, -float(point[1]))
+
+func _add_road(feature: Dictionary) -> void:
+    var pts: Array = feature.get("points", [])
+    if pts.size() < 2: return
+    var tags: Dictionary = feature.get("tags", {})
+    var road_type: String = str(tags.get("highway", ""))
+    var width := 5.0
+    if road_type in ["footway", "path", "track", "cycleway"]: width = 2.0
+    elif road_type in ["primary", "trunk", "secondary"]: width = 9.0
+    var vertices := PackedVector3Array()
+    for i in range(pts.size() - 1):
+        var a := _coord(pts[i], 0.035)
+        var b := _coord(pts[i+1], 0.035)
+        if a.distance_to(b) < 0.001: continue
+        var offset := Vector3(-(b.z-a.z), 0, b.x-a.x).normalized() * width * 0.5
+        vertices.append_array(PackedVector3Array([a-offset, a+offset, b+offset, a-offset, b+offset, b-offset]))
+    if vertices.is_empty(): return
+    var arr := []
+    arr.resize(Mesh.ARRAY_MAX)
+    arr[Mesh.ARRAY_VERTEX] = vertices
+    var mesh := ArrayMesh.new()
+    mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+    var instance := MeshInstance3D.new()
+    instance.mesh = mesh
+    instance.material_override = _material(Color("#918779") if road_type in ["residential", "service", "primary", "secondary", "trunk"] else Color("#786d57"))
+    add_child(instance)
+
+func _add_building(feature: Dictionary) -> void:
+    var pts: Array = feature.get("points", [])
+    if pts.size() < 3: return
+    var min_x := INF
+    var max_x := -INF
+    var min_z := INF
+    var max_z := -INF
+    for p in pts:
+        var v := _coord(p)
+        min_x = minf(min_x, v.x)
+        max_x = maxf(max_x, v.x)
+        min_z = minf(min_z, v.z)
+        max_z = maxf(max_z, v.z)
+    var w := max_x-min_x
+    var d := max_z-min_z
+    if w < 0.5 or d < 0.5: return
+    var height := 5.0
+    var tags: Dictionary = feature.get("tags", {})
+    if tags.has("height"):
+        var clean := str(tags["height"]).replace("m", "").strip_edges()
+        if clean.is_valid_float(): height = clampf(clean.to_float(), 2.0, 50.0)
+    elif tags.has("building:levels"):
+        var levels := str(tags["building:levels"])
+        if levels.is_valid_float(): height = clampf(levels.to_float()*3.0, 2.0, 50.0)
+    var mesh := BoxMesh.new()
+    mesh.size = Vector3(w, height, d)
+    var instance := MeshInstance3D.new()
+    instance.mesh = mesh
+    instance.position = Vector3((min_x+max_x)*0.5, height*0.5, (min_z+max_z)*0.5)
+    instance.material_override = _material(Color("#786e63"))
+    add_child(instance)
+
+func _create_player() -> void:
+    var player := CharacterBody3D.new()
+    player.name = "Player"
+    player.set_script(PLAYER_SCRIPT)
+    player.position = Vector3(90, 0.2, -20)
+    add_child(player)
+
+func _create_label() -> void:
+    var layer := CanvasLayer.new()
+    var label := Label.new()
+    label.text = "ЧЕРНОЗЁРЬЕ 0.4  |  WASD — ходьба  |  Shift — бег  |  M — карта  |  Esc — курсор"
+    label.position = Vector2(16, 16)
+    layer.add_child(label)
+    add_child(layer)
+
+# Trees only in OSM forest polygons, never randomly across the whole map.
+func _create_forest_from_osm(features: Array) -> void:
+    var polygons: Array[PackedVector2Array] = []
+    var road_segments: Array = []
+    var building_boxes: Array[Rect2] = []
+    for feature in features:
+        if not feature is Dictionary:
+            continue
+        var points: Array = feature.get("points", [])
+        var kind: String = str(feature.get("type", ""))
+        if kind == "forest" and points.size() >= 4:
+            var polygon := PackedVector2Array()
+            for p in points:
+                polygon.append(Vector2(float(p[0]), -float(p[1])))
+            polygons.append(polygon)
+        elif kind == "building" and points.size() >= 3:
+            var lo := Vector2(INF, INF)
+            var hi := Vector2(-INF, -INF)
+            for p in points:
+                var q := Vector2(float(p[0]), -float(p[1]))
+                lo = lo.min(q)
+                hi = hi.max(q)
+            building_boxes.append(Rect2(lo - Vector2(4.0, 4.0), hi - lo + Vector2(8.0, 8.0)))
+        elif kind == "road" and points.size() >= 2:
+            var previous := Vector2(float(points[0][0]), -float(points[0][1]))
+            for i in range(1, points.size()):
+                var next_point := Vector2(float(points[i][0]), -float(points[i][1]))
+                road_segments.append([previous, next_point])
+                previous = next_point
+
+    if polygons.is_empty():
+        print("Лесные полигоны OSM не найдены")
+        return
+
+    var random := RandomNumberGenerator.new()
+    random.seed = 20261117
+    var positions: Array[Vector3] = []
+    for i in range(21000):
+        if positions.size() >= 850:
+            break
+        var p := Vector2(random.randf_range(-995.0, 995.0), random.randf_range(-995.0, 995.0))
+        var within_forest := false
+        for polygon in polygons:
+            if Geometry2D.is_point_in_polygon(p, polygon):
+                within_forest = true
+                break
+        if not within_forest:
+            continue
+        # Clear the large meadow and bus-stop vicinity according to user markup.
+        if _inside_meadow(p) or p.distance_to(Vector2(90.0, -20.0)) < 22.0:
+            continue
+        var obstructed := false
+        for box in building_boxes:
+            if box.has_point(p):
+                obstructed = true
+                break
+        if obstructed:
+            continue
+        for segment in road_segments:
+            if p.distance_to(Geometry2D.get_closest_point_to_segment(p, segment[0], segment[1])) < 5.0:
+                obstructed = true
+                break
+        if not obstructed:
+            positions.append(Vector3(p.x, 0.0, p.y))
+
+    if positions.is_empty():
+        print("На данном участке нет места для деревьев по OSM")
+        return
+
+    var trunk_mesh := CylinderMesh.new()
+    trunk_mesh.top_radius = 0.16
+    trunk_mesh.bottom_radius = 0.28
+    trunk_mesh.height = 3.2
+    trunk_mesh.radial_segments = 6
+    var crown_mesh := CylinderMesh.new()
+    crown_mesh.top_radius = 0.0
+    crown_mesh.bottom_radius = 1.8
+    crown_mesh.height = 6.5
+    crown_mesh.radial_segments = 6
+    var trunks_mesh := MultiMesh.new()
+    trunks_mesh.transform_format = MultiMesh.TRANSFORM_3D
+    trunks_mesh.mesh = trunk_mesh
+    trunks_mesh.instance_count = positions.size()
+    var crowns_mesh := MultiMesh.new()
+    crowns_mesh.transform_format = MultiMesh.TRANSFORM_3D
+    crowns_mesh.mesh = crown_mesh
+    crowns_mesh.instance_count = positions.size()
+    for i in range(positions.size()):
+        var scale_factor := random.randf_range(0.8, 1.3)
+        var base := positions[i]
+        trunks_mesh.set_instance_transform(i, Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * scale_factor), base + Vector3(0.0, 1.6 * scale_factor, 0.0)))
+        crowns_mesh.set_instance_transform(i, Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * scale_factor), base + Vector3(0.0, 5.0 * scale_factor, 0.0)))
+    var trunks := MultiMeshInstance3D.new()
+    trunks.multimesh = trunks_mesh
+    trunks.material_override = _material(Color("#594537"))
+    add_child(trunks)
+    var crowns := MultiMeshInstance3D.new()
+    crowns.multimesh = crowns_mesh
+    crowns.material_override = _material(Color("#253e32"))
+    add_child(crowns)
+    print("Лес OSM: полигонов ", polygons.size(), ", деревьев ", positions.size())
+
+
+# User-supplied approximate coordinates. These are not independently surveyed.
+func _inside_meadow(p: Vector2) -> bool:
+    var meadow := PackedVector2Array([
+        Vector2(-410, -70), Vector2(-110, -125), Vector2(50, -175),
+        Vector2(120, -290), Vector2(40, -375), Vector2(-200, -465),
+        Vector2(-480, -410)
+    ])
+    return Geometry2D.is_point_in_polygon(p, meadow)
+
+func _create_user_paths() -> void:
+    _add_road({"points": [[90.0, 20.0], [0.0, -180.0]], "tags": {"highway": "path"}})
+    _add_road({"points": [[110.0, -320.0], [430.0, -200.0]], "tags": {"highway": "path"}})
+
+func _create_landmarks() -> void:
+    _add_landmark(Vector2(90, 20), "ОСТАНОВКА / СТАРТ", Color("#e5c17a"))
+    _add_landmark(Vector2(100, 720), "ЗАБРОШЕННЫЙ ЛАГЕРЬ", Color("#c7a0dd"))
+    _add_landmark(Vector2(-260, -270), "БОЛЬШОЕ ПОЛЕ", Color("#d5d68d"))
+    _add_landmark(Vector2(715, -800), "ТУРБАЗА", Color("#75c1da"))
+    _add_landmark(Vector2(975, 120), "ЛОЖНЫЙ ВЫХОД", Color("#e7a1a1"))
+
+func _add_landmark(point: Vector2, title: String, tint: Color) -> void:
+    var marker := Node3D.new()
+    marker.name = title
+    marker.position = Vector3(point.x, 0.0, -point.y)
+    add_child(marker)
+    var pole := MeshInstance3D.new()
+    var pole_mesh := CylinderMesh.new()
+    pole_mesh.height = 2.6
+    pole_mesh.top_radius = 0.075
+    pole_mesh.bottom_radius = 0.075
+    pole.mesh = pole_mesh
+    pole.position.y = 1.3
+    pole.material_override = _material(tint)
+    marker.add_child(pole)
+    var label3d := Label3D.new()
+    label3d.text = title
+    label3d.font_size = 38
+    label3d.pixel_size = 0.012
+    label3d.position.y = 3.1
+    label3d.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+    label3d.modulate = tint
+    marker.add_child(label3d)
+
+var overview_layer: CanvasLayer
+func _create_overview_map() -> void:
+    overview_layer = CanvasLayer.new()
+    overview_layer.layer = 15
+    overview_layer.visible = false
+    add_child(overview_layer)
+    var backdrop := ColorRect.new()
+    backdrop.color = Color(0.025, 0.035, 0.03, 0.94)
+    backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    overview_layer.add_child(backdrop)
+    var panel := TextureRect.new()
+    panel.texture = load("res://map_overview.png")
+    panel.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    panel.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    overview_layer.add_child(panel)
+
+func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M:
+        overview_layer.visible = not overview_layer.visible
+        get_viewport().set_input_as_handled()
