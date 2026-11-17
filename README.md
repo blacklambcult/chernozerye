@@ -78,3 +78,18 @@ The previous settlement masks also excluded **all** trees; limited garden-tree g
 **Accuracy:** none of these additions are measured house-by-house. Roofs, garden pads, shed positions and trees are illustrative game geometry. The existing OSM roads, and the user-provided conceptual sector reviews, are not altered by this cosmetic/experiential iteration.
 
 Verify the last GitHub Actions export before reviewing the browser build. In-game header is `CHERNOZERYE / LIVE MAP 1.2`. Assess the change from ground-level gameplay; map geometry changes only in presentation label.
+
+## Prototype 1.3 — streetscape at walking height
+
+The previous build spawned in an empty clearing. The prototype now starts at a nearby *existing OSM unclassified road* around projected point (130, 82), approximately 74 m from the former start. The in-game landmark and map start marker are moved to match. This does **not** assert the real-world bus stop's verified location.
+
+- Muted gravel/earth shoulders around minor OSM road surfaces and clearer permanent-dusk lighting.
+- Each provisional house has a door and two small windows; most have decorative fence segments, gates/gaps and small garden shrubs.
+- Houses' long axes are aligned to their parent road segments; overview-map rotation is inverted to remain consistent with world coordinates.
+- Mixed low-poly forest: two-stage fir crowns and rounded deciduous crowns; distant tree shadows are disabled for Web performance.
+- Materials are reused via a palette cache rather than regenerated for every facade, fence and shrub.
+- Live map header `CHERNOZERYE / LIVE MAP 1.3`; overview house button has shortened text to fit smaller viewports.
+
+**Geographic disclaimer:** garden fences, facade and forest details remain stylized placeholders. A 2×2 km scale is retained, but this is not yet a property-accurate 1:1 reconstruction. Visual comparison with screenshots is qualitative only.
+
+**Review checklist:** after the latest Actions job passes, hard-refresh the browser. Walk along the road immediately after spawning; check the dirt shoulder, gates, windows, mixed tree outlines and smooth mouse controls. Use M to confirm that the START marker is now located at the player's spawn; H toggles approximate house footprints.
