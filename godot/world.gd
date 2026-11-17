@@ -95,7 +95,7 @@ func _add_road(feature: Dictionary) -> void:
         vertices.append_array(PackedVector3Array([a-offset, a+offset, b+offset, a-offset, b+offset, b-offset]))
         if road_type in ["residential", "service", "unclassified", "track"]:
             for lane in [-1.0, 1.0]:
-                var center_offset := normal * (lane * width * 0.22)
+                var center_offset: Vector3 = normal * (float(lane) * width * 0.22)
                 var half_rut := normal * 0.12
                 var lifted := Vector3.UP * 0.024
                 wheel_ruts.append_array(PackedVector3Array([
@@ -357,7 +357,7 @@ func _create_overview_map() -> void:
     map_panel.set_script(preload("res://live_map_v08.gd"))
     map_root.add_child(map_panel)
     map_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    var source := JSON.parse_string(FileAccess.get_file_as_string(MAP_FILE))
+    var source = JSON.parse_string(FileAccess.get_file_as_string(MAP_FILE))
     var features: Array = []
     if source is Dictionary:
         features = source.get("features", [])
