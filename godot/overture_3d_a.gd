@@ -27,6 +27,14 @@ func _build() -> void:
     var roofs := PackedVector3Array()
     var roof_normals := PackedVector3Array()
     var roof_colors := PackedColorArray()
+    var wall_palette: Array[Color] = [
+        Color("#988778"), Color("#a29281"), Color("#87796d"),
+        Color("#b09a84"), Color("#8b8277")
+    ]
+    var roof_palette: Array[Color] = [
+        Color("#65514e"), Color("#68636a"), Color("#845c50"),
+        Color("#5d6668"), Color("#6f5c4f")
+    ]
 
     for feature in buildings:
         if not feature is Dictionary:
@@ -53,14 +61,8 @@ func _build() -> void:
         var reported = feature.get("height_m", null)
         if reported is float or reported is int:
             height = clampf(float(reported), 2.5, 12.0)
-        var wall_tint := [
-            Color("#988778"), Color("#a29281"), Color("#87796d"),
-            Color("#b09a84"), Color("#8b8277")
-        ][variant]
-        var roof_tint := [
-            Color("#65514e"), Color("#68636a"), Color("#845c50"),
-            Color("#5d6668"), Color("#6f5c4f")
-        ][variant]
+        var wall_tint: Color = wall_palette[variant]
+        var roof_tint: Color = roof_palette[variant]
 
         for i in range(footprint.size()):
             var a: Vector2 = footprint[i]
