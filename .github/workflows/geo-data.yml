@@ -1,0 +1,55 @@
+name: Import Overture building footprints (audit only)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/import_overture_buildings.py'
+      - '.github/workflows/geo-data.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install geo import dependencies
+        run: python -m pip install overturemaps pyproj shapely
+      - name: Download and convert georeferenced building polygons
+        run: python scripts/import_overture_buildings.py
+      - name: Show geographic import coverage
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path('godot/overture_buildings.json')
+          result = json.loads(path.read_text(encoding='utf-8'))
+          count = len(result['buildings'])
+          print(f'Independent building candidates in the 2 km square: {count}')
+          with open(__import__('os').environ['GITHUB_STEP_SUMMARY'], 'a') as file:
+              file.write(f'### Chernozerye Overture footprint audit\n')
+              file.write(f'Buildings: **{count}** (automated candidates, not cadastral truth).\n')
+          PY
+      - name: Commit audit data if the coverage is nonempty
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add godot/overture_buildings.json
+          if git diff --cached --quiet; then
+            echo "No dataset changes"
+            exit 0
+          fi
+          git commit -m "data: import Overture footprint candidates for sector review"
+          git push origin HEAD:main
