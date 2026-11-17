@@ -140,7 +140,7 @@ func _create_player() -> void:
 func _create_label() -> void:
     var layer := CanvasLayer.new()
     var label := Label.new()
-    label.text = "ЧЕРНОЗЁРЬЕ 0.7 BLOCKOUT  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
+    label.text = "ЧЕРНОЗЁРЬЕ 0.8 LIVE MAP  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
     label.position = Vector2(16, 16)
     layer.add_child(label)
     add_child(layer)
@@ -292,23 +292,27 @@ func _add_landmark(point: Vector2, title: String, tint: Color) -> void:
     marker.add_child(label3d)
 
 var overview_layer: CanvasLayer
+var map_panel: Control
+
 func _create_overview_map() -> void:
     overview_layer = CanvasLayer.new()
     overview_layer.layer = 15
     overview_layer.visible = false
     add_child(overview_layer)
-    var backdrop := ColorRect.new()
-    backdrop.color = Color(0.025, 0.035, 0.03, 0.94)
-    backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    overview_layer.add_child(backdrop)
-    var panel := TextureRect.new()
-    panel.texture = load("res://map_overview.png")
-    panel.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-    panel.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-    panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    overview_layer.add_child(panel)
+    map_panel = Control.new()
+    map_panel.set_script(preload("res://live_map_v08.gd"))
+    overview_layer.add_child(map_panel)
+    var source := JSON.parse_string(FileAccess.get_file_as_string(MAP_FILE))
+    var features: Array = []
+    if source is Dictionary:
+        features = source.get("features", [])
+    map_panel.initialize(self, get_node("GeographyBlockoutV07"), get_node("Player"), features)
+    map_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 func _input(event: InputEvent) -> void:
-    if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_M:
-        overview_layer.visible = not overview_layer.visible
-        get_viewport().set_input_as_handled()
+    if event is InputEventKey and event.pressed and not event.echo:
+        if event.physical_keycode == KEY_M or event.keycode == KEY_M or (event.unicode != 0 and char(event.unicode).to_lower() == "ь"):
+            overview_layer.visible = not overview_layer.visible
+            if overview_layer.visible:
+                Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+            get_viewport().set_input_as_handled()
