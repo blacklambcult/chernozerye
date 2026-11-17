@@ -15,10 +15,13 @@ func _ready() -> void:
             print("OSM объектов загружено: ", features.size())
             for feature in features:
                 if feature.get("type", "") == "road": _add_road(feature)
-                elif feature.get("type", "") == "building": _add_building(feature)
+                # OSM buildings are too sparse/inaccurate here; use provisional blockout instead.
     else:
         push_warning("world_data.json отсутствует — сначала выполните python scripts/fetch_osm.py")
-    _create_forest_from_osm(forest_features)
+    var geographical_blockout := Node3D.new()
+    geographical_blockout.name = "GeographyBlockoutV07"
+    geographical_blockout.set_script(preload("res://geography_v07.gd"))
+    add_child(geographical_blockout)
     _create_user_paths()
     _create_landmarks()
     _create_player()
@@ -137,7 +140,7 @@ func _create_player() -> void:
 func _create_label() -> void:
     var layer := CanvasLayer.new()
     var label := Label.new()
-    label.text = "ЧЕРНОЗЁРЬЕ 0.5  |  Клик мышью — осмотр  |  WASD/ЦФЫВ — ходьба  |  Shift — бег  |  M/Ь — карта  |  Esc — курсор"
+    label.text = "ЧЕРНОЗЁРЬЕ 0.7 BLOCKOUT  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
     label.position = Vector2(16, 16)
     layer.add_child(label)
     add_child(layer)
