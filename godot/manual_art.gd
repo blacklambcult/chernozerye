@@ -1,5 +1,5 @@
 extends Node3D
-# CHERNOZERYE 3.8 / DUSK VILLAGE CONCEPT PASS
+# CHERNOZERYE 3.9 / ROAD, ENTRY AND ROOF STABILIZATION
 # All spatial placements derive from the user's manual GeoJSON features.
 # Decorative features are deterministic and never modify the survey geometry.
 
