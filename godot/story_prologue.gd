@@ -20,6 +20,8 @@ var mask_found := false
 var chapter_completed := false
 var journal_open := false
 var objective_label: Label
+var distance_label: Label
+var journal_hint_label: Label
 var prompt_label: Label
 var message_label: Label
 var journal_panel: PanelContainer
@@ -214,6 +216,23 @@ func _build_hud() -> void:
     objective_label.add_theme_font_size_override("font_size", 16)
     objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
     layer.add_child(objective_label)
+    # Mission distance and journal hotkey belong immediately below the quest,
+    # leaving the lower-center of the screen exclusively for story subtitles.
+    distance_label = Label.new()
+    distance_label.name = "QuestDistanceTopLeft"
+    distance_label.position = Vector2(18, 45)
+    distance_label.add_theme_font_size_override("font_size", 13)
+    distance_label.add_theme_color_override("font_color", Color("#d4c4a9"))
+    distance_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    layer.add_child(distance_label)
+    journal_hint_label = Label.new()
+    journal_hint_label.name = "JournalHintTopLeft"
+    journal_hint_label.text = "[J / О] — журнал"
+    journal_hint_label.position = Vector2(18, 66)
+    journal_hint_label.add_theme_font_size_override("font_size", 12)
+    journal_hint_label.add_theme_color_override("font_color", Color("#aeb4b0"))
+    journal_hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    layer.add_child(journal_hint_label)
     prompt_label = Label.new()
     prompt_label.anchor_left = 0.5
     prompt_label.anchor_right = 0.5
@@ -344,16 +363,18 @@ func _update_focus() -> void:
     if player == null:
         return
     var hint := ""
+    var top_left_info := ""
     if not inside_home:
         var distance := player.global_position.distance_to(_gate_location())
+        if chapter_completed:
+            top_left_info = "Чернозёрье · исследование продолжается"
+        else:
+            top_left_info = "До родного дома: %d м" % int(distance)
         if distance <= GATE_RANGE:
             focus = "enter"
             hint = "[E / У] Войти в родной дом"
-        elif chapter_completed:
-            hint = "[J / О] Журнал — исследование Чернозёрья продолжается"
-        else:
-            hint = "До родного дома: %d м  %s  ·  [J / О] — журнал" % [int(distance), _home_bearing()]
     else:
+        top_left_info = "Родной дом · внутри"
         var candidates := []
         if not note_found:
             candidates.append("note")
@@ -375,7 +396,9 @@ func _update_focus() -> void:
             "exit":
                 hint = "[E / У] Выйти на улицу"
             _:
-                hint = "Исследуй дом · [J / О] — журнал"
+                hint = ""
+    if distance_label != null and distance_label.text != top_left_info:
+        distance_label.text = top_left_info
     if prompt_label != null and hint != _last_prompt:
         prompt_label.text = hint
         _last_prompt = hint
