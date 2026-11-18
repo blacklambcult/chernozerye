@@ -117,24 +117,28 @@ func _run() -> void:
     if absf(left_leg.position.z) > 0.04 or absf(right_leg.position.z) > 0.04:
         _fail("hips are offset forward or backward from torso")
         return
-    var left_knee := left_leg.get_node_or_null("KneeFabric") as MeshInstance3D
-    var right_knee := right_leg.get_node_or_null("KneeFabric") as MeshInstance3D
-    var left_calf := left_leg.get_node_or_null("TrouserCalf") as MeshInstance3D
-    var toe := left_leg.get_node_or_null("BootToe") as MeshInstance3D
+    var left_knee := left_leg.get_node_or_null("KneeJoint/KneeFabric") as MeshInstance3D
+    var right_knee := right_leg.get_node_or_null("KneeJoint/KneeFabric") as MeshInstance3D
+    var left_calf := left_leg.get_node_or_null("KneeJoint/TrouserCalf") as MeshInstance3D
+    var toe := left_leg.get_node_or_null("KneeJoint/AnkleJoint/BootToe") as MeshInstance3D
     if left_knee == null or right_knee == null or left_calf == null or toe == null:
-        _fail("complete thigh-knee-calf-boot geometry must remain")
+        _fail("articulated thigh-knee-calf-ankle-boot geometry must remain")
         return
-    if absf(left_knee.position.z) > 0.13 or absf(right_knee.position.z) > 0.13:
-        _fail("knees protrude too far forward of standing hips")
+    var left_knee_position := pelvis.to_local(left_knee.global_position)
+    var right_knee_position := pelvis.to_local(right_knee.global_position)
+    var calf_position := pelvis.to_local(left_calf.global_position)
+    var toe_position := pelvis.to_local(toe.global_position)
+    if absf(left_knee_position.z - left_leg.position.z) > 0.06:
+        _fail("resting knees protrude too far in front of hips")
         return
-    if absf(left_calf.position.z - left_knee.position.z) > 0.09:
-        _fail("lower leg is bent too sharply compared with the knee")
+    if absf(calf_position.z - left_knee_position.z) > 0.09:
+        _fail("resting calf leans too far away from knee")
         return
-    if toe.position.z < -0.34 or toe.position.z > -0.18:
-        _fail("boot toe projects too far out or retracts into the leg")
+    if toe_position.z < -0.20 or toe_position.z > -0.025:
+        _fail("boot toe has incorrect depth beneath the pelvis")
         return
-    if absf(left_knee.position.x + right_knee.position.x) > 0.001:
-        _fail("knees are asymmetric under the pelvis")
+    if absf(left_knee_position.x + right_knee_position.x) > 0.001:
+        _fail("knees are asymmetric beneath hips")
         return
     var camera := actor.get_node("Camera3D") as Camera3D
     var max_coat_y := pelvis.position.y + 0.448
@@ -152,7 +156,7 @@ func _run() -> void:
     if not (pelvis.get_node("LeftArm") as Node3D).visible:
         _fail("side-hanging arms are hidden at downward pitch")
         return
-    var boot := left_leg.get_node_or_null("BootToe") as MeshInstance3D
+    var boot := left_leg.get_node_or_null("KneeJoint/AnkleJoint/BootToe") as MeshInstance3D
     if boot == null:
         _fail("forward-facing boot toe is missing")
         return

@@ -17,6 +17,11 @@ var right_leg: Node3D
 var left_arm: Node3D
 var right_arm: Node3D
 var walk_phase := 0.0
+var walk_weight := 0.0
+var left_knee_joint: Node3D
+var right_knee_joint: Node3D
+var left_ankle_joint: Node3D
+var right_ankle_joint: Node3D
 var hide_right_hand := false
 var pelvis_root: Node3D
 var upper_coat: MeshInstance3D
@@ -131,31 +136,38 @@ func _segment(parent: Node3D, name: String,
     return node
 
 func _leg(side: float, label: String, root: Node3D) -> Node3D:
-    # Keep hips directly below the waist. A mostly vertical thigh and shin
-    # read as natural standing legs rather than a crouch with feet kicked out.
-    # Only the boot toe extends modestly forward from the vertical leg axis.
-    var pivot := Node3D.new()
-    pivot.name = label
-    pivot.position = Vector3(side * 0.132, -0.118, -0.018)
-    root.add_child(pivot)
+    # Hips, knees and ankles are separate joints. At rest the joints form an
+    # almost vertical line beneath the pelvis; only the toe points forward.
+    # This keeps the feet under the player instead of projecting them ahead.
+    var hip := Node3D.new()
+    hip.name = label
+    hip.position = Vector3(side * 0.145, -0.120, 0.005)
+    root.add_child(hip)
+    _segment(hip, "TrouserThigh", Vector3.ZERO,
+        Vector3(side * 0.008, -0.330, 0.014), 0.107, 0.095, PANTS)
 
-    _segment(pivot, "TrouserThigh", Vector3.ZERO,
-        Vector3(side * 0.010, -0.325, -0.095), 0.108, 0.098, PANTS)
-    _sphere(pivot, "KneeFabric",
-        Vector3(side * 0.010, -0.333, -0.100),
-        0.088, PANTS, Vector3(1.0, 0.88, 0.96))
-    _segment(pivot, "TrouserCalf",
-        Vector3(side * 0.010, -0.340, -0.102),
-        Vector3(side * 0.018, -0.585, -0.175),
-        0.092, 0.070, PANTS)
+    var knee := Node3D.new()
+    knee.name = "KneeJoint"
+    knee.position = Vector3(side * 0.008, -0.330, 0.014)
+    hip.add_child(knee)
+    _sphere(knee, "KneeFabric", Vector3.ZERO,
+        0.091, PANTS, Vector3(1.0, 0.88, 1.0))
+    _segment(knee, "TrouserCalf",
+        Vector3(0.0, -0.012, 0.0),
+        Vector3(side * 0.004, -0.294, 0.020),
+        0.092, 0.079, PANTS)
 
-    _box(pivot, "Boot", Vector3(0.162, 0.118, 0.188),
-        Vector3(side * 0.018, -0.650, -0.212), BOOTS)
-    _box(pivot, "BootToe", Vector3(0.172, 0.060, 0.150),
-        Vector3(side * 0.018, -0.684, -0.286), BOOTS)
-    _box(pivot, "BootSole", Vector3(0.176, 0.028, 0.168),
-        Vector3(side * 0.018, -0.710, -0.268), BELT)
-    return pivot
+    var ankle := Node3D.new()
+    ankle.name = "AnkleJoint"
+    ankle.position = Vector3(side * 0.004, -0.294, 0.020)
+    knee.add_child(ankle)
+    _box(ankle, "Boot", Vector3(0.165, 0.115, 0.175),
+        Vector3(0.0, -0.054, -0.035), BOOTS)
+    _box(ankle, "BootToe", Vector3(0.171, 0.064, 0.145),
+        Vector3(0.0, -0.100, -0.126), BOOTS)
+    _box(ankle, "BootSole", Vector3(0.180, 0.025, 0.183),
+        Vector3(0.0, -0.118, -0.107), BELT)
+    return hip
 
 func _arm(side: float, label: String, root: Node3D) -> Node3D:
     # Side-hanging arms frame the lower corners of an extreme downwards view.
@@ -205,9 +217,13 @@ func _ready() -> void:
 
     left_leg = _leg(-1.0, "LeftLeg", pelvis_root)
     right_leg = _leg(1.0, "RightLeg", pelvis_root)
+    left_knee_joint = left_leg.get_node("KneeJoint") as Node3D
+    right_knee_joint = right_leg.get_node("KneeJoint") as Node3D
+    left_ankle_joint = left_knee_joint.get_node("AnkleJoint") as Node3D
+    right_ankle_joint = right_knee_joint.get_node("AnkleJoint") as Node3D
     left_arm = _arm(-1.0, "LeftArm", pelvis_root)
     right_arm = _arm(1.0, "RightArm", pelvis_root)
-    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true pelvis_aligned=true torso_visible=true front_panels=true forward_legs=true")
+    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true pelvis_aligned=true torso_visible=true front_panels=true upright_joints=true grounded_gait=true")
 
 
 func set_right_hand_occupied(value: bool) -> void:
@@ -215,25 +231,50 @@ func set_right_hand_occupied(value: bool) -> void:
     if right_arm != null:
         right_arm.visible = not value and not view_down_cutaway
 
+func _update_gait(delta: float, grounded_speed: float) -> void:
+    # Drive the visual walk cycle only from grounded horizontal movement.
+    # The player capsule, jump and collision physics are left untouched.
+    var pace := clampf(grounded_speed / 3.35, 0.0, 1.55)
+    var target_weight := clampf(pace, 0.0, 1.0)
+    walk_weight = move_toward(walk_weight, target_weight, delta * 5.0)
+    if target_weight > 0.04:
+        walk_phase = fposmod(walk_phase + delta * (4.0 + 3.0 * pace), TAU)
+    var left_step := sin(walk_phase)
+    var right_step := -left_step
+    var smoothing := clampf(delta * 12.0, 0.0, 1.0)
+    # Small hip swing, knee flex only on the forward/swing half of a stride.
+    left_leg.rotation.x = lerpf(left_leg.rotation.x,
+        left_step * 0.19 * walk_weight, smoothing)
+    right_leg.rotation.x = lerpf(right_leg.rotation.x,
+        right_step * 0.19 * walk_weight, smoothing)
+    left_knee_joint.rotation.x = lerpf(left_knee_joint.rotation.x,
+        -maxf(0.0, left_step) * 0.25 * walk_weight, smoothing)
+    right_knee_joint.rotation.x = lerpf(right_knee_joint.rotation.x,
+        -maxf(0.0, right_step) * 0.25 * walk_weight, smoothing)
+    # Counter-rotate the ankles: boots remain close to level instead of
+    # pitching outward with an entire rigid leg.
+    left_ankle_joint.rotation.x = lerpf(left_ankle_joint.rotation.x,
+        -0.85 * (left_leg.rotation.x + left_knee_joint.rotation.x), smoothing)
+    right_ankle_joint.rotation.x = lerpf(right_ankle_joint.rotation.x,
+        -0.85 * (right_leg.rotation.x + right_knee_joint.rotation.x), smoothing)
+    left_arm.rotation.x = lerpf(left_arm.rotation.x,
+        -left_step * 0.085 * walk_weight, smoothing)
+    right_arm.rotation.x = lerpf(right_arm.rotation.x,
+        -right_step * 0.085 * walk_weight, smoothing)
+    position.y = lerpf(position.y,
+        0.006 * absf(sin(walk_phase)) * walk_weight, smoothing)
+
+
 func _process(delta: float) -> void:
     var actor := get_parent() as CharacterBody3D
     if actor == null:
         return
-    # Full-body rig follows player yaw, never the camera pitch. Keep both
-    # garment panels, trouser legs, and arms available at all angles.
+    # The pelvis follows body yaw, not vertical camera pitch. It stays in
+    # world space even at maximum look-down or while the mouse is turning.
     view_down_cutaway = false
     upper_coat.visible = true
     lower_jacket.visible = true
     left_arm.visible = true
     right_arm.visible = not hide_right_hand
     var planar_speed := Vector2(actor.velocity.x, actor.velocity.z).length()
-    var moving := clampf(planar_speed / 3.4, 0.0, 1.0)
-    if moving > 0.04 and actor.is_on_floor():
-        walk_phase += delta * (5.0 + moving * 1.1)
-    var swing := sin(walk_phase) * moving
-    # In-place walk cycle: never change colliders or actual foot placement.
-    left_leg.rotation.x = swing * 0.12
-    right_leg.rotation.x = -swing * 0.12
-    left_arm.rotation.x = -swing * 0.085
-    right_arm.rotation.x = swing * 0.085
-    position.y = 0.005 * absf(sin(walk_phase)) * moving
+    _update_gait(delta, planar_speed if actor.is_on_floor() else 0.0)
