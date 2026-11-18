@@ -56,6 +56,35 @@ func _run() -> void:
     actor.name = "PlayerCosmeticHarness"
     actor.set_script(load("res://player.gd"))
     get_root().add_child(actor)
+    # Raycasts can pass while a CharacterBody's actual capsule still clips
+    # through a wall. Exercise the same player shape used in the browser.
+    actor.set_physics_process(false)
+    var capsule: CapsuleShape3D = null
+    for child in actor.get_children():
+        if child is CollisionShape3D:
+            capsule = (child as CollisionShape3D).shape as CapsuleShape3D
+            break
+    if capsule == null or capsule.radius < 0.44:
+        _fail("first-person capsule is too narrow to protect the camera")
+        return
+    actor.global_position = Vector3(2.0, 0.2, 1.5)
+    await physics_frame
+    if not actor.test_move(actor.global_transform, Vector3(0.0, 0.0, -3.0)):
+        _fail("actual player capsule passes through building wall")
+        return
+    actor.global_position = Vector3(6.0, 0.2, -8.0)
+    await physics_frame
+    if actor.test_move(actor.global_transform, Vector3(4.0, 0.0, 0.0)):
+        _fail("actual player capsule blocked by invisible gate obstacle")
+        return
+    var smoke := actor.get("_smoke_particles") as CPUParticles3D
+    if smoke == null or smoke.mesh == null:
+        _fail("adult character cosmetic effect missing")
+        return
+    var smoke_quad := smoke.mesh as QuadMesh
+    if smoke_quad == null or smoke_quad.size.x > 0.05:
+        _fail("cosmetic particles still cover too much of first-person view")
+        return
     actor.call("_start_character_idle")
     if float(actor.get("_idle_smoke_timer")) <= 0.0:
         _fail("character gesture did not start from button action")
@@ -64,5 +93,5 @@ func _run() -> void:
     if prop == null or not prop.visible:
         _fail("character idle prop not visible during action")
         return
-    print("COLLISION_REGRESSION_OK: house=solid fence=solid gap=open player_idle=cosmetic")
+    print("COLLISION_REGRESSION_OK: house=solid fence=solid gap=open player_idle=cosmetic capsule=blocked view=compact")
     quit(0)
