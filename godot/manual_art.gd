@@ -1870,8 +1870,8 @@ func _decorate_plot_props(points: PackedVector2Array) -> void:
         attempts += 1
         var p := Vector2(rng.randf_range(low.x, high.x),
             rng.randf_range(low.y, high.y))
-        var debris_types := [6, 4, 6, 3, 5, 4, 6, 1, 2, 0, 4]
-        var kind := debris_types[(_fence_count * 7 + placed.size() * 3) % debris_types.size()]
+        var debris_types: Array[int] = [6, 4, 6, 3, 5, 4, 6, 1, 2, 0, 4]
+        var kind: int = debris_types[(_fence_count * 7 + placed.size() * 3) % debris_types.size()]
         var rotation := float(rng.randi_range(0, 3)) * PI * 0.5
         if not _yard_spot_ok(p, points, placed, kind):
             _yard_positions_rejected += 1
