@@ -29,6 +29,40 @@ func _initialize() -> void:
         _fail("road strips are disconnected at the bend")
         return
 
+    # Across different hand-drawn roads, surface ribbons overlap at equal
+    # height. Confirm that we produce exactly one cover at the junction.
+    geo.set("manual_roads", [
+        [Vector2(-12, 0), Vector2(12, 0), 0],
+        [Vector2(0, -11), Vector2(0, 11), 1],
+        [Vector2(6, 0), Vector2(12, 0), 0]
+    ])
+    geo.call("_detect_road_intersections")
+    var crossings: Array = geo.get("_junctions")
+    if crossings.size() != 1:
+        _fail("crossroads must produce exactly one de-duplicated surface cover")
+        return
+    if (crossings[0]["center"] as Vector2).length() > 0.01:
+        _fail("crossing patch is not centred on the intersection")
+        return
+    var junction_fan := PackedVector3Array()
+    geo.call("_junction_fan", Vector2.ZERO, 3.5, 0.193, junction_fan, 0)
+    if junction_fan.size() != 48:
+        _fail("junction cap must be a closed 16-triangle fan")
+        return
+    for vertex in junction_fan:
+        if absf(vertex.y - 0.193) > 0.001:
+            _fail("junction cap is not separated from overlapping road meshes")
+            return
+    # Almost touching endpoints should form a small T-junction cover.
+    geo.set("manual_roads", [
+        [Vector2(-12, 0), Vector2(12, 0), 0],
+        [Vector2(0, 10), Vector2(0, 0.8), 1]
+    ])
+    geo.call("_detect_road_intersections")
+    if (geo.get("_junctions") as Array).size() != 1:
+        _fail("nearby T-junction endpoint not joined")
+        return
+
     var art := Node3D.new()
     art.set_script(load("res://manual_art.gd"))
     art.set("_roads", [[Vector2(-20.0, -10.0), Vector2(20.0, -10.0), 3.8]])
@@ -64,5 +98,5 @@ func _initialize() -> void:
     if art.call("_yard_spot_ok", midpoint + Vector2(3.1, 0.0), garden, [], 2):
         _fail("greenhouse allowed to overlap a doorway")
         return
-    print("GEOMETRY_REGRESSION_OK: joined_roads and safe_gate / greenhouse clearance")
+    print("GEOMETRY_REGRESSION_OK: joined roads, crossroads, T-junctions and safe entrances")
     quit(0)
