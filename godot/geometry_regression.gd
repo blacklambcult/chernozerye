@@ -29,8 +29,8 @@ func _initialize() -> void:
         _fail("road strips are disconnected at the bend")
         return
 
-    # Across different hand-drawn roads, surface ribbons overlap at equal
-    # height. Confirm that we produce exactly one cover at the junction.
+    # Crossed road ribbons must be handled without visible circular geometry.
+    # Detection still reserves a small no-ruts zone.
     geo.set("manual_roads", [
         [Vector2(-12, 0), Vector2(12, 0), 0],
         [Vector2(0, -11), Vector2(0, 11), 1],
@@ -50,20 +50,22 @@ func _initialize() -> void:
     if geo.call("_near_junction", Vector2(50.0, 50.0), 2.8):
         _fail("junction suppression may not erase a distant road")
         return
-    # A full 2D crossing must cover the road edges and the adjacent shoulders.
+    # The old junction cap reached 8 m radius; it must no longer exist.
     var main_radius: float = crossings[0]["radius"]
-    if main_radius < 4.0:
-        _fail("crossing cap does not cover the visible road shoulders")
+    if main_radius < 2.2 or main_radius > 3.2:
+        _fail("junction no-ruts zone outside compact 2.2–3.2 m range")
         return
-    var junction_fan := PackedVector3Array()
-    geo.call("_junction_fan", Vector2.ZERO, 3.5, 0.205, junction_fan, 0)
-    if junction_fan.size() != 48:
-        _fail("junction cap must be a closed 16-triangle fan")
+    var elevation_zero: float = geo.call("_road_elevation", 0)
+    var elevation_one: float = geo.call("_road_elevation", 1)
+    var elevation_last: float = geo.call("_road_elevation", 17)
+    if elevation_one - elevation_zero < 0.003 or elevation_last - elevation_zero > 0.065:
+        _fail("separate roads need a small but effective height bias")
         return
-    for vertex in junction_fan:
-        if absf(vertex.y - 0.205) > 0.001:
-            _fail("junction cap is not separated from overlapping road meshes")
-            return
+    geo.call("_build_road_intersections")
+    if int(geo.get("_junction_mesh_count")) != 0 or geo.get_child_count() != 0:
+        _fail("junctions must not create any visible round cap meshes")
+        return
+
     # Confirm the generated interrupted track geometry stays entirely outside
     # the reserved crossing radius + taper distance.
     var line := PackedVector2Array([
@@ -128,5 +130,5 @@ func _initialize() -> void:
     if art.call("_yard_spot_ok", midpoint + Vector2(3.1, 0.0), garden, [], 2):
         _fail("greenhouse allowed to overlap a doorway")
         return
-    print("GEOMETRY_REGRESSION_OK: joined roads, crossroads, T-junctions and safe entrances")
+    print("GEOMETRY_REGRESSION_OK: no circle caps, biased road levels, crossroads and safe entrances")
     quit(0)
