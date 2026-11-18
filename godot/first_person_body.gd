@@ -74,7 +74,7 @@ func _segment(parent: Node3D, name: String,
 func _leg(side: float, label: String) -> Node3D:
     var pivot := Node3D.new()
     pivot.name = label
-    pivot.position = Vector3(side * 0.165, 0.80, 0.025)
+    pivot.position = Vector3(side * 0.165, 0.80, -0.045)
     add_child(pivot)
     _sphere(pivot, "HipJoint", Vector3.ZERO, 0.16, PANTS)
     _segment(pivot, "TrouserThigh", Vector3.ZERO,
@@ -92,48 +92,51 @@ func _leg(side: float, label: String) -> Node3D:
 func _arm(side: float, label: String) -> Node3D:
     var pivot := Node3D.new()
     pivot.name = label
-    pivot.position = Vector3(side * 0.28, 1.285, -0.015)
+    # Shift shoulders backward and below the eye. Previously these spheres
+    # filled the image when the user looked down into the body.
+    pivot.position = Vector3(side * 0.295, 1.155, 0.20)
     add_child(pivot)
-    _sphere(pivot, "Shoulder", Vector3.ZERO, 0.145, COAT)
+    _sphere(pivot, "Shoulder", Vector3.ZERO, 0.105, COAT)
     _segment(pivot, "Sleeve", Vector3.ZERO,
-        Vector3(side * 0.12, -0.34, -0.035), 0.135, 0.107, COAT)
-    _sphere(pivot, "Elbow", Vector3(side * 0.12, -0.34, -0.035),
-        0.115, COAT_SHADOW)
+        Vector3(side * 0.065, -0.29, -0.04), 0.105, 0.088, COAT)
+    _sphere(pivot, "Elbow", Vector3(side * 0.065, -0.29, -0.04),
+        0.09, COAT_SHADOW)
     _segment(pivot, "LowerSleeve",
-        Vector3(side * 0.12, -0.35, -0.035),
-        Vector3(side * 0.115, -0.57, -0.19), 0.109, 0.080, COAT)
-    _sphere(pivot, "Hand", Vector3(side * 0.115, -0.625, -0.205),
-        0.087, GLOVES, Vector3(1.0, 1.25, 0.72))
+        Vector3(side * 0.065, -0.30, -0.04),
+        Vector3(side * 0.09, -0.51, -0.16), 0.088, 0.066, COAT)
+    _sphere(pivot, "Hand", Vector3(side * 0.09, -0.565, -0.185),
+        0.072, GLOVES, Vector3(1.0, 1.18, 0.75))
     for n in range(3):
         _segment(pivot, "Finger" + str(n),
-            Vector3(side * 0.115 + (float(n) - 1.0) * 0.044,
-                -0.69, -0.214),
-            Vector3(side * 0.115 + (float(n) - 1.0) * 0.044,
-                -0.755, -0.238), 0.021, 0.015, GLOVES)
+            Vector3(side * 0.09 + (float(n) - 1.0) * 0.035,
+                -0.615, -0.20),
+            Vector3(side * 0.09 + (float(n) - 1.0) * 0.035,
+                -0.674, -0.22), 0.017, 0.012, GLOVES)
     return pivot
 
 func _ready() -> void:
     name = "FirstPersonFullBody"
-    # Torso is below the near eye position, allowing looking down at your coat.
-    _sphere(self, "ChestAndShoulders", Vector3(0.0, 1.075, 0.050),
-        0.39, COAT, Vector3(0.93, 0.91, 0.57))
-    _box(self, "LowerJacket", Vector3(0.58, 0.30, 0.29),
-        Vector3(0.0, 0.87, 0.055), COAT)
-    _box(self, "Belt", Vector3(0.57, 0.075, 0.31),
-        Vector3(0.0, 0.79, -0.015), BELT)
-    _box(self, "BeltBuckle", Vector3(0.068, 0.062, 0.022),
-        Vector3(0.0, 0.79, -0.181), SHIRT)
-    # Small open collar prevents seeing a solid head sphere from inside.
-    _sphere(self, "Collar", Vector3(0, 1.395, 0.05),
-        0.175, COAT_SHADOW, Vector3(1.1, 0.30, 1.0))
+    # The eye is at y=1.55, z=0. The chest must never occupy that space.
+    # Low rear-offset torso has an unobstructed viewing cone to the legs.
+    # The old 0.39-radius chest sphere and high collar formed a giant dark
+    # polygon inside the near camera when looking down.
+    _box(self, "ChestAndShoulders", Vector3(0.53, 0.35, 0.25),
+        Vector3(0.0, 1.075, 0.20), COAT)
+    _box(self, "LowerJacket", Vector3(0.52, 0.29, 0.27),
+        Vector3(0.0, 0.835, 0.14), COAT)
+    _box(self, "Belt", Vector3(0.53, 0.065, 0.27),
+        Vector3(0.0, 0.775, 0.10), BELT)
+    _box(self, "BeltBuckle", Vector3(0.064, 0.055, 0.018),
+        Vector3(0.0, 0.775, -0.041), SHIRT)
+    # Keep collar out of the first-person view (the head is deliberately absent).
     for side in [-1.0, 1.0]:
         _box(self, "JacketPocket", Vector3(0.17, 0.115, 0.035),
-            Vector3(side * 0.174, 0.955, -0.142), COAT_SHADOW)
+            Vector3(side * 0.165, 0.935, 0.060), COAT_SHADOW)
     left_leg = _leg(-1.0, "LeftLeg")
     right_leg = _leg(1.0, "RightLeg")
     left_arm = _arm(-1.0, "LeftArm")
     right_arm = _arm(1.0, "RightArm")
-    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true")
+    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true")
 
 func set_right_hand_occupied(value: bool) -> void:
     hide_right_hand = value
