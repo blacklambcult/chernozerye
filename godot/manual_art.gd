@@ -58,6 +58,8 @@ var _building_bounds: Array[Rect2] = []
 var _plot_props_count := 0
 var _flower_patches := 0
 var _front_walkways := 0
+var _chimney_smoke_sources: Array[Vector3] = []
+var _chimneys_smoking := 0
 var _canopy_count := 0
 var _lean_to_count := 0
 var _roof_patch_count := 0
@@ -144,10 +146,12 @@ func decorate(features: Array) -> void:
     _create_solid_mesh(_yard_details, Color("#48443b"), "Старый деревенский быт / ящики и дрова")
     _create_solid_mesh(_road_ruts, RUT_COLOR, "Дорога / земляные колеи")
     _create_solid_mesh(_overhead_wires, Color("#242d2d"), "Старые кабели / провисшие линии")
+    _create_chimney_smoke()
     print("MANUAL_UTILITY_READY: poles=", _utility_pole_count,
         " lamp_heads=", _street_lamp_heads, " warm_lights=", _street_lights,
         " balconies=", _balcony_count,
-        " flower_patches=", _flower_patches, " walks=", _front_walkways)
+        " flower_patches=", _flower_patches, " walks=", _front_walkways,
+        " chimney_smoke=", _chimneys_smoking)
     _create_forest_assets()
     print("MANUAL_ART_READY: buildings=", _building_count,
         " plots=", _fence_count, " roads=", _road_count, " lamps=", _lights_placed)
@@ -1263,6 +1267,51 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
         _batch_box("chimney", chimney_at, Vector3(0.70, 1.10, 0.70))
         _batch_box("chimney_cap", chimney_at + Vector3.UP * 0.62,
             Vector3(0.87, 0.16, 0.87))
+        _chimney_smoke_sources.append(chimney_at + Vector3.UP * 0.82)
+
+func _create_chimney_smoke() -> void:
+    # November: a few inhabited izbas are heated. Only the 7 nearest visible
+    # chimneys create smoke, keeping the WebGL/Compatibility particle budget low.
+    var spawn := Vector3(-789.7, 0.0, -268.6)
+    _chimney_smoke_sources.sort_custom(func(a: Vector3, b: Vector3) -> bool:
+        return a.distance_squared_to(spawn) < b.distance_squared_to(spawn))
+    var smoke_mesh := QuadMesh.new()
+    smoke_mesh.size = Vector2(0.34, 0.34)
+    var smoke_material := StandardMaterial3D.new()
+    smoke_material.albedo_color = Color(0.67, 0.68, 0.69, 0.20)
+    smoke_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+    smoke_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    smoke_material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+    smoke_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+    smoke_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_OPAQUE_ONLY
+    smoke_mesh.material = smoke_material
+    var smoke_limit := mini(7, _chimney_smoke_sources.size())
+    for index in range(smoke_limit):
+        var smoke := CPUParticles3D.new()
+        smoke.name = "NovemberChimneySmoke_" + str(index)
+        smoke.position = _chimney_smoke_sources[index]
+        smoke.amount = 13
+        smoke.lifetime = 5.5
+        smoke.preprocess = 5.5
+        smoke.randomness = 0.48
+        smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+        smoke.emission_sphere_radius = 0.13
+        smoke.direction = Vector3(0.20, 1.0, 0.15)
+        smoke.spread = 12.0
+        smoke.initial_velocity_min = 0.34
+        smoke.initial_velocity_max = 0.64
+        smoke.gravity = Vector3(0.02, 0.055, 0.01)
+        smoke.scale_amount_min = 0.65
+        smoke.scale_amount_max = 1.55
+        smoke.local_coords = false
+        smoke.mesh = smoke_mesh
+        add_child(smoke)
+        smoke.emitting = true
+        _chimneys_smoking += 1
+    print("NOVEMBER_SMOKE_READY: active=", _chimneys_smoking,
+        " candidates=", _chimney_smoke_sources.size(),
+        " particles_per_chimney=13")
+
 
 func _box_faces(verts: PackedVector3Array, center: Vector3, size: Vector3) -> void:
     var lo := center - size * 0.5
