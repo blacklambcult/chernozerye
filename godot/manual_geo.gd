@@ -4,8 +4,8 @@ extends Node3D
 # Visuals are blockout placeholders; outline shapes and positions are preserved.
 const SOURCE := "res://manual_layout.json"
 const COLORS := {
-    "road": Color("#544d46"),
-    "path": Color("#494941"),
+    "road": Color("#796e60"),
+    "path": Color("#66645c"),
     "plot": Color("#333b32"),
     "forest": Color("#1c3228"),
     "water": Color("#234253"),
@@ -221,7 +221,7 @@ func _scatter_forest(points: PackedVector2Array) -> void:
             continue
         if _nearest_road(p) < 7.0:
             continue
-        var scale := rng.randf_range(0.70, 1.45)
+        var scale := rng.randf_range(0.67, 1.12)
         var rotation := rng.randf_range(-PI, PI)
         var basis := Basis().rotated(Vector3.UP, rotation).scaled(Vector3.ONE * scale)
         if count % 4 == 0:
@@ -246,23 +246,58 @@ func _instanced_tree(mesh: Mesh, transforms: Array[Transform3D], color: Color, l
     node.material_override = _mat(color)
     add_child(node)
 
+func _layer_transforms(source: Array[Transform3D], local_rise: float) -> Array[Transform3D]:
+    var layers: Array[Transform3D] = []
+    for t in source:
+        # A basis-scaled offset keeps foliage aligned with tree size.
+        layers.append(Transform3D(t.basis, t.origin + t.basis * Vector3(0.0, local_rise, 0.0)))
+    return layers
+
 func _build_forest_instances() -> void:
-    var fir := CylinderMesh.new()
-    fir.top_radius = 0.0
-    fir.bottom_radius = 3.3
-    fir.height = 8.0
-    fir.radial_segments = 5
-    _instanced_tree(fir, forest_positions, Color("#233b31"), "Тёмные ели / массив")
-    var broad := CylinderMesh.new()
-    broad.top_radius = 0.52
-    broad.bottom_radius = 3.5
-    broad.height = 8.5
-    broad.radial_segments = 7
-    _instanced_tree(broad, broad_canopies, Color("#354d3d"), "Ели / широкие кроны")
+    # Three staggered bough layers read as old pines instead of a single giant cone.
+    # All layers reuse the original surveyed forest point positions.
+    var lowest := CylinderMesh.new()
+    lowest.top_radius = 0.32
+    lowest.bottom_radius = 2.4
+    lowest.height = 4.1
+    lowest.radial_segments = 6
+    _instanced_tree(lowest, _layer_transforms(forest_positions, -1.1),
+        Color("#263d36"), "Ели / нижние лапы")
+
+    var middle := CylinderMesh.new()
+    middle.top_radius = 0.22
+    middle.bottom_radius = 1.83
+    middle.height = 3.4
+    middle.radial_segments = 6
+    _instanced_tree(middle, _layer_transforms(forest_positions, 1.1),
+        Color("#2a4539"), "Ели / средние лапы")
+
+    var top := CylinderMesh.new()
+    top.top_radius = 0.0
+    top.bottom_radius = 1.30
+    top.height = 2.9
+    top.radial_segments = 5
+    _instanced_tree(top, _layer_transforms(forest_positions, 3.05),
+        Color("#304a3c"), "Ели / кроны")
+
+    # Aspen canopy is irregular, compact, and visually distinct from conifers.
+    var broad := SphereMesh.new()
+    broad.radius = 2.15
+    broad.height = 3.5
+    broad.radial_segments = 6
+    broad.rings = 3
+    _instanced_tree(broad, broad_canopies, Color("#3b5446"), "Осинник / кроны")
+    var smaller := SphereMesh.new()
+    smaller.radius = 1.45
+    smaller.height = 2.7
+    smaller.radial_segments = 5
+    smaller.rings = 2
+    _instanced_tree(smaller, _layer_transforms(broad_canopies, 2.1),
+        Color("#435d49"), "Осинник / верхушки")
     var trunk := CylinderMesh.new()
     trunk.top_radius = 0.25
-    trunk.bottom_radius = 0.44
+    trunk.bottom_radius = 0.40
     trunk.height = 3.3
     trunk.radial_segments = 5
-    _instanced_tree(trunk, tree_trunks, Color("#37352f"), "Лес / стволы")
+    _instanced_tree(trunk, tree_trunks, Color("#3b3b34"), "Лес / стволы")
     print("MANUAL_FOREST_READY: trees=", tree_trunks.size())
