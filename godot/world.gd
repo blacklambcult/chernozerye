@@ -5,9 +5,9 @@ const LOGO_DATA = preload("res://logo_data.gd")
 const MAP_FILE := "res://world_data.json"
 const MANUAL_FILE := "res://manual_layout.json"
 const GAME_TITLE := "Fearless Knights of the Cordon"
-const GAME_STAGE := "Pre-Alpha 0.4.0"
+const GAME_STAGE := "Pre-Alpha 0.4.1"
 const SEASON := "NOVEMBER"
-const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.4.0 · ЧЕРНОЗЁРЬЕ · 314 ОБЪЕКТОВ"
+const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.4.1 · ЧЕРНОЗЁРЬЕ · 314 ОБЪЕКТОВ"
 var manual_mode := false
 var manual_button: Button
 var _status_label: Label
@@ -350,7 +350,7 @@ func _create_label() -> void:
     layer.add_child(label)
     var weather_label := Label.new()
     weather_label.name = "NovemberWeatherLabel"
-    weather_label.text = "ЧЕРНОЗЁРЬЕ  /  НОЯБРЬ  /  ПОЗДНИЙ ВЕЧЕР  /  МОКРЫЙ СНЕГ"
+    weather_label.text = "ЧЕРНОЗЁРЬЕ  /  НОЯБРЬ  /  ПОЗДНИЙ ВЕЧЕР  /  МОКРЫЙ СНЕГ  |  E: ОСМОТР  J: ЖУРНАЛ  V: ЖЕСТ"
     weather_label.position = Vector2(16, 38)
     weather_label.add_theme_color_override("font_color", Color("#aeb9bc"))
     weather_label.add_theme_font_size_override("font_size", 11)
