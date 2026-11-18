@@ -89,7 +89,7 @@ jobs:
           set -euo pipefail
           godot --headless --path godot --script res://collision_regression.gd 2>&1 | tee /tmp/collision-regression.log
           grep -q "COLLISION_REGRESSION_OK: house=solid fence=solid gap=open player_idle=cosmetic capsule=blocked view=compact" /tmp/collision-regression.log
-          grep -q "FIRST_PERSON_HUD_REGRESSION_OK:" /tmp/collision-regression.log
+          grep -q "FIRST_PERSON_HUD_REGRESSION_OK: avatar=body+legs+arms prop=filter+paper+ember compass=NESW health=100 slots=4 eye_clear=true elbow_bent=true" /tmp/collision-regression.log
 
       - name: Smoke-test actual scene startup
         shell: bash
@@ -238,7 +238,7 @@ jobs:
           set -euo pipefail
           # Immutable directory per commit. A static /pre-alpha-0.3.9/
           # was cached by some browsers even after a successful new publish.
-          RELEASE_DIR="pre-alpha-0.4.5-${GITHUB_SHA:0:8}"
+          RELEASE_DIR="pre-alpha-0.4.6-${GITHUB_SHA:0:8}"
           mkdir -p "build/web/${RELEASE_DIR}"
           godot --headless --path godot --export-release "Web" "$(pwd)/build/web/${RELEASE_DIR}/index.html"
           test -s "build/web/${RELEASE_DIR}/index.html"
@@ -252,10 +252,10 @@ jobs:
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <meta http-equiv="refresh" content="0; url=./${RELEASE_DIR}/">
             <meta name="robots" content="noindex">
-            <title>Fearless Knights of the Cordon — Pre-Alpha 0.4.5</title>
+            <title>Fearless Knights of the Cordon — Pre-Alpha 0.4.6</title>
           </head>
           <body>
-            <p><a href="./${RELEASE_DIR}/">Открыть Fearless Knights of the Cordon — Pre-Alpha 0.4.5</a></p>
+            <p><a href="./${RELEASE_DIR}/">Открыть Fearless Knights of the Cordon — Pre-Alpha 0.4.6</a></p>
             <script>window.location.replace("./${RELEASE_DIR}/");</script>
           </body>
           </html>
