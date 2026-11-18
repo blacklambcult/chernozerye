@@ -13,6 +13,7 @@ var last_event := "none"
 var pressed := {"w": false, "a": false, "s": false, "d": false, "m": false}
 var map_open := false
 var controls_locked := false
+var mouse_sensitivity := MOUSE_SENS
 # Narrative character animation is isolated from player movement and stats.
 var _avatar: Node3D
 var _character_sequence: Node3D
@@ -64,6 +65,10 @@ func _ready() -> void:
     _character_sequence.name = "CharacterSmoking"
     _character_sequence.set_script(preload("res://character_smoking.gd"))
     camera.add_child(_character_sequence)
+    var pause_overlay := CanvasLayer.new()
+    pause_overlay.name = "PauseOverlay"
+    pause_overlay.set_script(preload("res://pause_overlay.gd"))
+    add_child(pause_overlay)
 
 func _start_character_sequence() -> bool:
     if _character_sequence == null:
@@ -90,8 +95,8 @@ func _input(event: InputEvent) -> void:
         if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
             Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
     elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-        rotate_y(-event.relative.x * MOUSE_SENS)
-        camera.rotate_x(-event.relative.y * MOUSE_SENS)
+        rotate_y(-event.relative.x * mouse_sensitivity)
+        camera.rotate_x(-event.relative.y * mouse_sensitivity)
         camera.rotation.x = clampf(camera.rotation.x, -1.45, 1.45)
         last_event = "mouse movement"
     elif event is InputEventKey:
@@ -110,8 +115,6 @@ func _input(event: InputEvent) -> void:
             _start_character_sequence()
         if key.pressed and not key.echo and (key.keycode == KEY_F3 or key.physical_keycode == KEY_F3):
             status_label.visible = not status_label.visible
-        if key.pressed and key.keycode == KEY_ESCAPE:
-            Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func _movement_speed(sprinting: bool) -> float:
     return SPRINT_SPEED if sprinting else SPEED
