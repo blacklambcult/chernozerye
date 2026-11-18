@@ -102,11 +102,38 @@ func _run() -> void:
     if avatar.get_node_or_null("LeftArm") == null or avatar.get_node_or_null("RightArm") == null:
         _fail("first-person arms are not modeled")
         return
+    # The camera's downward ray must not begin inside or directly hit a huge
+    # chest mesh. Verify the torso is below eye height and shifted behind view.
+    var chest := avatar.get_node_or_null("ChestAndShoulders") as MeshInstance3D
+    if chest == null or not chest.mesh is BoxMesh:
+        _fail("upper torso must be a compact box, not a head-sized sphere")
+        return
+    var torso_box := chest.mesh as BoxMesh
+    var eye_height := (actor.get_node("Camera3D") as Camera3D).position.y
+    if chest.position.y + torso_box.size.y * 0.5 >= eye_height - 0.20:
+        _fail("head/torso clearance insufficient for look-down camera")
+        return
+    if chest.position.z - torso_box.size.z * 0.5 < 0.01:
+        _fail("torso front must stay behind the eye when looking down")
+        return
     var hand_model := actor.get("_smoke_prop") as Node3D
     for detail in ["BrownFilter", "WhitePaper", "RedEmber"]:
-        if hand_model.get_node_or_null("PeriodCharacterProp/" + detail) == null:
+        if hand_model.get_node_or_null("AnimatedHand/PeriodCharacterProp/" + detail) == null:
             _fail("missing close-up character prop detail: " + detail)
             return
+    var wrist := hand_model.get_node("AnimatedHand") as Node3D
+    var elbow := hand_model.get_node("ElbowJoint") as Node3D
+    actor.call("_apply_idle_pose", 0.0)
+    var wrist_rest := wrist.position
+    actor.call("_apply_idle_pose", 1.0)
+    var wrist_raised := wrist.position
+    var elbow_raised := elbow.position
+    if wrist_raised.y - wrist_rest.y < 0.35 or wrist_raised.x > 0.25:
+        _fail("hand should rise toward center/face, not stay extended ahead")
+        return
+    if elbow_raised.distance_to(wrist_raised) < 0.22:
+        _fail("elbow must stay visibly bent")
+        return
     actor.call("_start_character_idle")
     if float(actor.get("_idle_smoke_timer")) <= 0.0:
         _fail("character gesture did not start from button action")
@@ -141,5 +168,5 @@ func _run() -> void:
         _fail("quick slot selection does not update")
         return
     print("COLLISION_REGRESSION_OK: house=solid fence=solid gap=open player_idle=cosmetic capsule=blocked view=compact")
-    print("FIRST_PERSON_HUD_REGRESSION_OK: avatar=body+legs+arms prop=filter+paper+ember compass=NESW health=100 slots=4")
+    print("FIRST_PERSON_HUD_REGRESSION_OK: avatar=body+legs+arms prop=filter+paper+ember compass=NESW health=100 slots=4 eye_clear=true elbow_bent=true")
     quit(0)
