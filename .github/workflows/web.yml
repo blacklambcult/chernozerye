@@ -80,9 +80,10 @@ jobs:
           grep -q "MANUAL_LAYOUT_READY: 130" /tmp/world-smoke.log
           grep -q "MANUAL_ART_READY: buildings=59 plots=34 roads=18" /tmp/world-smoke.log
           grep -q "MANUAL_VILLAGE_DETAIL_READY: canopies=" /tmp/world-smoke.log
+          grep -q "MANUAL_FACADE_READY: lean_tos=" /tmp/world-smoke.log
           # The new lighting mode is enabled only after the player selects the manual village.
           # Assert its configuration statically; startup smoke has not clicked that button.
-          grep -q 'ambient_light_energy = 0.42 if manual_mode' godot/world.gd
+          grep -q 'ambient_light_energy = 0.48 if manual_mode' godot/world.gd
           grep -q 'light_specular = 0.0' godot/world.gd
           grep -q "MANUAL_FOREST_READY: trees=" /tmp/world-smoke.log
           grep -q "clearance=roads13/buildings6.5" /tmp/world-smoke.log
@@ -97,23 +98,23 @@ jobs:
         run: |
           set -euo pipefail
           # Versioned asset directory prevents stale .wasm/.pck files in browsers.
-          mkdir -p build/web/v29
-          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v29/index.html"
-          test -s build/web/v29/index.html
-          test -f build/web/v29/index.wasm
-          test -f build/web/v29/index.pck
+          mkdir -p build/web/v30
+          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v30/index.html"
+          test -s build/web/v30/index.html
+          test -f build/web/v30/index.wasm
+          test -f build/web/v30/index.pck
           cat > build/web/index.html <<'HTML'
           <!doctype html>
           <html lang="ru">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta http-equiv="refresh" content="0; url=./v29/">
+            <meta http-equiv="refresh" content="0; url=./v30/">
             <title>Чернозёрье — загрузка новой версии</title>
           </head>
           <body>
-            <p><a href="./v29/">Открыть Чернозёрье 2.9</a></p>
-            <script>window.location.replace("./v29/");</script>
+            <p><a href="./v30/">Открыть Чернозёрье 3.0</a></p>
+            <script>window.location.replace("./v30/");</script>
           </body>
           </html>
           HTML

@@ -36,6 +36,9 @@ var _feature_house_distance := INF
 var _building_polygons: Array[PackedVector2Array] = []
 var _plot_props_count := 0
 var _canopy_count := 0
+var _lean_to_count := 0
+var _roof_patch_count := 0
+var _shutter_count := 0
 
 func decorate(features: Array) -> void:
     _rng.seed = 19960918
@@ -96,6 +99,8 @@ func decorate(features: Array) -> void:
         " plots=", _fence_count, " roads=", _road_count, " lamps=", _lights_placed)
     print("MANUAL_VILLAGE_DETAIL_READY: canopies=", _canopy_count,
         " plot_props=", _plot_props_count, " crooked_fences=", _fence_count)
+    print("MANUAL_FACADE_READY: lean_tos=", _lean_to_count,
+        " roof_patches=", _roof_patch_count, " rotten_shutters=", _shutter_count)
 
 func _local_points(raw: Array) -> PackedVector2Array:
     var points := PackedVector2Array()
@@ -240,9 +245,14 @@ func _flush_details() -> void:
         "board": Color("#50493e"),
         "porch": Color("#4b433b"),
         "lamp": Color("#df9c52"),
-        "trim": Color("#596363"),
+        "trim": Color("#6c7167"),
         "rust": Color("#604039"),
         "awning": Color("#343433"),
+        "shutter": Color("#42483f"),
+        "shutter_dark": Color("#2c312f"),
+        "roof_patch": Color("#3b403f"),
+        "lean_to": Color("#46443e"),
+        "lean_to_roof": Color("#292f30"),
         "pole": Color("#413b35"),
         "crossarm": Color("#343531")
     }
@@ -307,7 +317,8 @@ func _wall_panel(key: String, start: Vector2, finish: Vector2, normal: Vector3,
     _batch_quad(key, aa, bb, cc, dd)
 
 func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
-        center_fraction: float, side_length: float, illuminated: bool, boarded: bool = false) -> void:
+        center_fraction: float, side_length: float, illuminated: bool,
+        boarded: bool = false, decay: int = 0) -> void:
     var half := minf(0.07, 0.72 / maxf(side_length, 0.1))
     var u0 := center_fraction - half
     var u1 := center_fraction + half
@@ -321,8 +332,23 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
     _wall_panel("trim", start, finish, normal, u0 - 0.024, u1 + 0.024, 2.77, 2.88, 0.173)
     _wall_panel("trim", start, finish, normal, u0 - 0.038, u1 + 0.038, 1.28, 1.38, 0.170)
     if boarded:
-        _wall_panel("board", start, finish, normal, u0, u1, 1.68, 1.94, 0.170)
-        _wall_panel("board", start, finish, normal, u0, u1, 2.23, 2.43, 0.174)
+        _wall_panel("board", start, finish, normal, u0, u1, 1.68, 1.94, 0.190)
+        _wall_panel("board", start, finish, normal, u0, u1, 2.23, 2.43, 0.194)
+    if decay % 4 == 1:
+        # Rotten window shutter: asymmetry and one partly detached plank.
+        var sw := minf(0.05, 0.34 / maxf(side_length, 0.1))
+        _wall_panel("shutter", start, finish, normal,
+            u0 - sw, u0 - 0.022, 1.31, 2.73, 0.195)
+        _wall_panel("shutter_dark", start, finish, normal,
+            u0 - sw, u0 - 0.016, 1.62, 1.71, 0.208)
+        _wall_panel("shutter_dark", start, finish, normal,
+            u0 - sw, u0 - 0.016, 2.18, 2.27, 0.209)
+        _shutter_count += 1
+    elif decay % 6 == 0:
+        var sw := minf(0.05, 0.31 / maxf(side_length, 0.1))
+        _wall_panel("shutter", start, finish, normal,
+            u1 + 0.020, u1 + sw, 1.43, 2.69, 0.194)
+        _shutter_count += 1
     if illuminated and _lights_placed < 7:
         _lights_placed += 1
         var center := start.lerp(finish, center_fraction)
@@ -389,14 +415,24 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
             _wall_panel("door", a, b, normal, 0.5 - door_half,
                 0.5 + door_half, 0.12, 2.13, 0.15)
             if category == "house" and length > 7.0:
-                _make_window(a, b, normal, 0.19, length, index % 6 == 0, index % 5 == 0)
-                _make_window(a, b, normal, 0.81, length, index % 9 == 0, index % 7 == 0)
+                _make_window(a, b, normal, 0.19, length, index % 6 == 0, index % 5 == 0, index + i)
+                _make_window(a, b, normal, 0.81, length, index % 9 == 0, index % 7 == 0, index + i + 3)
         elif category == "house" and length > 5.0:
             _make_window(a, b, normal, 0.5, length, index % 11 == 0 and i % 2 == 0,
-                (index + i) % 8 == 0)
+                (index + i) % 8 == 0, index + i)
     _make_textured_mesh(wall_verts, wall_uvs, _material(Color.WHITE, wall_tex),
         category + " / pixel-wood")
     _decorate_roof(points, category, walls_height, roof_tex, index)
+    if category == "house" and points.size() == 4 and index % 7 == 3:
+        var rear_index := (front_index + 2) % 4
+        var rear_a: Vector2 = points[rear_index]
+        var rear_b: Vector2 = points[(rear_index + 1) % 4]
+        if rear_a.distance_to(rear_b) > 5.0 and _nearest_road_distance((rear_a + rear_b) * 0.5) > 3.5:
+            var rear_side := rear_b - rear_a
+            var rear_out := Vector2(rear_side.y, -rear_side.x).normalized()
+            if signed < 0.0:
+                rear_out *= -1.0
+            _decorate_lean_to(rear_a, rear_b, Vector3(rear_out.x, 0.0, -rear_out.y))
     if category == "house":
         if index % 4 == 2 and points[front_index].distance_to(points[(front_index + 1) % points.size()]) > 4.8:
             var start: Vector2 = points[front_index]
@@ -407,6 +443,32 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
                 outward *= -1.0
             _decorate_entry_canopy(start, finish, Vector3(outward.x, 0.0, -outward.y))
         _decorate_showcase_yard(points, front_index)
+
+func _decorate_lean_to(a: Vector2, b: Vector2, outward: Vector3) -> void:
+    # Small warped annex behind selected real houses; no new map footprint.
+    var line := _pt(b, 0.0) - _pt(a, 0.0)
+    if line.length() < 4.5:
+        return
+    var tangent := line.normalized()
+    var mid := _pt(a.lerp(b, 0.5), 0.13)
+    var left_back := mid - tangent * 1.35 + outward * 0.10
+    var right_back := mid + tangent * 1.35 + outward * 0.10
+    var left_front := left_back + outward * 1.65
+    var right_front := right_back + outward * 1.65
+    var low := Vector3.UP * 0.12
+    var high_back := Vector3.UP * 2.58
+    var high_front := Vector3.UP * 1.87
+    _batch_quad("lean_to", left_front + low, right_front + low,
+        right_front + high_front, left_front + high_front)
+    _batch_quad("lean_to", left_back + low, left_front + low,
+        left_front + high_front, left_back + high_back)
+    _batch_quad("lean_to", right_front + low, right_back + low,
+        right_back + high_back, right_front + high_front)
+    _batch_quad("lean_to_roof", left_back + high_back + Vector3.UP * 0.08,
+        right_back + high_back + Vector3.UP * 0.08,
+        right_front + high_front + Vector3.UP * 0.08,
+        left_front + high_front + Vector3.UP * 0.08)
+    _lean_to_count += 1
 
 func _decorate_entry_canopy(a: Vector2, b: Vector2, outward: Vector3) -> void:
     # A crooked sheet-metal porch awning for selected *real* house outlines.
@@ -485,6 +547,21 @@ func _roof_face(verts: PackedVector3Array, uvs: PackedVector2Array,
         Vector2(0, 0), Vector2(a.distance_to(b) / 5.0, 0),
         Vector2(a.distance_to(c) / 5.0, 1.0))
 
+func _decorate_roof_patch(eave_a: Vector2, eave_b: Vector2,
+        ridge_a: Vector2, ridge_b: Vector2, eave: float, rise: float) -> void:
+    # Uneven patch of repaired sheet metal follows the existing roof slope.
+    var low_t := 0.31
+    var high_t := 0.64
+    var l0 := eave_a.lerp(eave_b, 0.18).lerp(ridge_a.lerp(ridge_b, 0.18), low_t)
+    var r0 := eave_a.lerp(eave_b, 0.58).lerp(ridge_a.lerp(ridge_b, 0.58), low_t)
+    var r1 := eave_a.lerp(eave_b, 0.58).lerp(ridge_a.lerp(ridge_b, 0.58), high_t)
+    var l1 := eave_a.lerp(eave_b, 0.18).lerp(ridge_a.lerp(ridge_b, 0.18), high_t)
+    _batch_quad("roof_patch", _pt(l0, eave + rise * low_t + 0.065),
+        _pt(r0, eave + rise * low_t + 0.065),
+        _pt(r1, eave + rise * high_t + 0.065),
+        _pt(l1, eave + rise * high_t + 0.065))
+    _roof_patch_count += 1
+
 func _decorate_roof(points: PackedVector2Array, category: String, base: float,
         tex: Texture2D, index: int) -> void:
     var v := PackedVector3Array()
@@ -503,6 +580,8 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
             _roof_face(v, uv, points[3], r1, points[2], eave, eave + rise, eave)
             _roof_face(v, uv, points[0], r0, points[3], eave, eave + rise, eave)
             _roof_face(v, uv, points[1], points[2], r1, eave, eave, eave + rise)
+            if category == "house" and index % 4 == 1:
+                _decorate_roof_patch(points[0], points[1], r0, r1, eave, rise)
         else:
             var r0 := (points[0] + points[1]) * 0.5
             var r1 := (points[2] + points[3]) * 0.5
@@ -512,6 +591,8 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
             _roof_face(v, uv, points[0], r1, points[3], eave, eave + rise, eave)
             _roof_face(v, uv, points[0], points[1], r0, eave, eave, eave + rise)
             _roof_face(v, uv, points[2], points[3], r1, eave, eave, eave + rise)
+            if category == "house" and index % 4 == 1:
+                _decorate_roof_patch(points[1], points[2], r0, r1, eave, rise)
     else:
         var centroid := Vector2.ZERO
         for p in points:
