@@ -19,6 +19,10 @@ var _smoke_prop: Node3D
 var _smoke_particles: CPUParticles3D
 var _smoke_animation_count := 0
 var _avatar: Node3D
+var _gesture_upper: MeshInstance3D
+var _gesture_lower: MeshInstance3D
+var _gesture_elbow: MeshInstance3D
+var _gesture_hand: Node3D
 
 func set_controls_locked(value: bool) -> void:
     controls_locked = value
@@ -110,45 +114,51 @@ func _view_round(parent: Node3D, title: String,
     return mesh_node
 
 func _build_character_idle_prop() -> void:
-    # One articulated right arm temporarily appears in front of the camera.
-    # The normal full-body right arm is hidden only during this animation.
+    # Separate articulated arm viewmodel with independent shoulder, elbow and
+    # wrist locations; avoids sliding the whole straight limb across the frame.
     _smoke_prop = Node3D.new()
     _smoke_prop.name = "AdultCharacterIdleProp"
     _smoke_prop.visible = false
     camera.add_child(_smoke_prop)
-    _view_round(_smoke_prop, "JacketElbow", Vector3(0.58, -0.75, -0.52),
-        0.13, Color("#393e38"))
-    _view_segment(_smoke_prop, "BentRightSleeve",
-        Vector3(0.60, -0.78, -0.50),
-        Vector3(0.39, -0.42, -0.76), 0.129, 0.085, Color("#41483f"))
-    _view_round(_smoke_prop, "Wrist", Vector3(0.38, -0.40, -0.77),
-        0.078, Color("#917968"))
-    _view_round(_smoke_prop, "Palm", Vector3(0.36, -0.34, -0.83),
-        0.082, Color("#aa9079"), Vector3(0.90, 1.08, 0.75))
-    for finger in range(3):
-        var side := float(finger - 1) * 0.041
-        _view_segment(_smoke_prop, "VisibleFinger" + str(finger),
-            Vector3(0.36 + side, -0.30, -0.855),
-            Vector3(0.35 + side, -0.235, -0.902),
-            0.021, 0.014, Color("#aa9079"))
+    _gesture_upper = _view_segment(_smoke_prop, "UpperArmSleeve",
+        Vector3(0.47, -0.70, 0.12), Vector3(0.52, -0.77, -0.46),
+        0.108, 0.092, Color("#41483f"))
+    _gesture_lower = _view_segment(_smoke_prop, "BentForearmSleeve",
+        Vector3(0.52, -0.77, -0.46), Vector3(0.41, -0.65, -0.82),
+        0.093, 0.071, Color("#3b433c"))
+    _gesture_elbow = _view_round(_smoke_prop, "ElbowJoint",
+        Vector3(0.52, -0.77, -0.46), 0.095, Color("#3b433c"))
+    _gesture_hand = Node3D.new()
+    _gesture_hand.name = "AnimatedHand"
+    _gesture_hand.position = Vector3(0.41, -0.65, -0.82)
+    _smoke_prop.add_child(_gesture_hand)
+    _view_round(_gesture_hand, "Palm", Vector3.ZERO,
+        0.069, Color("#aa9079"), Vector3(0.87, 1.13, 0.75))
+    _view_round(_gesture_hand, "Thumb", Vector3(-0.068, 0.001, -0.012),
+        0.029, Color("#aa9079"))
+    for finger in range(4):
+        var side := float(finger) - 1.5
+        _view_segment(_gesture_hand, "Finger" + str(finger),
+            Vector3(side * 0.028, 0.036, -0.022),
+            Vector3(side * 0.024, 0.086, -0.048),
+            0.016, 0.012, Color("#aa9079"))
 
     var cigarette := Node3D.new()
     cigarette.name = "PeriodCharacterProp"
-    cigarette.position = Vector3(0.36, -0.26, -0.902)
-    cigarette.rotation.x = -1.35
-    _smoke_prop.add_child(cigarette)
-    # Unbranded period prop: distinguish paper, cardboard filter and ember.
+    cigarette.position = Vector3(0.012, 0.090, -0.06)
+    cigarette.rotation.x = -0.18
+    _gesture_hand.add_child(cigarette)
+    # Unbranded decorative prop. No buffs, resources or health effects.
     _view_segment(cigarette, "BrownFilter",
-        Vector3(0, -0.020, 0), Vector3(0, 0.020, 0),
+        Vector3(0, -0.022, 0), Vector3(0, 0.018, 0),
         0.009, 0.009, Color("#916b4d"))
     _view_segment(cigarette, "WhitePaper",
-        Vector3(0, 0.020, 0), Vector3(0, 0.125, 0),
+        Vector3(0, 0.018, 0), Vector3(0, 0.120, 0),
         0.0085, 0.0085, Color("#eee8dc"))
     var ember := _view_round(cigarette, "RedEmber",
-        Vector3(0, 0.134, 0), 0.012, Color("#b95231"),
+        Vector3(0, 0.132, 0), 0.012, Color("#b95231"),
         Vector3(1.0, 0.48, 1.0))
     ember.material_override = _appearance_material(Color("#b95231"), true)
-
     _smoke_particles = CPUParticles3D.new()
     _smoke_particles.name = "FaintCharacterSmoke"
     _smoke_particles.position = Vector3(0, 0.145, 0)
@@ -172,6 +182,37 @@ func _build_character_idle_prop() -> void:
     smoke_quad.material = smoke_mat
     _smoke_particles.mesh = smoke_quad
     cigarette.add_child(_smoke_particles)
+    _apply_idle_pose(0.0)
+
+
+func _orient_arm_segment(limb: MeshInstance3D, a: Vector3, b: Vector3) -> void:
+    var axis := b - a
+    if axis.length_squared() < 0.0001:
+        return
+    limb.position = (a + b) * 0.5
+    limb.quaternion = Quaternion(Vector3.UP, axis.normalized())
+    var geo := limb.mesh as CylinderMesh
+    limb.scale.y = axis.length() / maxf(geo.height, 0.01)
+
+
+func _apply_idle_pose(weight: float) -> void:
+    # Shoulder is fixed near the character. Elbow stays bent while the hand
+    # follows an arc to the lower center of the view (face height), not forward
+    # in a straight line. All numbers are viewmodel-relative, not mechanics.
+    if _gesture_upper == null or _gesture_lower == null or _gesture_hand == null:
+        return
+    var t := clampf(weight, 0.0, 1.0)
+    var shoulder := Vector3(0.49, -0.78, 0.15)
+    var elbow := Vector3(0.52, -0.75, -0.49).lerp(
+        Vector3(0.50, -0.48, -0.43), t)
+    var wrist := Vector3(0.41, -0.65, -0.82).lerp(
+        Vector3(0.13, -0.17, -0.36), t)
+    _orient_arm_segment(_gesture_upper, shoulder, elbow)
+    _orient_arm_segment(_gesture_lower, elbow, wrist)
+    _gesture_elbow.position = elbow
+    _gesture_hand.position = wrist
+    _gesture_hand.rotation.z = -0.16 * t
+    _gesture_hand.rotation.x = -0.08 * t
 
 func _start_character_idle() -> void:
     if controls_locked or _idle_smoke_timer > 0.0 or _smoke_prop == null:
@@ -183,8 +224,7 @@ func _start_character_idle() -> void:
     if map != null and map.visible:
         return
     _idle_smoke_timer = _idle_smoke_duration
-    _smoke_prop.position = Vector3.ZERO
-    _smoke_prop.rotation = Vector3.ZERO
+    _apply_idle_pose(0.0)
     _smoke_prop.visible = true
     _smoke_particles.emitting = false
     if _avatar != null:
@@ -205,10 +245,8 @@ func _process(delta: float) -> void:
         pose = smoothstep(0.0, 0.26, t)
     elif t > 0.73:
         pose = 1.0 - smoothstep(0.73, 1.0, t)
-    # The hand rises in a curved path then goes back down.
-    _smoke_prop.position = Vector3(-0.11 * pose, 0.29 * pose, 0.08 * pose)
-    _smoke_prop.rotation.z = 0.10 * pose
-    _smoke_prop.rotation.x = 0.035 * sin(t * TAU)
+    # Jointed IK-like visual pose with a fixed shoulder and bending elbow.
+    _apply_idle_pose(pose)
     _smoke_particles.emitting = t > 0.35 and t < 0.80
     if _idle_smoke_timer <= 0.0:
         _smoke_particles.emitting = false
