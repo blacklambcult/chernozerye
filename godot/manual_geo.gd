@@ -63,6 +63,10 @@ func _build_manual() -> void:
             var footprint := _points(f.get("points", []))
             if footprint.size() >= 3:
                 building_footprints.append(footprint)
+    # Find crossings before generating wheel marks and gravel. Otherwise
+    # long dark ruts are drawn underneath a small circular junction patch
+    # and re-emerge as a hard X through the intersection.
+    _detect_road_intersections()
     for f in features:
         if not f is Dictionary:
             continue
@@ -218,30 +222,52 @@ func _add_strip(raw: Array, width: float, height: float, tint: Color, label: Str
         _add_village_roadside(points, width, height)
 
 
+func _near_junction(point: Vector2, margin: float = 0.0) -> bool:
+    for crossing in _junctions:
+        var center: Vector2 = crossing["center"]
+        var radius: float = crossing["radius"]
+        if point.distance_squared_to(center) <= pow(radius + margin, 2.0):
+            return true
+    return false
+
+
 func _add_road_wear(points: PackedVector2Array, height: float) -> void:
-    # Tracks share a turn vertex with the road centre line; no independent
-    # rectangular segments that split or overlap at sharp bends.
+    # Old continuous dark tracks from two surveyed roads overlapped into a
+    # black X at crossroads. Draw faint, interrupted wheel marks instead;
+    # never render marks near intersections or plot crossings.
     var tracks := PackedVector3Array()
     var grass := PackedVector3Array()
-    _append_joined_ribbon(tracks, points, 0.38, -1.12, height)
-    _append_joined_ribbon(tracks, points, 0.38, 1.12, height)
-    # Irregular broken vegetation in the middle, below the tracks' height.
     for i in range(points.size() - 1):
-        var a := points[i]
-        var b := points[i + 1]
-        var length := a.distance_to(b)
-        if length < 0.22:
+        var a: Vector2 = points[i]
+        var b: Vector2 = points[i + 1]
+        var delta := b - a
+        var distance := delta.length()
+        if distance < 0.3:
             continue
-        var steps := maxi(1, int(ceil(length / 4.3)))
+        var tangent := delta / distance
+        var side := Vector2(-tangent.y, tangent.x)
+        var steps := maxi(1, int(ceil(distance / 2.25)))
         for j in range(steps):
-            if (i * 7 + j) % 4 == 0:
+            var p0 := a.lerp(b, float(j) / float(steps))
+            var p1 := a.lerp(b, float(j + 1) / float(steps))
+            var mid := (p0 + p1) * 0.5
+            if _near_junction(mid, 2.8):
                 continue
-            var t0 := float(j) / float(steps)
-            var t1 := float(j + 1) / float(steps)
-            var segment := PackedVector2Array([a.lerp(b, t0), a.lerp(b, t1)])
-            _append_joined_ribbon(grass, segment, 0.26, 0.0, height + 0.014)
-    _mesh_from_triangles(tracks, Color("#3b362f"), "Дорога / непрерывные колеи")
-    _mesh_from_triangles(grass, Color("#424a3b"), "Дорога / редкая трава между колеями")
+            # A few empty sections prevent mechanical parallel lines.
+            if (i * 7 + j * 3) % 9 != 0:
+                var tint_shift := 0.07 * sin(float(j * 11 + i * 3))
+                for side_sign in [-1, 1]:
+                    var lane := float(side_sign) * (1.04 + tint_shift)
+                    var start := p0 + side * lane
+                    var finish := p1 + side * lane
+                    var narrow := PackedVector2Array([start, finish])
+                    var mark_width := 0.20 + 0.09 * absf(sin(float(j * 5 + i * 7)))
+                    _append_joined_ribbon(tracks, narrow, mark_width, 0.0, height)
+            if (j + i) % 4 == 1 and not _near_junction(mid, 4.0):
+                var center := PackedVector2Array([p0, p1])
+                _append_joined_ribbon(grass, center, 0.13, 0.0, height + 0.010)
+    _mesh_from_triangles(tracks, Color("#484339"), "Дорога / мягкие прерывистые колеи")
+    _mesh_from_triangles(grass, Color("#484a3c"), "Дорога / редкая центральная трава")
 
 
 func _add_village_roadside(points: PackedVector2Array, width: float, height: float) -> void:
@@ -281,7 +307,7 @@ func _add_village_roadside(points: PackedVector2Array, width: float, height: flo
                 if (j + i * 7 + sign * 3) % 3 == 0:
                     var center := first.lerp(last, rng.randf_range(0.15, 0.85))
                     center += side * sgn * (width * 0.5 + rng.randf_range(0.64, 1.20))
-                    if _near_building(center, 0.75):
+                    if _near_building(center, 0.75) or _near_junction(center, 2.0):
                         continue
                     var blade := rng.randf_range(0.28, 0.66)
                     var lean := tangent * rng.randf_range(-0.15, 0.15)
@@ -303,11 +329,12 @@ func _add_village_roadside(points: PackedVector2Array, width: float, height: flo
             if (j + i) % 2 == 0:
                 var t := first.lerp(last, rng.randf())
                 t += side * rng.randf_range(-1.55, 1.55)
-                var dx := tangent * rng.randf_range(0.09, 0.22)
-                var dy := side * rng.randf_range(0.10, 0.28)
-                var plane_y := height + 0.052
-                _put_triangle(stones, _pos(t - dx, plane_y),
-                    _pos(t + dy, plane_y), _pos(t + dx, plane_y))
+                if not _near_junction(t, 1.0):
+                    var dx := tangent * rng.randf_range(0.09, 0.22)
+                    var dy := side * rng.randf_range(0.10, 0.28)
+                    var plane_y := height + 0.052
+                    _put_triangle(stones, _pos(t - dx, plane_y),
+                        _pos(t + dy, plane_y), _pos(t + dx, plane_y))
     _mesh_from_triangles(shoulders, Color("#4a4438"), "Дорога / неровные грунтовые обочины")
     _mesh_from_triangles(stones, Color("#655c4b"), "Дорога / гравий и выбоины")
     _mesh_from_triangles(weeds, Color("#404f37"), "Обочина / тёмная дикая трава")
@@ -374,7 +401,7 @@ func _detect_road_intersections() -> void:
                     continue
                 junction = best_point
             # At shallow angles, the crossing road strips occupy a wider area.
-            var patch_radius := clampf(3.0 / maxf(sine, 0.57), 3.25, 5.2)
+            var patch_radius := clampf(3.7 / maxf(sine, 0.40), 4.1, 8.0)
             _register_road_junction(junction, patch_radius)
 
 
@@ -393,7 +420,8 @@ func _junction_fan(center: Vector2, radius: float, height: float,
 
 
 func _build_road_intersections() -> void:
-    _detect_road_intersections()
+    # Detection runs before wheel mark generation so junction clearance can
+    # avoid visible X-shaped overlaps, not only hide them afterwards.
     if _junctions.is_empty():
         print("MANUAL_ROAD_JUNCTIONS_READY: total=0")
         return
@@ -405,8 +433,8 @@ func _build_road_intersections() -> void:
         var radius: float = entry["radius"]
         # Raise above road at 0.11, tracks at 0.145, grass at 0.159 and
         # gravel at 0.162. Avoid all coplanar crosses, but add no collider.
-        _junction_fan(point, radius + 0.35, 0.182, outer, index)
-        _junction_fan(point, radius, 0.193, packed, index)
+        _junction_fan(point, radius + 0.55, 0.184, outer, index)
+        _junction_fan(point, radius, 0.205, packed, index)
     _mesh_from_triangles(outer, Color("#474235"), "Перекрёстки / грунтовые переходы")
     _mesh_from_triangles(packed, COLORS["road"], "Перекрёстки / единая поверхность")
     _junction_mesh_count = _junctions.size()
