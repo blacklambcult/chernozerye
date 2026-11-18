@@ -23,6 +23,8 @@ var manual_roads: Array = []
 var building_footprints: Array[PackedVector2Array] = []
 var _roadside_tufts := 0
 var _roadside_sections := 0
+var _junctions: Array = []
+var _junction_mesh_count := 0
 var _base_buildings: Node3D
 
 func _ready() -> void:
@@ -43,14 +45,20 @@ func _build_manual() -> void:
     _base_buildings.name = "UnstyledBuildingBlockout"
     _base_buildings.visible = false
     add_child(_base_buildings)
+    var surveyed_road_id := 0
     for f in features:
         if not f is Dictionary:
             continue
         var kind := str(f.get("type", ""))
         if kind == "road" or kind == "path":
-            var polyline := _points(f.get("points", []))
+            var polyline := _clean_road_points(_points(f.get("points", [])))
+            var this_road_id := surveyed_road_id if kind == "road" else -1
             for i in range(polyline.size() - 1):
-                manual_roads.append([polyline[i], polyline[i + 1]])
+                if polyline[i].distance_squared_to(polyline[i + 1]) < 0.0004:
+                    continue
+                manual_roads.append([polyline[i], polyline[i + 1], this_road_id])
+            if kind == "road":
+                surveyed_road_id += 1
         elif kind in ["house", "sauna", "shed"]:
             var footprint := _points(f.get("points", []))
             if footprint.size() >= 3:
@@ -85,6 +93,9 @@ func _build_manual() -> void:
                 "object":
                     _add_area(points, 0.12, COLORS[category], "Объект")
         object_count += 1
+    # Intersection caps sit above the individual road surfaces: same-height
+    # crossing quads previously z-fought and produced black triangles on WebGL.
+    _build_road_intersections()
     _build_forest_instances()
     # Separate, reversible decorative layer; manual survey coordinates remain untouched.
     var art := Node3D.new()
@@ -94,7 +105,8 @@ func _build_manual() -> void:
     art.call("decorate", features)
     print("MANUAL_LAYOUT_READY: ", object_count)
     print("MANUAL_STREETSCAPE_READY: roadside_sections=", _roadside_sections,
-        " roadside_grass=", _roadside_tufts)
+        " roadside_grass=", _roadside_tufts,
+        " junctions=", _junction_mesh_count)
 
 func _points(raw: Array) -> PackedVector2Array:
     var result := PackedVector2Array()
@@ -300,6 +312,105 @@ func _add_village_roadside(points: PackedVector2Array, width: float, height: flo
     _mesh_from_triangles(stones, Color("#655c4b"), "Дорога / гравий и выбоины")
     _mesh_from_triangles(weeds, Color("#404f37"), "Обочина / тёмная дикая трава")
     _mesh_from_triangles(dried, Color("#656044"), "Обочина / сухие стебли")
+
+
+func _register_road_junction(point: Vector2, radius: float) -> void:
+    # Nearby manual line endpoints often duplicate a junction; one patch per
+    # intersection prevents overlapping coplanar junction fans.
+    for n in range(_junctions.size()):
+        var old: Dictionary = _junctions[n]
+        if point.distance_to(old["center"]) < 6.5:
+            old["radius"] = maxf(float(old["radius"]), radius)
+            _junctions[n] = old
+            return
+    _junctions.append({"center": point, "radius": radius})
+
+
+func _detect_road_intersections() -> void:
+    _junctions.clear()
+    for i in range(manual_roads.size()):
+        var one: Array = manual_roads[i]
+        if one.size() < 3 or int(one[2]) < 0:
+            continue
+        var a: Vector2 = one[0]
+        var b: Vector2 = one[1]
+        var da := (b - a).normalized()
+        for j in range(i + 1, manual_roads.size()):
+            var two: Array = manual_roads[j]
+            if two.size() < 3 or int(two[2]) < 0 or int(one[2]) == int(two[2]):
+                continue
+            var c: Vector2 = two[0]
+            var d: Vector2 = two[1]
+            var db := (d - c).normalized()
+            var sine := absf(da.cross(db))
+            if sine < 0.26:
+                continue
+            # Cheap segment AABB before Geometry2D's exact intersection.
+            if maxf(a.x, b.x) + 2.1 < minf(c.x, d.x) or (
+                    maxf(c.x, d.x) + 2.1 < minf(a.x, b.x)):
+                continue
+            if maxf(a.y, b.y) + 2.1 < minf(c.y, d.y) or (
+                    maxf(c.y, d.y) + 2.1 < minf(a.y, b.y)):
+                continue
+            var junction: Variant = Geometry2D.segment_intersects_segment(a, b, c, d)
+            if junction == null:
+                # Imported segments may nearly touch at a T junction without
+                # sharing mathematically identical endpoints.
+                var best_distance := INF
+                var best_point := Vector2.ZERO
+                for end in [a, b]:
+                    var near := Geometry2D.get_closest_point_to_segment(end, c, d)
+                    var dist := end.distance_to(near)
+                    if dist < best_distance:
+                        best_distance = dist
+                        best_point = (end + near) * 0.5
+                for end in [c, d]:
+                    var near := Geometry2D.get_closest_point_to_segment(end, a, b)
+                    var dist := end.distance_to(near)
+                    if dist < best_distance:
+                        best_distance = dist
+                        best_point = (end + near) * 0.5
+                if best_distance > 1.3:
+                    continue
+                junction = best_point
+            # At shallow angles, the crossing road strips occupy a wider area.
+            var patch_radius := clampf(3.0 / maxf(sine, 0.57), 3.25, 5.2)
+            _register_road_junction(junction, patch_radius)
+
+
+func _junction_fan(center: Vector2, radius: float, height: float,
+        verts: PackedVector3Array, salt: int) -> void:
+    var sides := 16
+    for i in range(sides):
+        var a0 := float(i) * TAU / float(sides)
+        var a1 := float(i + 1) * TAU / float(sides)
+        var r0 := radius * (0.965 + 0.035 * sin(float(i * 13 + salt)))
+        var r1 := radius * (0.965 + 0.035 * sin(float((i + 1) * 13 + salt)))
+        var p0 := center + Vector2(cos(a0), sin(a0)) * r0
+        var p1 := center + Vector2(cos(a1), sin(a1)) * r1
+        _put_triangle(verts, _pos(center, height),
+            _pos(p0, height), _pos(p1, height))
+
+
+func _build_road_intersections() -> void:
+    _detect_road_intersections()
+    if _junctions.is_empty():
+        print("MANUAL_ROAD_JUNCTIONS_READY: total=0")
+        return
+    var outer := PackedVector3Array()
+    var packed := PackedVector3Array()
+    for index in range(_junctions.size()):
+        var entry: Dictionary = _junctions[index]
+        var point: Vector2 = entry["center"]
+        var radius: float = entry["radius"]
+        # Raise above road at 0.11, tracks at 0.145, grass at 0.159 and
+        # gravel at 0.162. Avoid all coplanar crosses, but add no collider.
+        _junction_fan(point, radius + 0.35, 0.182, outer, index)
+        _junction_fan(point, radius, 0.193, packed, index)
+    _mesh_from_triangles(outer, Color("#474235"), "Перекрёстки / грунтовые переходы")
+    _mesh_from_triangles(packed, COLORS["road"], "Перекрёстки / единая поверхность")
+    _junction_mesh_count = _junctions.size()
+    print("MANUAL_ROAD_JUNCTIONS_READY: total=", _junction_mesh_count)
 
 
 func _add_outline(points: PackedVector2Array, width: float, height: float, tint: Color, label: String) -> void:
