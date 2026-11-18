@@ -11,6 +11,8 @@ var show_houses := false
 var show_osm_buildings := false
 var sector_a_zoom := false
 var neighborhood_zoom := false
+var show_manual := false
+var manual_features: Array = []
 
 func initialize(world_node: Node3D, geo_node: Node3D, player_node: Node3D, features: Array, overture: Array) -> void:
     world = world_node
@@ -18,6 +20,10 @@ func initialize(world_node: Node3D, geo_node: Node3D, player_node: Node3D, featu
     player = player_node
     osm_features = features
     overture_buildings = overture
+    if FileAccess.file_exists("res://manual_layout.json"):
+        var manual_data = JSON.parse_string(FileAccess.get_file_as_string("res://manual_layout.json"))
+        if manual_data is Dictionary:
+            manual_features = manual_data.get("features", [])
 
 func _ready() -> void:
     mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -32,11 +38,15 @@ func _process(delta: float) -> void:
             queue_redraw()
 
 func _view_center() -> Vector2:
+    if show_manual:
+        return Vector2(-620.0, 90.0)
     if neighborhood_zoom:
         return Vector2(-760.0, 360.0)
     return Vector2(-660.0, 390.0) if sector_a_zoom else Vector2.ZERO
 
 func _view_half() -> float:
+    if show_manual:
+        return 700.0
     if neighborhood_zoom:
         return 150.0
     return 340.0 if sector_a_zoom else HALF
@@ -116,6 +126,55 @@ func _line(points: PackedVector2Array, tint: Color, width: float = 2.0) -> void:
 func _text(p: Vector2, text: String, color: Color = Color.WHITE, font_size: int = 13) -> void:
     draw_string(ThemeDB.fallback_font, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size, color)
 
+func _draw_manual_survey(nw: Vector2, se: Vector2) -> void:
+    var order := ["forest", "water", "plot", "road", "path", "object", "house", "sauna", "shed", "car"]
+    var tints := {
+        "forest": Color("#406848"),
+        "water": Color("#4c9fc1"),
+        "plot": Color("#e9c38a"),
+        "road": Color("#dab18b"),
+        "path": Color("#e1cc91"),
+        "object": Color("#aab5b1"),
+        "house": Color("#e4a178"),
+        "sauna": Color("#e17c83"),
+        "shed": Color("#bcb0a0"),
+        "car": Color("#7bb7f0")
+    }
+    for category in order:
+        for feature in manual_features:
+            if not feature is Dictionary or str(feature.get("type", "")) != category:
+                continue
+            var pts := PackedVector2Array()
+            for raw in feature.get("points", []):
+                pts.append(Vector2(float(raw[0]), float(raw[1])))
+            if pts.is_empty():
+                continue
+            var tint: Color = tints[category]
+            if category == "car":
+                if _in_view(pts[0]):
+                    draw_circle(_map_pos(pts[0]), 4.0, tint)
+            elif category == "road" or category == "path":
+                _line(pts, tint, 3.0 if category == "road" else 1.5)
+            elif category == "plot":
+                pts.append(pts[0])
+                _line(pts, tint, 1.6)
+            else:
+                _poly(pts, tint)
+    draw_rect(Rect2(nw, se - nw), Color("#e1ece5"), false, 2.0)
+    if is_instance_valid(player):
+        var p := Vector2(player.position.x, -player.position.z)
+        if _in_view(p):
+            draw_circle(_map_pos(p), 7.0, Color("#ff934e"))
+    _text(Vector2(18, 29), "CHERNOZERYE / GEO LAB 2.1", Color("#f0e7db"), 20)
+    _text(Vector2(18, 49), "РУЧНАЯ КАРТА / 1400 × 1400 М / СЕВЕР ВВЕРХ", Color("#e4d0b2"), 13)
+    _text(Vector2(18, 80), str(manual_features.size()) + " объектов пользователя / без процедурной генерации", Color("#ffd1a1"), 15)
+    _text(Vector2(18, 111), "Здания — оранжевые, участки — контуры, лес — зелёный, дороги — бежевые", Color("#bacdc5"), 12)
+    var bar_origin := Vector2(nw.x + 24.0, se.y - 26.0)
+    var bar_width := (_map_pos(_view_center() + Vector2(100.0, 0.0)) - _map_pos(_view_center())).x
+    draw_line(bar_origin, bar_origin + Vector2(bar_width, 0.0), Color.WHITE, 3.0)
+    _text(bar_origin + Vector2(4.0, -6.0), "100 м", Color.WHITE, 13)
+    _text(Vector2(18.0, size.y - 12.0), "GEO LAB 2.0 → Godot 2.1 / Плоский рельеф, примерные высоты", Color("#c7d5cc"), 12)
+
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO, size), Color(0.025, 0.036, 0.035, 0.97))
     var c := _view_center()
@@ -132,10 +191,13 @@ func _draw() -> void:
         for point in feature.get("points", []):
             forest_polygon.append(Vector2(float(point[0]), float(point[1])))
         _poly(forest_polygon, Color("#29473a"))
-    var tick_step := 50 if neighborhood_zoom else (100 if sector_a_zoom else 500)
-    for tick in range(-1000, 1001, tick_step):
+    var tick_step := 100 if show_manual else (50 if neighborhood_zoom else (100 if sector_a_zoom else 500))
+    for tick in range(-2000, 2001, tick_step):
         _line(PackedVector2Array([Vector2(float(tick), -HALF), Vector2(float(tick), HALF)]), Color(1, 1, 1, 0.12), 1.0)
         _line(PackedVector2Array([Vector2(-HALF, float(tick)), Vector2(HALF, float(tick))]), Color(1, 1, 1, 0.12), 1.0)
+    if show_manual:
+        _draw_manual_survey(nw, se)
+        return
     if is_instance_valid(geo):
         # Historical settlement polygons are illustrative and often omit real homes.
         # Hide these masks in sector A inspection mode; rely on Overture outlines.
