@@ -320,7 +320,9 @@ func _flush_details() -> void:
         "frame": FRAME_COLOR,
         "door": DOOR_COLOR,
         "lintel": Color("#52473f"),
-        "chimney": Color("#444442"),
+        "chimney": Color("#704a3e"),
+        "chimney_cap": Color("#34383a"),
+        "path_stone": Color("#68665d"),
         "board": Color("#50493e"),
         "porch": Color("#4b433b"),
         "lamp": Color("#df9c52"),
@@ -926,6 +928,21 @@ func _decorate_showcase_yard(points: PackedVector2Array, front_edge: int) -> voi
     var vout := Vector3(outward_2d.x, 0, -outward_2d.y)
     var tangent := Vector3(side.x, 0, -side.y).normalized()
     var origin := _pt((a + b) * 0.5, 0.18)
+    # A few crooked stone slabs lead toward the porch; visual-only ground detail.
+    for i in range(7):
+        var slab := origin + vout * (0.65 + float(i) * 0.47)
+        slab += tangent * (0.09 * sin(float(i) * 2.4))
+        slab.y = 0.14
+        var p := Vector2(slab.x, -slab.z)
+        if _road_surface_gap(p) < 0.75 or _plot_boundary_gap(p) < 0.30:
+            continue
+        if not _clear_of_buildings(p, 0.20):
+            continue
+        _batch_quad("path_stone",
+            slab - tangent * 0.33 - vout * 0.20,
+            slab + tangent * 0.33 - vout * 0.20,
+            slab + tangent * 0.33 + vout * 0.20,
+            slab - tangent * 0.33 + vout * 0.20)
     # Modular entrance already draws steps: avoid double stairs and overlapping props.
     var stack_origin := origin + tangent * 2.25 + vout * 1.4
     var stack_p := Vector2(stack_origin.x, -stack_origin.z)
@@ -973,6 +990,33 @@ func _roof_quad(verts: PackedVector3Array, uvs: PackedVector2Array,
         Vector2(0.0, 0.0), Vector2(u, 0.0), Vector2(u, v))
     _face(verts, uvs, _pt(a, ah), _pt(c, ch), _pt(d, dh),
         Vector2(0.0, 0.0), Vector2(u, v), Vector2(0.0, v))
+
+
+func _decorate_gable_trim(left: Vector2, right: Vector2, apex: Vector2,
+        eave: float, rise: float, outward: Vector3) -> void:
+    # Pale scalloped verge boards on the gable ends; the thickened boards are
+    # offset 18 cm from the original roof edge to avoid coplanar flicker.
+    var offset := outward * 0.18
+    var l := _pt(left, eave)
+    var r := _pt(right, eave)
+    var peak := _pt(apex, eave + rise)
+    for segment in [[l, peak], [peak, r]]:
+        var p0: Vector3 = segment[0]
+        var p1: Vector3 = segment[1]
+        _batch_quad("trim_cream",
+            p0 + offset + Vector3.UP * 0.05,
+            p1 + offset + Vector3.UP * 0.05,
+            p1 + offset + Vector3.DOWN * 0.10,
+            p0 + offset + Vector3.DOWN * 0.10)
+        # Coarse notches, not tiny high-frequency roof geometry.
+        var along := (p1 - p0).normalized() * 0.10
+        for notch in range(6):
+            var q := p0.lerp(p1, (float(notch) + 0.5) / 6.0) + offset
+            _batch_quad("trim_cream",
+                q - along + Vector3.DOWN * 0.08,
+                q + along + Vector3.DOWN * 0.08,
+                q + along + Vector3.DOWN * 0.23,
+                q - along + Vector3.DOWN * 0.23)
 
 
 func _decorate_roof_patch(eave_a: Vector2, eave_b: Vector2,
@@ -1054,6 +1098,10 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
             # Close both gables with solid wood so the roof reads as one building.
             _batch_tri("gable_planks", _pt(a, eave), _pt(ridge0, eave + rise), _pt(d, eave))
             _batch_tri("gable_planks", _pt(b, eave), _pt(c, eave), _pt(ridge1, eave + rise))
+            if category == "house":
+                var outer_a := (_pt(a, 0.0) - _pt(b, 0.0)).normalized()
+                _decorate_gable_trim(a, d, ridge0, eave, rise, outer_a)
+                _decorate_gable_trim(b, c, ridge1, eave, rise, -outer_a)
             if category == "house" and index % 3 == 1:
                 _decorate_roof_patch(a, b, ridge0, ridge1, eave, rise)
     else:
@@ -1084,8 +1132,10 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
         for p in roof_points:
             center += p
         center /= float(roof_points.size())
-        _batch_box("chimney", _pt(center + Vector2(0.5, 0.4), base + rise * 0.65 + 0.25),
-            Vector3(0.7, 1.1, 0.7))
+        var chimney_at := _pt(center + Vector2(0.5, 0.4), base + rise * 0.65 + 0.25)
+        _batch_box("chimney", chimney_at, Vector3(0.70, 1.10, 0.70))
+        _batch_box("chimney_cap", chimney_at + Vector3.UP * 0.62,
+            Vector3(0.87, 0.16, 0.87))
 
 func _box_faces(verts: PackedVector3Array, center: Vector3, size: Vector3) -> void:
     var lo := center - size * 0.5
