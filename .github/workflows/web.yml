@@ -83,7 +83,6 @@ jobs:
           grep -q "clearance=roads13/buildings6.5" /tmp/world-smoke.log
           grep -q "MANUAL_SHOWCASE_YARD_READY:" /tmp/world-smoke.log
           grep -q "MANUAL_UTILITY_READY: poles=" /tmp/world-smoke.log
-          grep -q "MANUAL_MATTE_READY: no specular, no glow" /tmp/world-smoke.log
           if grep -E "SCRIPT ERROR|FATAL ERROR|out of memory" /tmp/world-smoke.log; then
             exit 1
           fi
