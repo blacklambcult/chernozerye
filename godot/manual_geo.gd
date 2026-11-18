@@ -4,10 +4,10 @@ extends Node3D
 # Visuals are blockout placeholders; outline shapes and positions are preserved.
 const SOURCE := "res://manual_layout.json"
 const COLORS := {
-    "road": Color("#514b41"),
-    "path": Color("#49493f"),
-    "plot": Color("#333b32"),
-    "forest": Color("#38483d"),
+    "road": Color("#4b4239"),
+    "path": Color("#4a423a"),
+    "plot": Color("#32312d"),
+    "forest": Color("#3b3e38"),
     "water": Color("#234253"),
     "object": Color("#9c9ca1"),
     "house": Color("#bb8b73"),
@@ -22,6 +22,8 @@ var tree_trunks: Array[Transform3D] = []
 var manual_roads: Array = []
 var building_footprints: Array[PackedVector2Array] = []
 var _roadside_tufts := 0
+var _mud_patches := 0
+var _puddle_patches := 0
 var _roadside_sections := 0
 var _junctions: Array = []
 var _junction_mesh_count := 0
@@ -119,6 +121,8 @@ func _build_manual() -> void:
     print("MANUAL_STREETSCAPE_READY: roadside_sections=", _roadside_sections,
         " roadside_grass=", _roadside_tufts,
         " junctions=", _junction_mesh_count)
+    print("NOVEMBER_MUD_READY: patches=", _mud_patches,
+        " shallow_puddles=", _puddle_patches)
 
 func _points(raw: Array) -> PackedVector2Array:
     var result := PackedVector2Array()
@@ -232,8 +236,76 @@ func _add_strip(raw: Array, width: float, height: float, tint: Color, label: Str
     _append_joined_ribbon(surface, points, width, 0.0, height)
     _mesh_from_triangles(surface, tint, label)
     if label == "road":
+        _add_november_mud(points, height)
         _add_road_wear(points, height + 0.035)
         _add_village_roadside(points, width, height)
+
+
+func _append_mud_patch(output: PackedVector3Array, center: Vector2,
+        tangent: Vector2, wide: Vector2, length: float, width: float,
+        altitude: float, salt: int) -> void:
+    # Eight broad, uneven soil polygons, not round junction covers.
+    # Each patch is strictly inside the road and above its own surface.
+    var sides := 8
+    for k in range(sides):
+        var angle_a := TAU * float(k) / float(sides)
+        var angle_b := TAU * float(k + 1) / float(sides)
+        var distortion_a := 0.88 + 0.10 * sin(float(k * 13 + salt * 7))
+        var distortion_b := 0.88 + 0.10 * sin(float((k + 1) * 13 + salt * 7))
+        var p0 := center + tangent * (cos(angle_a) * length * distortion_a)
+        p0 += wide * (sin(angle_a) * width * distortion_a)
+        var p1 := center + tangent * (cos(angle_b) * length * distortion_b)
+        p1 += wide * (sin(angle_b) * width * distortion_b)
+        _put_triangle(output, _pos(center, altitude),
+            _pos(p0, altitude), _pos(p1, altitude))
+
+
+func _add_november_mud(points: PackedVector2Array, height: float) -> void:
+    # Waterlogged soil and narrow shallow puddles, clipped to each 3.8 m
+    # roadway. Do not scatter at crossroads (would reintroduce flickering).
+    var mud := PackedVector3Array()
+    var dark_mud := PackedVector3Array()
+    var puddles := PackedVector3Array()
+    var rng := RandomNumberGenerator.new()
+    rng.seed = 20261118 + int(absf(points[0].x * 11.0 + points[0].y * 17.0))
+    for i in range(points.size() - 1):
+        var a: Vector2 = points[i]
+        var b: Vector2 = points[i + 1]
+        var delta := b - a
+        var distance := delta.length()
+        if distance < 0.4:
+            continue
+        var tangent := delta / distance
+        var wide := Vector2(-tangent.y, tangent.x)
+        var sections := maxi(1, int(ceil(distance / 3.6)))
+        for j in range(sections):
+            if rng.randf() > 0.72:
+                continue
+            var along := (float(j) + rng.randf_range(0.25, 0.75)) / float(sections)
+            var center := a.lerp(b, along)
+            center += wide * rng.randf_range(-0.85, 0.85)
+            if _near_junction(center, 2.4):
+                continue
+            var half_long := rng.randf_range(0.48, 1.20)
+            var half_wide := rng.randf_range(0.24, 0.62)
+            var pool := rng.randf() < 0.16
+            if pool:
+                half_long *= 0.70
+                half_wide *= 0.65
+                _append_mud_patch(puddles, center, tangent, wide, half_long,
+                    half_wide, height + 0.024, i * 61 + j)
+                _puddle_patches += 1
+            else:
+                if (j + i) % 3 == 0:
+                    _append_mud_patch(dark_mud, center, tangent, wide, half_long,
+                        half_wide, height + 0.018, i * 61 + j)
+                else:
+                    _append_mud_patch(mud, center, tangent, wide, half_long,
+                        half_wide, height + 0.018, i * 61 + j)
+                _mud_patches += 1
+    _mesh_from_triangles(mud, Color("#40352e"), "Ноябрь / влажный грунт")
+    _mesh_from_triangles(dark_mud, Color("#332c28"), "Ноябрь / грязевые пятна")
+    _mesh_from_triangles(puddles, Color("#3e4445"), "Ноябрь / неглубокие лужи")
 
 
 func _near_junction(point: Vector2, margin: float = 0.0) -> bool:
@@ -280,8 +352,8 @@ func _add_road_wear(points: PackedVector2Array, height: float) -> void:
             if (j + i) % 4 == 1 and not _near_junction(mid, 4.0):
                 var center := PackedVector2Array([p0, p1])
                 _append_joined_ribbon(grass, center, 0.13, 0.0, height + 0.010)
-    _mesh_from_triangles(tracks, Color("#484339"), "Дорога / мягкие прерывистые колеи")
-    _mesh_from_triangles(grass, Color("#484a3c"), "Дорога / редкая центральная трава")
+    _mesh_from_triangles(tracks, Color("#3b342e"), "Дорога / мягкие прерывистые колеи")
+    _mesh_from_triangles(grass, Color("#49473c"), "Дорога / редкая центральная трава")
 
 
 func _add_village_roadside(points: PackedVector2Array, width: float, height: float) -> void:
@@ -352,10 +424,10 @@ func _add_village_roadside(points: PackedVector2Array, width: float, height: flo
                     var plane_y := height + 0.052
                     _put_triangle(stones, _pos(t - dx, plane_y),
                         _pos(t + dy, plane_y), _pos(t + dx, plane_y))
-    _mesh_from_triangles(shoulders, Color("#4a4438"), "Дорога / неровные грунтовые обочины")
-    _mesh_from_triangles(stones, Color("#655c4b"), "Дорога / гравий и выбоины")
-    _mesh_from_triangles(weeds, Color("#404f37"), "Обочина / тёмная дикая трава")
-    _mesh_from_triangles(dried, Color("#656044"), "Обочина / сухие стебли")
+    _mesh_from_triangles(shoulders, Color("#3e3830"), "Дорога / сырые земляные обочины")
+    _mesh_from_triangles(stones, Color("#544d43"), "Дорога / мокрый гравий и выбоины")
+    _mesh_from_triangles(weeds, Color("#3f4439"), "Обочина / пожухлая ноябрьская трава")
+    _mesh_from_triangles(dried, Color("#605444"), "Обочина / сухие стебли")
 
 
 func _register_road_junction(point: Vector2, radius: float) -> void:
@@ -565,7 +637,7 @@ func _build_forest_instances() -> void:
     lowest.height = 3.5
     lowest.radial_segments = 6
     _instanced_tree(lowest, _layer_transforms(forest_positions, -1.4),
-        Color("#24342f"), "Ели / нижние лапы")
+        Color("#2c3632"), "Ели / нижние лапы")
 
     var middle := CylinderMesh.new()
     middle.top_radius = 0.22
@@ -573,7 +645,7 @@ func _build_forest_instances() -> void:
     middle.height = 2.9
     middle.radial_segments = 6
     _instanced_tree(middle, _layer_transforms(forest_positions, 0.65),
-        Color("#293b34"), "Ели / средние лапы")
+        Color("#333d36"), "Ели / средние лапы")
 
     var top := CylinderMesh.new()
     top.top_radius = 0.0
@@ -581,22 +653,22 @@ func _build_forest_instances() -> void:
     top.height = 2.5
     top.radial_segments = 5
     _instanced_tree(top, _layer_transforms(forest_positions, 2.3),
-        Color("#33463a"), "Ели / кроны")
+        Color("#39443b"), "Ели / кроны")
 
     # Aspen canopy is irregular, compact, and visually distinct from conifers.
     var broad := SphereMesh.new()
-    broad.radius = 1.75
-    broad.height = 3.0
+    broad.radius = 1.12
+    broad.height = 2.50
     broad.radial_segments = 6
     broad.rings = 3
-    _instanced_tree(broad, broad_canopies, Color("#36463e"), "Осинник / кроны")
+    _instanced_tree(broad, broad_canopies, Color("#454039"), "Осинник / кроны")
     var smaller := SphereMesh.new()
     smaller.radius = 1.1
     smaller.height = 2.1
     smaller.radial_segments = 5
     smaller.rings = 2
     _instanced_tree(smaller, _layer_transforms(broad_canopies, 1.3),
-        Color("#3b4c40"), "Осинник / верхушки")
+        Color("#4e473e"), "Осинник / верхушки")
     var trunk := CylinderMesh.new()
     trunk.top_radius = 0.25
     trunk.bottom_radius = 0.40
