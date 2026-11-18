@@ -211,25 +211,27 @@ func _pixel_texture(tone: Color, seed: int, rooftop: bool, wall_style: int = 0) 
     rng.seed = seed
     for y in range(64):
         for x in range(64):
-            var offset := rng.randf_range(-0.095, 0.038)
+            # Slate's one-texel scratches and strong random pixel noise caused
+            # moire/crawling every time the camera moved. Preserve broad weathering
+            # while making the roof texture strictly low-frequency and mip-safe.
+            var offset := rng.randf_range(-0.025, 0.015) if rooftop else rng.randf_range(-0.095, 0.038)
             if rooftop:
                 match wall_style:
-                    0: # Old corrugated slate
-                        if y % 9 == 0: offset -= 0.11
-                        if x % 11 == 0: offset -= 0.065
-                    1: # Rusty iron sheets
-                        if x % 7 <= 1: offset -= 0.13
-                        if y % 23 == 0: offset -= 0.08
-                    2: # Wooden planking
-                        if x % 12 <= 1: offset -= 0.16
-                        if y % 19 == 0: offset -= 0.07
-                    3: # Patchy dark roofing
-                        if (x / 13 + y / 9) % 4 == 0: offset -= 0.14
-                    4: # Wavy asbestos sheets
-                        if x % 9 < 2: offset -= 0.12
-                        if y % 15 == 0: offset -= 0.12
-                if y % 21 >= 17 and x % 13 < 4:
-                    offset += 0.035
+                    0: # Slate rows, with muted wide corrugations.
+                        if y % 16 < 3: offset -= 0.055
+                        if x % 18 < 3: offset -= 0.026
+                    1: # Faded rusty iron panels.
+                        if x % 17 < 4: offset -= 0.060
+                        if y % 27 < 3: offset -= 0.029
+                    2: # Broad timber planks.
+                        if x % 20 < 4: offset -= 0.068
+                        if y % 24 < 3: offset -= 0.030
+                    3: # Broad irregular repairs, no individual hot pixels.
+                        if (int(x / 18) + int(y / 18)) % 4 == 0: offset -= 0.060
+                    4: # Wavy old asbestos sheets.
+                        if x % 16 < 4: offset -= 0.058
+                        if y % 24 < 3: offset -= 0.038
+                offset += 0.010 * sin(float(x) * 0.17 + float(y) * 0.08)
             else:
                 match wall_style:
                     1:
@@ -1098,16 +1100,16 @@ func _decorate_showcase_yard(points: PackedVector2Array, front_edge: int) -> voi
 func _roof_face(verts: PackedVector3Array, uvs: PackedVector2Array,
         a: Vector2, b: Vector2, c: Vector2, ah: float, bh: float, ch: float) -> void:
     _face(verts, uvs, _pt(a, ah), _pt(b, bh), _pt(c, ch),
-        Vector2(0, 0), Vector2(a.distance_to(b) / 5.0, 0),
-        Vector2(a.distance_to(c) / 5.0, 1.0))
+        Vector2(0, 0), Vector2(a.distance_to(b) / 8.0, 0),
+        Vector2(a.distance_to(c) / 8.0, 1.0))
 
 func _roof_quad(verts: PackedVector3Array, uvs: PackedVector2Array,
         a: Vector2, b: Vector2, c: Vector2, d: Vector2,
         ah: float, bh: float, ch: float, dh: float) -> void:
     # Both triangles use a single UV frame. Resetting UV for each triangle
     # created a diagonal texture discontinuity and apparent roof shimmer.
-    var u := maxf(0.25, a.distance_to(b) / 5.0)
-    var v := maxf(0.25, a.distance_to(d) / 5.0)
+    var u := maxf(0.25, a.distance_to(b) / 8.0)
+    var v := maxf(0.25, a.distance_to(d) / 8.0)
     _face(verts, uvs, _pt(a, ah), _pt(b, bh), _pt(c, ch),
         Vector2(0.0, 0.0), Vector2(u, 0.0), Vector2(u, v))
     _face(verts, uvs, _pt(a, ah), _pt(c, ch), _pt(d, dh),
@@ -1144,16 +1146,16 @@ func _decorate_gable_trim(left: Vector2, right: Vector2, apex: Vector2,
 func _decorate_roof_patch(eave_a: Vector2, eave_b: Vector2,
         ridge_a: Vector2, ridge_b: Vector2, eave: float, rise: float) -> void:
     # Uneven patch of repaired sheet metal follows the existing roof slope.
-    var low_t := 0.31
-    var high_t := 0.64
+    var low_t := 0.34
+    var high_t := 0.62
     var l0 := eave_a.lerp(eave_b, 0.18).lerp(ridge_a.lerp(ridge_b, 0.18), low_t)
     var r0 := eave_a.lerp(eave_b, 0.58).lerp(ridge_a.lerp(ridge_b, 0.58), low_t)
     var r1 := eave_a.lerp(eave_b, 0.58).lerp(ridge_a.lerp(ridge_b, 0.58), high_t)
     var l1 := eave_a.lerp(eave_b, 0.18).lerp(ridge_a.lerp(ridge_b, 0.18), high_t)
-    _batch_quad("roof_patch", _pt(l0, eave + rise * low_t + 0.15),
-        _pt(r0, eave + rise * low_t + 0.15),
-        _pt(r1, eave + rise * high_t + 0.15),
-        _pt(l1, eave + rise * high_t + 0.15))
+    _batch_quad("roof_patch", _pt(l0, eave + rise * low_t + 0.24),
+        _pt(r0, eave + rise * low_t + 0.24),
+        _pt(r1, eave + rise * high_t + 0.24),
+        _pt(l1, eave + rise * high_t + 0.24))
     _roof_patch_count += 1
 
 func _decorate_roof(points: PackedVector2Array, category: String, base: float,
