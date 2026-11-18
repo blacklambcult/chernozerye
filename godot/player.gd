@@ -28,6 +28,7 @@ func set_controls_locked(value: bool) -> void:
 
 func _ready() -> void:
     camera = Camera3D.new()
+    camera.name = "Camera3D"
     camera.position.y = 1.55
     # A near plane of 0.05 made subpixel roof layers flicker in GL Compatibility.
     camera.near = 0.22
@@ -35,6 +36,7 @@ func _ready() -> void:
     camera.current = true
     add_child(camera)
     var collision := CollisionShape3D.new()
+    collision.name = "CollisionShape3D"
     var shape := CapsuleShape3D.new()
     shape.height = 1.8
     shape.radius = 0.46
