@@ -5,9 +5,9 @@ const LOGO_DATA = preload("res://logo_data.gd")
 const MAP_FILE := "res://world_data.json"
 const MANUAL_FILE := "res://manual_layout.json"
 const GAME_TITLE := "Fearless Knights of the Cordon"
-const GAME_STAGE := "Pre-Alpha 0.3.9"
+const GAME_STAGE := "Pre-Alpha 0.4.0"
 const SEASON := "NOVEMBER"
-const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.3.9 · ЧЕРНОЗЁРЬЕ · 314 ОБЪЕКТОВ"
+const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.4.0 · ЧЕРНОЗЁРЬЕ · 314 ОБЪЕКТОВ"
 var manual_mode := false
 var manual_button: Button
 var _status_label: Label
@@ -70,6 +70,14 @@ func _ready() -> void:
     # The original sector/preview buttons are no longer part of the player HUD.
     _activate_default_village()
     _create_november_snow()
+    _create_story_prologue()
+
+func _create_story_prologue() -> void:
+    var story := Node.new()
+    story.name = "StoryPrologue"
+    story.set_script(preload("res://story_prologue.gd"))
+    add_child(story)
+
 
 func _create_november_snow() -> void:
     # CPUParticles3D works in the GL Compatibility Web renderer. Follow the
@@ -763,6 +771,9 @@ func _toggle_houses() -> void:
 func _input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
         if event.physical_keycode == KEY_M or event.keycode == KEY_M or (event.unicode != 0 and char(event.unicode).to_lower() == "ь"):
+            var prologue := get_node_or_null("StoryPrologue")
+            if prologue != null and (bool(prologue.get("inside_home")) or bool(prologue.get("journal_open"))):
+                return
             overview_layer.visible = not overview_layer.visible
             if overview_layer.visible:
                 Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
