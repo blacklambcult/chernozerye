@@ -467,12 +467,13 @@ func _entry_clear(mid: Vector3, tangent: Vector3, outward: Vector3,
     return true
 
 
-func _entrance_route_distance(p: Vector2) -> float:
-    # Fast bounding-box rejection keeps the 88 plot fences inexpensive.
+func _entrance_route_distance(p: Vector2, extra: float = 0.0) -> float:
+    # A greenhouse's clearance radius must also expand the spatial prefilter.
+    # Otherwise its centre is missed despite its walls blocking the doorstep.
     var best := INF
     for route in _entrance_routes:
-        var r: Rect2 = route["bounds"]
-        if not r.has_point(p):
+        var bounds: Rect2 = route["bounds"]
+        if not bounds.grow(extra).has_point(p):
             continue
         var closest := Geometry2D.get_closest_point_to_segment(
             p, route["start"], route["end"])
@@ -481,7 +482,7 @@ func _entrance_route_distance(p: Vector2) -> float:
 
 
 func _entry_zone_conflict(p: Vector2, extra: float = 0.0) -> bool:
-    return _entrance_route_distance(p) < 1.10 + extra
+    return _entrance_route_distance(p, extra) < 1.10 + extra
 
 
 func _build_entrance_routes(features: Array) -> void:
@@ -994,7 +995,7 @@ func _decorate_lean_to(a: Vector2, b: Vector2, outward: Vector3) -> void:
         var p := Vector2(corner.x, -corner.z)
         if _road_surface_gap(p) < 0.65 or _plot_boundary_gap(p) < 0.45:
             return
-        if not _clear_of_buildings(p, 0.5):
+        if not _clear_of_buildings(p, 0.5) or _entry_zone_conflict(p, 0.8):
             return
     var low := Vector3.UP * 0.12
     var high_back := Vector3.UP * 2.58
