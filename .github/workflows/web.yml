@@ -92,6 +92,8 @@ jobs:
           grep -q "MANUAL_NIGHT_READY: true" /tmp/world-smoke.log
           grep -q "NOVEMBER_SNOW_READY: cpu=true amount=340 follow_player=true" /tmp/world-smoke.log
           grep -q "NOVEMBER_MUD_READY: patches=" /tmp/world-smoke.log
+          grep -q "NOVEMBER_SMOKE_READY: active=" /tmp/world-smoke.log
+          grep -q 'weather_label.name = "NovemberWeatherLabel"' godot/world.gd
           python - <<'PY'
           import re
           from pathlib import Path
@@ -100,7 +102,11 @@ jobs:
           assert x, 'November mud detail counters absent'
           mud, puddles = map(int, x.groups())
           assert mud >= 25 and puddles > 0, ('November road texture insufficient', mud, puddles)
-          print('NOVEMBER_WEATHER_AUDIT_OK: mud=', mud, 'puddles=', puddles)
+          smoke = re.search(r'NOVEMBER_SMOKE_READY: active=(\d+) candidates=(\d+)', log)
+          assert smoke, 'No active chimney smoke diagnostic'
+          active, candidates = map(int, smoke.groups())
+          assert 1 <= active <= 7 and candidates >= active, ('Smoke emitter budget invalid', active, candidates)
+          print('NOVEMBER_WEATHER_AUDIT_OK: mud=', mud, 'puddles=', puddles, 'smoke=', active)
           PY
           grep -q '^    _activate_default_village()' godot/world.gd
           grep -q 'config/name="Fearless Knights of the Cordon"' godot/project.godot
