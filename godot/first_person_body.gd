@@ -4,12 +4,12 @@ extends Node3D
 # beneath the player's eye camera. No head mesh is rendered from inside it.
 # All pieces are visual only; the CharacterBody capsule remains authoritative.
 
-const COAT := Color("#42453d")
-const COAT_SHADOW := Color("#30342f")
+const COAT := Color("#48443f")
+const COAT_SHADOW := Color("#353330")
 const SHIRT := Color("#686255")
-const PANTS := Color("#343a38")
+const PANTS := Color("#363634")
 const BOOTS := Color("#242827")
-const GLOVES := Color("#70685c")
+const GLOVES := Color("#60594e")
 const BELT := Color("#252722")
 
 var left_leg: Node3D
@@ -36,6 +36,25 @@ func _box(parent: Node3D, name: String, size: Vector3,
     node.position = pos
     parent.add_child(node)
     return node
+
+func _tapered_coat(parent: Node3D, name: String, pos: Vector3,
+        height: float, top_width: float, bottom_width: float) -> MeshInstance3D:
+    # Eight-sided tapered wool coat, not a squared-off tactical chest plate.
+    # Flattening its depth keeps it out of the eye's vertical viewing cone.
+    var coat := CylinderMesh.new()
+    coat.top_radius = top_width
+    coat.bottom_radius = bottom_width
+    coat.height = height
+    coat.radial_segments = 8
+    var visible_coat := MeshInstance3D.new()
+    visible_coat.name = name
+    visible_coat.mesh = coat
+    visible_coat.material_override = _material(COAT)
+    visible_coat.position = pos
+    visible_coat.scale.z = 0.68
+    parent.add_child(visible_coat)
+    return visible_coat
+
 
 func _sphere(parent: Node3D, name: String, pos: Vector3,
         radius: float, tint: Color, shape: Vector3 = Vector3.ONE) -> MeshInstance3D:
@@ -116,22 +135,19 @@ func _arm(side: float, label: String) -> Node3D:
 
 func _ready() -> void:
     name = "FirstPersonFullBody"
-    # The eye is at y=1.55, z=0. The chest must never occupy that space.
-    # Low rear-offset torso has an unobstructed viewing cone to the legs.
-    # The old 0.39-radius chest sphere and high collar formed a giant dark
-    # polygon inside the near camera when looking down.
-    _box(self, "ChestAndShoulders", Vector3(0.53, 0.35, 0.25),
-        Vector3(0.0, 1.075, 0.20), COAT)
-    _box(self, "LowerJacket", Vector3(0.52, 0.29, 0.27),
-        Vector3(0.0, 0.835, 0.14), COAT)
-    _box(self, "Belt", Vector3(0.53, 0.065, 0.27),
-        Vector3(0.0, 0.775, 0.10), BELT)
-    _box(self, "BeltBuckle", Vector3(0.064, 0.055, 0.018),
-        Vector3(0.0, 0.775, -0.041), SHIRT)
-    # Keep collar out of the first-person view (the head is deliberately absent).
-    for side in [-1.0, 1.0]:
-        _box(self, "JacketPocket", Vector3(0.17, 0.115, 0.035),
-            Vector3(side * 0.165, 0.935, 0.060), COAT_SHADOW)
+    # Eye at y=1.55, z=0. The chest is narrow, flat and behind the
+    # camera rather than a giant green torso intersecting the viewing cone.
+    # Visible when looking straight down: the waist of an ordinary coat,
+    # trousers and shoes. No plated vest, collar, or separate chest pockets.
+    _tapered_coat(self, "ChestAndShoulders",
+        Vector3(0.0, 1.075, 0.25), 0.37, 0.215, 0.235)
+    _box(self, "LowerJacket", Vector3(0.43, 0.215, 0.21),
+        Vector3(0.0, 0.81, 0.235), COAT)
+    _box(self, "CoatHem", Vector3(0.455, 0.038, 0.23),
+        Vector3(0.0, 0.700, 0.235), COAT_SHADOW)
+    # A thin vertical fabric seam, not a belt buckle or armor plate.
+    _box(self, "CoatSeam", Vector3(0.015, 0.20, 0.012),
+        Vector3(0.0, 0.835, 0.121), COAT_SHADOW)
     left_leg = _leg(-1.0, "LeftLeg")
     right_leg = _leg(1.0, "RightLeg")
     left_arm = _arm(-1.0, "LeftArm")
@@ -148,13 +164,13 @@ func _process(delta: float) -> void:
     if actor == null:
         return
     var planar_speed := Vector2(actor.velocity.x, actor.velocity.z).length()
-    var moving := clampf(planar_speed / 6.0, 0.0, 1.0)
+    var moving := clampf(planar_speed / 3.4, 0.0, 1.0)
     if moving > 0.04 and actor.is_on_floor():
-        walk_phase += delta * (7.8 + moving * 1.7)
+        walk_phase += delta * (5.0 + moving * 1.1)
     var swing := sin(walk_phase) * moving
     # In-place walk cycle: never change colliders or actual foot placement.
-    left_leg.rotation.x = swing * 0.27
-    right_leg.rotation.x = -swing * 0.27
-    left_arm.rotation.x = -swing * 0.12
-    right_arm.rotation.x = swing * 0.12
-    position.y = 0.009 * absf(sin(walk_phase)) * moving
+    left_leg.rotation.x = swing * 0.19
+    right_leg.rotation.x = -swing * 0.19
+    left_arm.rotation.x = -swing * 0.085
+    right_arm.rotation.x = swing * 0.085
+    position.y = 0.005 * absf(sin(walk_phase)) * moving
