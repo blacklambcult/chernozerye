@@ -150,62 +150,86 @@ func _add_area(points: PackedVector2Array, y: float, tint: Color, label: String)
             _pos(points[triangles[k + 1]], y), _pos(points[triangles[k + 2]], y))
     _mesh_from_triangles(verts, tint, label)
 
-func _add_strip(raw: Array, width: float, height: float, tint: Color, label: String) -> void:
-    var points := _points(raw)
-    var verts := PackedVector3Array()
+func _clean_road_points(points: PackedVector2Array) -> PackedVector2Array:
+    # Exported hand-drawn lines occasionally contain repeated consecutive points.
+    var clean := PackedVector2Array()
+    for p in points:
+        if clean.is_empty() or p.distance_squared_to(clean[clean.size() - 1]) > 0.0004:
+            clean.append(p)
+    return clean
+
+
+func _joined_offset(points: PackedVector2Array, index: int, distance: float) -> Vector2:
+    # One shared offset vertex at each turn prevents cracks between road segments.
+    var last := points.size() - 1
+    var prev_dir := (points[index] - points[maxi(0, index - 1)]).normalized()
+    var next_dir := (points[mini(last, index + 1)] - points[index]).normalized()
+    if index == 0:
+        prev_dir = next_dir
+    elif index == last:
+        next_dir = prev_dir
+    var n0 := Vector2(-prev_dir.y, prev_dir.x)
+    var n1 := Vector2(-next_dir.y, next_dir.x)
+    var bisector := n0 + n1
+    if bisector.length_squared() < 0.02:
+        return points[index] + n1 * distance
+    var miter := bisector.normalized()
+    var projection := miter.dot(n1)
+    if projection < 0.36:
+        return points[index] + n1 * distance
+    return points[index] + miter * distance * minf(1.65, 1.0 / projection)
+
+
+func _append_joined_ribbon(vertices: PackedVector3Array, points: PackedVector2Array,
+        width: float, offset: float, elevation: float) -> void:
+    if points.size() < 2:
+        return
+    var half_width := width * 0.5
     for i in range(points.size() - 1):
-        var a: Vector3 = _pos(points[i], height)
-        var b: Vector3 = _pos(points[i + 1], height)
-        var delta := b - a
-        if delta.length_squared() < 0.01:
-            continue
-        var sideways := Vector3(-delta.z, 0, delta.x).normalized() * width * 0.5
-        _put_triangle(verts, a-sideways, a+sideways, b+sideways)
-        _put_triangle(verts, a-sideways, b+sideways, b-sideways)
-    _mesh_from_triangles(verts, tint, label)
+        var left0 := _pos(_joined_offset(points, i, offset - half_width), elevation)
+        var right0 := _pos(_joined_offset(points, i, offset + half_width), elevation)
+        var left1 := _pos(_joined_offset(points, i + 1, offset - half_width), elevation)
+        var right1 := _pos(_joined_offset(points, i + 1, offset + half_width), elevation)
+        _put_triangle(vertices, left0, right0, right1)
+        _put_triangle(vertices, left0, right1, left1)
+
+
+func _add_strip(raw: Array, width: float, height: float, tint: Color, label: String) -> void:
+    var points := _clean_road_points(_points(raw))
+    if points.size() < 2:
+        return
+    var surface := PackedVector3Array()
+    _append_joined_ribbon(surface, points, width, 0.0, height)
+    _mesh_from_triangles(surface, tint, label)
     if label == "road":
-        _add_road_wear(points, height + 0.030)
+        _add_road_wear(points, height + 0.035)
         _add_village_roadside(points, width, height)
 
 
 func _add_road_wear(points: PackedVector2Array, height: float) -> void:
-    # Dirt lane with separate worn tire tracks and short, irregular centre grass.
-    # Geometry follows the Geo Lab road exactly; there is no new road network.
+    # Tracks share a turn vertex with the road centre line; no independent
+    # rectangular segments that split or overlap at sharp bends.
     var tracks := PackedVector3Array()
     var grass := PackedVector3Array()
+    _append_joined_ribbon(tracks, points, 0.38, -1.12, height)
+    _append_joined_ribbon(tracks, points, 0.38, 1.12, height)
+    # Irregular broken vegetation in the middle, below the tracks' height.
     for i in range(points.size() - 1):
         var a := points[i]
         var b := points[i + 1]
-        var delta := b - a
-        var length := delta.length()
-        if length < 0.2:
+        var length := a.distance_to(b)
+        if length < 0.22:
             continue
-        var normal := Vector2(-delta.y, delta.x).normalized()
-        var steps := maxi(1, int(ceil(length / 4.5)))
-        for step in range(steps):
-            var u0 := float(step) / float(steps)
-            var u1 := minf(1.0, (float(step) + 1.0) / float(steps))
-            var from := a.lerp(b, u0)
-            var to := a.lerp(b, u1)
-            for sign in [-1.0, 1.0]:
-                var lane_shift := normal * float(sign) * 1.15
-                var w := normal * (0.21 + 0.035 * sin(float(step * 13 + i * 7)))
-                var p0 := _pos(from + lane_shift - w, height)
-                var p1 := _pos(from + lane_shift + w, height)
-                var p2 := _pos(to + lane_shift + w, height)
-                var p3 := _pos(to + lane_shift - w, height)
-                _put_triangle(tracks, p0, p1, p2)
-                _put_triangle(tracks, p0, p2, p3)
-            if (step + i * 3) % 3 != 0:
-                var patch_w := normal * 0.18
-                var g0 := _pos(from - patch_w, height + 0.018)
-                var g1 := _pos(from + patch_w, height + 0.018)
-                var g2 := _pos(to + patch_w, height + 0.018)
-                var g3 := _pos(to - patch_w, height + 0.018)
-                _put_triangle(grass, g0, g1, g2)
-                _put_triangle(grass, g0, g2, g3)
-    _mesh_from_triangles(tracks, Color("#3b362f"), "Дорога / две грунтовые колеи")
-    _mesh_from_triangles(grass, Color("#424a3b"), "Дорога / трава между колеями")
+        var steps := maxi(1, int(ceil(length / 4.3)))
+        for j in range(steps):
+            if (i * 7 + j) % 4 == 0:
+                continue
+            var t0 := float(j) / float(steps)
+            var t1 := float(j + 1) / float(steps)
+            var segment := PackedVector2Array([a.lerp(b, t0), a.lerp(b, t1)])
+            _append_joined_ribbon(grass, segment, 0.26, 0.0, height + 0.014)
+    _mesh_from_triangles(tracks, Color("#3b362f"), "Дорога / непрерывные колеи")
+    _mesh_from_triangles(grass, Color("#424a3b"), "Дорога / редкая трава между колеями")
 
 
 func _add_village_roadside(points: PackedVector2Array, width: float, height: float) -> void:
@@ -213,6 +237,8 @@ func _add_village_roadside(points: PackedVector2Array, width: float, height: flo
     # Geometry follows user-drawn GeoJSON roads, with no changed centre lines.
     # A modest batched budget keeps the Web Compatibility renderer responsive.
     var shoulders := PackedVector3Array()
+    # Joined base apron sits 2.5 cm under the road and remains visible on both sides.
+    _append_joined_ribbon(shoulders, points, width + 1.45, 0.0, height - 0.025)
     var stones := PackedVector3Array()
     var weeds := PackedVector3Array()
     var dried := PackedVector3Array()
@@ -238,17 +264,6 @@ func _add_village_roadside(points: PackedVector2Array, width: float, height: flo
             # Use integer signs: GDScript's % operator rejects float operands.
             for sign in [-1, 1]:
                 var sgn := float(sign)
-                var inner := side * sgn * (width * 0.5 - 0.04)
-                var outer0 := side * sgn * (width * 0.5 + 0.62 +
-                    0.17 * sin(float(j * 19 + i * 13)))
-                var outer1 := side * sgn * (width * 0.5 + 0.62 +
-                    0.17 * sin(float((j + 1) * 19 + i * 13)))
-                _put_triangle(shoulders, _pos(first + inner, height - 0.025),
-                    _pos(last + inner, height - 0.025),
-                    _pos(last + outer1, height - 0.025))
-                _put_triangle(shoulders, _pos(first + inner, height - 0.025),
-                    _pos(last + outer1, height - 0.025),
-                    _pos(first + outer0, height - 0.025))
                 _roadside_sections += 1
                 # Deterministic sparse wild grass at the outer shoulder, not on tire tracks.
                 if (j + i * 7 + sign * 3) % 3 == 0:
