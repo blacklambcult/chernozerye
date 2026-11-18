@@ -2,6 +2,9 @@ extends Node3D
 
 const PLAYER_SCRIPT = preload("res://player.gd")
 const MAP_FILE := "res://world_data.json"
+const MANUAL_FILE := "res://manual_layout.json"
+var manual_mode := false
+var manual_button: Button
 var _status_label: Label
 
 func _process(_delta: float) -> void:
@@ -16,6 +19,9 @@ func _ready() -> void:
     _create_ground()
     _create_lighting()
     var forest_features: Array = []
+    var road_group := Node3D.new()
+    road_group.name = "OSMRoadMeshes"
+    add_child(road_group)
     if FileAccess.file_exists(MAP_FILE):
         var data = JSON.parse_string(FileAccess.get_file_as_string(MAP_FILE))
         if data is Dictionary:
@@ -37,12 +43,17 @@ func _ready() -> void:
     precise_buildings.name = "OvertureBuildingsSectorA"
     precise_buildings.set_script(preload("res://overture_3d_a.gd"))
     add_child(precise_buildings)
+    var manual_scene := Node3D.new()
+    manual_scene.name = "ManualSurvey"
+    manual_scene.set_script(preload("res://manual_geo.gd"))
+    add_child(manual_scene)
     _create_user_paths()
     _create_landmarks()
     _create_player()
     _create_label()
     _create_overview_map()
     _create_quick_navigation()
+    _create_manual_navigation()
 
 func _material(color: Color) -> StandardMaterial3D:
     var m := StandardMaterial3D.new()
@@ -52,7 +63,7 @@ func _material(color: Color) -> StandardMaterial3D:
 
 func _create_ground() -> void:
     var mesh := PlaneMesh.new()
-    mesh.size = Vector2(2000, 2000)
+    mesh.size = Vector2(2600, 2600)
     var instance := MeshInstance3D.new()
     instance.mesh = mesh
     instance.material_override = _material(Color("#435443"))
@@ -61,7 +72,7 @@ func _create_ground() -> void:
     ground.position.y = -0.2
     var collider := CollisionShape3D.new()
     var shape := BoxShape3D.new()
-    shape.size = Vector3(2000, 0.4, 2000)
+    shape.size = Vector3(2600, 0.4, 2600)
     collider.shape = shape
     ground.add_child(collider)
     add_child(ground)
@@ -139,7 +150,7 @@ func _add_road(feature: Dictionary) -> void:
     elif road_type in ["residential", "service", "secondary"]:
         road_color = Color("#918779")
     instance.material_override = _material(road_color)
-    add_child(instance)
+    get_node("OSMRoadMeshes").add_child(instance)
     if not shoulders.is_empty():
         var edge_arrays := []
         edge_arrays.resize(Mesh.ARRAY_MAX)
@@ -149,7 +160,7 @@ func _add_road(feature: Dictionary) -> void:
         var edge := MeshInstance3D.new()
         edge.mesh = edge_mesh
         edge.material_override = _material(Color("#55554b"))
-        add_child(edge)
+        get_node("OSMRoadMeshes").add_child(edge)
     if not wheel_ruts.is_empty():
         var rut_arrays := []
         rut_arrays.resize(Mesh.ARRAY_MAX)
@@ -159,7 +170,7 @@ func _add_road(feature: Dictionary) -> void:
         var rut_node := MeshInstance3D.new()
         rut_node.mesh = rut_mesh
         rut_node.material_override = _material(Color("#645d4f"))
-        add_child(rut_node)
+        get_node("OSMRoadMeshes").add_child(rut_node)
 
 func _add_building(feature: Dictionary) -> void:
     var pts: Array = feature.get("points", [])
@@ -453,6 +464,43 @@ func _create_quick_navigation() -> void:
     action_button.tooltip_text = "Переместиться на нанесённую в OSM улицу рядом с новыми контурами зданий"
     action_button.pressed.connect(_visit_sector_a)
     action_layer.add_child(action_button)
+
+func _create_manual_navigation() -> void:
+    var layer := CanvasLayer.new()
+    layer.name = "ManualPreviewControls"
+    layer.layer = 8
+    add_child(layer)
+    manual_button = Button.new()
+    manual_button.text = "РУЧНАЯ РАЗМЕТКА · 130 ОБЪЕКТОВ"
+    manual_button.position = Vector2(16.0, 121.0)
+    manual_button.size = Vector2(276.0, 42.0)
+    manual_button.tooltip_text = "Показать отдельно дороги, дома, участки и лес из загруженного GeoJSON"
+    manual_button.pressed.connect(_toggle_manual_preview)
+    layer.add_child(manual_button)
+
+func _toggle_manual_preview() -> void:
+    manual_mode = not manual_mode
+    var manual := get_node_or_null("ManualSurvey") as Node3D
+    var geo := get_node_or_null("GeographyBlockoutV07") as Node3D
+    var overture := get_node_or_null("OvertureBuildingsSectorA") as Node3D
+    var osm_roads := get_node_or_null("OSMRoadMeshes") as Node3D
+    if manual != null:
+        manual.visible = manual_mode
+    if geo != null:
+        geo.visible = not manual_mode
+    if overture != null:
+        overture.visible = not manual_mode
+    if osm_roads != null:
+        osm_roads.visible = not manual_mode
+    manual_button.text = "ВЕРНУТЬ СТАРУЮ МЕСТНОСТЬ" if manual_mode else "РУЧНАЯ РАЗМЕТКА · 130 ОБЪЕКТОВ"
+    if is_instance_valid(_status_label):
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 2.1 / РУЧНАЯ ГЕОГРАФИЯ · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
+    var character := get_node_or_null("Player") as CharacterBody3D
+    if character != null:
+        character.velocity = Vector3.ZERO
+        character.global_position = Vector3(-789.7, 0.22, -268.6) if manual_mode else Vector3(130.0, 0.22, -82.0)
+    overview_layer.visible = false
+    Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func _visit_sector_a() -> void:
     # Location sampled from a residential OSM road away from mapped rooftops.
