@@ -102,8 +102,8 @@ func _material(color: Color, texture: Texture2D = null) -> StandardMaterial3D:
         mat.albedo_texture = texture
     return mat
 
-func _pixel_texture(tone: Color, seed: int, rooftop: bool) -> Texture2D:
-    var key := str(seed) + "/" + str(rooftop)
+func _pixel_texture(tone: Color, seed: int, rooftop: bool, wall_style: int = 0) -> Texture2D:
+    var key := str(seed) + "/" + str(rooftop) + "/" + str(wall_style)
     if _textures.has(key):
         return _textures[key]
     var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
@@ -120,14 +120,33 @@ func _pixel_texture(tone: Color, seed: int, rooftop: bool) -> Texture2D:
                 if y % 21 >= 17 and x % 13 < 4:
                     offset += 0.09
             else:
-                if x % 8 == 0:
-                    offset -= 0.28
-                if x % 8 == 1:
-                    offset += 0.055
-                if y % 19 == 0:
-                    offset -= 0.08
+                match wall_style:
+                    1:
+                        # Coarse horizontal village log/plank cladding.
+                        if y % 8 <= 1:
+                            offset -= 0.25
+                        if (x + (y / 8) * 13) % 28 == 0:
+                            offset -= 0.11
+                    2:
+                        # Limewash over uneven plaster, without strong wood stripes.
+                        offset = rng.randf_range(-0.095, 0.045)
+                        if (x / 9 + y / 7 + seed) % 13 == 0:
+                            offset -= 0.12
+                    3:
+                        # Old red-brick farm masonry in offset rows.
+                        if y % 8 == 0:
+                            offset -= 0.23
+                        if (x + (8 if int(y / 8) % 2 == 0 else 0)) % 18 == 0:
+                            offset -= 0.19
+                    _:
+                        if x % 8 == 0:
+                            offset -= 0.24
+                        if x % 8 == 1:
+                            offset += 0.055
+                        if y % 19 == 0:
+                            offset -= 0.08
                 if (x * 17 + y * 7 + seed) % 67 <= 2:
-                    offset -= 0.17
+                    offset -= 0.16
             var shade := clampf(1.0 + offset, 0.35, 1.16)
             img.set_pixel(x, y, Color(tone.r * shade, tone.g * shade, tone.b * shade, 1.0))
     var tex := ImageTexture.create_from_image(img)
@@ -198,7 +217,9 @@ func _flush_details() -> void:
         "chimney": Color("#444442"),
         "board": Color("#50493e"),
         "porch": Color("#4b433b"),
-        "lamp": Color("#df9c52")
+        "lamp": Color("#df9c52"),
+        "trim": Color("#8a9c9c"),
+        "rust": Color("#604039")
     }
     for key in _detail_batches.keys():
         var verts: PackedVector3Array = _detail_batches[key]
@@ -269,6 +290,11 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
     _wall_panel("window_lit" if illuminated else "window",
         start, finish, normal, u0, u1, 1.47, 2.66, 0.142)
     _wall_panel("lintel", start, finish, normal, u0, u1, 1.97, 2.04, 0.157)
+    # Narrow painted frames: recognisable provincial window surrounds.
+    _wall_panel("trim", start, finish, normal, u0 - 0.025, u0 - 0.009, 1.30, 2.83, 0.169)
+    _wall_panel("trim", start, finish, normal, u1 + 0.009, u1 + 0.025, 1.30, 2.83, 0.169)
+    _wall_panel("trim", start, finish, normal, u0 - 0.024, u1 + 0.024, 2.77, 2.88, 0.173)
+    _wall_panel("trim", start, finish, normal, u0 - 0.038, u1 + 0.038, 1.28, 1.38, 0.170)
     if boarded:
         _wall_panel("board", start, finish, normal, u0, u1, 1.68, 1.94, 0.170)
         _wall_panel("board", start, finish, normal, u0, u1, 2.23, 2.43, 0.174)
@@ -290,13 +316,27 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
     _building_count += 1
     var index := _building_count
     # The bright survey blockout is hidden in manual_geo.gd; art can use natural 1-storey proportions.
-    var walls_height := 3.9 if category == "house" else (2.7 if category == "sauna" else 2.35)
+    var walls_height := (3.35 + float(index % 4) * 0.27) if category == "house" else (2.7 if category == "sauna" else 2.35)
+    # Alternating cladding and construction material breaks up identical cottage rows.
+    var wall_style := 0
     var tone := Color(WOOD_TONES[(index * 7) % WOOD_TONES.size()])
-    if category == "sauna":
+    if category == "house":
+        if index % 7 == 0:
+            wall_style = 3
+            tone = Color("#806154")  # weathered brick
+            walls_height = 4.45
+        elif index % 5 == 0:
+            wall_style = 2
+            tone = Color("#838982")  # limewash
+        elif index % 3 == 0:
+            wall_style = 1
+            tone = Color("#5a5044")  # horizontal logs
+    elif category == "sauna":
         tone = Color("#38362f")
+        wall_style = 1
     elif category == "shed":
         tone = Color("#49453f")
-    var wall_tex := _pixel_texture(tone, 8021 + int(index % 5), false)
+    var wall_tex := _pixel_texture(tone, 8021 + int(index % 5), false, wall_style)
     var roof_tex := _pixel_texture(Color(ROOF_TONES[index % ROOF_TONES.size()]), 9121 + int(index % 4), true)
     var wall_verts := PackedVector3Array()
     var wall_uvs := PackedVector2Array()
