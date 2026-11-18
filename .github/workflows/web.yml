@@ -80,7 +80,10 @@ jobs:
           grep -q "MANUAL_LAYOUT_READY: 130" /tmp/world-smoke.log
           grep -q "MANUAL_ART_READY: buildings=59 plots=34 roads=18" /tmp/world-smoke.log
           grep -q "MANUAL_VILLAGE_DETAIL_READY: canopies=" /tmp/world-smoke.log
-          grep -q "MANUAL_NO_GLARE_READY: ambient=0.42, moon=0.35, fog_light=0.36, exposure=0.98" /tmp/world-smoke.log
+          # The new lighting mode is enabled only after the player selects the manual village.
+          # Assert its configuration statically; startup smoke has not clicked that button.
+          grep -q 'ambient_light_energy = 0.42 if manual_mode' godot/world.gd
+          grep -q 'light_specular = 0.0' godot/world.gd
           grep -q "MANUAL_FOREST_READY: trees=" /tmp/world-smoke.log
           grep -q "clearance=roads13/buildings6.5" /tmp/world-smoke.log
           grep -q "MANUAL_SHOWCASE_YARD_READY:" /tmp/world-smoke.log
