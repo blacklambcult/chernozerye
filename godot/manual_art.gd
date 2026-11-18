@@ -17,6 +17,9 @@ const RUT_COLOR := Color("#423a32")
 # Hand-surveyed geometry remains fixed; clearance affects decorative objects only.
 var _roads: Array = []
 var _plot_edges: Array = []
+var _entrance_routes: Array = []
+var _fronts_facing_road := 0
+var _reserved_gate_sections := 0
 var _fence_panels_skipped := 0
 var _fence_panels_total := 0
 var _fence_panels_relocated := 0
@@ -116,6 +119,9 @@ func decorate(features: Array) -> void:
             if plot_points.size() >= 3:
                 for i in range(plot_points.size()):
                     _plot_edges.append([plot_points[i], plot_points[(i + 1) % plot_points.size()]])
+    # Roads and building footprints are known now: reserve safe approaches before
+    # either garden props or fence panels are placed.
+    _build_entrance_routes(features)
     for item in features:
         if not item is Dictionary:
             continue
@@ -160,7 +166,9 @@ func decorate(features: Array) -> void:
         " firewood=", _yard_counts[3], " scrap=", _yard_counts[4],
         " benches=", _yard_counts[5])
     print("VILLAGE_FENCE_JOINTS_READY: bridged=", _fence_joints_joined,
-        " short_spans_recovered=", _fence_short_spans_recovered)
+        " short_spans_recovered=", _fence_short_spans_recovered,
+        " entrance_routes=", _entrance_routes.size(),
+        " gate_sections_reserved=", _reserved_gate_sections)
     print("VILLAGE_CLEARANCE_READY: rejected_fence_panels=", _fence_panels_skipped,
         " total_fence_panels=", _fence_panels_total,
         " relocated_fence_panels=", _fence_panels_relocated,
@@ -440,6 +448,8 @@ func _fence_span_clear(a: Vector2, b: Vector2,
         var p := a.lerp(b, t)
         if not Geometry2D.is_point_in_polygon(p, polygon) or not _fence_point_clear(p):
             return false
+        if _entry_zone_conflict(p, 0.12):
+            return false
     return true
 
 
@@ -455,21 +465,100 @@ func _entry_clear(mid: Vector3, tangent: Vector3, outward: Vector3,
     return true
 
 
+func _entrance_route_distance(p: Vector2) -> float:
+    # Fast bounding-box rejection keeps the 88 plot fences inexpensive.
+    var best := INF
+    for route in _entrance_routes:
+        var r: Rect2 = route["bounds"]
+        if not r.has_point(p):
+            continue
+        var closest := Geometry2D.get_closest_point_to_segment(
+            p, route["start"], route["end"])
+        best = minf(best, p.distance_to(closest))
+    return best
+
+
+func _entry_zone_conflict(p: Vector2, extra: float = 0.0) -> bool:
+    return _entrance_route_distance(p) < 1.10 + extra
+
+
+func _build_entrance_routes(features: Array) -> void:
+    _entrance_routes.clear()
+    for item in features:
+        if not item is Dictionary or str(item.get("type", "")) != "house":
+            continue
+        var polygon := _local_points(item.get("points", []))
+        if polygon.size() < 3:
+            continue
+        var front := _building_front_edge(polygon)
+        var a := polygon[front]
+        var b := polygon[(front + 1) % polygon.size()]
+        if a.distance_to(b) <= 3.3:
+            continue
+        var side := (b - a).normalized()
+        var outward := Vector2(side.y, -side.x)
+        if _signed_area(polygon) < 0.0:
+            outward *= -1.0
+        var mid := (a + b) * 0.5
+        var start := mid + outward * 0.40
+        var road_dist := _nearest_road_distance(mid)
+        var max_distance := clampf(road_dist + 1.0, 2.8, 24.0)
+        var finish := mid + outward * max_distance
+        var lo := start.min(finish) - Vector2(1.6, 1.6)
+        var hi := start.max(finish) + Vector2(1.6, 1.6)
+        _entrance_routes.append({
+            "start": start, "end": finish, "bounds": Rect2(lo, hi - lo)
+        })
+    print("VILLAGE_ENTRANCES_READY: reserved=", _entrance_routes.size(),
+        " road_facing=", _fronts_facing_road)
+
+
 func _building_front_edge(points: PackedVector2Array) -> int:
+    # Choose a road-facing *accessible* facade, not merely the closest wall.
+    # The wall choice is deterministic and does not change a single survey point.
     var best_index := 0
     var best_score := INF
+    var clockwise := _signed_area(points) < 0.0
     for i in range(points.size()):
         var a := points[i]
         var b := points[(i + 1) % points.size()]
-        var length := a.distance_to(b)
-        if length < 2.5:
+        var side := b - a
+        var length := side.length()
+        if length < 3.35:
             continue
-        var distance := _nearest_road_distance((a + b) * 0.5)
-        var score := distance - minf(length, 15.0) * 0.1
+        var mid := (a + b) * 0.5
+        var outward := Vector2(side.y, -side.x).normalized()
+        if clockwise:
+            outward *= -1.0
+        var road_distance := INF
+        var nearest := Vector2.INF
+        for segment in _roads:
+            var foot := Geometry2D.get_closest_point_to_segment(mid, segment[0], segment[1])
+            var d := mid.distance_to(foot)
+            if d < road_distance:
+                road_distance = d
+                nearest = foot
+        var score := road_distance * 0.80 - minf(length, 15.0) * 0.075
+        if road_distance < INF and road_distance > 0.2:
+            var facing := (nearest - mid).normalized().dot(outward)
+            if facing < 0.20:
+                score += 18.0 + 8.0 * (0.20 - facing)
+        if _road_surface_gap(mid) < 1.0:
+            score += 8.0
+        # Test the two door jambs and the exterior approach along the normal.
+        var tangent := side / length
+        for depth in [0.85, 1.7, 2.6]:
+            for across in [-0.60, 0.0, 0.60]:
+                var p := mid + outward * float(depth) + tangent * float(across)
+                if not _clear_of_buildings(p, 0.16):
+                    score += 15.0
+                if depth < 1.8 and _road_surface_gap(p) < 0.15:
+                    score += 6.0
         if score < best_score:
             best_score = score
             best_index = i
     return best_index
+
 
 func _wall_panel(key: String, start: Vector2, finish: Vector2, normal: Vector3,
         frac0: float, frac1: float, bottom: float, top: float, extra: float = 0.12) -> void:
@@ -1332,6 +1421,11 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool,
         _fence_panels_total += 1
         var raw_start := a + tangent * from_dist
         var raw_finish := a + tangent * to_dist
+        if _entry_zone_conflict(raw_start, 0.24) or _entry_zone_conflict(
+                (raw_start + raw_finish) * 0.5, 0.24) or _entry_zone_conflict(raw_finish, 0.24):
+            _reserved_gate_sections += 1
+            _fence_break()
+            continue
         var fit := _fence_fit_span(raw_start, raw_finish, inward, polygon)
         if not fit.is_empty():
             _fence_draw_span(fit[0], fit[1], i, polygon)
@@ -1510,6 +1604,8 @@ func _yard_radius(kind: int) -> float:
 func _yard_spot_ok(p: Vector2, polygon: PackedVector2Array,
         other: Array, kind: int) -> bool:
     var radius := _yard_radius(kind)
+    if _entry_zone_conflict(p, radius + 0.45):
+        return false
     if not Geometry2D.is_point_in_polygon(p, polygon):
         return false
     # Test the whole item's bounding radius instead of its centre.
@@ -1585,6 +1681,8 @@ func _decorate_plot_props(points: PackedVector2Array) -> void:
         if not Geometry2D.is_point_in_polygon(p, points):
             continue
         if _road_surface_gap(p) < 0.72 or _plot_boundary_gap(p) < 0.70:
+            continue
+        if _entry_zone_conflict(p, 0.75):
             continue
         if not _clear_of_buildings(p, 0.83):
             continue
