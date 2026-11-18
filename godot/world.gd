@@ -493,6 +493,12 @@ func _toggle_manual_preview() -> void:
     if osm_roads != null:
         osm_roads.visible = not manual_mode
     manual_button.text = "ВЕРНУТЬ СТАРУЮ МЕСТНОСТЬ" if manual_mode else "РУЧНАЯ РАЗМЕТКА · 130 ОБЪЕКТОВ"
+    if map_panel != null:
+        map_panel.set("show_manual", manual_mode)
+        map_panel.queue_redraw()
+    for control in [houses_button, sector_button, osm_button, overture_button, sector_a_visit_button]:
+        if control != null:
+            control.visible = not manual_mode
     if is_instance_valid(_status_label):
         _status_label.text = "ЧЕРНОЗЁРЬЕ 2.1 / РУЧНАЯ ГЕОГРАФИЯ · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
     var character := get_node_or_null("Player") as CharacterBody3D
