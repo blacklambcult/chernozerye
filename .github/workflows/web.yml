@@ -93,6 +93,7 @@ jobs:
           grep -q "NOVEMBER_SNOW_READY: cpu=true amount=340 follow_player=true" /tmp/world-smoke.log
           grep -q "NOVEMBER_MUD_READY: patches=" /tmp/world-smoke.log
           grep -q "NOVEMBER_SMOKE_READY: active=" /tmp/world-smoke.log
+          grep -q "ABANDONED_VILLAGE_LIGHTS_READY:" /tmp/world-smoke.log
           grep -q 'weather_label.name = "NovemberWeatherLabel"' godot/world.gd
           python - <<'PY'
           import re
@@ -105,7 +106,19 @@ jobs:
           smoke = re.search(r'NOVEMBER_SMOKE_READY: active=(\d+) candidates=(\d+)', log)
           assert smoke, 'No active chimney smoke diagnostic'
           active, candidates = map(int, smoke.groups())
-          assert 1 <= active <= 7 and candidates >= active, ('Smoke emitter budget invalid', active, candidates)
+          assert 0 <= active <= 1 and candidates >= active, ('Abandoned village has too many smoke plumes', active, candidates)
+          houses = re.search(
+              r'ABANDONED_VILLAGE_LIGHTS_READY: houses=(\d+) dark=(\d+)'
+              r' warm_houses=(\d+) anomalous_houses=(\d+)'
+              r' warm_windows=(\d+) otherworldly_windows=(\d+)', log)
+          assert houses, 'Missing abandoned village illumination audit'
+          total, dark, warm, eerie, warm_windows, eerie_windows = map(int, houses.groups())
+          assert total == 92, ('Unexpected surveyed house count', total)
+          assert dark >= 80 and warm <= 8 and eerie == 2, ('Village too inhabited', houses.groups())
+          assert 3 <= warm_windows <= 8, ('Warm window distribution invalid', warm_windows)
+          assert 1 <= eerie_windows <= 2, ('Unnatural light missing', eerie_windows)
+          print('ABANDONED_VILLAGE_AUDIT_OK:', dark, warm_windows, eerie_windows,
+                'smoking=', active)
           print('NOVEMBER_WEATHER_AUDIT_OK: mud=', mud, 'puddles=', puddles, 'smoke=', active)
           PY
           grep -q '^    _activate_default_village()' godot/world.gd
