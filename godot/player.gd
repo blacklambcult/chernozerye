@@ -14,6 +14,9 @@ var map_open := false
 func _ready() -> void:
     camera = Camera3D.new()
     camera.position.y = 1.55
+    # A near plane of 0.05 made subpixel roof layers flicker in GL Compatibility.
+    camera.near = 0.25
+    camera.far = 2300.0
     camera.current = true
     add_child(camera)
     var collision := CollisionShape3D.new()
