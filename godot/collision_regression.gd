@@ -146,7 +146,9 @@ func _run() -> void:
         _fail("torso occupies player eye height")
         return
     camera.rotation.x = -1.45
-    avatar.call("_process",0.016)
+    # Allow the view-dependent first-person pose to settle before checking it.
+    for frame in range(30):
+        avatar.call("_process",0.016)
     if not upper.visible or not jacket.visible:
         _fail("body disappears while looking down")
         return

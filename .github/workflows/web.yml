@@ -64,7 +64,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for script in world.gd player.gd geography_v07.gd live_map_v08.gd overture_3d_a.gd manual_geo.gd manual_art.gd izba_variants.gd logo_data.gd story_prologue.gd collision_regression.gd first_person_body.gd gameplay_hud.gd character_smoking.gd pause_overlay.gd pause_regression.gd body_gait_regression.gd; do
+          for script in world.gd player.gd geography_v07.gd live_map_v08.gd overture_3d_a.gd manual_geo.gd manual_art.gd izba_variants.gd logo_data.gd story_prologue.gd collision_regression.gd first_person_body.gd gameplay_hud.gd character_smoking.gd pause_overlay.gd pause_regression.gd body_gait_regression.gd body_view_regression.gd; do
             echo "Checking ${script}"
             godot --headless --path godot --check-only --script "res://${script}"
           done
@@ -97,6 +97,12 @@ jobs:
           set -o pipefail
           godot --headless --path godot --script res://body_gait_regression.gd 2>&1 | tee /tmp/body-gait-regression.log
           grep -q "BODY_GAIT_REGRESSION_OK: upright_rest=true alternating_stride=true independent_knees=true level_boots=true idle_reset=true" /tmp/body-gait-regression.log
+
+      - name: Regression-test visible boots against ground and coat
+        run: |
+          set -o pipefail
+          godot --headless --path godot --script res://body_view_regression.gd 2>&1 | tee /tmp/body-view-regression.log
+          grep -q "BODY_VIEW_REGRESSION_OK: soles_above_ground=true knees_visible=true two_boots_distinct=true coat_clearance=true upright_restored=true" /tmp/body-view-regression.log
 
       - name: Regression-test pause and mouse sensitivity
         shell: bash

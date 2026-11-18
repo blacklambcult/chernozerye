@@ -8,7 +8,7 @@ const COAT := Color("#465148")
 const COAT_SHADOW := Color("#303932")
 const SHIRT := Color("#686255")
 const PANTS := Color("#4b5048")
-const BOOTS := Color("#242827")
+const BOOTS := Color("#343a34")
 const GLOVES := Color("#60594e")
 const BELT := Color("#252722")
 
@@ -22,6 +22,11 @@ var left_knee_joint: Node3D
 var right_knee_joint: Node3D
 var left_ankle_joint: Node3D
 var right_ankle_joint: Node3D
+var left_thigh_mesh: MeshInstance3D
+var right_thigh_mesh: MeshInstance3D
+var left_calf_mesh: MeshInstance3D
+var right_calf_mesh: MeshInstance3D
+var look_down_weight := 0.0
 var hide_right_hand := false
 var pelvis_root: Node3D
 var upper_coat: MeshInstance3D
@@ -161,12 +166,14 @@ func _leg(side: float, label: String, root: Node3D) -> Node3D:
     ankle.name = "AnkleJoint"
     ankle.position = Vector3(side * 0.004, -0.294, 0.020)
     knee.add_child(ankle)
-    _box(ankle, "Boot", Vector3(0.165, 0.115, 0.175),
-        Vector3(0.0, -0.054, -0.035), BOOTS)
-    _box(ankle, "BootToe", Vector3(0.171, 0.064, 0.145),
-        Vector3(0.0, -0.100, -0.126), BOOTS)
-    _box(ankle, "BootSole", Vector3(0.180, 0.025, 0.183),
-        Vector3(0.0, -0.118, -0.107), BELT)
+    # The old toe and sole sat BELOW the collision floor and could be hidden
+    # by the ground mesh. Keep every boot surface just above ground level.
+    _box(ankle, "Boot", Vector3(0.165, 0.102, 0.175),
+        Vector3(0.0, -0.042, -0.042), BOOTS)
+    _box(ankle, "BootToe", Vector3(0.171, 0.064, 0.170),
+        Vector3(0.0, -0.044, -0.187), BOOTS)
+    _box(ankle, "BootSole", Vector3(0.180, 0.025, 0.240),
+        Vector3(0.0, -0.070, -0.120), BELT)
     return hip
 
 func _arm(side: float, label: String, root: Node3D) -> Node3D:
@@ -221,15 +228,47 @@ func _ready() -> void:
     right_knee_joint = right_leg.get_node("KneeJoint") as Node3D
     left_ankle_joint = left_knee_joint.get_node("AnkleJoint") as Node3D
     right_ankle_joint = right_knee_joint.get_node("AnkleJoint") as Node3D
+    left_thigh_mesh = left_leg.get_node("TrouserThigh") as MeshInstance3D
+    right_thigh_mesh = right_leg.get_node("TrouserThigh") as MeshInstance3D
+    left_calf_mesh = left_knee_joint.get_node("TrouserCalf") as MeshInstance3D
+    right_calf_mesh = right_knee_joint.get_node("TrouserCalf") as MeshInstance3D
     left_arm = _arm(-1.0, "LeftArm", pelvis_root)
     right_arm = _arm(1.0, "RightArm", pelvis_root)
-    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true pelvis_aligned=true torso_visible=true front_panels=true upright_joints=true grounded_gait=true")
+    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true pelvis_aligned=true torso_visible=true front_panels=true upright_joints=true grounded_gait=true soles_above_ground=true")
 
 
 func set_right_hand_occupied(value: bool) -> void:
     hide_right_hand = value
     if right_arm != null:
         right_arm.visible = not value and not view_down_cutaway
+
+func _fit_bone_mesh(mesh: MeshInstance3D, a: Vector3, b: Vector3) -> void:
+    # Adjust only the render segment; this never moves the player collider.
+    var axis := b - a
+    var cylinder := mesh.mesh as CylinderMesh
+    mesh.position = (a + b) * 0.5
+    mesh.quaternion = Quaternion(Vector3.UP, axis.normalized())
+    mesh.scale.y = axis.length() / cylinder.height
+
+
+func _align_leg_to_downward_view(delta: float, pitch: float) -> void:
+    # A camera looking nearly vertically down compresses upright legs into
+    # the coat silhouette. Slightly reposition the knees/ankles in the
+    # first-person VISUAL pose, while leaving hip positions and the
+    # CharacterBody/collision capsule fixed.
+    var target := smoothstep(0.68, 1.38, -pitch)
+    look_down_weight = lerpf(look_down_weight, target, clampf(delta * 12.0, 0.0, 1.0))
+    var knee_offset := 0.115 * look_down_weight
+    var ankle_offset := 0.072 * look_down_weight
+    left_knee_joint.position.z = 0.014 - knee_offset
+    right_knee_joint.position.z = 0.014 - knee_offset
+    left_ankle_joint.position.z = 0.020 - ankle_offset
+    right_ankle_joint.position.z = 0.020 - ankle_offset
+    _fit_bone_mesh(left_thigh_mesh, Vector3.ZERO, left_knee_joint.position)
+    _fit_bone_mesh(right_thigh_mesh, Vector3.ZERO, right_knee_joint.position)
+    _fit_bone_mesh(left_calf_mesh, Vector3(0.0, -0.012, 0.0), left_ankle_joint.position)
+    _fit_bone_mesh(right_calf_mesh, Vector3(0.0, -0.012, 0.0), right_ankle_joint.position)
+
 
 func _update_gait(delta: float, grounded_speed: float) -> void:
     # Drive the visual walk cycle only from grounded horizontal movement.
@@ -278,3 +317,6 @@ func _process(delta: float) -> void:
     right_arm.visible = not hide_right_hand
     var planar_speed := Vector2(actor.velocity.x, actor.velocity.z).length()
     _update_gait(delta, planar_speed if actor.is_on_floor() else 0.0)
+    var eye_camera := actor.get_node_or_null("Camera3D") as Camera3D
+    if eye_camera != null:
+        _align_leg_to_downward_view(delta, eye_camera.rotation.x)
