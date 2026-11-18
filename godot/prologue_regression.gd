@@ -27,6 +27,20 @@ func _run_tests() -> void:
     if story.get("waypoint") == null:
         _fail("home waypoint missing")
         return
+    # Layout: quest, distance and journal top-left; subtitles bottom-center.
+    var distance := story.get("distance_label") as Label
+    var journal_hint := story.get("journal_hint_label") as Label
+    var subtitles := story.get("message_label") as Label
+    var interaction := story.get("prompt_label") as Label
+    if distance == null or journal_hint == null or subtitles == null or interaction == null:
+        _fail("mission HUD labels missing")
+        return
+    if distance.position.y > 55.0 or journal_hint.position.y > 85.0:
+        _fail("distance and journal must stay below top-left quest")
+        return
+    if subtitles.anchor_left != 0.5 or subtitles.anchor_top != 1.0:
+        _fail("subtitle text must remain bottom-center")
+        return
     var gate: Vector2 = story.get("gate_point")
     var bearing: String = story.call("_home_bearing")
     if bearing not in ["ПРЯМО", "НАЗАД", "СПРАВА", "СЛЕВА", "ЗДЕСЬ"]:
@@ -48,6 +62,13 @@ func _run_tests() -> void:
     story.call("_update_approach")
     if int(story.get("_approach_triggers")) != 2:
         _fail("yard homecoming cue does not fire once")
+        return
+    story.call("_update_focus")
+    if str(distance.text).contains("ПРЯМО") or str(distance.text).contains("НАЗАД"):
+        _fail("distance line must not duplicate compass direction")
+        return
+    if not str(journal_hint.text).contains("журнал"):
+        _fail("journal hotkey missing at top-left")
         return
     story.call("_enter_home")
     if not bool(story.get("inside_home")):
