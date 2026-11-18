@@ -35,9 +35,9 @@ jobs:
           python - <<'PY'
           import json
           d = json.load(open('godot/manual_layout.json', encoding='utf-8'))
-          assert len(d['features']) == 130
-          assert d['metadata']['type_counts']['house'] == 35
-          assert d['metadata']['type_counts']['plot'] == 34
+          assert len(d['features']) == 314
+          assert d['metadata']['type_counts']['house'] == 92
+          assert d['metadata']['type_counts']['plot'] == 88
           print('MANUAL_SOURCE_VERIFIED:', len(d['features']))
           PY
 
@@ -64,7 +64,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for script in world.gd player.gd geography_v07.gd live_map_v08.gd overture_3d_a.gd manual_geo.gd manual_art.gd izba_variants.gd; do
+          for script in world.gd player.gd geography_v07.gd live_map_v08.gd overture_3d_a.gd manual_geo.gd manual_art.gd izba_variants.gd logo_data.gd; do
             echo "Checking ${script}"
             godot --headless --path godot --check-only --script "res://${script}"
           done
@@ -77,14 +77,15 @@ jobs:
           timeout 45s godot --headless --path godot --quit-after 20 2>&1 | tee /tmp/world-smoke.log
           grep -q "WORLD_READY: geometry complete" /tmp/world-smoke.log
           grep -q "OVERTURE_3D_A_READY:" /tmp/world-smoke.log
-          grep -q "MANUAL_LAYOUT_READY: 130" /tmp/world-smoke.log
-          grep -q "MANUAL_ART_READY: buildings=59 plots=34 roads=18" /tmp/world-smoke.log
+          grep -q "MANUAL_LAYOUT_READY: 314" /tmp/world-smoke.log
+          grep -q "MANUAL_ART_READY: buildings=162 plots=88 roads=18" /tmp/world-smoke.log
           grep -q "MANUAL_VILLAGE_DETAIL_READY: canopies=" /tmp/world-smoke.log
           grep -q "MANUAL_FACADE_READY: lean_tos=" /tmp/world-smoke.log
           grep -q "IZBA_GENERATOR_READY: floor_counts=" /tmp/world-smoke.log
           grep -q "IZBA_DETAIL_READY: log_courses=" /tmp/world-smoke.log
           grep -q "VILLAGE_YARDS_READY: wells=" /tmp/world-smoke.log
           grep -q "VILLAGE_CLEARANCE_READY: rejected_fence_panels=" /tmp/world-smoke.log
+          grep -q "CHERNOZERYE_LOGO_READY:" /tmp/world-smoke.log
           # Guard against removing most plot boundaries again (v3.4 skipped 328).
           python - <<'PY'
           import re
@@ -92,14 +93,16 @@ jobs:
           log = Path('/tmp/world-smoke.log').read_text()
           m = re.search(
               r'VILLAGE_CLEARANCE_READY: rejected_fence_panels=(\d+)'
-              r' relocated_fence_panels=(\d+).* sealed_roof_joints=(\d+)',
+              r' total_fence_panels=(\d+) relocated_fence_panels=(\d+)'
+              r'.* sealed_roof_joints=(\d+)',
               log)
           assert m, 'Missing village geometry counts'
-          missing, relocated, sealed = map(int, m.groups())
-          assert missing < 250, ('Too many fence sections removed', missing)
+          missing, attempted, relocated, sealed = map(int, m.groups())
+          assert attempted > 0, 'No fence panels attempted'
+          assert missing / attempted < 0.55, ('Most fence sections were lost', missing, attempted)
           assert relocated > 20, ('No roadside fence correction performed', relocated)
-          assert sealed == 35, ('Unexpected house roof count', sealed)
-          print('VILLAGE_GEOMETRY_AUDIT_OK:', missing, relocated, sealed)
+          assert sealed == 92, ('Unexpected house roof count', sealed)
+          print('VILLAGE_GEOMETRY_AUDIT_OK:', missing, attempted, relocated, sealed)
           PY
           # The new lighting mode is enabled only after the player selects the manual village.
           # Assert its configuration statically; startup smoke has not clicked that button.
@@ -118,23 +121,23 @@ jobs:
         run: |
           set -euo pipefail
           # Versioned asset directory prevents stale .wasm/.pck files in browsers.
-          mkdir -p build/web/v36
-          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v36/index.html"
-          test -s build/web/v36/index.html
-          test -f build/web/v36/index.wasm
-          test -f build/web/v36/index.pck
+          mkdir -p build/web/v37
+          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v37/index.html"
+          test -s build/web/v37/index.html
+          test -f build/web/v37/index.wasm
+          test -f build/web/v37/index.pck
           cat > build/web/index.html <<'HTML'
           <!doctype html>
           <html lang="ru">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta http-equiv="refresh" content="0; url=./v36/">
+            <meta http-equiv="refresh" content="0; url=./v37/">
             <title>Чернозёрье — загрузка новой версии</title>
           </head>
           <body>
-            <p><a href="./v36/">Открыть Чернозёрье 3.6</a></p>
-            <script>window.location.replace("./v36/");</script>
+            <p><a href="./v37/">Открыть Чернозёрье 3.7</a></p>
+            <script>window.location.replace("./v37/");</script>
           </body>
           </html>
           HTML
