@@ -23,6 +23,8 @@ var _fence_rails: PackedVector3Array = PackedVector3Array()
 var _fence_slats: PackedVector3Array = PackedVector3Array()
 var _yard_details: PackedVector3Array = PackedVector3Array()
 var _road_ruts: PackedVector3Array = PackedVector3Array()
+var _overhead_wires: PackedVector3Array = PackedVector3Array()
+var _utility_pole_count := 0
 var _bush_positions: Array[Transform3D] = []
 var _aspen_positions: Array[Transform3D] = []
 var _aspen_trunks: Array[Transform3D] = []
@@ -78,6 +80,8 @@ func decorate(features: Array) -> void:
     _create_solid_mesh(_fence_slats, Color("#3a3b35"), "Забор / обветшавший штакетник")
     _create_solid_mesh(_yard_details, Color("#48443b"), "Старый деревенский быт / ящики и дрова")
     _create_solid_mesh(_road_ruts, RUT_COLOR, "Дорога / земляные колеи")
+    _create_solid_mesh(_overhead_wires, Color("#242d2d"), "Старые кабели / провисшие линии")
+    print("MANUAL_UTILITY_READY: poles=", _utility_pole_count)
     _create_forest_assets()
     print("MANUAL_ART_READY: buildings=", _building_count,
         " plots=", _fence_count, " roads=", _road_count, " lamps=", _lights_placed)
@@ -221,7 +225,9 @@ func _flush_details() -> void:
         "porch": Color("#4b433b"),
         "lamp": Color("#df9c52"),
         "trim": Color("#596363"),
-        "rust": Color("#604039")
+        "rust": Color("#604039"),
+        "pole": Color("#413b35"),
+        "crossarm": Color("#343531")
     }
     for key in _detail_batches.keys():
         var verts: PackedVector3Array = _detail_batches[key]
@@ -593,6 +599,46 @@ func _decorate_road(points: PackedVector2Array) -> void:
             var side := Vector3(perpendicular.x, 0, -perpendicular.y) * 0.10
             _push_tri(_road_ruts, pa - side, pa + side, pb + side)
             _push_tri(_road_ruts, pa - side, pb + side, pb - side)
+    _decorate_utility_poles(points)
+
+func _wire_segment(a: Vector3, b: Vector3) -> void:
+    # Thin vertical ribbons remain visible against the sky in the Web renderer.
+    var thickness := Vector3.UP * 0.016
+    _push_tri(_overhead_wires, a - thickness, a + thickness, b + thickness)
+    _push_tri(_overhead_wires, a - thickness, b + thickness, b - thickness)
+
+func _decorate_utility_poles(points: PackedVector2Array) -> void:
+    # Props follow surveyed road coordinates; they are not new map objects.
+    # Hard cap for fast Godot Web export and a sparsely electrified 1990s village.
+    for i in range(points.size() - 1):
+        if _utility_pole_count >= 35:
+            return
+        var a: Vector2 = points[i]
+        var b: Vector2 = points[i + 1]
+        var length := a.distance_to(b)
+        if length < 36.0:
+            continue
+        var direction := (b - a) / length
+        var perpendicular := Vector2(-direction.y, direction.x)
+        var roadside := 3.9 * (1.0 if _road_count % 3 != 0 else -1.0)
+        var number := maxi(1, int(floor(length / 43.0)))
+        var previous := Vector2(INF, INF)
+        for j in range(number):
+            if _utility_pole_count >= 35:
+                return
+            var p := a.lerp(b, (float(j) + 0.5) / float(number)) + perpendicular * roadside
+            _batch_box("pole", _pt(p, 3.05), Vector3(0.22, 6.1, 0.22))
+            _batch_box("crossarm", _pt(p, 5.85), Vector3(1.3, 0.16, 0.17))
+            if previous != Vector2(INF, INF):
+                var horizontal := Vector3(perpendicular.x, 0.0, -perpendicular.y)
+                for offset in [-0.42, 0.42]:
+                    var from_pos := _pt(previous, 5.8) + horizontal * float(offset)
+                    var to_pos := _pt(p, 5.8) + horizontal * float(offset)
+                    var middle := (from_pos + to_pos) * 0.5 - Vector3.UP * 0.3
+                    _wire_segment(from_pos, middle)
+                    _wire_segment(middle, to_pos)
+            previous = p
+            _utility_pole_count += 1
 
 func _decorate_forest(points: PackedVector2Array) -> void:
     if points.size() < 3:
