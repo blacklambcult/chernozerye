@@ -1,6 +1,7 @@
 extends Node3D
 
 const PLAYER_SCRIPT = preload("res://player.gd")
+const LOGO_DATA = preload("res://logo_data.gd")
 const MAP_FILE := "res://world_data.json"
 const MANUAL_FILE := "res://manual_layout.json"
 var manual_mode := false
@@ -55,6 +56,7 @@ func _ready() -> void:
     _create_landmarks()
     _create_player()
     _create_label()
+    _create_brand_watermark()
     _create_overview_map()
     _create_quick_navigation()
     _create_manual_navigation()
@@ -278,6 +280,36 @@ func _create_label() -> void:
     layer.add_child(label)
     add_child(layer)
     _status_label = label
+
+func _create_brand_watermark() -> void:
+    # Use the exact player-supplied emblem as a lightweight non-interactive HUD mark.
+    var img := Image.new()
+    var jpg_bytes := Marshalls.base64_to_raw(LOGO_DATA.BASE64)
+    var err := img.load_jpg_from_buffer(jpg_bytes)
+    if err != OK:
+        push_warning("CHERNOZERYE logo image could not be decoded: " + str(err))
+        return
+    var layer := CanvasLayer.new()
+    layer.name = "BrandWatermark"
+    layer.layer = 15
+    add_child(layer)
+    var emblem := TextureRect.new()
+    emblem.name = "ChernozeryeEmblem"
+    emblem.texture = ImageTexture.create_from_image(img)
+    emblem.anchor_left = 1.0
+    emblem.anchor_right = 1.0
+    emblem.anchor_top = 0.0
+    emblem.anchor_bottom = 0.0
+    emblem.offset_left = -166.0
+    emblem.offset_right = -10.0
+    emblem.offset_top = 10.0
+    emblem.offset_bottom = 166.0
+    emblem.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    emblem.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    emblem.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    emblem.modulate.a = 0.92
+    layer.add_child(emblem)
+    print("CHERNOZERYE_LOGO_READY: original user emblem, hud=156px")
 
 # Trees only in OSM forest polygons, never randomly across the whole map.
 func _create_forest_from_osm(features: Array) -> void:
@@ -528,7 +560,7 @@ func _create_manual_navigation() -> void:
     layer.layer = 8
     add_child(layer)
     manual_button = Button.new()
-    manual_button.text = "РУЧНАЯ РАЗМЕТКА · 130 ОБЪЕКТОВ"
+    manual_button.text = "РУЧНАЯ РАЗМЕТКА · 314 ОБЪЕКТОВ"
     manual_button.position = Vector2(16.0, 121.0)
     manual_button.size = Vector2(276.0, 42.0)
     manual_button.tooltip_text = "Показать отдельно дороги, дома, участки и лес из загруженного GeoJSON"
@@ -549,7 +581,7 @@ func _toggle_manual_preview() -> void:
         overture.visible = not manual_mode
     if osm_roads != null:
         osm_roads.visible = not manual_mode
-    manual_button.text = "ВЕРНУТЬ СТАРУЮ МЕСТНОСТЬ" if manual_mode else "РУЧНАЯ РАЗМЕТКА · 130 ОБЪЕКТОВ"
+    manual_button.text = "ВЕРНУТЬ СТАРУЮ МЕСТНОСТЬ" if manual_mode else "РУЧНАЯ РАЗМЕТКА · 314 ОБЪЕКТОВ"
     var terrain := get_node_or_null("BaseGround") as MeshInstance3D
     if terrain != null:
         if manual_mode and _manual_ground_material == null:
@@ -599,11 +631,17 @@ func _toggle_manual_preview() -> void:
         if control != null:
             control.visible = not manual_mode
     if is_instance_valid(_status_label):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 3.6 / СТЫКИ И ФАКТУРЫ · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 3.7 / НОВЫЕ КВАРТАЛЫ · 314 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
     var character := get_node_or_null("Player") as CharacterBody3D
     if character != null:
         character.velocity = Vector3.ZERO
         character.global_position = Vector3(-789.7, 0.22, -268.6) if manual_mode else Vector3(130.0, 0.22, -82.0)
+        # Short depth range plus a slightly farther near plane reduces roof/fascia
+        # depth-buffer jitter in Godot Compatibility Web when looking up close.
+        var player_camera := character.get_node_or_null("Camera3D") as Camera3D
+        if player_camera != null:
+            player_camera.near = 0.36 if manual_mode else 0.25
+            player_camera.far = 680.0 if manual_mode else 2300.0
     overview_layer.visible = false
     Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
