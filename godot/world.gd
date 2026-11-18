@@ -340,6 +340,14 @@ func _create_label() -> void:
     label.text = GAME_HUD_TITLE
     label.position = Vector2(16, 16)
     layer.add_child(label)
+    var weather_label := Label.new()
+    weather_label.name = "NovemberWeatherLabel"
+    weather_label.text = "ЧЕРНОЗЁРЬЕ  /  НОЯБРЬ  /  ПОЗДНИЙ ВЕЧЕР  /  МОКРЫЙ СНЕГ"
+    weather_label.position = Vector2(16, 38)
+    weather_label.add_theme_color_override("font_color", Color("#aeb9bc"))
+    weather_label.add_theme_font_size_override("font_size", 11)
+    weather_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    layer.add_child(weather_label)
     add_child(layer)
     _status_label = label
 
