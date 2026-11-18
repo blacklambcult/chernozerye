@@ -21,6 +21,8 @@ var broad_canopies: Array[Transform3D] = []
 var tree_trunks: Array[Transform3D] = []
 var manual_roads: Array = []
 var building_footprints: Array[PackedVector2Array] = []
+var _roadside_tufts := 0
+var _roadside_sections := 0
 var _base_buildings: Node3D
 
 func _ready() -> void:
@@ -91,6 +93,8 @@ func _build_manual() -> void:
     add_child(art)
     art.call("decorate", features)
     print("MANUAL_LAYOUT_READY: ", object_count)
+    print("MANUAL_STREETSCAPE_READY: roadside_sections=", _roadside_sections,
+        " roadside_grass=", _roadside_tufts)
 
 func _points(raw: Array) -> PackedVector2Array:
     var result := PackedVector2Array()
@@ -161,6 +165,7 @@ func _add_strip(raw: Array, width: float, height: float, tint: Color, label: Str
     _mesh_from_triangles(verts, tint, label)
     if label == "road":
         _add_road_wear(points, height + 0.030)
+        _add_village_roadside(points, width, height)
 
 
 func _add_road_wear(points: PackedVector2Array, height: float) -> void:
@@ -201,6 +206,79 @@ func _add_road_wear(points: PackedVector2Array, height: float) -> void:
                 _put_triangle(grass, g0, g2, g3)
     _mesh_from_triangles(tracks, Color("#3b362f"), "Дорога / две грунтовые колеи")
     _mesh_from_triangles(grass, Color("#424a3b"), "Дорога / трава между колеями")
+
+
+func _add_village_roadside(points: PackedVector2Array, width: float, height: float) -> void:
+    # Dirt shoulders, small stone chips and knee-high verge plants.
+    # Geometry follows user-drawn GeoJSON roads, with no changed centre lines.
+    # A modest batched budget keeps the Web Compatibility renderer responsive.
+    var shoulders := PackedVector3Array()
+    var stones := PackedVector3Array()
+    var weeds := PackedVector3Array()
+    var dried := PackedVector3Array()
+    var rng := RandomNumberGenerator.new()
+    if points.size() < 2:
+        return
+    rng.seed = 712671 + int(absf(points[0].x * 3.9 + points[0].y * 6.1))
+    for i in range(points.size() - 1):
+        var a: Vector2 = points[i]
+        var b: Vector2 = points[i + 1]
+        var delta := b - a
+        var length := delta.length()
+        if length < 0.25:
+            continue
+        var tangent := delta / length
+        var side := Vector2(-tangent.y, tangent.x)
+        var steps := mini(220, maxi(1, int(ceil(length / 2.8))))
+        for j in range(steps):
+            var t0 := float(j) / float(steps)
+            var t1 := float(j + 1) / float(steps)
+            var first := a.lerp(b, t0)
+            var last := a.lerp(b, t1)
+            for sign in [-1.0, 1.0]:
+                var sgn := float(sign)
+                var inner := side * sgn * (width * 0.5 - 0.04)
+                var outer0 := side * sgn * (width * 0.5 + 0.62 +
+                    0.17 * sin(float(j * 19 + i * 13)))
+                var outer1 := side * sgn * (width * 0.5 + 0.62 +
+                    0.17 * sin(float((j + 1) * 19 + i * 13)))
+                _put_triangle(shoulders, _pos(first + inner, height - 0.025),
+                    _pos(last + inner, height - 0.025),
+                    _pos(last + outer1, height - 0.025))
+                _put_triangle(shoulders, _pos(first + inner, height - 0.025),
+                    _pos(last + outer1, height - 0.025),
+                    _pos(first + outer0, height - 0.025))
+                _roadside_sections += 1
+                # Deterministic sparse wild grass at the outer shoulder, not on tire tracks.
+                if (j + i * 7 + sign * 3) % 3 == 0:
+                    var center := first.lerp(last, rng.randf_range(0.15, 0.85))
+                    center += side * sgn * (width * 0.5 + rng.randf_range(0.64, 1.20))
+                    if _near_building(center, 0.75):
+                        continue
+                    var blade := rng.randf_range(0.28, 0.66)
+                    var lean := tangent * rng.randf_range(-0.15, 0.15)
+                    var crown := _pos(center + lean, 0.12 + blade)
+                    var root := _pos(center, 0.12)
+                    var half := side * 0.11
+                    var target: PackedVector3Array = dried if (j + sign + i) % 5 == 0 else weeds
+                    _put_triangle(target, _pos(center - half, 0.12), crown,
+                        _pos(center + half, 0.12))
+                    _put_triangle(target, _pos(center - tangent * 0.11, 0.12),
+                        crown, _pos(center + tangent * 0.11, 0.12))
+                    _roadside_tufts += 1
+            # Pebbles and irregular compacted soil, small enough not to read as a grid.
+            if (j + i) % 2 == 0:
+                var t := first.lerp(last, rng.randf())
+                t += side * rng.randf_range(-1.55, 1.55)
+                var dx := tangent * rng.randf_range(0.09, 0.22)
+                var dy := side * rng.randf_range(0.10, 0.28)
+                var plane_y := height + 0.031
+                _put_triangle(stones, _pos(t - dx, plane_y),
+                    _pos(t + dy, plane_y), _pos(t + dx, plane_y))
+    _mesh_from_triangles(shoulders, Color("#4a4438"), "Дорога / неровные грунтовые обочины")
+    _mesh_from_triangles(stones, Color("#655c4b"), "Дорога / гравий и выбоины")
+    _mesh_from_triangles(weeds, Color("#404f37"), "Обочина / тёмная дикая трава")
+    _mesh_from_triangles(dried, Color("#656044"), "Обочина / сухие стебли")
 
 
 func _add_outline(points: PackedVector2Array, width: float, height: float, tint: Color, label: String) -> void:
