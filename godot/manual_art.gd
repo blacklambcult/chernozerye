@@ -12,7 +12,7 @@ const WINDOW_COLOR := Color("#131a1f")
 const WINDOW_LIT := Color("#d9c46e")
 const FENCE_COLOR := Color("#494840")
 const POST_COLOR := Color("#3e3c36")
-const RUT_COLOR := Color("#423a32")
+const RUT_COLOR := Color("#383029")
 
 # Hand-surveyed geometry remains fixed; clearance affects decorative objects only.
 var _roads: Array = []
@@ -343,10 +343,10 @@ func _flush_details() -> void:
         "lamp_glass": Color("#f9c96f"),
         "bench_wood": Color("#536c70"),
         "bench_dark": Color("#363a37"),
-        "flower_stem": Color("#5c744b"),
-        "flower_pink": Color("#966278"),
-        "flower_white": Color("#c4c3ad"),
-        "flower_leaf": Color("#40533d"),
+        "flower_stem": Color("#5b5c47"),
+        "flower_pink": Color("#75616a"),
+        "flower_white": Color("#a6a297"),
+        "flower_leaf": Color("#48483d"),
         "trim": Color("#6c7167"),
         "rust": Color("#604039"),
         "awning": Color("#343433"),
@@ -367,9 +367,9 @@ func _flush_details() -> void:
         "trim_cream": Color("#898778"),
         "well_stone": Color("#4b504b"),
         "well_wood": Color("#5e5441"),
-        "soil": Color("#453a30"),
+        "soil": Color("#392e28"),
         "bed_edge": Color("#534839"),
-        "sprout": Color("#485c3d"),
+        "sprout": Color("#50503b"),
         "greenhouse_glass": Color("#526a63"),
         "greenhouse_frame": Color("#7a8276"),
         "greenhouse_roof": Color("#687970"),
@@ -1676,7 +1676,7 @@ func _decorate_plot_props(points: PackedVector2Array) -> void:
         _plot_props_count += 1
         placed.append({"center": p, "radius": _yard_radius(kind)})
     # Bounded flower patches: well away from buildings, fences and road surfaces.
-    var flower_goal := clampi(int((high.x - low.x) * (high.y - low.y) / 225.0), 2, 6)
+    var flower_goal := clampi(int((high.x - low.x) * (high.y - low.y) / 400.0), 1, 3)
     var flowers_placed := 0
     for trial in range(flower_goal * 24):
         if flowers_placed >= flower_goal:
@@ -1850,11 +1850,11 @@ func _add_instanced(mesh: Mesh, instances: Array[Transform3D], tint: Color, name
 
 func _create_forest_assets() -> void:
     var canopy := SphereMesh.new()
-    canopy.radius = 1.95
-    canopy.height = 3.8
+    canopy.radius = 1.20
+    canopy.height = 2.6
     canopy.radial_segments = 5
     canopy.rings = 3
-    _add_instanced(canopy, _aspen_positions, Color("#283e36"), "Осинник / ломаные кроны")
+    _add_instanced(canopy, _aspen_positions, Color("#4b463d"), "Осинник / ломаные кроны")
     var aspen_trunk := CylinderMesh.new()
     aspen_trunk.top_radius = 0.13
     aspen_trunk.bottom_radius = 0.27
@@ -1866,4 +1866,4 @@ func _create_forest_assets() -> void:
     bush.height = 1.6
     bush.radial_segments = 5
     bush.rings = 2
-    _add_instanced(bush, _bush_positions, Color("#2d4237"), "Подлесок / репейник")
+    _add_instanced(bush, _bush_positions, Color("#414136"), "Подлесок / репейник")
