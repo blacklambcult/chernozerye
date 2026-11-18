@@ -111,6 +111,19 @@ jobs:
           grep -q "ABANDONED_VILLAGE_LIGHTS_READY:" /tmp/world-smoke.log
           grep -q "VILLAGE_COLLISION_READY:" /tmp/world-smoke.log
           grep -q "FOREST_COLLISION_READY:" /tmp/world-smoke.log
+          grep -q "CAMERA_CLIP_GUARD_READY:" /tmp/world-smoke.log
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          log = Path("/tmp/world-smoke.log").read_text()
+          m = re.search(r"CAMERA_CLIP_GUARD_READY: near=([\d.]+) far=([\d.]+) radius=([\d.]+)", log)
+          assert m, "Camera near-plane guard absent"
+          near, far, radius = map(float, m.groups())
+          assert 0.08 <= near <= 0.22, (near, "camera near plane risks clipping")
+          assert near + 0.20 < radius, (near, radius, "camera plane outside capsule")
+          assert far <= 280.0, (far, "depth buffer too imprecise in WebGL")
+          print("CAMERA_CLIPPING_AUDIT_OK:", near, far, radius)
+          PY
           python - <<'PY'
           import re
           from pathlib import Path
@@ -222,7 +235,7 @@ jobs:
           set -euo pipefail
           # Immutable directory per commit. A static /pre-alpha-0.3.9/
           # was cached by some browsers even after a successful new publish.
-          RELEASE_DIR="pre-alpha-0.4.2-${GITHUB_SHA:0:8}"
+          RELEASE_DIR="pre-alpha-0.4.3-${GITHUB_SHA:0:8}"
           mkdir -p "build/web/${RELEASE_DIR}"
           godot --headless --path godot --export-release "Web" "$(pwd)/build/web/${RELEASE_DIR}/index.html"
           test -s "build/web/${RELEASE_DIR}/index.html"
@@ -236,10 +249,10 @@ jobs:
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <meta http-equiv="refresh" content="0; url=./${RELEASE_DIR}/">
             <meta name="robots" content="noindex">
-            <title>Fearless Knights of the Cordon — Pre-Alpha 0.4.2</title>
+            <title>Fearless Knights of the Cordon — Pre-Alpha 0.4.3</title>
           </head>
           <body>
-            <p><a href="./${RELEASE_DIR}/">Открыть Fearless Knights of the Cordon — Pre-Alpha 0.4.2</a></p>
+            <p><a href="./${RELEASE_DIR}/">Открыть Fearless Knights of the Cordon — Pre-Alpha 0.4.3</a></p>
             <script>window.location.replace("./${RELEASE_DIR}/");</script>
           </body>
           </html>
