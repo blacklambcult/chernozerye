@@ -102,6 +102,11 @@ func _material(color: Color, texture: Texture2D = null) -> StandardMaterial3D:
     mat.roughness = 1.0
     mat.metallic = 0.0
     mat.specular = 0.0
+    # Explicit matte defaults: no reflective highlights, rim/clearcoat or emitted wall light.
+    mat.rim_enabled = false
+    mat.clearcoat_enabled = false
+    mat.anisotropy_enabled = false
+    mat.emission_enabled = false
     mat.cull_mode = BaseMaterial3D.CULL_DISABLED
     mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
     if texture != null:
@@ -117,43 +122,43 @@ func _pixel_texture(tone: Color, seed: int, rooftop: bool, wall_style: int = 0) 
     rng.seed = seed
     for y in range(64):
         for x in range(64):
-            var offset := rng.randf_range(-0.14, 0.10)
+            var offset := rng.randf_range(-0.095, 0.038)
             if rooftop:
                 if y % 9 == 0:
-                    offset -= 0.25
+                    offset -= 0.11
                 if x % 11 == 0:
-                    offset -= 0.12
+                    offset -= 0.0655
                 if y % 21 >= 17 and x % 13 < 4:
-                    offset += 0.09
+                    offset += 0.035
             else:
                 match wall_style:
                     1:
                         # Coarse horizontal village log/plank cladding.
                         if y % 8 <= 1:
-                            offset -= 0.25
+                            offset -= 0.16
                         if (x + (y / 8) * 13) % 28 == 0:
-                            offset -= 0.11
+                            offset -= 0.075
                     2:
                         # Limewash over uneven plaster, without strong wood stripes.
-                        offset = rng.randf_range(-0.095, 0.045)
+                        offset = rng.randf_range(-0.070, 0.020)
                         if (x / 9 + y / 7 + seed) % 13 == 0:
-                            offset -= 0.12
+                            offset -= 0.085
                     3:
                         # Old red-brick farm masonry in offset rows.
                         if y % 8 == 0:
-                            offset -= 0.23
+                            offset -= 0.17
                         if (x + (8 if int(y / 8) % 2 == 0 else 0)) % 18 == 0:
-                            offset -= 0.19
+                            offset -= 0.14
                     _:
                         if x % 8 == 0:
-                            offset -= 0.24
+                            offset -= 0.16
                         if x % 8 == 1:
-                            offset += 0.055
+                            offset += 0.018
                         if y % 19 == 0:
                             offset -= 0.08
                 if (x * 17 + y * 7 + seed) % 67 <= 2:
                     offset -= 0.16
-            var shade := clampf(1.0 + offset, 0.35, 1.16)
+            var shade := clampf(0.90 + offset, 0.52, 0.98)
             img.set_pixel(x, y, Color(tone.r * shade, tone.g * shade, tone.b * shade, 1.0))
     var tex := ImageTexture.create_from_image(img)
     _textures[key] = tex
@@ -313,7 +318,7 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
         lamp.name = "Тусклая лампа / окно"
         lamp.position = _pt(center, 2.3) + normal * 1.1
         lamp.light_color = Color("#ffbc7e")
-        lamp.light_energy = 0.72
+        lamp.light_energy = 0.49
         lamp.omni_range = 11.0
         lamp.shadow_enabled = false
         add_child(lamp)
@@ -428,7 +433,7 @@ func _decorate_showcase_yard(points: PackedVector2Array, front_edge: int) -> voi
     light.name = "Старая лампа у крыльца"
     light.position = lamp_origin + Vector3.UP * 3.05
     light.light_color = Color("#ffb46d")
-    light.light_energy = 0.60
+    light.light_energy = 0.43
     light.omni_range = 8.0
     light.shadow_enabled = false
     add_child(light)
@@ -685,8 +690,7 @@ func _add_instanced(mesh: Mesh, instances: Array[Transform3D], tint: Color, name
     node.name = name
     node.multimesh = multi
     var foliage_material := _material(tint)
-    if not name.contains("стволы"):
-        foliage_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    # The unshaded foliage stayed saturated/bright in fog; use soft diffuse instead.
     node.material_override = foliage_material
     node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     add_child(node)
