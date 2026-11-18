@@ -94,6 +94,7 @@ jobs:
           grep -q "NOVEMBER_MUD_READY: patches=" /tmp/world-smoke.log
           grep -q "NOVEMBER_SMOKE_READY: active=" /tmp/world-smoke.log
           grep -q "ABANDONED_VILLAGE_LIGHTS_READY:" /tmp/world-smoke.log
+          grep -q "ABANDONMENT_FACADE_READY:" /tmp/world-smoke.log
           grep -q 'weather_label.name = "NovemberWeatherLabel"' godot/world.gd
           python - <<'PY'
           import re
@@ -117,8 +118,20 @@ jobs:
           assert dark >= 80 and warm <= 8 and eerie == 2, ('Village too inhabited', houses.groups())
           assert 3 <= warm_windows <= 8, ('Warm window distribution invalid', warm_windows)
           assert 1 <= eerie_windows <= 2, ('Unnatural light missing', eerie_windows)
+          facade = re.search(
+              r'ABANDONMENT_FACADE_READY: boarded_windows=(\d+)'
+              r' sealed_entries=(\d+) anomaly_motes=(\d+)', log)
+          assert facade, 'Missing decay facade counters'
+          boarded, sealed, motes = map(int, facade.groups())
+          assert boarded >= 15 and sealed >= 8, ('Abandoned houses look too intact', facade.groups())
+          assert motes == 2, ('Only the two anomalous houses should emit dust', motes)
+          yards = re.search(r'VILLAGE_YARDS_READY:.* collapsed_gate=(\d+)', log)
+          assert yards and int(yards.group(1)) > 0, 'Broken gates missing from yards'
+          flowers = re.search(r'MANUAL_UTILITY_READY:.*flower_patches=(\d+)', log)
+          assert flowers and int(flowers.group(1)) < 40, 'Too many live garden flowers'
           print('ABANDONED_VILLAGE_AUDIT_OK:', dark, warm_windows, eerie_windows,
-                'smoking=', active)
+                'smoking=', active, 'boarded=', boarded, 'sealed=', sealed,
+                'anomalies=', motes, 'collapsed_gates=', int(yards.group(1)))
           print('NOVEMBER_WEATHER_AUDIT_OK: mud=', mud, 'puddles=', puddles, 'smoke=', active)
           PY
           grep -q '^    _activate_default_village()' godot/world.gd
