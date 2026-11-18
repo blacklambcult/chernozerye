@@ -102,6 +102,12 @@ func _run() -> void:
     if not (jacket.mesh is CylinderMesh) or not (upper.mesh is CylinderMesh):
         _fail("jacket needs joined tapered pieces, not a block")
         return
+    if (jacket.mesh as CylinderMesh).cap_top or (upper.mesh as CylinderMesh).cap_top:
+        _fail("top garment caps must be open to eliminate the large octagon")
+        return
+    if (jacket.mesh as CylinderMesh).cap_bottom or (upper.mesh as CylinderMesh).cap_bottom:
+        _fail("garment shells must have no large opaque horizontal caps")
+        return
     if absf(left_leg.position.x + right_leg.position.x) > 0.001:
         _fail("leg placement is not symmetric")
         return
@@ -164,8 +170,25 @@ func _run() -> void:
     if int(sequence.get("phase")) != 5:
         _fail("sequence did not reach automatic ambient state")
         return
-    if not (sequence.get("mouth_prop") as Node3D).visible:
+    var face_prop := sequence.get("mouth_prop") as Node3D
+    if not face_prop.visible:
         _fail("mouth-edge visual absent during ambient state")
+        return
+    if absf(face_prop.position.x) > 0.05 or face_prop.position.z < -0.19:
+        _fail("ambient prop drifts into center screen instead of lip edge")
+        return
+    if face_prop.rotation_degrees.x > -55.0:
+        _fail("ambient prop does not point forward from the face")
+        return
+    camera.rotation.x = -1.40
+    sequence.call("_render_phase")
+    if face_prop.visible:
+        _fail("mouth prop floats over the torso while looking down")
+        return
+    camera.rotation.x = 0.0
+    sequence.call("_render_phase")
+    if not face_prop.visible:
+        _fail("mouth prop not restored when returning to level view")
         return
     if (sequence.get("gesture") as Node3D).visible:
         _fail("gesture remains on screen during two-minute ambient state")
@@ -196,6 +219,6 @@ func _run() -> void:
         _fail("cosmetic character sequence changed game health")
         return
     print("COLLISION_REGRESSION_OK: house=solid fence=solid gap=open capsule=blocked")
-    print("FIRST_PERSON_HUD_REGRESSION_OK: torso=visible_looking_down legs=2 jacket=connected compass=NESW health=100 slots=4")
-    print("CHARACTER_SEQUENCE_REGRESSION_OK: selected_slot=required staged=true burn_seconds=120 hands_clear=true auto_discard=true no_buffs=true")
+    print("FIRST_PERSON_HUD_REGRESSION_OK: torso=visible_looking_down legs=2 jacket=connected compass=NESW health=100 slots=4 coat_caps=open")
+    print("CHARACTER_SEQUENCE_REGRESSION_OK: selected_slot=required staged=true burn_seconds=120 hands_clear=true auto_discard=true no_buffs=true face_occluded_lookdown=true")
     quit(0)
