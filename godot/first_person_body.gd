@@ -4,10 +4,10 @@ extends Node3D
 # beneath the player's eye camera. No head mesh is rendered from inside it.
 # All pieces are visual only; the CharacterBody capsule remains authoritative.
 
-const COAT := Color("#48443f")
-const COAT_SHADOW := Color("#353330")
+const COAT := Color("#465148")
+const COAT_SHADOW := Color("#303932")
 const SHIRT := Color("#686255")
-const PANTS := Color("#363634")
+const PANTS := Color("#4b5048")
 const BOOTS := Color("#242827")
 const GLOVES := Color("#60594e")
 const BELT := Color("#252722")
@@ -41,27 +41,59 @@ func _box(parent: Node3D, name: String, size: Vector3,
     parent.add_child(node)
     return node
 
-func _tapered_coat(parent: Node3D, name: String, pos: Vector3,
-        height: float, top_width: float, bottom_width: float) -> MeshInstance3D:
-    # Eight-sided tapered wool coat, not a squared-off tactical chest plate.
-    # Flattening its depth keeps it out of the eye's vertical viewing cone.
-    var coat := CylinderMesh.new()
-    coat.top_radius = top_width
-    coat.bottom_radius = bottom_width
-    coat.height = height
-    coat.radial_segments = 8
-    # CylinderMesh top caps produced the giant octagon in look-down screenshots.
-    # Keep the garment shell, but let the camera see inside its open neckline.
-    coat.cap_top = false
-    coat.cap_bottom = false
-    var visible_coat := MeshInstance3D.new()
-    visible_coat.name = name
-    visible_coat.mesh = coat
-    visible_coat.material_override = _material(COAT)
-    visible_coat.position = pos
-    visible_coat.scale.z = 0.68
-    parent.add_child(visible_coat)
-    return visible_coat
+func _cloth_quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3,
+        d: Vector3, color: Color) -> void:
+    # A vertical panel, not a horizontal cylinder cap seen from inside.
+    for point in [a, b, c, a, c, d]:
+        st.set_color(color)
+        st.add_vertex(point)
+
+
+func _jacket_section(root: Node3D, label: String,
+        upper_y: float, lower_y: float, upper_width: float, lower_width: float,
+        upper_front_z: float, lower_front_z: float) -> MeshInstance3D:
+    # The viewing eye is ABOVE and behind this garment. The upper collar
+    # bends backwards toward the player, while its waist/front face projects
+    # ahead of the legs. The player sees a continuous coat silhouette and
+    # pants below it, never a large top-facing octagonal lid.
+    var st := SurfaceTool.new()
+    st.begin(Mesh.PRIMITIVE_TRIANGLES)
+    var top_left := Vector3(-upper_width, upper_y, upper_front_z)
+    var top_center := Vector3(0, upper_y, upper_front_z + 0.018)
+    var top_right := Vector3(upper_width, upper_y, upper_front_z)
+    var low_left := Vector3(-lower_width, lower_y, lower_front_z)
+    var low_center := Vector3(0, lower_y, lower_front_z + 0.016)
+    var low_right := Vector3(lower_width, lower_y, lower_front_z)
+    _cloth_quad(st, top_left, top_center, low_center, low_left, COAT)
+    _cloth_quad(st, top_center, top_right, low_right, low_center,
+        COAT.darkened(0.07))
+    var top_back_z := upper_front_z + 0.19
+    var low_back_z := lower_front_z + 0.17
+    _cloth_quad(st,
+        top_right, Vector3(upper_width * 0.84, upper_y, top_back_z),
+        Vector3(lower_width * 0.88, lower_y, low_back_z),
+        low_right, COAT_SHADOW)
+    _cloth_quad(st,
+        Vector3(-upper_width * 0.84, upper_y, top_back_z), top_left,
+        low_left, Vector3(-lower_width * 0.88, lower_y, low_back_z),
+        COAT_SHADOW)
+    _cloth_quad(st,
+        Vector3(upper_width * 0.84, upper_y, top_back_z),
+        Vector3(-upper_width * 0.84, upper_y, top_back_z),
+        Vector3(-lower_width * 0.88, lower_y, low_back_z),
+        Vector3(lower_width * 0.88, lower_y, low_back_z),
+        COAT.darkened(0.12))
+    st.generate_normals()
+    var mat := _material(Color.WHITE)
+    mat.vertex_color_use_as_albedo = true
+    mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+    st.set_material(mat)
+    var node := MeshInstance3D.new()
+    node.name = label
+    node.mesh = st.commit()
+    root.add_child(node)
+    return node
+
 
 
 func _sphere(parent: Node3D, name: String, pos: Vector3,
@@ -99,42 +131,48 @@ func _segment(parent: Node3D, name: String,
     return node
 
 func _leg(side: float, label: String, root: Node3D) -> Node3D:
-    # Both hips and the jacket share the SAME pelvis coordinate frame.
-    # No visible ball-shaped hip joints: fabric runs continuously into thighs.
+    # Hip -> thigh -> bent knee -> shin -> boot: receding forward through
+    # the view rather than two short vertical pipes directly under the eye.
     var pivot := Node3D.new()
     pivot.name = label
-    pivot.position = Vector3(side * 0.145, -0.055, 0.0)
+    pivot.position = Vector3(side * 0.154, -0.106, -0.060)
     root.add_child(pivot)
     _segment(pivot, "TrouserThigh", Vector3.ZERO,
-        Vector3(side * 0.012, -0.325, -0.028), 0.107, 0.097, PANTS)
-    _box(pivot, "FabricAtKnee", Vector3(0.196, 0.12, 0.165),
-        Vector3(side * 0.012, -0.353, -0.026), PANTS)
+        Vector3(side * 0.012, -0.313, -0.205), 0.114, 0.105, PANTS)
+    _sphere(pivot, "KneeFabric", Vector3(side * 0.012, -0.321, -0.208),
+        0.102, PANTS, Vector3(1.0, 0.85, 0.96))
     _segment(pivot, "TrouserCalf",
-        Vector3(side * 0.012, -0.365, -0.030),
-        Vector3(side * 0.02, -0.610, -0.038), 0.096, 0.081, PANTS)
-    _box(pivot, "Boot", Vector3(0.205, 0.157, 0.31),
-        Vector3(side * 0.02, -0.674, -0.09), BOOTS)
-    _box(pivot, "BootSole", Vector3(0.215, 0.046, 0.325),
-        Vector3(side * 0.02, -0.747, -0.09), BELT)
+        Vector3(side * 0.012, -0.332, -0.207),
+        Vector3(side * 0.024, -0.592, -0.390), 0.102, 0.076, PANTS)
+    _box(pivot, "Boot", Vector3(0.198, 0.145, 0.245),
+        Vector3(side * 0.024, -0.652, -0.446), BOOTS)
+    _box(pivot, "BootToe", Vector3(0.202, 0.073, 0.222),
+        Vector3(side * 0.024, -0.693, -0.571), BOOTS)
+    _box(pivot, "BootSole", Vector3(0.206, 0.038, 0.245),
+        Vector3(side * 0.024, -0.731, -0.538), BELT)
     return pivot
+
 
 
 func _arm(side: float, label: String, root: Node3D) -> Node3D:
+    # Side-hanging arms frame the lower corners of an extreme downwards view.
+    # They are body-space; only the eyes rotate with vertical camera pitch.
     var pivot := Node3D.new()
     pivot.name = label
-    pivot.position = Vector3(side * 0.255, 0.375, 0.040)
+    pivot.position = Vector3(side * 0.278, 0.385, 0.125)
     root.add_child(pivot)
-    _sphere(pivot, "Shoulder", Vector3.ZERO, 0.098, COAT)
+    _sphere(pivot, "Shoulder", Vector3.ZERO, 0.088, COAT)
     _segment(pivot, "Sleeve", Vector3.ZERO,
-        Vector3(side * 0.060, -0.27, -0.03), 0.098, 0.083, COAT)
-    _sphere(pivot, "Elbow", Vector3(side * 0.060, -0.27, -0.03),
-        0.082, COAT_SHADOW)
+        Vector3(side * 0.080, -0.270, 0.010), 0.083, 0.071, COAT)
+    _sphere(pivot, "Elbow", Vector3(side * 0.080, -0.270, 0.010),
+        0.068, COAT_SHADOW)
     _segment(pivot, "LowerSleeve",
-        Vector3(side * 0.060, -0.28, -0.030),
-        Vector3(side * 0.08, -0.48, -0.13), 0.081, 0.062, COAT)
-    _sphere(pivot, "Hand", Vector3(side * 0.080, -0.52, -0.135),
-        0.065, GLOVES, Vector3(0.95, 1.1, 0.75))
+        Vector3(side * 0.080, -0.277, 0.005),
+        Vector3(side * 0.096, -0.488, -0.055), 0.071, 0.055, COAT)
+    _sphere(pivot, "Hand", Vector3(side * 0.096, -0.523, -0.066),
+        0.059, GLOVES, Vector3(0.92, 1.22, 0.74))
     return pivot
+
 
 
 func _ready() -> void:
@@ -143,30 +181,30 @@ func _ready() -> void:
     # CharacterBody3D and follows yaw without lifting legs or moving the waist.
     pelvis_root = Node3D.new()
     pelvis_root.name = "PelvisRoot"
-    pelvis_root.position = Vector3(0.0, 0.80, -0.040)
+    pelvis_root.position = Vector3(0.0, 0.84, 0.0)
     add_child(pelvis_root)
 
-    # Both halves of a plain autumn jacket remain visible when looking down.
-    # They meet at the waist and overlap the leg attachment; unlike a cutaway
-    # they never disappear, and unlike a huge chest block they stay below eyes.
-    upper_coat = _tapered_coat(pelvis_root, "ChestAndShoulders",
-        Vector3(0.0, 0.305, -0.012), 0.315, 0.172, 0.191)
-    lower_jacket = _tapered_coat(pelvis_root, "LowerJacket",
-        Vector3(0.0, 0.075, 0.005), 0.255, 0.185, 0.204)
-    # The narrow vertical strip suggests the front fastening of a winter coat
-    # without an opaque horizontal plane blocking the view to the thighs.
-    _box(pelvis_root, "CoatFrontSeam", Vector3(0.014, 0.21, 0.011),
-        Vector3(0.0, 0.12, -0.137), COAT_SHADOW)
-    _box(pelvis_root, "CoatHem", Vector3(0.386, 0.034, 0.210),
-        Vector3(0.0, -0.053, 0.005), COAT_SHADOW)
-    _box(pelvis_root, "HipFabric", Vector3(0.337, 0.113, 0.192),
-        Vector3(0.0, -0.113, -0.005), PANTS)
+    # Chest is always represented by the outer front fabric. No collar/head
+    # exists in the first-person mesh, and the upper fabric lies below the
+    # near plane so the player can look vertically down from eye height.
+    upper_coat = _jacket_section(pelvis_root, "ChestAndShoulders",
+        0.448, 0.120, 0.235, 0.226, 0.138, -0.018)
+    lower_jacket = _jacket_section(pelvis_root, "LowerJacket",
+        0.122, -0.087, 0.226, 0.238, -0.018, -0.073)
+    _box(pelvis_root, "CoatHem", Vector3(0.434, 0.032, 0.060),
+        Vector3(0.0, -0.094, -0.070), COAT_SHADOW)
+    # Waist of the trousers fills the opening between the jacket and hips
+    # without adding a roof-like horizontal face in front of the camera.
+    _box(pelvis_root, "HipFabric", Vector3(0.360, 0.104, 0.135),
+        Vector3(0.0, -0.146, -0.040), PANTS)
+    _box(pelvis_root, "JacketFastening", Vector3(0.011, 0.19, 0.012),
+        Vector3(0.0, -0.010, -0.078), COAT_SHADOW)
 
     left_leg = _leg(-1.0, "LeftLeg", pelvis_root)
     right_leg = _leg(1.0, "RightLeg", pelvis_root)
     left_arm = _arm(-1.0, "LeftArm", pelvis_root)
     right_arm = _arm(1.0, "RightArm", pelvis_root)
-    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true pelvis_aligned=true torso_visible=true open_coat_neck=true")
+    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true pelvis_aligned=true torso_visible=true front_panels=true forward_legs=true")
 
 
 func set_right_hand_occupied(value: bool) -> void:
@@ -178,16 +216,13 @@ func _process(delta: float) -> void:
     var actor := get_parent() as CharacterBody3D
     if actor == null:
         return
-    var camera := actor.get_node_or_null("Camera3D") as Camera3D
-    if camera != null:
-        # Body is anchored below the camera, so no chest hiding is needed.
-        # At steep angles only raised arms are suppressed to preserve clarity.
-        var look_down := camera.rotation.x < -1.18
-        view_down_cutaway = look_down
-        upper_coat.visible = true
-        lower_jacket.visible = true
-        left_arm.visible = not look_down
-        right_arm.visible = not look_down and not hide_right_hand
+    # Full-body rig follows player yaw, never the camera pitch. Keep both
+    # garment panels, trouser legs, and arms available at all angles.
+    view_down_cutaway = false
+    upper_coat.visible = true
+    lower_jacket.visible = true
+    left_arm.visible = true
+    right_arm.visible = not hide_right_hand
     var planar_speed := Vector2(actor.velocity.x, actor.velocity.z).length()
     var moving := clampf(planar_speed / 3.4, 0.0, 1.0)
     if moving > 0.04 and actor.is_on_floor():
