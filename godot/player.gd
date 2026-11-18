@@ -30,16 +30,18 @@ func _ready() -> void:
     camera = Camera3D.new()
     camera.position.y = 1.55
     # A near plane of 0.05 made subpixel roof layers flicker in GL Compatibility.
-    camera.near = 0.25
+    camera.near = 0.22
     camera.far = 2300.0
     camera.current = true
     add_child(camera)
     var collision := CollisionShape3D.new()
     var shape := CapsuleShape3D.new()
     shape.height = 1.8
-    shape.radius = 0.35
+    shape.radius = 0.46
     collision.position.y = 0.9
     collision.shape = shape
+    floor_snap_length = 0.18
+    safe_margin = 0.015
     add_child(collision)
     Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
     var hud := CanvasLayer.new()
@@ -63,9 +65,9 @@ func _build_character_idle_prop() -> void:
     camera.add_child(_smoke_prop)
     var sleeve := MeshInstance3D.new()
     var sleeve_mesh := BoxMesh.new()
-    sleeve_mesh.size = Vector3(0.13, 0.34, 0.19)
+    sleeve_mesh.size = Vector3(0.085, 0.20, 0.13)
     sleeve.mesh = sleeve_mesh
-    sleeve.position = Vector3(0.31, -0.51, -1.02)
+    sleeve.position = Vector3(0.39, -0.68, -1.10)
     var cloth := StandardMaterial3D.new()
     cloth.albedo_color = Color("#3a3932")
     cloth.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -73,9 +75,9 @@ func _build_character_idle_prop() -> void:
     _smoke_prop.add_child(sleeve)
     var hand := MeshInstance3D.new()
     var glove_mesh := BoxMesh.new()
-    glove_mesh.size = Vector3(0.14, 0.10, 0.11)
+    glove_mesh.size = Vector3(0.10, 0.075, 0.085)
     hand.mesh = glove_mesh
-    hand.position = Vector3(0.30, -0.31, -1.04)
+    hand.position = Vector3(0.39, -0.54, -1.10)
     var glove_mat := StandardMaterial3D.new()
     glove_mat.albedo_color = Color("#5a5448")
     glove_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -84,11 +86,11 @@ func _build_character_idle_prop() -> void:
     var cigarette := MeshInstance3D.new()
     cigarette.name = "PeriodCharacterProp"
     var stick := CylinderMesh.new()
-    stick.top_radius = 0.012
-    stick.bottom_radius = 0.012
-    stick.height = 0.17
+    stick.top_radius = 0.007
+    stick.bottom_radius = 0.007
+    stick.height = 0.115
     cigarette.mesh = stick
-    cigarette.position = Vector3(0.28, -0.20, -1.09)
+    cigarette.position = Vector3(0.39, -0.445, -1.13)
     cigarette.rotation_degrees.z = -30.0
     var paper := StandardMaterial3D.new()
     paper.albedo_color = Color("#b8b2a5")
@@ -97,9 +99,9 @@ func _build_character_idle_prop() -> void:
     _smoke_prop.add_child(cigarette)
     _smoke_particles = CPUParticles3D.new()
     _smoke_particles.name = "FaintCharacterSmoke"
-    _smoke_particles.position = Vector3(0.23, -0.12, -1.10)
-    _smoke_particles.amount = 7
-    _smoke_particles.lifetime = 1.7
+    _smoke_particles.position = Vector3(0.37, -0.38, -1.14)
+    _smoke_particles.amount = 4
+    _smoke_particles.lifetime = 1.15
     _smoke_particles.randomness = 0.7
     _smoke_particles.direction = Vector3(0.15, 1.0, 0.12)
     _smoke_particles.spread = 23.0
@@ -108,9 +110,9 @@ func _build_character_idle_prop() -> void:
     _smoke_particles.gravity = Vector3(0.0, 0.06, 0.0)
     _smoke_particles.emitting = false
     var smoke_quad := QuadMesh.new()
-    smoke_quad.size = Vector2(0.10, 0.10)
+    smoke_quad.size = Vector2(0.038, 0.038)
     var smoke_mat := StandardMaterial3D.new()
-    smoke_mat.albedo_color = Color(0.70, 0.72, 0.73, 0.18)
+    smoke_mat.albedo_color = Color(0.70, 0.72, 0.73, 0.12)
     smoke_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
     smoke_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
     smoke_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
@@ -143,7 +145,7 @@ func _process(delta: float) -> void:
     if _smoke_prop != null:
         # Brief understated hand movement: no instructional lighting sequence.
         var elapsed := _idle_smoke_duration - _idle_smoke_timer
-        _smoke_prop.position.y = 0.02 * sin(elapsed * 2.1)
+        _smoke_prop.position.y = 0.01 * sin(elapsed * 2.1)
         _smoke_prop.rotation.z = 0.03 * sin(elapsed * 1.4)
         if _idle_smoke_timer <= 0.0:
             _smoke_particles.emitting = false
