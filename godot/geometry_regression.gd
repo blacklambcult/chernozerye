@@ -23,15 +23,11 @@ func _initialize() -> void:
     if not joint_l.is_finite() or not joint_r.is_finite():
         _fail("bad miter join at 90-degree bend")
         return
-    # Shared road corner is used by both triangles at the bend.
-    var first_end: Vector3 = surface[2]
-    var second_start: Vector3 = surface[6]
-    if first_end.distance_to(second_start) > 0.001:
-        # The first quad's right end and the second quad's left start differ;
-        # compare matching right-side vertices instead.
-        if surface[2].distance_to(surface[7]) > 0.001:
-            _fail("road strips are disconnected at the bend")
-            return
+    # Both triangles at the turn must share exactly the same two edge vertices.
+    if surface[2].distance_to(surface[7]) > 0.001 or (
+            surface[5].distance_to(surface[6]) > 0.001):
+        _fail("road strips are disconnected at the bend")
+        return
 
     var art := Node3D.new()
     art.set_script(load("res://manual_art.gd"))
