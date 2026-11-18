@@ -715,19 +715,27 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
 func _decorate_modular_entrance(a: Vector2, b: Vector2,
         outward: Vector3, style: int) -> void:
     # Five compact entrances that preserve the hand-surveyed foundation footprint.
-    var distance := _nearest_road_distance((a + b) * 0.5)
-    var extension := 0.65 if distance < 2.8 else 1.35
+    var distance := _road_surface_gap((a + b) * 0.5)
+    # The entrance is optional decoration: never extrude into a street.
+    var extension := minf(1.35, maxf(0.0, distance - 0.60))
+    if extension < 0.90:
+        return
     var axis := _pt(b, 0) - _pt(a, 0)
     var tangent := axis.normalized()
     var mid := _pt((a + b) * 0.5, 0.12)
     var wide := minf(1.25, axis.length() * 0.18)
+    if not _entry_clear(mid, tangent, outward, extension, wide):
+        return
     var front := mid + outward * extension
     if style == 0:
         # Bare three uneven steps.
         for n in range(3):
-            var d := 0.48 + float(n) * 0.27
-            _batch_box("porch_deck", mid + outward * d + Vector3.UP * (0.16 + float(2 - n) * 0.12),
-                Vector3(1.65, 0.19, 0.52))
+            var d := 0.35 + float(n) * 0.23
+            var step_center := mid + outward * d + Vector3.UP * (0.16 + float(2 - n) * 0.12)
+            var left := step_center - tangent * 0.82
+            var right := step_center + tangent * 0.82
+            _batch_quad("porch_deck", left, right,
+                right + outward * 0.25, left + outward * 0.25)
     elif style == 1:
         _decorate_entry_canopy(a, b, outward)
     elif style == 2 and extension > 1.0:
@@ -774,6 +782,14 @@ func _decorate_lean_to(a: Vector2, b: Vector2, outward: Vector3) -> void:
     var right_back := mid + tangent * 1.35 + outward * 0.10
     var left_front := left_back + outward * 1.65
     var right_front := right_back + outward * 1.65
+    # Refuse an annex if its outer corners collide with another house,
+    # the road surface, or a plot boundary/fence.
+    for corner in [left_front, right_front]:
+        var p := Vector2(corner.x, -corner.z)
+        if _road_surface_gap(p) < 0.65 or _plot_boundary_gap(p) < 0.45:
+            return
+        if not _clear_of_buildings(p, 0.5):
+            return
     var low := Vector3.UP * 0.12
     var high_back := Vector3.UP * 2.58
     var high_front := Vector3.UP * 1.87
@@ -830,34 +846,34 @@ func _decorate_showcase_yard(points: PackedVector2Array, front_edge: int) -> voi
     var vout := Vector3(outward_2d.x, 0, -outward_2d.y)
     var tangent := Vector3(side.x, 0, -side.y).normalized()
     var origin := _pt((a + b) * 0.5, 0.18)
-    # Three uneven timber steps, woodpile and one creaking yard lamp.
-    for i in range(3):
-        var delta := vout * (0.55 + float(i) * 0.58)
-        var h := 0.48 - float(i) * 0.12
-        var half_width := 1.10 + float(i) * 0.08
-        var left := origin + delta - tangent * half_width + Vector3.UP * h
-        var right := origin + delta + tangent * half_width + Vector3.UP * h
-        _batch_quad("porch", left, right, right + vout * 0.42, left + vout * 0.42)
-        _batch_quad("porch", left + Vector3.DOWN * 0.12, right + Vector3.DOWN * 0.12, right, left)
-    # Wood crates near the front wall.
+    # Modular entrance already draws steps: avoid double stairs and overlapping props.
     var stack_origin := origin + tangent * 2.25 + vout * 1.4
-    for i in range(4):
-        _batch_box("porch", stack_origin + tangent * float(i % 2) * 0.62 +
-            Vector3.UP * (0.18 + 0.36 * float(i / 2)),
-            Vector3(0.52, 0.32, 0.50))
-    # A dim yard lantern outside the doorway.
+    var stack_p := Vector2(stack_origin.x, -stack_origin.z)
+    var stack_clear := _road_surface_gap(stack_p) > 0.8
+    stack_clear = stack_clear and _plot_boundary_gap(stack_p) > 0.7
+    stack_clear = stack_clear and _clear_of_buildings(stack_p, 0.65)
+    if stack_clear:
+        for i in range(4):
+            _batch_box("porch", stack_origin + tangent * float(i % 2) * 0.62 +
+                Vector3.UP * (0.18 + 0.36 * float(i / 2)),
+                Vector3(0.52, 0.32, 0.50))
     var lamp_origin := origin - tangent * 2.0 + vout * 2.25
-    _batch_box("chimney", lamp_origin + Vector3.UP * 1.55, Vector3(0.13, 3.05, 0.13))
-    _batch_box("lamp", lamp_origin + Vector3.UP * 3.05, Vector3(0.35, 0.36, 0.35))
-    var light := OmniLight3D.new()
-    light.name = "Старая лампа у крыльца"
-    light.position = lamp_origin + Vector3.UP * 3.05
-    light.light_color = Color("#ffb46d")
-    light.light_energy = 0.38
-    light.light_specular = 0.0
-    light.omni_range = 7.5
-    light.shadow_enabled = false
-    add_child(light)
+    var lamp_p := Vector2(lamp_origin.x, -lamp_origin.z)
+    var lamp_clear := _road_surface_gap(lamp_p) > 0.8
+    lamp_clear = lamp_clear and _plot_boundary_gap(lamp_p) > 0.65
+    lamp_clear = lamp_clear and _clear_of_buildings(lamp_p, 0.65)
+    if lamp_clear:
+        _batch_box("chimney", lamp_origin + Vector3.UP * 1.55, Vector3(0.13, 3.05, 0.13))
+        _batch_box("lamp", lamp_origin + Vector3.UP * 3.05, Vector3(0.35, 0.36, 0.35))
+        var light := OmniLight3D.new()
+        light.name = "Старая лампа у крыльца"
+        light.position = lamp_origin + Vector3.UP * 3.05
+        light.light_color = Color("#e9d081")
+        light.light_energy = 0.26
+        light.light_specular = 0.0
+        light.omni_range = 6.0
+        light.shadow_enabled = false
+        add_child(light)
     print("MANUAL_SHOWCASE_YARD_READY: ", centroid)
 
 func _roof_face(verts: PackedVector3Array, uvs: PackedVector2Array,
@@ -1034,6 +1050,8 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool) -> void:
         if _fence_count % 5 == 2 and (i * 11 + _fence_count) % 17 == 0:
             continue
         var p := a.lerp(b, t)
+        if not _fence_point_clear(p):
+            continue
         var h := 1.40 + 0.25 * sin(float(i * 13 + _fence_count * 7))
         var tilt := Vector2(
             0.20 * sin(float(i * 19 + _fence_count)),
@@ -1047,6 +1065,9 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool) -> void:
             continue
         var start := a + tang * from_dist
         var finish := a + tang * to_dist
+        if not _fence_span_clear(start, finish):
+            _fence_panels_skipped += 1
+            continue
         # Some plots have an irregular full picket fence; others keep the old open rails.
         if _fence_count % 3 == 1:
             var slat_count := maxi(1, int(ceil((to_dist - from_dist) / 0.74)))
@@ -1291,6 +1312,10 @@ func _decorate_utility_poles(points: PackedVector2Array) -> void:
             if _utility_pole_count >= 35:
                 return
             var p := a.lerp(b, (float(j) + 0.5) / float(number)) + perpendicular * roadside
+            if _road_surface_gap(p) < 0.65 or _plot_boundary_gap(p) < 0.55:
+                continue
+            if not _clear_of_buildings(p, 0.85):
+                continue
             _batch_box("pole", _pt(p, 3.05), Vector3(0.22, 6.1, 0.22))
             _batch_box("crossarm", _pt(p, 5.85), Vector3(1.3, 0.16, 0.17))
             if previous != Vector2(INF, INF):
