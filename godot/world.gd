@@ -493,6 +493,18 @@ func _toggle_manual_preview() -> void:
     if osm_roads != null:
         osm_roads.visible = not manual_mode
     manual_button.text = "ВЕРНУТЬ СТАРУЮ МЕСТНОСТЬ" if manual_mode else "РУЧНАЯ РАЗМЕТКА · 130 ОБЪЕКТОВ"
+    var sky := get_node_or_null("WorldEnvironment") as WorldEnvironment
+    if sky != null and sky.environment != null:
+        var env: Environment = sky.environment
+        env.background_color = Color("#3d4350") if manual_mode else Color("#575b69")
+        env.ambient_light_color = Color("#7d8995") if manual_mode else Color("#b0a9a4")
+        env.ambient_light_energy = 0.64 if manual_mode else 0.82
+        env.fog_light_color = Color("#47515d") if manual_mode else Color("#676976")
+        env.fog_density = 0.0027 if manual_mode else 0.0018
+    var sun := get_node_or_null("DirectionalLight3D") as DirectionalLight3D
+    if sun != null:
+        sun.light_energy = 0.56 if manual_mode else 1.05
+        sun.light_color = Color("#aab7bd") if manual_mode else Color("#f0b69a")
     if map_panel != null:
         map_panel.set("show_manual", manual_mode)
         map_panel.queue_redraw()
@@ -500,7 +512,7 @@ func _toggle_manual_preview() -> void:
         if control != null:
             control.visible = not manual_mode
     if is_instance_valid(_status_label):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 2.1 / РУЧНАЯ ГЕОГРАФИЯ · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 2.2 / PS1 ДЕРЕВНЯ · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
     var character := get_node_or_null("Player") as CharacterBody3D
     if character != null:
         character.velocity = Vector3.ZERO
