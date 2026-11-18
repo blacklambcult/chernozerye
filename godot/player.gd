@@ -134,7 +134,7 @@ func _start_character_idle() -> void:
     if map != null and map.visible:
         return
     _idle_smoke_timer = _idle_smoke_duration
-    _smoke_prop.position = Vector3(0.08, -0.20, 0.0)
+    _smoke_prop.position = Vector3(0.23, -0.32, 0.0)
     _smoke_prop.rotation = Vector3.ZERO
     _smoke_prop.visible = true
     _smoke_particles.emitting = true
@@ -152,8 +152,8 @@ func _process(delta: float) -> void:
         var elapsed := _idle_smoke_duration - _idle_smoke_timer
         var t := clampf(elapsed / _idle_smoke_duration, 0.0, 1.0)
         var arc := pow(maxf(0.0, sin(PI * t)), 1.3)
-        _smoke_prop.position = Vector3(0.08 - 0.045 * arc,
-            -0.20 + 0.19 * arc, 0.03 * arc)
+        _smoke_prop.position = Vector3(0.23 - 0.035 * arc,
+            -0.32 + 0.16 * arc, 0.03 * arc)
         _smoke_prop.rotation.z = 0.045 * sin(TAU * t)
         if _idle_smoke_timer <= 0.0:
             _smoke_particles.emitting = false
