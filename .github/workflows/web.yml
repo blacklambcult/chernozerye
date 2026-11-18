@@ -147,27 +147,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Versioned asset directory prevents stale .wasm/.pck files in browsers.
-          mkdir -p build/web/pre-alpha-0.3.9
-          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/pre-alpha-0.3.9/index.html"
-          test -s build/web/pre-alpha-0.3.9/index.html
-          test -f build/web/pre-alpha-0.3.9/index.wasm
-          test -f build/web/pre-alpha-0.3.9/index.pck
-          cat > build/web/index.html <<'HTML'
+          # Immutable directory per commit. A static /pre-alpha-0.3.9/
+          # was cached by some browsers even after a successful new publish.
+          RELEASE_DIR="pre-alpha-0.3.9-${GITHUB_SHA:0:8}"
+          mkdir -p "build/web/${RELEASE_DIR}"
+          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/${RELEASE_DIR}/index.html"
+          test -s "build/web/${RELEASE_DIR}/index.html"
+          test -f "build/web/${RELEASE_DIR}/index.wasm"
+          test -f "build/web/${RELEASE_DIR}/index.pck"
+          cat > build/web/index.html <<HTML
           <!doctype html>
           <html lang="ru">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta http-equiv="refresh" content="0; url=./pre-alpha-0.3.9/">
+            <meta http-equiv="refresh" content="0; url=./${RELEASE_DIR}/">
+            <meta name="robots" content="noindex">
             <title>Fearless Knights of the Cordon — Pre-Alpha 0.3.9</title>
           </head>
           <body>
-            <p><a href="./pre-alpha-0.3.9/">Открыть Fearless Knights of the Cordon — Pre-Alpha 0.3.9</a></p>
-            <script>window.location.replace("./pre-alpha-0.3.9/");</script>
+            <p><a href="./${RELEASE_DIR}/">Открыть Fearless Knights of the Cordon — Pre-Alpha 0.3.9</a></p>
+            <script>window.location.replace("./${RELEASE_DIR}/");</script>
           </body>
           </html>
           HTML
+          echo "WEB_RELEASE_READY: ${RELEASE_DIR}"
           touch build/web/.nojekyll
 
       - name: Prepare the satellite geography viewer
