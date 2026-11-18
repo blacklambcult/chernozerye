@@ -65,9 +65,9 @@ func _ready() -> void:
     _create_user_paths()
     _create_landmarks()
     _create_player()
-    _create_label()
     _create_brand_watermark()
     _create_overview_map()
+    _create_gameplay_hud()
     # Load the manual 314-object village from the first playable frame.
     # The original sector/preview buttons are no longer part of the player HUD.
     _activate_default_village()
@@ -344,6 +344,17 @@ func _create_player() -> void:
     player.rotation.y = deg_to_rad(-125.0)
     add_child(player)
 
+func _create_gameplay_hud() -> void:
+    var hud_layer := CanvasLayer.new()
+    hud_layer.name = "GameplayHUD"
+    hud_layer.layer = 18
+    add_child(hud_layer)
+    var ui := Control.new()
+    ui.name = "SurvivalHUD"
+    ui.set_script(preload("res://gameplay_hud.gd"))
+    hud_layer.add_child(ui)
+
+
 func _create_label() -> void:
     var layer := CanvasLayer.new()
     var label := Label.new()
@@ -380,16 +391,16 @@ func _create_brand_watermark() -> void:
     emblem.anchor_right = 1.0
     emblem.anchor_top = 0.0
     emblem.anchor_bottom = 0.0
-    emblem.offset_left = -166.0
-    emblem.offset_right = -10.0
-    emblem.offset_top = 10.0
-    emblem.offset_bottom = 166.0
+    emblem.offset_left = -83.0
+    emblem.offset_right = -14.0
+    emblem.offset_top = 12.0
+    emblem.offset_bottom = 81.0
     emblem.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     emblem.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
     emblem.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    emblem.modulate.a = 0.92
+    emblem.modulate.a = 0.74
     layer.add_child(emblem)
-    print("FEARLESS_KNIGHTS_LOGO_READY: original user emblem, hud=156px")
+    print("FEARLESS_KNIGHTS_LOGO_READY: original user emblem, hud=69px")
 
 # Trees only in OSM forest polygons, never randomly across the whole map.
 func _create_forest_from_osm(features: Array) -> void:
