@@ -18,6 +18,13 @@ const RUT_COLOR := Color("#383029")
 
 # Hand-surveyed geometry remains fixed; clearance affects decorative objects only.
 var _roads: Array = []
+# Batched double-sided static collision surfaces for the manual village.
+var _building_collision_faces := PackedVector3Array()
+var _fence_collision_faces := PackedVector3Array()
+var _yard_collision_faces := PackedVector3Array()
+var _collision_building_count := 0
+var _collision_fence_span_count := 0
+var _collision_yard_count := 0
 var _plot_edges: Array = []
 var _entrance_routes: Array = []
 var _fronts_facing_road := 0
@@ -165,6 +172,7 @@ func decorate(features: Array) -> void:
             "forest":
                 _decorate_forest(polygon)
     _flush_details()
+    _build_collision_bodies()
     _create_solid_mesh(_fence_posts, Color("#423b35"), "Забор / столбы")
     _create_solid_mesh(_fence_rails, Color("#48433d"), "Забор / рейки")
     _create_solid_mesh(_fence_wire_mesh, Color("#4c6759"), "Старая зелёная рабица")
@@ -186,6 +194,10 @@ func decorate(features: Array) -> void:
         " flower_patches=", _flower_patches, " walks=", _front_walkways,
         " chimney_smoke=", _chimneys_smoking)
     _create_forest_assets()
+    print("VILLAGE_COLLISION_READY: buildings=", _collision_building_count,
+        " fence_spans=", _collision_fence_span_count,
+        " large_yard_props=", _collision_yard_count,
+        " collision_bodies=3")
     print("MANUAL_ART_READY: buildings=", _building_count,
         " plots=", _fence_count, " roads=", _road_count, " lamps=", _lights_placed)
     print("MANUAL_VILLAGE_DETAIL_READY: canopies=", _canopy_count,
@@ -211,6 +223,57 @@ func decorate(features: Array) -> void:
         " relocated_fence_panels=", _fence_panels_relocated,
         " rejected_yard_positions=", _yard_positions_rejected,
         " sealed_roof_joints=", _roof_joints_sealed)
+
+
+func _collision_wall(faces: PackedVector3Array,
+        a: Vector3, b: Vector3, floor_height: float, top_height: float) -> void:
+    if a.distance_squared_to(b) < 0.01 or top_height <= floor_height:
+        return
+    var p := Vector3(a.x, floor_height, a.z)
+    var q := Vector3(b.x, floor_height, b.z)
+    var r := Vector3(b.x, top_height, b.z)
+    var t := Vector3(a.x, top_height, a.z)
+    _push_tri(faces, p, q, r)
+    _push_tri(faces, p, r, t)
+
+
+func _register_building_collider(points: PackedVector2Array, height: float) -> void:
+    # Match the same footprint used to render actual walls, not invisible blockout.
+    for i in range(points.size()):
+        var a: Vector2 = points[i]
+        var b: Vector2 = points[(i + 1) % points.size()]
+        _collision_wall(_building_collision_faces, _pt(a, 0.0),
+            _pt(b, 0.0), 0.02, height)
+    _collision_building_count += 1
+
+
+func _register_fence_collider(a: Vector2, b: Vector2) -> void:
+    _collision_wall(_fence_collision_faces, _pt(a, 0.0),
+        _pt(b, 0.0), 0.08, 1.40)
+    _collision_fence_span_count += 1
+
+
+func _build_collision_body(faces: PackedVector3Array, label: String) -> void:
+    if faces.is_empty():
+        return
+    var body := StaticBody3D.new()
+    body.name = label
+    body.collision_layer = 1
+    body.collision_mask = 1
+    var shape := ConcavePolygonShape3D.new()
+    shape.set_faces(faces)
+    shape.backface_collision = true
+    var collider := CollisionShape3D.new()
+    collider.shape = shape
+    body.add_child(collider)
+    add_child(body)
+
+
+func _build_collision_bodies() -> void:
+    _build_collision_body(_building_collision_faces, "CollisionBuildings")
+    _build_collision_body(_fence_collision_faces, "CollisionFences")
+    _build_collision_body(_yard_collision_faces, "CollisionYardProps")
+
 
 func _local_points(raw: Array) -> PackedVector2Array:
     var points := PackedVector2Array()
@@ -897,6 +960,7 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
         _window_counts[window_style] += 1
         _entrance_counts[entrance_style] += 1
     var walls_height := (6.52 if floors == 2 else 3.78) if category == "house" else (2.7 if category == "sauna" else 2.35)
+    _register_building_collider(points, walls_height)
     var wall_style := body_style if category == "house" else (1 if category == "sauna" else 0)
     # From the supplied Russian village photographs: dark logs, faded paint,
     # mint-green fences, dull blue gables, rusty metal and pale limewash.
@@ -1542,6 +1606,7 @@ func _fence_bridge_gap(a: Vector2, b: Vector2,
     if gap > 1.55:
         _append_crooked_post(_fence_posts, (a + b) * 0.5, 1.24, Vector2(0.04, -0.02))
     _fence_chainlink(a, b)
+    _register_fence_collider(a, b)
     _fence_joints_joined += 1
 
 
@@ -1582,6 +1647,7 @@ func _fence_draw_span(start: Vector2, finish: Vector2, ordinal: int,
             v1 - half_thickness, v1 + half_thickness)
         _push_tri(_fence_rails, v0 - half_thickness,
             v1 + half_thickness, v0 + half_thickness)
+    _register_fence_collider(start, finish)
     _last_fence_endpoint = finish
 
 
@@ -1673,7 +1739,12 @@ func _yard_box(key: String, center: Vector2, offset: Vector2,
     var pos := _pt(center, elevation) + basis * Vector3(offset.x, 0, offset.y)
     var current: PackedVector3Array = _detail_batches.get(key, PackedVector3Array())
     for vertex in faces:
-        current.append(pos + basis * vertex)
+        var world_point: Vector3 = pos + basis * vertex
+        current.append(world_point)
+        if key in ["well_stone", "greenhouse_glass", "greenhouse_frame", "rusted_gate"]:
+            _yard_collision_faces.append(world_point)
+    if key in ["well_stone", "greenhouse_glass", "greenhouse_frame", "rusted_gate"]:
+        _collision_yard_count += 1
     _detail_batches[key] = current
 
 
