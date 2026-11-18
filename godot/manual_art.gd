@@ -245,7 +245,9 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
         return
     _building_count += 1
     var index := _building_count
-    var walls_height := 4.65 if category == "house" else (2.75 if category == "sauna" else 2.3)
+    # The underlying survey blockout uses 5.0 / 3.1 / 2.6 m tops.
+    # Place textured walls slightly in front and roofs above those tops to avoid bright clipping.
+    var walls_height := 5.06 if category == "house" else (3.16 if category == "sauna" else 2.66)
     var tone := Color(WOOD_TONES[(index * 7) % WOOD_TONES.size()])
     if category == "sauna":
         tone = Color("#554c45")
