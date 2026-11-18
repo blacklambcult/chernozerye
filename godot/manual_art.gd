@@ -226,15 +226,45 @@ func decorate(features: Array) -> void:
 
 
 func _collision_wall(faces: PackedVector3Array,
-        a: Vector3, b: Vector3, floor_height: float, top_height: float) -> void:
+        a: Vector3, b: Vector3, floor_height: float, top_height: float,
+        thickness: float = 0.0) -> void:
     if a.distance_squared_to(b) < 0.01 or top_height <= floor_height:
         return
     var p := Vector3(a.x, floor_height, a.z)
     var q := Vector3(b.x, floor_height, b.z)
     var r := Vector3(b.x, top_height, b.z)
     var t := Vector3(a.x, top_height, a.z)
-    _push_tri(faces, p, q, r)
-    _push_tri(faces, p, r, t)
+    if thickness <= 0.0:
+        # Each fence collider mirrors an actually built span, leaving reserved
+        # gate sections fully open. Avoid thousands of expensive extra solids.
+        _push_tri(faces, p, q, r)
+        _push_tri(faces, p, r, t)
+        return
+    # Old walls were zero-thickness planes. A first-person capsule could get
+    # extremely close to extruded log details; robust closed physical volumes
+    # keep the camera outside even when sliding along building corners.
+    var edge := (q - p).normalized()
+    var side := Vector3(-edge.z, 0.0, edge.x) * (thickness * 0.5)
+    var pf := p + side
+    var qf := q + side
+    var rf := r + side
+    var tf := t + side
+    var pb := p - side
+    var qb := q - side
+    var rb := r - side
+    var tb := t - side
+    _push_tri(faces, pf, qf, rf)
+    _push_tri(faces, pf, rf, tf)
+    _push_tri(faces, qb, pb, tb)
+    _push_tri(faces, qb, tb, rb)
+    _push_tri(faces, pb, pf, tf)
+    _push_tri(faces, pb, tf, tb)
+    _push_tri(faces, qf, qb, rb)
+    _push_tri(faces, qf, rb, rf)
+    _push_tri(faces, tf, rf, rb)
+    _push_tri(faces, tf, rb, tb)
+    _push_tri(faces, pb, qb, qf)
+    _push_tri(faces, pb, qf, pf)
 
 
 func _register_building_collider(points: PackedVector2Array, height: float) -> void:
@@ -243,7 +273,7 @@ func _register_building_collider(points: PackedVector2Array, height: float) -> v
         var a: Vector2 = points[i]
         var b: Vector2 = points[(i + 1) % points.size()]
         _collision_wall(_building_collision_faces, _pt(a, 0.0),
-            _pt(b, 0.0), 0.02, height)
+            _pt(b, 0.0), 0.02, height, 0.30)
     _collision_building_count += 1
 
 
