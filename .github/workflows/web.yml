@@ -90,6 +90,18 @@ jobs:
           grep -q "FEARLESS_KNIGHTS_STARTUP_READY:" /tmp/world-smoke.log
           grep -q "manual_mode=true" /tmp/world-smoke.log
           grep -q "MANUAL_NIGHT_READY: true" /tmp/world-smoke.log
+          grep -q "NOVEMBER_SNOW_READY: cpu=true amount=340 follow_player=true" /tmp/world-smoke.log
+          grep -q "NOVEMBER_MUD_READY: patches=" /tmp/world-smoke.log
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          log = Path('/tmp/world-smoke.log').read_text()
+          x = re.search(r'NOVEMBER_MUD_READY: patches=(\d+) shallow_puddles=(\d+)', log)
+          assert x, 'November mud detail counters absent'
+          mud, puddles = map(int, x.groups())
+          assert mud >= 25 and puddles > 0, ('November road texture insufficient', mud, puddles)
+          print('NOVEMBER_WEATHER_AUDIT_OK: mud=', mud, 'puddles=', puddles)
+          PY
           grep -q '^    _activate_default_village()' godot/world.gd
           grep -q 'config/name="Fearless Knights of the Cordon"' godot/project.godot
           grep -q "MANUAL_ART_READY: buildings=162 plots=88 roads=18" /tmp/world-smoke.log
@@ -133,7 +145,7 @@ jobs:
           PY
           # Manual village mode is enabled by default during scene startup.
           # Assert the new twilight configuration without an artificial UI click.
-          grep -q 'ambient_light_energy = 0.70 if manual_mode' godot/world.gd
+          grep -q 'ambient_light_energy = 0.67 if manual_mode' godot/world.gd
           grep -q 'light_specular = 0.0' godot/world.gd
           grep -q "MANUAL_FOREST_READY: trees=" /tmp/world-smoke.log
           grep -q "clearance=roads13/buildings6.5" /tmp/world-smoke.log
