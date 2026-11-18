@@ -1,4 +1,19 @@
-# ЧЕРНОЗЁРЬЕ
+# Fearless Knights of the Cordon
+
+**Текущая версия игры: Pre-Alpha 0.3.9.** Место действия — Чернозёрье.
+
+### Запуск игры (текущая версия)
+
+- Откройте https://blacklambcult.github.io/chernozerye/
+- Веб-версия **сразу открывает игровую 3D-деревню** по ручной разметке из 314 объектов; больше не нужно нажимать «Ручная разметка».
+- В игровом HUD и встроенной карте отображаются **Fearless Knights of the Cordon / Pre-Alpha 0.3.9**. Старые кнопки перехода в географический прототип и возврата к нему не показываются.
+- Временная отдельная ссылка на файлы сборки: https://blacklambcult.github.io/chernozerye/pre-alpha-0.3.9/ — только после успешной публикации GitHub Actions.
+- **WASD** — движение, мышь — обзор после щелчка, **M/Ь** — карта, **Esc** — освободить курсор.
+- В GitHub Actions автоматическая проверка требует `FEARLESS_KNIGHTS_STARTUP_READY`, `manual_mode=true`, загрузку 314 объектов и прежние проверки геометрии. При неудачной сборке последняя опубликованная игра не изменяется.
+
+---
+
+## История проекта «Чернозёрье»
 
 Low-poly atmospheric 3D exploration game in Godot 4. A 2 × 2 km prototype based on the real geography of Черноозерский Кордон (Уфа, Башкортостан), with a fixed dusk atmosphere.
 
