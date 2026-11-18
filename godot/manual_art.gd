@@ -88,7 +88,7 @@ var _log_courses_count := 0
 var _eaves_count := 0
 var _carved_count := 0
 var _active_trim_key := "trim"
-var _yard_counts := [0, 0, 0, 0, 0, 0]
+var _yard_counts := [0, 0, 0, 0, 0, 0, 0]
 var _clipped_log_segments := 0
 
 func _process(delta: float) -> void:
@@ -201,7 +201,7 @@ func decorate(features: Array) -> void:
     print("VILLAGE_YARDS_READY: wells=", _yard_counts[0],
         " beds=", _yard_counts[1], " greenhouses=", _yard_counts[2],
         " firewood=", _yard_counts[3], " scrap=", _yard_counts[4],
-        " benches=", _yard_counts[5])
+        " benches=", _yard_counts[5], " collapsed_gate=", _yard_counts[6])
     print("VILLAGE_FENCE_JOINTS_READY: bridged=", _fence_joints_joined,
         " short_spans_recovered=", _fence_short_spans_recovered,
         " entrance_routes=", _entrance_routes.size(),
@@ -421,6 +421,8 @@ func _flush_details() -> void:
         "yard_rust": Color("#6b4a39"),
         "yard_tool": Color("#767c72"),
         "yard_tire": Color("#232624"),
+        "fallen_planks": Color("#4d473d"),
+        "rusted_gate": Color("#444a47"),
         "panel_patch": Color("#464943"),
         "carving": Color("#5c6259"),
         "cross_board": Color("#494238"),
@@ -1764,6 +1766,19 @@ func _yard_prop(center: Vector2, kind: int, rotation: float, salt: int) -> void:
                 0.17, Vector3(0.29, 0.28, 0.10), rotation + 0.25)
             _yard_box("yard_tire", center, Vector2(-0.15, -1.09),
                 0.23, Vector3(0.74, 0.46, 0.65), rotation)
+        6:
+            # Rotten timber sections, warped gate leaning on a tipped cart.
+            # Low and contained inside the existing plot; does not cross roads.
+            _yard_box("fallen_planks", center, Vector2(-0.65, -0.35),
+                0.22, Vector3(2.2, 0.16, 0.35), rotation - 0.22)
+            _yard_box("fallen_planks", center, Vector2(0.35, 0.55),
+                0.18, Vector3(2.9, 0.14, 0.29), rotation + 0.28)
+            _yard_box("fallen_planks", center, Vector2(0.70, -0.75),
+                0.24, Vector3(1.55, 0.17, 0.26), rotation + 0.65)
+            _yard_box("rusted_gate", center, Vector2(0.22, 0.12),
+                0.79, Vector3(1.45, 1.37, 0.10), rotation + 0.34)
+            _yard_box("yard_rust", center, Vector2(-0.85, 0.76),
+                0.27, Vector3(0.37, 0.33, 0.48), rotation)
         5:
             # Weathered garden bench and a modest flower patch in the front yard.
             _yard_box("bench_wood", center, Vector2(0, 0.0),
@@ -1789,6 +1804,7 @@ func _yard_radius(kind: int) -> float:
         2: return 2.45  # Greenhouse
         3: return 2.15  # Firewood shelter
         5: return 1.75  # Garden bench and flowers
+        6: return 1.95  # Fallen gate and broken timber
         _: return 2.05  # Scrap, barrels and tools
 
 
@@ -1845,14 +1861,17 @@ func _decorate_plot_props(points: PackedVector2Array) -> void:
         high = high.max(p)
     var rng := RandomNumberGenerator.new()
     rng.seed = 1996001 + _fence_count * 8191
-    var target := 1 + _fence_count % 3
+    # Every fourth plot has been left completely empty for years. Other plots
+    # contain only one or two remnants, never a full inhabited garden.
+    var target := 0 if _fence_count % 4 == 0 else 1 + int(_fence_count % 3 == 0)
     var placed: Array = []
     var attempts := 0
     while placed.size() < target and attempts < 160:
         attempts += 1
         var p := Vector2(rng.randf_range(low.x, high.x),
             rng.randf_range(low.y, high.y))
-        var kind := (_fence_count * 3 + placed.size() * 2) % 6
+        var debris_types := [6, 4, 6, 3, 5, 4, 6, 1, 2, 0, 4]
+        var kind := debris_types[(_fence_count * 7 + placed.size() * 3) % debris_types.size()]
         var rotation := float(rng.randi_range(0, 3)) * PI * 0.5
         if not _yard_spot_ok(p, points, placed, kind):
             _yard_positions_rejected += 1
@@ -1862,7 +1881,8 @@ func _decorate_plot_props(points: PackedVector2Array) -> void:
         _plot_props_count += 1
         placed.append({"center": p, "radius": _yard_radius(kind)})
     # Bounded flower patches: well away from buildings, fences and road surfaces.
-    var flower_goal := clampi(int((high.x - low.x) * (high.y - low.y) / 400.0), 1, 3)
+    # Remaining November stalks are rare; most abandoned plots have none.
+    var flower_goal := 1 if _fence_count % 5 == 0 else 0
     var flowers_placed := 0
     for trial in range(flower_goal * 24):
         if flowers_placed >= flower_goal:
