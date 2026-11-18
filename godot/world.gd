@@ -523,17 +523,17 @@ func _toggle_manual_preview() -> void:
     # Hold direct references so toggling scenes always changes the actual light and sky.
     if _night_environment != null:
         _night_environment.background_mode = Environment.BG_COLOR
-        _night_environment.background_color = Color("#171e2b") if manual_mode else Color("#575b69")
+        _night_environment.background_color = Color("#273344") if manual_mode else Color("#575b69")
         _night_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-        _night_environment.ambient_light_color = Color("#637589") if manual_mode else Color("#b0a9a4")
-        _night_environment.ambient_light_energy = 0.30 if manual_mode else 0.82
+        _night_environment.ambient_light_color = Color("#a1b0b7") if manual_mode else Color("#b0a9a4")
+        _night_environment.ambient_light_energy = 0.58 if manual_mode else 0.82
         _night_environment.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED if manual_mode else Environment.REFLECTION_SOURCE_BG
         _night_environment.fog_enabled = true
-        _night_environment.fog_light_color = Color("#202d39") if manual_mode else Color("#676976")
-        _night_environment.fog_density = 0.005 if manual_mode else 0.0018
+        _night_environment.fog_light_color = Color("#354351") if manual_mode else Color("#676976")
+        _night_environment.fog_density = 0.0034 if manual_mode else 0.0018
     if _sun_light != null:
-        _sun_light.light_energy = 0.30 if manual_mode else 1.05
-        _sun_light.light_color = Color("#9aacc7") if manual_mode else Color("#f0b69a")
+        _sun_light.light_energy = 0.58 if manual_mode else 1.05
+        _sun_light.light_color = Color("#b2bacc") if manual_mode else Color("#f0b69a")
     print("MANUAL_NIGHT_READY: ", manual_mode,
         " bg=", _night_environment.background_color if _night_environment != null else "MISSING_ENV")
 
@@ -544,7 +544,7 @@ func _toggle_manual_preview() -> void:
         if control != null:
             control.visible = not manual_mode
     if is_instance_valid(_status_label):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 2.4 / СУМЕРЕЧНЫЙ КВАРТАЛ · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 2.5 / СТАРАЯ ДЕРЕВНЯ · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
     var character := get_node_or_null("Player") as CharacterBody3D
     if character != null:
         character.velocity = Vector3.ZERO
