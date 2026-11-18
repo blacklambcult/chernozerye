@@ -29,11 +29,25 @@ func _run_tests() -> void:
         return
     var gate: Vector2 = story.get("gate_point")
     var bearing: String = story.call("_home_bearing")
-    if bearing not in ["↑", "↓", "←", "→", "•"]:
+    if bearing not in ["ПРЯМО", "НАЗАД", "СПРАВА", "СЛЕВА", "ЗДЕСЬ"]:
         _fail("Missing directional clue to home")
         return
     if gate.distance_to(Vector2(-789.7, 268.6)) > 170.0:
         _fail("selected home is too far from start position")
+        return
+    # Check that the escalating prose plays once at each approach distance.
+    var gate_world := Vector3(gate.x, 0.22, -gate.y)
+    player.position = gate_world + Vector3(20.0, 0.0, 0.0)
+    story.call("_update_approach")
+    story.call("_update_approach")
+    if int(story.get("_approach_triggers")) != 1:
+        _fail("first homecoming cue does not fire once")
+        return
+    player.position = gate_world + Vector3(8.0, 0.0, 0.0)
+    story.call("_update_approach")
+    story.call("_update_approach")
+    if int(story.get("_approach_triggers")) != 2:
+        _fail("yard homecoming cue does not fire once")
         return
     story.call("_enter_home")
     if not bool(story.get("inside_home")):
@@ -59,5 +73,5 @@ func _run_tests() -> void:
     if not home_point.is_finite():
         _fail("invalid surveyed house center")
         return
-    print("PROLOGUE_REGRESSION_OK: surveyed_home=true room=true note=true mask=true exit=true")
+    print("PROLOGUE_REGRESSION_OK: surveyed_home=true room=true note=true mask=true exit=true cues=2 bearing=readable")
     quit(0)
