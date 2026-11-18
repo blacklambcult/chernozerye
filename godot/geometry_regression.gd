@@ -70,7 +70,11 @@ func _initialize() -> void:
         Vector2(-14.0, 0.0), Vector2(14.0, 0.0)
     ])
     geo.call("_add_road_wear", line, 0.145)
-    var ruts := geo.get_node_or_null("Дорога / мягкие прерывистые колеи") as MeshInstance3D
+    var ruts: MeshInstance3D = null
+    for child in geo.get_children():
+        if child is MeshInstance3D and child.name == "Дорога / мягкие прерывистые колеи":
+            ruts = child
+            break
     if ruts == null or ruts.mesh == null:
         _fail("no road wheel marks generated for the regression segment")
         return
