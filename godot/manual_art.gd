@@ -1,5 +1,5 @@
 extends Node3D
-# CHERNOZERYE 3.1 / MODULAR IZBA GENERATOR
+# CHERNOZERYE 3.2 / MODULAR IZBA GEOMETRY
 # All spatial placements derive from the user's manual GeoJSON features.
 # Decorative features are deterministic and never modify the survey geometry.
 
@@ -9,7 +9,7 @@ const ROOF_TONES := ["#282e31", "#373432", "#30383a", "#403933"]
 const DOOR_COLOR := Color("#24221f")
 const FRAME_COLOR := Color("#494943")
 const WINDOW_COLOR := Color("#131a1f")
-const WINDOW_LIT := Color("#efac5d")
+const WINDOW_LIT := Color("#876149")
 const FENCE_COLOR := Color("#494840")
 const POST_COLOR := Color("#3e3c36")
 const RUT_COLOR := Color("#423a32")
@@ -45,6 +45,9 @@ var _roof_counts := [0, 0, 0, 0, 0]
 var _body_counts := [0, 0, 0, 0, 0]
 var _window_counts := [0, 0, 0, 0, 0]
 var _entrance_counts := [0, 0, 0, 0, 0]
+var _log_courses_count := 0
+var _eaves_count := 0
+var _carved_count := 0
 
 func decorate(features: Array) -> void:
     _rng.seed = 19960918
@@ -110,6 +113,8 @@ func decorate(features: Array) -> void:
     print("IZBA_GENERATOR_READY: floor_counts=", _floor_counts,
         " body=", _body_counts, " roof=", _roof_counts,
         " windows=", _window_counts, " entrances=", _entrance_counts)
+    print("IZBA_DETAIL_READY: log_courses=", _log_courses_count,
+        " roof_eaves=", _eaves_count, " carved=", _carved_count)
 
 func _local_points(raw: Array) -> PackedVector2Array:
     var points := PackedVector2Array()
@@ -279,6 +284,11 @@ func _flush_details() -> void:
         "lean_to": Color("#46443e"),
         "lean_to_roof": Color("#292f30"),
         "log_course": Color("#35352f"),
+        "log_upper": Color("#574b40"),
+        "log_front": Color("#493d35"),
+        "log_lower": Color("#302c29"),
+        "fascia": Color("#2e3332"),
+        "muntin": Color("#383b35"),
         "panel_patch": Color("#464943"),
         "carving": Color("#5c6259"),
         "cross_board": Color("#494238"),
@@ -362,8 +372,12 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
         low, high, 0.115)
     _wall_panel("window_lit" if illuminated else "window",
         start, finish, normal, u0, u1, low + 0.11, high - 0.11, 0.142)
-    _wall_panel("lintel", start, finish, normal, u0, u1,
-        low + 0.61, low + 0.68, 0.157)
+    # Window muntins: divided, imperfect Soviet-era panes, not luminous squares.
+    _wall_panel("muntin", start, finish, normal,
+        center_fraction - 0.006, center_fraction + 0.006,
+        low + 0.10, high - 0.10, 0.162)
+    _wall_panel("muntin", start, finish, normal,
+        u0, u1, low + 0.67, low + 0.74, 0.166)
     _wall_panel(trim, start, finish, normal, u0 - 0.023, u0 - 0.009,
         low - 0.06, high + 0.06, 0.169)
     _wall_panel(trim, start, finish, normal, u1 + 0.009, u1 + 0.023,
@@ -373,6 +387,12 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
     _wall_panel(trim, start, finish, normal, u0 - 0.030, u1 + 0.030,
         low - 0.11, low + 0.015, 0.176)
     if style == 1:
+        # One triangular wooden crown with five square-cut ornament teeth.
+        _carved_count += 1
+        _batch_tri("carving",
+            _pt(start.lerp(finish, u0 - 0.027), high + 0.12) + normal * 0.182,
+            _pt(start.lerp(finish, center_fraction), high + 0.37) + normal * 0.182,
+            _pt(start.lerp(finish, u1 + 0.027), high + 0.12) + normal * 0.182)
         # Five simple PS1 silhouette teeth suggest carved Bashkir/Volga nalichniki.
         for tooth in range(5):
             var l := lerpf(u0 - 0.028, u1 + 0.028, float(tooth) / 5.0)
@@ -393,6 +413,7 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
         _wall_panel("board", start, finish, normal, u0, u1,
             low + 0.82, low + 1.05, 0.196)
     elif style == 4:
+        _carved_count += 1
         _wall_panel("carving", start, finish, normal,
             u0 - 0.034, u1 + 0.034, high + 0.13, high + 0.24, 0.182)
         _wall_panel("frame", start, finish, normal, u0 + half * 0.90,
@@ -407,11 +428,33 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
         lamp.name = "Тусклая лампа / окно"
         lamp.position = _pt(center, low + 0.92) + normal * 1.1
         lamp.light_color = Color("#ffbc7e")
-        lamp.light_energy = 0.42
+        lamp.light_energy = 0.22
         lamp.light_specular = 0.0
-        lamp.omni_range = 9.0
+        lamp.omni_range = 6.0
         lamp.shadow_enabled = false
         add_child(lamp)
+
+func _raised_log(a: Vector2, b: Vector2, normal: Vector3, y: float) -> void:
+    # PS1 construction: three flat-shaded sides produce visible horizontal depth.
+    # No cylinders, PBR or additional draw calls per timber: batched by material.
+    var p := _pt(a, y)
+    var q := _pt(b, y)
+    var back := normal * 0.09
+    var front := normal * 0.225
+    _batch_quad("log_upper", p + back + Vector3.UP * 0.24,
+        q + back + Vector3.UP * 0.24,
+        q + front + Vector3.UP * 0.08,
+        p + front + Vector3.UP * 0.08)
+    _batch_quad("log_front", p + front + Vector3.UP * 0.08,
+        q + front + Vector3.UP * 0.08,
+        q + front - Vector3.UP * 0.08,
+        p + front - Vector3.UP * 0.08)
+    _batch_quad("log_lower", p + front - Vector3.UP * 0.08,
+        q + front - Vector3.UP * 0.08,
+        q + back - Vector3.UP * 0.23,
+        p + back - Vector3.UP * 0.23)
+    _log_courses_count += 1
+
 
 func _decorate_wall_module(a: Vector2, b: Vector2, normal: Vector3,
         height: float, style: int, salt: int) -> void:
@@ -420,12 +463,10 @@ func _decorate_wall_module(a: Vector2, b: Vector2, normal: Vector3,
             # Vertical rough corner posts (old board walls).
             _wall_panel("panel_patch", a, b, normal, 0.011, 0.023, 0.20, height, 0.098)
         1:
-            # Real log-course silhouette in addition to the pixelated log material.
-            var rows := int(floorf((height - 0.2) / 0.58))
+            # Each rough-hewn timber has three actual facets, with 0.22m relief.
+            var rows := int(floorf((height - 0.25) / 0.58))
             for n in range(rows):
-                var cy := 0.34 + float(n) * 0.58
-                _wall_panel("log_course", a, b, normal, 0.005, 0.995,
-                    cy, cy + 0.075, 0.108)
+                _raised_log(a, b, normal, 0.42 + float(n) * 0.58)
         2:
             # Flaked plaster remnants.
             _wall_panel("panel_patch", a, b, normal, 0.06, 0.19,
@@ -715,14 +756,23 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
             3: rise = 1.58  # Four-sided hip
             4: rise = 0.96  # Asymmetric lean-to
     var eave := base + 0.12
-    if points.size() == 4:
+    # Visual roof only expands 0.28m beyond the unchanged manual building polygon.
+    var footprint_center := Vector2.ZERO
+    for p in points:
+        footprint_center += p
+    footprint_center /= float(maxi(1, points.size()))
+    var roof_points := PackedVector2Array()
+    for p in points:
+        var direction := (p - footprint_center).normalized()
+        roof_points.append(p + direction * (0.28 if category == "house" else 0.09))
+    if roof_points.size() == 4:
         # Put the long sides on a-b and d-c, regardless of footprint rotation.
-        var across_0 := points[0].distance_to(points[1])
-        var across_1 := points[1].distance_to(points[2])
-        var a: Vector2 = points[0] if across_0 >= across_1 else points[1]
-        var b: Vector2 = points[1] if across_0 >= across_1 else points[2]
-        var c: Vector2 = points[2] if across_0 >= across_1 else points[3]
-        var d: Vector2 = points[3] if across_0 >= across_1 else points[0]
+        var across_0 := roof_points[0].distance_to(roof_points[1])
+        var across_1 := roof_points[1].distance_to(roof_points[2])
+        var a: Vector2 = roof_points[0] if across_0 >= across_1 else roof_points[1]
+        var b: Vector2 = roof_points[1] if across_0 >= across_1 else roof_points[2]
+        var c: Vector2 = roof_points[2] if across_0 >= across_1 else roof_points[3]
+        var d: Vector2 = roof_points[3] if across_0 >= across_1 else roof_points[0]
         var ridge0 := (a + d) * 0.5
         var ridge1 := (b + c) * 0.5
         if category == "house" and roof_style == 3:
@@ -739,8 +789,8 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
             # One continuous sloping panel and end walls: recognisably a shed roof.
             _roof_face(v, uv, a, b, c, eave + rise, eave + rise, eave)
             _roof_face(v, uv, a, c, d, eave + rise, eave, eave)
-            _roof_face(v, uv, d, a, a, eave, eave + rise, eave)
-            _roof_face(v, uv, c, b, b, eave, eave + rise, eave)
+            _roof_face(v, uv, d, a, (d + a) * 0.5, eave, eave + rise, eave + rise * 0.5)
+            _roof_face(v, uv, c, b, (c + b) * 0.5, eave, eave + rise, eave + rise * 0.5)
             _batch_quad("panel_patch", _pt(a, eave), _pt(b, eave),
                 _pt(b, eave + rise), _pt(a, eave + rise))
         else:
@@ -754,19 +804,28 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
                 _decorate_roof_patch(a, b, ridge0, ridge1, eave, rise)
     else:
         var centroid := Vector2.ZERO
-        for p in points:
+        for p in roof_points:
             centroid += p
-        centroid /= float(points.size())
-        for i in range(points.size()):
-            _roof_face(v, uv, points[i], points[(i + 1) % points.size()],
+        centroid /= float(roof_points.size())
+        for i in range(roof_points.size()):
+            _roof_face(v, uv, roof_points[i], roof_points[(i + 1) % roof_points.size()],
                 centroid, eave, eave, eave + rise)
+    # A dark fascia wraps the street-side overhang and makes roof thickness legible.
+    if category == "house" and roof_style != 4:
+        for edge in range(roof_points.size()):
+            var p := roof_points[edge]
+            var q := roof_points[(edge + 1) % roof_points.size()]
+            _batch_quad("fascia", _pt(p, eave - 0.19),
+                _pt(q, eave - 0.19), _pt(q, eave + 0.06),
+                _pt(p, eave + 0.06))
+            _eaves_count += 1
     _make_textured_mesh(v, uv, _material(Color.WHITE, tex),
         category + " / modular roof " + str(roof_style))
     if category == "house" and index % 3 != 0:
         var center := Vector2.ZERO
-        for p in points:
+        for p in roof_points:
             center += p
-        center /= float(points.size())
+        center /= float(roof_points.size())
         _batch_box("chimney", _pt(center + Vector2(0.5, 0.4), base + rise * 0.65 + 0.25),
             Vector3(0.7, 1.1, 0.7))
 
