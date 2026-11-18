@@ -421,7 +421,7 @@ func _decorate_road(points: PackedVector2Array) -> void:
             continue
         var perpendicular := Vector2(-(b.y-a.y), (b.x-a.x)).normalized()
         for lane in [-1.0, 1.0]:
-            var off := perpendicular * lane * 1.18
+            var off: Vector2 = perpendicular * float(lane) * 1.18
             var pa := _pt(a + off, 0.134)
             var pb := _pt(b + off, 0.134)
             var side := Vector3(perpendicular.x, 0, -perpendicular.y) * 0.10
