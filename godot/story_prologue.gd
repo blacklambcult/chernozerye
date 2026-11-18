@@ -296,6 +296,20 @@ func _target_position(id: String) -> Vector3:
             return ROOM_ORIGIN + Vector3(0, 0.85, 3.65)
     return _gate_location()
 
+func _home_bearing() -> String:
+    # Simple relative direction, not an unsafe straight-line navigation path
+    # through houses or fences. The existing waypoint stays at the road.
+    if player == null:
+        return "•"
+    var delta := _gate_location() - player.global_position
+    delta.y = 0.0
+    if delta.length_squared() < 0.01:
+        return "•"
+    var front := -player.global_transform.basis.z
+    var right := player.global_transform.basis.x
+    return ("↑" if delta.dot(front) >= 0.0 else "↓") if absf(delta.dot(front)) >= absf(delta.dot(right)) else ("→" if delta.dot(right) >= 0.0 else "←")
+
+
 func _update_focus() -> void:
     focus = ""
     if player == null:
@@ -309,7 +323,7 @@ func _update_focus() -> void:
         elif chapter_completed:
             hint = "[J / О] Журнал — исследование Чернозёрья продолжается"
         else:
-            hint = "До родного дома: %d м · [J / О] — журнал" % int(distance)
+            hint = "До родного дома: %d м  %s  ·  [J / О] — журнал" % [int(distance), _home_bearing()]
     else:
         var candidates := []
         if not note_found:
