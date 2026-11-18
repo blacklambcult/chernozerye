@@ -28,9 +28,28 @@ var _aspen_positions: Array[Transform3D] = []
 var _building_count := 0
 var _fence_count := 0
 var _road_count := 0
+var _feature_house_center := Vector2(INF, INF)
+var _feature_house_distance := INF
 
 func decorate(features: Array) -> void:
     _rng.seed = 19960918
+    # Choose one real, hand-surveyed building nearest the documented village spawn.
+    # This is a visual showcase, not an invented new geographic footprint.
+    var player_spawn_2d := Vector2(-789.7, 268.6)
+    for item in features:
+        if not item is Dictionary or str(item.get("type", "")) != "house":
+            continue
+        var points := _local_points(item.get("points", []))
+        if points.size() < 3:
+            continue
+        var centroid := Vector2.ZERO
+        for p in points:
+            centroid += p
+        centroid /= float(points.size())
+        var dist := centroid.distance_to(player_spawn_2d)
+        if dist < _feature_house_distance:
+            _feature_house_distance = dist
+            _feature_house_center = centroid
     for item in features:
         if not item is Dictionary:
             continue
@@ -177,7 +196,9 @@ func _flush_details() -> void:
         "door": DOOR_COLOR,
         "lintel": Color("#52473f"),
         "chimney": Color("#444442"),
-        "board": Color("#50493e")
+        "board": Color("#50493e"),
+        "porch": Color("#4b433b"),
+        "lamp": Color("#df9c52")
     }
     for key in _detail_batches.keys():
         var verts: PackedVector3Array = _detail_batches[key]
@@ -310,6 +331,60 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
     _make_textured_mesh(wall_verts, wall_uvs, _material(Color.WHITE, wall_tex),
         category + " / pixel-wood")
     _decorate_roof(points, category, walls_height, roof_tex, index)
+    if category == "house":
+        _decorate_showcase_yard(points, front_index)
+
+func _decorate_showcase_yard(points: PackedVector2Array, front_edge: int) -> void:
+    # Only a single actual surveyed house near spawn receives the atmospheric micro-scene.
+    if _feature_house_center == Vector2(INF, INF):
+        return
+    var centroid := Vector2.ZERO
+    for p in points:
+        centroid += p
+    centroid /= float(points.size())
+    if centroid.distance_to(_feature_house_center) > 0.15:
+        return
+    var a: Vector2 = points[front_edge]
+    var b: Vector2 = points[(front_edge + 1) % points.size()]
+    var side := b - a
+    if side.length() < 4.0:
+        return
+    # Leave roadside clear and build a porch only if the house is set back enough.
+    if _nearest_road_distance((a + b) * 0.5) < 4.5:
+        return
+    var orientation := -1.0 if _signed_area(points) > 0.0 else 1.0
+    var outward_2d := Vector2(side.y, -side.x).normalized() * orientation
+    var vout := Vector3(outward_2d.x, 0, -outward_2d.y)
+    var tangent := Vector3(side.x, 0, -side.y).normalized()
+    var origin := _pt((a + b) * 0.5, 0.18)
+    # Three uneven timber steps, woodpile and one creaking yard lamp.
+    for i in range(3):
+        var delta := vout * (0.55 + float(i) * 0.58)
+        var h := 0.48 - float(i) * 0.12
+        var half_width := 1.10 + float(i) * 0.08
+        var left := origin + delta - tangent * half_width + Vector3.UP * h
+        var right := origin + delta + tangent * half_width + Vector3.UP * h
+        _batch_quad("porch", left, right, right + vout * 0.42, left + vout * 0.42)
+        _batch_quad("porch", left + Vector3.DOWN * 0.12, right + Vector3.DOWN * 0.12, right, left)
+    # Wood crates near the front wall.
+    var stack_origin := origin + tangent * 2.25 + vout * 1.4
+    for i in range(4):
+        _batch_box("porch", stack_origin + tangent * float(i % 2) * 0.62 +
+            Vector3.UP * (0.18 + 0.36 * float(i / 2)),
+            Vector3(0.52, 0.32, 0.50))
+    # A dim yard lantern outside the doorway.
+    var lamp_origin := origin - tangent * 2.0 + vout * 2.25
+    _batch_box("chimney", lamp_origin + Vector3.UP * 1.55, Vector3(0.13, 3.05, 0.13))
+    _batch_box("lamp", lamp_origin + Vector3.UP * 3.05, Vector3(0.35, 0.36, 0.35))
+    var light := OmniLight3D.new()
+    light.name = "Старая лампа у крыльца"
+    light.position = lamp_origin + Vector3.UP * 3.05
+    light.light_color = Color("#ffb46d")
+    light.light_energy = 0.9
+    light.omni_range = 10.0
+    light.shadow_enabled = false
+    add_child(light)
+    print("MANUAL_SHOWCASE_YARD_READY: ", centroid)
 
 func _roof_face(verts: PackedVector3Array, uvs: PackedVector2Array,
         a: Vector2, b: Vector2, c: Vector2, ah: float, bh: float, ch: float) -> void:
@@ -424,12 +499,15 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool) -> void:
                 var h := 1.10 + 0.3 * sin(float(i * 19 + j * 17))
                 _append_box_to(_fence_slats, _pt(center, h * 0.5 + 0.12),
                     Vector3(0.13, h, 0.13))
-        for y in [0.52, 1.1]:
+        for y in [0.52, 1.10]:
+            # Vertical timber ribbons facing the street: older rails were
+            # horizontal zero-thickness strips and nearly invisible at eye level.
             var v0 := _pt(start, y)
             var v1 := _pt(finish, y)
-            var side := Vector3(-tang.y, 0, -tang.x).normalized() * 0.06
-            _push_tri(_fence_rails, v0 - side, v0 + side, v1 + side)
-            _push_tri(_fence_rails, v0 - side, v1 + side, v1 - side)
+            var toward := Vector3(-tang.y, 0, -tang.x).normalized() * 0.04
+            var down := Vector3.UP * 0.085
+            _push_tri(_fence_rails, v0 + toward - down, v1 + toward - down, v1 + toward + down)
+            _push_tri(_fence_rails, v0 + toward - down, v1 + toward + down, v0 + toward + down)
 
 func _decorate_fence(points: PackedVector2Array) -> void:
     if points.size() < 3:
