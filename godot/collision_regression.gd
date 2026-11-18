@@ -189,7 +189,7 @@ func _run() -> void:
     if not (pelvis.get_node("RightArm") as Node3D).visible:
         _fail("full-body arm failed to restore")
         return
-    if get_tree().get_nodes_in_group("DiscardedScenicProps").is_empty():
+    if get_nodes_in_group("DiscardedScenicProps").is_empty():
         _fail("automatic final ground prop missing")
         return
     if int(hud.get("current_health")) != 100:
