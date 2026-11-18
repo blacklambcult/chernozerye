@@ -258,13 +258,18 @@ func _add_village_roadside(points: PackedVector2Array, width: float, height: flo
                     var blade := rng.randf_range(0.28, 0.66)
                     var lean := tangent * rng.randf_range(-0.15, 0.15)
                     var crown := _pos(center + lean, 0.12 + blade)
-                    var root := _pos(center, 0.12)
                     var half := side * 0.11
-                    var target: PackedVector3Array = dried if (j + sign + i) % 5 == 0 else weeds
-                    _put_triangle(target, _pos(center - half, 0.12), crown,
-                        _pos(center + half, 0.12))
-                    _put_triangle(target, _pos(center - tangent * 0.11, 0.12),
-                        crown, _pos(center + tangent * 0.11, 0.12))
+                    # Mutate the original packed buffer, not a copy-on-write alias.
+                    if (j + sign + i) % 5 == 0:
+                        _put_triangle(dried, _pos(center - half, 0.12), crown,
+                            _pos(center + half, 0.12))
+                        _put_triangle(dried, _pos(center - tangent * 0.11, 0.12),
+                            crown, _pos(center + tangent * 0.11, 0.12))
+                    else:
+                        _put_triangle(weeds, _pos(center - half, 0.12), crown,
+                            _pos(center + half, 0.12))
+                        _put_triangle(weeds, _pos(center - tangent * 0.11, 0.12),
+                            crown, _pos(center + tangent * 0.11, 0.12))
                     _roadside_tufts += 1
             # Pebbles and irregular compacted soil, small enough not to read as a grid.
             if (j + i) % 2 == 0:
@@ -272,7 +277,7 @@ func _add_village_roadside(points: PackedVector2Array, width: float, height: flo
                 t += side * rng.randf_range(-1.55, 1.55)
                 var dx := tangent * rng.randf_range(0.09, 0.22)
                 var dy := side * rng.randf_range(0.10, 0.28)
-                var plane_y := height + 0.031
+                var plane_y := height + 0.052
                 _put_triangle(stones, _pos(t - dx, plane_y),
                     _pos(t + dy, plane_y), _pos(t + dx, plane_y))
     _mesh_from_triangles(shoulders, Color("#4a4438"), "Дорога / неровные грунтовые обочины")
