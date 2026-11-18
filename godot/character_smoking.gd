@@ -259,7 +259,8 @@ func _render_phase() -> void:
         mouth_paper.scale.y = lerpf(1.0,0.28,portion)
         var ember_color := Color("#ac4834").lerp(Color("#ce6940"),
             0.18 + 0.13 * sin(burn_elapsed * 1.4))
-        embers.material_override = _material(ember_color,true)
+        var ember_mat := embers.material_override as StandardMaterial3D
+        ember_mat.albedo_color = ember_color
     else:
         mouth_paper.scale.y = 1.0
 
@@ -268,7 +269,7 @@ func _spawn_discarded_prop() -> void:
     if player == null or not is_instance_valid(player):
         return
     var world := player.get_parent()
-    if world == null or world is SceneTree:
+    if world == null:
         return
     var all_stubs := get_tree().get_nodes_in_group("DiscardedScenicProps")
     if all_stubs.size() >= MAX_STUBS:
