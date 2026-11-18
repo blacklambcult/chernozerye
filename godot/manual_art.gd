@@ -6,11 +6,11 @@ extends Node3D
 const WOOD_TONES := ["#454941", "#51473e", "#3b4039", "#4e433c", "#43463d", "#525047"]
 const ROOF_TONES := ["#282e31", "#373432", "#30383a", "#403933"]
 const DOOR_COLOR := Color("#24221f")
-const FRAME_COLOR := Color("#736859")
+const FRAME_COLOR := Color("#5a564d")
 const WINDOW_COLOR := Color("#131a1f")
 const WINDOW_LIT := Color("#efac5d")
-const FENCE_COLOR := Color("#786a56")
-const POST_COLOR := Color("#524b43")
+const FENCE_COLOR := Color("#5a544a")
+const POST_COLOR := Color("#3e3c36")
 const RUT_COLOR := Color("#423a32")
 
 var _roads: Array = []
@@ -25,6 +25,7 @@ var _yard_details: PackedVector3Array = PackedVector3Array()
 var _road_ruts: PackedVector3Array = PackedVector3Array()
 var _bush_positions: Array[Transform3D] = []
 var _aspen_positions: Array[Transform3D] = []
+var _aspen_trunks: Array[Transform3D] = []
 var _building_count := 0
 var _fence_count := 0
 var _road_count := 0
@@ -72,9 +73,9 @@ func decorate(features: Array) -> void:
             "forest":
                 _decorate_forest(polygon)
     _flush_details()
-    _create_solid_mesh(_fence_posts, Color("#554a40"), "Забор / столбы")
-    _create_solid_mesh(_fence_rails, Color("#5a5247"), "Забор / рейки")
-    _create_solid_mesh(_fence_slats, Color("#49483e"), "Забор / обветшавший штакетник")
+    _create_solid_mesh(_fence_posts, Color("#423b35"), "Забор / столбы")
+    _create_solid_mesh(_fence_rails, Color("#48433d"), "Забор / рейки")
+    _create_solid_mesh(_fence_slats, Color("#3a3b35"), "Забор / обветшавший штакетник")
     _create_solid_mesh(_yard_details, Color("#48443b"), "Старый деревенский быт / ящики и дрова")
     _create_solid_mesh(_road_ruts, RUT_COLOR, "Дорога / земляные колеи")
     _create_forest_assets()
@@ -96,6 +97,7 @@ func _material(color: Color, texture: Texture2D = null) -> StandardMaterial3D:
     mat.albedo_color = color
     mat.roughness = 1.0
     mat.metallic = 0.0
+    mat.specular = 0.0
     mat.cull_mode = BaseMaterial3D.CULL_DISABLED
     mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
     if texture != null:
@@ -218,7 +220,7 @@ func _flush_details() -> void:
         "board": Color("#50493e"),
         "porch": Color("#4b433b"),
         "lamp": Color("#df9c52"),
-        "trim": Color("#8a9c9c"),
+        "trim": Color("#596363"),
         "rust": Color("#604039")
     }
     for key in _detail_batches.keys():
@@ -323,11 +325,11 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
     if category == "house":
         if index % 7 == 0:
             wall_style = 3
-            tone = Color("#806154")  # weathered brick
+            tone = Color("#655046")  # weathered brick
             walls_height = 4.45
         elif index % 5 == 0:
             wall_style = 2
-            tone = Color("#838982")  # limewash
+            tone = Color("#646c67")  # limewash
         elif index % 3 == 0:
             wall_style = 1
             tone = Color("#5a5044")  # horizontal logs
@@ -420,8 +422,8 @@ func _decorate_showcase_yard(points: PackedVector2Array, front_edge: int) -> voi
     light.name = "Старая лампа у крыльца"
     light.position = lamp_origin + Vector3.UP * 3.05
     light.light_color = Color("#ffb46d")
-    light.light_energy = 0.9
-    light.omni_range = 10.0
+    light.light_energy = 0.60
+    light.omni_range = 8.0
     light.shadow_enabled = false
     add_child(light)
     print("MANUAL_SHOWCASE_YARD_READY: ", centroid)
@@ -613,12 +615,13 @@ func _decorate_forest(points: PackedVector2Array) -> void:
         var p := Vector2(rng.randf_range(lo.x, hi.x), rng.randf_range(lo.y, hi.y))
         if not Geometry2D.is_point_in_polygon(p, points):
             continue
-        if _nearest_road_distance(p) < 8.0:
+        if _nearest_road_distance(p) < 13.0:
             continue
-        var scale := rng.randf_range(0.75, 1.4)
+        var scale := rng.randf_range(0.7, 1.07)
         var basis := Basis().rotated(Vector3.UP, rng.randf_range(-PI, PI)).scaled(Vector3.ONE * scale)
         if placed % 3 == 0:
-            _aspen_positions.append(Transform3D(basis, _pt(p, 5.6 * scale)))
+            _aspen_positions.append(Transform3D(basis, _pt(p, 4.25 * scale)))
+            _aspen_trunks.append(Transform3D(basis, _pt(p, 1.75 * scale)))
         else:
             _bush_positions.append(Transform3D(basis, _pt(p, 0.85 * scale)))
         placed += 1
@@ -635,19 +638,29 @@ func _add_instanced(mesh: Mesh, instances: Array[Transform3D], tint: Color, name
     var node := MultiMeshInstance3D.new()
     node.name = name
     node.multimesh = multi
-    node.material_override = _material(tint)
+    var foliage_material := _material(tint)
+    if not name.contains("стволы"):
+        foliage_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    node.material_override = foliage_material
+    node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     add_child(node)
 
 func _create_forest_assets() -> void:
     var canopy := SphereMesh.new()
-    canopy.radius = 2.8
-    canopy.height = 5.3
+    canopy.radius = 1.95
+    canopy.height = 3.8
     canopy.radial_segments = 5
     canopy.rings = 3
-    _add_instanced(canopy, _aspen_positions, Color("#445b43"), "Осинник / ломанные кроны")
+    _add_instanced(canopy, _aspen_positions, Color("#283e36"), "Осинник / ломаные кроны")
+    var aspen_trunk := CylinderMesh.new()
+    aspen_trunk.top_radius = 0.13
+    aspen_trunk.bottom_radius = 0.27
+    aspen_trunk.height = 3.5
+    aspen_trunk.radial_segments = 5
+    _add_instanced(aspen_trunk, _aspen_trunks, Color("#33352f"), "Осинник / стволы")
     var bush := SphereMesh.new()
     bush.radius = 0.85
     bush.height = 1.6
     bush.radial_segments = 5
     bush.rings = 2
-    _add_instanced(bush, _bush_positions, Color("#3a4c35"), "Подлесок / репейник")
+    _add_instanced(bush, _bush_positions, Color("#2d4237"), "Подлесок / репейник")
