@@ -599,7 +599,7 @@ func _toggle_manual_preview() -> void:
         if control != null:
             control.visible = not manual_mode
     if is_instance_valid(_status_label):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 3.3 / ЖИВЫЕ ДВОРЫ · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 3.4 / ГЕОМЕТРИЧЕСКАЯ ЧИСТКА · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
     var character := get_node_or_null("Player") as CharacterBody3D
     if character != null:
         character.velocity = Vector3.ZERO
