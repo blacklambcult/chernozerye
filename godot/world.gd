@@ -64,6 +64,11 @@ func _material(color: Color) -> StandardMaterial3D:
     m.albedo_color = color
     m.roughness = 1.0
     m.specular = 0.0
+    m.metallic = 0.0
+    m.clearcoat_enabled = false
+    m.rim_enabled = false
+    m.anisotropy_enabled = false
+    m.emission_enabled = false
     return m
 
 func _create_ground() -> void:
@@ -556,13 +561,13 @@ func _toggle_manual_preview() -> void:
         _night_environment.background_color = Color("#17232f") if manual_mode else Color("#575b69")
         _night_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
         _night_environment.ambient_light_color = Color("#8797a2") if manual_mode else Color("#b0a9a4")
-        _night_environment.ambient_light_energy = 0.46 if manual_mode else 0.82
+        _night_environment.ambient_light_energy = 0.40 if manual_mode else 0.82
         _night_environment.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED if manual_mode else Environment.REFLECTION_SOURCE_BG
         _night_environment.glow_enabled = false
         _night_environment.fog_enabled = true
         _night_environment.fog_mode = Environment.FOG_MODE_DEPTH if manual_mode else Environment.FOG_MODE_EXPONENTIAL
         _night_environment.fog_light_color = Color("#2b3a46") if manual_mode else Color("#676976")
-        _night_environment.fog_light_energy = 0.85 if manual_mode else 1.0
+        _night_environment.fog_light_energy = 0.70 if manual_mode else 1.0
         _night_environment.fog_sun_scatter = 0.0
         _night_environment.fog_aerial_perspective = 0.0
         _night_environment.fog_density = 0.88 if manual_mode else 0.0018
@@ -572,10 +577,12 @@ func _toggle_manual_preview() -> void:
         _night_environment.fog_height = 0.8 if manual_mode else 0.0
         _night_environment.fog_height_density = 0.017 if manual_mode else 0.0
     if _sun_light != null:
-        _sun_light.light_energy = 0.42 if manual_mode else 1.05
+        _sun_light.light_energy = 0.37 if manual_mode else 1.05
         _sun_light.light_color = Color("#94a4b2") if manual_mode else Color("#f0b69a")
         # The shadow map produced hard triangular streaks across the road and low-poly trees.
         _sun_light.shadow_enabled = not manual_mode
+    if manual_mode:
+        print("MANUAL_MATTE_READY: no specular, no glow, softened textures and lights")
     print("MANUAL_NIGHT_READY: ", manual_mode,
         " fog=", _night_environment.fog_mode if _night_environment != null else "MISSING_ENV",
         " glow=", _night_environment.glow_enabled if _night_environment != null else "MISSING_ENV",
@@ -588,7 +595,7 @@ func _toggle_manual_preview() -> void:
         if control != null:
             control.visible = not manual_mode
     if is_instance_valid(_status_label):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 2.7 / ГЛУХИЕ СУМЕРКИ · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 2.8 / МАТОВАЯ ДЕРЕВНЯ · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
     var character := get_node_or_null("Player") as CharacterBody3D
     if character != null:
         character.velocity = Vector3.ZERO
