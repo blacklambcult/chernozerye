@@ -64,7 +64,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for script in world.gd player.gd geography_v07.gd live_map_v08.gd overture_3d_a.gd manual_geo.gd manual_art.gd izba_variants.gd logo_data.gd story_prologue.gd collision_regression.gd; do
+          for script in world.gd player.gd geography_v07.gd live_map_v08.gd overture_3d_a.gd manual_geo.gd manual_art.gd izba_variants.gd logo_data.gd story_prologue.gd collision_regression.gd first_person_body.gd gameplay_hud.gd; do
             echo "Checking ${script}"
             godot --headless --path godot --check-only --script "res://${script}"
           done
@@ -89,6 +89,7 @@ jobs:
           set -euo pipefail
           godot --headless --path godot --script res://collision_regression.gd 2>&1 | tee /tmp/collision-regression.log
           grep -q "COLLISION_REGRESSION_OK: house=solid fence=solid gap=open player_idle=cosmetic capsule=blocked view=compact" /tmp/collision-regression.log
+          grep -q "FIRST_PERSON_HUD_REGRESSION_OK:" /tmp/collision-regression.log
 
       - name: Smoke-test actual scene startup
         shell: bash
@@ -103,6 +104,8 @@ jobs:
           # a click on any preview/legacy map button.
           grep -q "FEARLESS_KNIGHTS_STARTUP_READY:" /tmp/world-smoke.log
           grep -q "STORY_PROLOGUE_READY:" /tmp/world-smoke.log
+          grep -q "FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2" /tmp/world-smoke.log
+          grep -q "SURVIVAL_HUD_READY: compass=center hp=100 hotbar=4 cigarette_pack=slot1" /tmp/world-smoke.log
           grep -q "manual_mode=true" /tmp/world-smoke.log
           grep -q "MANUAL_NIGHT_READY: true" /tmp/world-smoke.log
           grep -q "NOVEMBER_SNOW_READY: cpu=true amount=340 follow_player=true" /tmp/world-smoke.log
@@ -235,7 +238,7 @@ jobs:
           set -euo pipefail
           # Immutable directory per commit. A static /pre-alpha-0.3.9/
           # was cached by some browsers even after a successful new publish.
-          RELEASE_DIR="pre-alpha-0.4.4-${GITHUB_SHA:0:8}"
+          RELEASE_DIR="pre-alpha-0.4.5-${GITHUB_SHA:0:8}"
           mkdir -p "build/web/${RELEASE_DIR}"
           godot --headless --path godot --export-release "Web" "$(pwd)/build/web/${RELEASE_DIR}/index.html"
           test -s "build/web/${RELEASE_DIR}/index.html"
@@ -249,10 +252,10 @@ jobs:
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <meta http-equiv="refresh" content="0; url=./${RELEASE_DIR}/">
             <meta name="robots" content="noindex">
-            <title>Fearless Knights of the Cordon — Pre-Alpha 0.4.4</title>
+            <title>Fearless Knights of the Cordon — Pre-Alpha 0.4.5</title>
           </head>
           <body>
-            <p><a href="./${RELEASE_DIR}/">Открыть Fearless Knights of the Cordon — Pre-Alpha 0.4.4</a></p>
+            <p><a href="./${RELEASE_DIR}/">Открыть Fearless Knights of the Cordon — Pre-Alpha 0.4.5</a></p>
             <script>window.location.replace("./${RELEASE_DIR}/");</script>
           </body>
           </html>
