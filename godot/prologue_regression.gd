@@ -28,6 +28,10 @@ func _run_tests() -> void:
         _fail("home waypoint missing")
         return
     var gate: Vector2 = story.get("gate_point")
+    var bearing: String = story.call("_home_bearing")
+    if bearing not in ["↑", "↓", "←", "→", "•"]:
+        _fail("Missing directional clue to home")
+        return
     if gate.distance_to(Vector2(-789.7, 268.6)) > 170.0:
         _fail("selected home is too far from start position")
         return
