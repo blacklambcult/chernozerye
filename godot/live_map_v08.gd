@@ -165,7 +165,7 @@ func _draw_manual_survey(nw: Vector2, se: Vector2) -> void:
         var p := Vector2(player.position.x, -player.position.z)
         if _in_view(p):
             draw_circle(_map_pos(p), 7.0, Color("#ff934e"))
-    _text(Vector2(18, 29), "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.5.0", Color("#f0e7db"), 20)
+    _text(Vector2(18, 29), "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.5.1", Color("#f0e7db"), 20)
     _text(Vector2(18, 49), "ЧЕРНОЗЁРЬЕ / КАРТА ДЕРЕВНИ / 1400 × 1400 М / СЕВЕР ВВЕРХ", Color("#e4d0b2"), 13)
     _text(Vector2(18, 80), str(manual_features.size()) + " объектов пользователя / без процедурной генерации", Color("#ffd1a1"), 15)
     _text(Vector2(18, 111), "Здания — оранжевые, участки — контуры, лес — зелёный, дороги — бежевые", Color("#bacdc5"), 12)
@@ -294,7 +294,7 @@ func _draw() -> void:
             var p := _map_pos(player_map_pos)
             draw_circle(p, 7.0, Color("#ff9149"))
             draw_arc(p, 9.0, 0.0, TAU, 24, Color("#191d1b"), 2.0)
-    _text(Vector2(18, 29), "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.5.0", Color("#f2ead8"), 20)
+    _text(Vector2(18, 29), "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.5.1", Color("#f2ead8"), 20)
     var map_scale := "КВАРТАЛ СЕКТОРА A / 300 x 300 м" if neighborhood_zoom else ("СЕКТОР A / 680 x 680 м" if sector_a_zoom else "2 x 2 km")
     _text(Vector2(18, 49), map_scale + "  |  N UP  |  M = close  |  H = toggle houses", Color("#c2cfc0"))
     var house_status := "УСЛОВНЫЕ ДОМА: ПОКАЗАНЫ" if show_houses else "УСЛОВНЫЕ ДОМА: СКРЫТЫ"
