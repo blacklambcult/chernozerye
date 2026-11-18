@@ -360,13 +360,13 @@ func _detect_road_intersections() -> void:
                 var best_point := Vector2.ZERO
                 for end in [a, b]:
                     var near := Geometry2D.get_closest_point_to_segment(end, c, d)
-                    var dist := end.distance_to(near)
+                    var dist: float = end.distance_to(near)
                     if dist < best_distance:
                         best_distance = dist
                         best_point = (end + near) * 0.5
                 for end in [c, d]:
                     var near := Geometry2D.get_closest_point_to_segment(end, a, b)
-                    var dist := end.distance_to(near)
+                    var dist: float = end.distance_to(near)
                     if dist < best_distance:
                         best_distance = dist
                         best_point = (end + near) * 0.5
