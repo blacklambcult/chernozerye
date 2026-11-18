@@ -18,6 +18,7 @@ const RUT_COLOR := Color("#423a32")
 var _roads: Array = []
 var _plot_edges: Array = []
 var _fence_panels_skipped := 0
+var _fence_panels_relocated := 0
 var _yard_positions_rejected := 0
 var _roof_joints_sealed := 0
 var _detail_batches: Dictionary = {}
@@ -89,7 +90,7 @@ func decorate(features: Array) -> void:
         var kind: String = str(item.get("type", ""))
         if kind in ["road", "path"]:
             var road_points := _local_points(item.get("points", []))
-            var width := 5.1 if kind == "road" else 1.6
+            var width := 3.8 if kind == "road" else 1.6
             for i in range(road_points.size() - 1):
                 _roads.append([road_points[i], road_points[i + 1], width])
         elif kind == "plot":
@@ -137,6 +138,7 @@ func decorate(features: Array) -> void:
         " beds=", _yard_counts[1], " greenhouses=", _yard_counts[2],
         " firewood=", _yard_counts[3], " scrap=", _yard_counts[4])
     print("VILLAGE_CLEARANCE_READY: rejected_fence_panels=", _fence_panels_skipped,
+        " relocated_fence_panels=", _fence_panels_relocated,
         " rejected_yard_positions=", _yard_positions_rejected,
         " sealed_roof_joints=", _roof_joints_sealed)
 
@@ -162,7 +164,7 @@ func _material(color: Color, texture: Texture2D = null) -> StandardMaterial3D:
     mat.anisotropy_enabled = false
     mat.emission_enabled = false
     mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-    mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+    mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
     if texture != null:
         mat.albedo_texture = texture
     return mat
@@ -230,6 +232,7 @@ func _pixel_texture(tone: Color, seed: int, rooftop: bool, wall_style: int = 0) 
                     offset -= 0.16
             var shade := clampf(0.90 + offset, 0.52, 0.98)
             img.set_pixel(x, y, Color(tone.r * shade, tone.g * shade, tone.b * shade, 1.0))
+    img.generate_mipmaps()
     var tex := ImageTexture.create_from_image(img)
     _textures[key] = tex
     return tex
@@ -338,7 +341,8 @@ func _flush_details() -> void:
         "annex_dark": Color("#303632"),
         "pole": Color("#413b35"),
         "crossarm": Color("#343531"),
-        "gable_planks": Color("#3b4748")
+        "gable_planks": Color("#3b4748"),
+        "corner_timber": Color("#393a36")
     }
     for key in _detail_batches.keys():
         var verts: PackedVector3Array = _detail_batches[key]
@@ -392,12 +396,14 @@ func _plot_boundary_gap(p: Vector2) -> float:
 
 
 func _fence_point_clear(p: Vector2) -> bool:
-    return _road_surface_gap(p) >= 0.55 and _clear_of_buildings(p, 0.42)
+    return _road_surface_gap(p) >= 0.23 and _clear_of_buildings(p, 0.42)
 
 
-func _fence_span_clear(a: Vector2, b: Vector2) -> bool:
+func _fence_span_clear(a: Vector2, b: Vector2,
+        polygon: PackedVector2Array) -> bool:
     for t in [0.0, 0.25, 0.5, 0.75, 1.0]:
-        if not _fence_point_clear(a.lerp(b, t)):
+        var p := a.lerp(b, t)
+        if not Geometry2D.is_point_in_polygon(p, polygon) or not _fence_point_clear(p):
             return false
     return true
 
@@ -661,9 +667,9 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
         if signed < 0.0:
             outward_2d *= -1.0
         var normal := Vector3(outward_2d.x, 0, -outward_2d.y)
-        var offset := normal * 0.07
-        _quad(wall_verts, wall_uvs, _pt(a, 0.12) + offset, _pt(b, 0.12) + offset,
-            _pt(b, walls_height) + offset, _pt(a, walls_height) + offset)
+        # Shared polygon corners instead of separate normal offsets: no split walls.
+        _quad(wall_verts, wall_uvs, _pt(a, 0.12), _pt(b, 0.12),
+            _pt(b, walls_height), _pt(a, walls_height))
         if category == "house":
             _decorate_wall_module(a, b, normal, walls_height, body_style,
                 index + i, i == front_index, floors)
@@ -689,6 +695,10 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
             if floors == 2:
                 _make_window(a, b, normal, 0.5, length, false, false,
                     index + i + 8, window_style, 1)
+    if category == "house":
+        for corner in points:
+            _batch_box("corner_timber", _pt(corner, walls_height * 0.5 + 0.04),
+                Vector3(0.26, walls_height - 0.08, 0.26))
     _make_textured_mesh(wall_verts, wall_uvs, _material(Color.WHITE, wall_tex),
         category + " / modular body " + str(body_style))
     _decorate_roof(points, category, walls_height, roof_tex, index, roof_style)
@@ -893,10 +903,10 @@ func _decorate_roof_patch(eave_a: Vector2, eave_b: Vector2,
     var r0 := eave_a.lerp(eave_b, 0.58).lerp(ridge_a.lerp(ridge_b, 0.58), low_t)
     var r1 := eave_a.lerp(eave_b, 0.58).lerp(ridge_a.lerp(ridge_b, 0.58), high_t)
     var l1 := eave_a.lerp(eave_b, 0.18).lerp(ridge_a.lerp(ridge_b, 0.18), high_t)
-    _batch_quad("roof_patch", _pt(l0, eave + rise * low_t + 0.065),
-        _pt(r0, eave + rise * low_t + 0.065),
-        _pt(r1, eave + rise * high_t + 0.065),
-        _pt(l1, eave + rise * high_t + 0.065))
+    _batch_quad("roof_patch", _pt(l0, eave + rise * low_t + 0.15),
+        _pt(r0, eave + rise * low_t + 0.15),
+        _pt(r1, eave + rise * high_t + 0.15),
+        _pt(l1, eave + rise * high_t + 0.15))
     _roof_patch_count += 1
 
 func _decorate_roof(points: PackedVector2Array, category: String, base: float,
@@ -1048,66 +1058,76 @@ func _fence_chainlink(a: Vector2, b: Vector2) -> void:
         _fence_wire(_pt(p, 1.24), _pt(q, 0.37))
 
 
-func _fence_edge(a: Vector2, b: Vector2, gate_center: bool) -> void:
+func _fence_edge(a: Vector2, b: Vector2, gate_center: bool,
+        polygon: PackedVector2Array) -> void:
     var length := a.distance_to(b)
     if length < 0.35:
         return
-    var count := maxi(1, int(ceil(length / 2.8)))
-    var tang := (b - a) / length
-    var gate_a := 0.0
-    var gate_b := 0.0
+    var count := maxi(1, int(ceil(length / 2.30)))
+    var tangent := (b - a) / length
+    var side := 1.0 if _signed_area(polygon) > 0.0 else -1.0
+    var inward := Vector2(-tangent.y, tangent.x) * side
+    var gate_a := -1.0
+    var gate_b := -1.0
     if gate_center and length >= 6.0:
         gate_a = length * 0.5 - 1.85
         gate_b = length * 0.5 + 1.85
-    for i in range(count + 1):
-        var t := float(i) / float(count)
-        var dist := length * t
-        if gate_center and dist >= gate_a and dist <= gate_b:
-            continue
-        # Missing posts and subtly different heights break up perfect suburban grids.
-        if _fence_count % 5 == 2 and (i * 11 + _fence_count) % 17 == 0:
-            continue
-        var p := a.lerp(b, t)
-        if not _fence_point_clear(p):
-            continue
-        var h := 1.40 + 0.25 * sin(float(i * 13 + _fence_count * 7))
-        var tilt := Vector2(
-            0.20 * sin(float(i * 19 + _fence_count)),
-            0.15 * cos(float(i * 17 + _fence_count * 3)))
-        _append_crooked_post(_fence_posts, p, h, tilt)
+    var last_post := Vector2(INF, INF)
     for i in range(count):
         var from_dist := length * float(i) / float(count)
         var to_dist := length * float(i + 1) / float(count)
         var segment_mid := (from_dist + to_dist) * 0.5
         if gate_center and segment_mid >= gate_a and segment_mid <= gate_b:
             continue
-        var start := a + tang * from_dist
-        var finish := a + tang * to_dist
-        if not _fence_span_clear(start, finish):
+        var raw_start := a + tangent * from_dist
+        var raw_finish := a + tangent * to_dist
+        var start := raw_start
+        var finish := raw_finish
+        var inset_used := -1.0
+        # Try a shallow setback first; larger setbacks only on overlapping roads.
+        for inset in [0.18, 0.45, 0.80, 1.20, 1.75, 2.35, 3.00]:
+            var p := raw_start + inward * float(inset)
+            var q := raw_finish + inward * float(inset)
+            if _fence_span_clear(p, q, polygon):
+                start = p
+                finish = q
+                inset_used = float(inset)
+                break
+        if inset_used < 0.0:
             _fence_panels_skipped += 1
             continue
-        # Three recognizable village fence types: slats, rails, old green wire mesh.
+        if inset_used >= 0.45:
+            _fence_panels_relocated += 1
+        # Endpoints and rails use the same adjusted edge: no floating panels.
+        for endpoint in range(2):
+            var p: Vector2 = start if endpoint == 0 else finish
+            if p.distance_to(last_post) < 0.08:
+                continue
+            var height := 1.35 + 0.22 * sin(float(i * 13 + endpoint * 7 + _fence_count))
+            var tilt := Vector2(0.10 * sin(float(i * 17 + endpoint)),
+                0.09 * cos(float(i * 11 + _fence_count)))
+            _append_crooked_post(_fence_posts, p, height, tilt)
+            last_post = p
         if _fence_count % 3 == 0:
             _fence_chainlink(start, finish)
-        if _fence_count % 3 == 1:
-            var slat_count := maxi(1, int(ceil((to_dist - from_dist) / 0.74)))
-            for j in range(slat_count):
-                if (i * 7 + j * 13 + _fence_count) % 17 == 0:
+        elif _fence_count % 3 == 1:
+            var slats := maxi(1, int(ceil(start.distance_to(finish) / 0.47)))
+            for j in range(slats):
+                if (i * 7 + j * 13 + _fence_count) % 19 == 0:
                     continue
-                var fraction := (float(j) + 0.5) / float(slat_count)
-                var center := start.lerp(finish, fraction)
-                var h := 1.10 + 0.3 * sin(float(i * 19 + j * 17))
-                _append_box_to(_fence_slats, _pt(center, h * 0.5 + 0.12),
-                    Vector3(0.13, h, 0.13))
-        for y in [0.52, 1.10]:
-            # Vertical timber ribbons facing the street: older rails were
-            # horizontal zero-thickness strips and nearly invisible at eye level.
-            var v0 := _pt(start, y)
-            var v1 := _pt(finish, y)
-            var toward := Vector3(-tang.y, 0, -tang.x).normalized() * 0.04
-            var down := Vector3.UP * 0.085
-            _push_tri(_fence_rails, v0 + toward - down, v1 + toward - down, v1 + toward + down)
-            _push_tri(_fence_rails, v0 + toward - down, v1 + toward + down, v0 + toward + down)
+                var p := start.lerp(finish, (float(j) + 0.5) / float(slats))
+                var height := 1.05 + 0.27 * sin(float(i * 19 + j * 17))
+                _append_box_to(_fence_slats, _pt(p, height * 0.5 + 0.12),
+                    Vector3(0.125, height, 0.125))
+        for rail_height in [0.50, 1.06]:
+            var v0 := _pt(start, rail_height)
+            var v1 := _pt(finish, rail_height)
+            var outward3 := Vector3(-tangent.y, 0, -tangent.x) * 0.04
+            var span := Vector3.UP * 0.085
+            _push_tri(_fence_rails, v0 + outward3 - span,
+                v1 + outward3 - span, v1 + outward3 + span)
+            _push_tri(_fence_rails, v0 + outward3 - span,
+                v1 + outward3 + span, v0 + outward3 + span)
 
 func _clear_of_buildings(p: Vector2, gap: float) -> bool:
     for footprint in _building_polygons:
@@ -1299,27 +1319,14 @@ func _decorate_fence(points: PackedVector2Array) -> void:
             near = distance
             gate_edge = i
     for i in range(points.size()):
-        _fence_edge(points[i], points[(i + 1) % points.size()], i == gate_edge)
+        _fence_edge(points[i], points[(i + 1) % points.size()], i == gate_edge, points)
     _decorate_plot_props(points)
 
 func _decorate_road(points: PackedVector2Array) -> void:
     if points.size() < 2:
         return
     _road_count += 1
-    for i in range(points.size() - 1):
-        var a := points[i]
-        var b := points[i + 1]
-        var length := a.distance_to(b)
-        if length < 0.5:
-            continue
-        var perpendicular := Vector2(-(b.y-a.y), (b.x-a.x)).normalized()
-        for lane in [-1.0, 1.0]:
-            var off: Vector2 = perpendicular * float(lane) * 1.18
-            var pa := _pt(a + off, 0.134)
-            var pb := _pt(b + off, 0.134)
-            var side := Vector3(perpendicular.x, 0, -perpendicular.y) * 0.13
-            _push_tri(_road_ruts, pa - side, pa + side, pb + side)
-            _push_tri(_road_ruts, pa - side, pb + side, pb - side)
+    # manual_geo.gd owns the road ruts; do not stack a second nearly coplanar mesh.
     _decorate_utility_poles(points)
 
 func _wire_segment(a: Vector3, b: Vector3) -> void:
