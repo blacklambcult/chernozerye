@@ -105,6 +105,11 @@ func _mat(color: Color) -> StandardMaterial3D:
     m.albedo_color = color
     m.roughness = 1.0
     m.specular = 0.0
+    m.metallic = 0.0
+    m.clearcoat_enabled = false
+    m.rim_enabled = false
+    m.anisotropy_enabled = false
+    m.emission_enabled = false
     m.cull_mode = BaseMaterial3D.CULL_DISABLED
     return m
 
