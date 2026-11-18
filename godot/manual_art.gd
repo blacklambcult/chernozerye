@@ -1,5 +1,5 @@
 extends Node3D
-# CHERNOZERYE 3.3 / VILLAGE MODULAR ART AND INHABITED YARDS
+# CHERNOZERYE 3.8 / DUSK VILLAGE CONCEPT PASS
 # All spatial placements derive from the user's manual GeoJSON features.
 # Decorative features are deterministic and never modify the survey geometry.
 
@@ -7,9 +7,9 @@ const IZBA_VARIANTS = preload("res://izba_variants.gd")
 const WOOD_TONES := ["#454941", "#51473e", "#3b4039", "#4e433c", "#43463d", "#525047"]
 const ROOF_TONES := ["#282e31", "#373432", "#30383a", "#403933"]
 const DOOR_COLOR := Color("#24221f")
-const FRAME_COLOR := Color("#494943")
+const FRAME_COLOR := Color("#73796d")
 const WINDOW_COLOR := Color("#131a1f")
-const WINDOW_LIT := Color("#a5b95c")
+const WINDOW_LIT := Color("#d9c46e")
 const FENCE_COLOR := Color("#494840")
 const POST_COLOR := Color("#3e3c36")
 const RUT_COLOR := Color("#423a32")
@@ -31,6 +31,9 @@ var _detail_batches: Dictionary = {}
 var _textures: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 var _lights_placed: int = 0
+var _street_lights := 0
+var _street_lamp_heads := 0
+var _balcony_count := 0
 var _fence_posts: PackedVector3Array = PackedVector3Array()
 var _fence_rails: PackedVector3Array = PackedVector3Array()
 var _fence_wire_mesh: PackedVector3Array = PackedVector3Array()
@@ -63,7 +66,7 @@ var _log_courses_count := 0
 var _eaves_count := 0
 var _carved_count := 0
 var _active_trim_key := "trim"
-var _yard_counts := [0, 0, 0, 0, 0]
+var _yard_counts := [0, 0, 0, 0, 0, 0]
 var _clipped_log_segments := 0
 
 func decorate(features: Array) -> void:
@@ -133,7 +136,9 @@ func decorate(features: Array) -> void:
     _create_solid_mesh(_yard_details, Color("#48443b"), "Старый деревенский быт / ящики и дрова")
     _create_solid_mesh(_road_ruts, RUT_COLOR, "Дорога / земляные колеи")
     _create_solid_mesh(_overhead_wires, Color("#242d2d"), "Старые кабели / провисшие линии")
-    print("MANUAL_UTILITY_READY: poles=", _utility_pole_count)
+    print("MANUAL_UTILITY_READY: poles=", _utility_pole_count,
+        " lamp_heads=", _street_lamp_heads, " warm_lights=", _street_lights,
+        " balconies=", _balcony_count)
     _create_forest_assets()
     print("MANUAL_ART_READY: buildings=", _building_count,
         " plots=", _fence_count, " roads=", _road_count, " lamps=", _lights_placed)
@@ -149,7 +154,8 @@ func decorate(features: Array) -> void:
         " clipped_segments=", _clipped_log_segments)
     print("VILLAGE_YARDS_READY: wells=", _yard_counts[0],
         " beds=", _yard_counts[1], " greenhouses=", _yard_counts[2],
-        " firewood=", _yard_counts[3], " scrap=", _yard_counts[4])
+        " firewood=", _yard_counts[3], " scrap=", _yard_counts[4],
+        " benches=", _yard_counts[5])
     print("VILLAGE_FENCE_JOINTS_READY: bridged=", _fence_joints_joined,
         " short_spans_recovered=", _fence_short_spans_recovered)
     print("VILLAGE_CLEARANCE_READY: rejected_fence_panels=", _fence_panels_skipped,
@@ -318,6 +324,12 @@ func _flush_details() -> void:
         "board": Color("#50493e"),
         "porch": Color("#4b433b"),
         "lamp": Color("#df9c52"),
+        "lamp_shade": Color("#55463a"),
+        "lamp_glass": Color("#f9c96f"),
+        "bench_wood": Color("#536c70"),
+        "bench_dark": Color("#363a37"),
+        "flower_stem": Color("#5c744b"),
+        "flower_pink": Color("#966278"),
         "trim": Color("#6c7167"),
         "rust": Color("#604039"),
         "awning": Color("#343433"),
@@ -362,8 +374,8 @@ func _flush_details() -> void:
     }
     for key in _detail_batches.keys():
         var verts: PackedVector3Array = _detail_batches[key]
-        if key == "window_lit":
-            var lit_mat := _material(WINDOW_LIT)
+        if key == "window_lit" or key == "lamp_glass":
+            var lit_mat := _material(WINDOW_LIT if key == "window_lit" else Color("#ffcf79"))
             lit_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
             var arrays := []
             arrays.resize(Mesh.ARRAY_MAX)
@@ -371,7 +383,7 @@ func _flush_details() -> void:
             var mesh := ArrayMesh.new()
             mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
             var lit_node := MeshInstance3D.new()
-            lit_node.name = "Редкие болезненно-зелёные окна"
+            lit_node.name = "Вечерний свет окон и уличных фонарей"
             lit_node.mesh = mesh
             lit_node.material_override = lit_mat
             lit_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -530,12 +542,12 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
         _lights_placed += 1
         var center := start.lerp(finish, center_fraction)
         var lamp := OmniLight3D.new()
-        lamp.name = "Нездоровое свечение в окне"
+        lamp.name = "Тёплый свет окна"
         lamp.position = _pt(center, low + 0.92) + normal * 1.1
-        lamp.light_color = Color("#bdc870")
-        lamp.light_energy = 0.30
+        lamp.light_color = Color("#e6cf86")
+        lamp.light_energy = 0.34
         lamp.light_specular = 0.0
-        lamp.omni_range = 5.5
+        lamp.omni_range = 5.2
         lamp.shadow_enabled = false
         add_child(lamp)
 
@@ -696,20 +708,20 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
             _wall_panel("door", a, b, normal, 0.5 - door_half,
                 0.5 + door_half, 0.12, 2.13, 0.15)
             if category == "house" and length > 7.0:
-                _make_window(a, b, normal, 0.19, length, index % 5 == 0,
+                _make_window(a, b, normal, 0.19, length, index % 5 != 1,
                     index % 11 == 0, index + i, window_style)
-                _make_window(a, b, normal, 0.81, length, index % 6 == 0,
+                _make_window(a, b, normal, 0.81, length, index % 4 != 1,
                     index % 10 == 0, index + i + 3, window_style)
             if category == "house" and floors == 2 and length > 5.0:
-                _make_window(a, b, normal, 0.3, length, false, false,
+                _make_window(a, b, normal, 0.3, length, index % 3 != 0, false,
                     index + i + 1, window_style, 1)
-                _make_window(a, b, normal, 0.7, length, false, false,
+                _make_window(a, b, normal, 0.7, length, index % 4 != 0, false,
                     index + i + 4, window_style, 1)
         elif category == "house" and length > 5.0:
-            _make_window(a, b, normal, 0.5, length, index % 7 == 0 and i % 2 == 0,
+            _make_window(a, b, normal, 0.5, length, (index + i) % 3 != 0,
                 (index + i) % 11 == 0, index + i, window_style)
             if floors == 2:
-                _make_window(a, b, normal, 0.5, length, false, false,
+                _make_window(a, b, normal, 0.5, length, (index + i) % 4 != 0, false,
                     index + i + 8, window_style, 1)
     if category == "house":
         for corner in points:
@@ -736,8 +748,10 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
             var out2d := Vector2(front_side.y, -front_side.x).normalized()
             if signed < 0.0:
                 out2d *= -1.0
-            _decorate_modular_entrance(front_a, front_b, Vector3(out2d.x, 0, -out2d.y),
-                entrance_style)
+            var front_normal := Vector3(out2d.x, 0, -out2d.y)
+            _decorate_modular_entrance(front_a, front_b, front_normal, entrance_style)
+            if floors == 2 and front_a.distance_to(front_b) > 6.8 and index % 2 == 0:
+                _decorate_balcony(front_a, front_b, front_normal)
         _decorate_showcase_yard(points, front_index)
 
 func _decorate_modular_entrance(a: Vector2, b: Vector2,
@@ -798,6 +812,44 @@ func _decorate_modular_entrance(a: Vector2, b: Vector2,
             mid + tangent * wide + Vector3.UP * 2.72,
             front + tangent * wide + Vector3.UP * 2.42,
             front - tangent * wide + Vector3.UP * 2.42)
+
+func _decorate_balcony(a: Vector2, b: Vector2, outward: Vector3) -> void:
+    # Compact two-storey wooden balcony like the supplied evening village concepts.
+    # The floor footprint and entrance remain untouched; keep it off roads/fences.
+    var tangent := (_pt(b, 0.0) - _pt(a, 0.0)).normalized()
+    var back := _pt((a + b) * 0.5, 3.30) + outward * 0.10
+    var front := back + outward * 0.82
+    var half_width := minf(1.95, a.distance_to(b) * 0.27)
+    for sign in [-1.0, 1.0]:
+        var check := front + tangent * float(sign) * half_width
+        var p := Vector2(check.x, -check.z)
+        if _road_surface_gap(p) < 0.85 or _plot_boundary_gap(p) < 0.15:
+            return
+        if not _clear_of_buildings(p, 0.18):
+            return
+    _batch_quad("porch_deck",
+        back - tangent * half_width, back + tangent * half_width,
+        front + tangent * half_width, front - tangent * half_width)
+    # Thick rail, two end rails and upright balusters; all geometry batched.
+    var rail_y := Vector3.UP * 0.96
+    _batch_quad("bench_wood", front - tangent * half_width + rail_y,
+        front + tangent * half_width + rail_y,
+        front + tangent * half_width + rail_y + Vector3.UP * 0.13,
+        front - tangent * half_width + rail_y + Vector3.UP * 0.13)
+    for i in range(9):
+        var t := float(i) / 8.0
+        var q := front + tangent * lerpf(-half_width, half_width, t)
+        _batch_quad("porch", q - tangent * 0.055, q + tangent * 0.055,
+            q + tangent * 0.055 + Vector3.UP * 0.98,
+            q - tangent * 0.055 + Vector3.UP * 0.98)
+    for sign in [-1.0, 1.0]:
+        var rear := back + tangent * float(sign) * half_width
+        var outer := front + tangent * float(sign) * half_width
+        _batch_quad("bench_wood", rear + rail_y, outer + rail_y,
+            outer + rail_y + Vector3.UP * 0.13,
+            rear + rail_y + Vector3.UP * 0.13)
+    _balcony_count += 1
+
 
 func _decorate_lean_to(a: Vector2, b: Vector2, outward: Vector3) -> void:
     # Small warped annex behind selected real houses; no new map footprint.
@@ -1344,6 +1396,21 @@ func _yard_prop(center: Vector2, kind: int, rotation: float, salt: int) -> void:
                 0.17, Vector3(0.29, 0.28, 0.10), rotation + 0.25)
             _yard_box("yard_tire", center, Vector2(-0.15, -1.09),
                 0.23, Vector3(0.74, 0.46, 0.65), rotation)
+        5:
+            # Weathered garden bench and a modest flower patch in the front yard.
+            _yard_box("bench_wood", center, Vector2(0, 0.0),
+                0.55, Vector3(1.85, 0.14, 0.55), rotation)
+            _yard_box("bench_wood", center, Vector2(0, 0.33),
+                1.03, Vector3(1.85, 0.84, 0.13), rotation)
+            for side in [-0.72, 0.72]:
+                _yard_box("bench_dark", center, Vector2(side, 0.0),
+                    0.31, Vector3(0.12, 0.48, 0.48), rotation)
+            for n in range(5):
+                var x := -1.1 + float(n) * 0.55
+                _yard_box("flower_stem", center, Vector2(x, -0.85),
+                    0.28, Vector3(0.07, 0.48, 0.07), rotation)
+                _yard_box("flower_pink", center, Vector2(x, -0.85),
+                    0.58, Vector3(0.23, 0.17, 0.23), rotation)
 
 
 func _yard_radius(kind: int) -> float:
@@ -1353,6 +1420,7 @@ func _yard_radius(kind: int) -> float:
         1: return 2.45  # Three raised garden beds
         2: return 2.45  # Greenhouse
         3: return 2.15  # Firewood shelter
+        5: return 1.75  # Garden bench and flowers
         _: return 2.05  # Scrap, barrels and tools
 
 
@@ -1398,7 +1466,7 @@ func _decorate_plot_props(points: PackedVector2Array) -> void:
         attempts += 1
         var p := Vector2(rng.randf_range(low.x, high.x),
             rng.randf_range(low.y, high.y))
-        var kind := (_fence_count * 3 + placed.size() * 2) % 5
+        var kind := (_fence_count * 3 + placed.size() * 2) % 6
         var rotation := float(rng.randi_range(0, 3)) * PI * 0.5
         if not _yard_spot_ok(p, points, placed, kind):
             _yard_positions_rejected += 1
@@ -1467,6 +1535,33 @@ func _decorate_utility_poles(points: PackedVector2Array) -> void:
                 continue
             _batch_box("pole", _pt(p, 3.05), Vector3(0.22, 6.1, 0.22))
             _batch_box("crossarm", _pt(p, 5.85), Vector3(1.3, 0.16, 0.17))
+            # Old Soviet road lantern: glowing polyhedron plus a short mounting arm.
+            if (_utility_pole_count + _road_count) % 2 == 0:
+                var toward_road := Vector3(-perpendicular.x, 0.0, perpendicular.y)
+                if roadside < 0.0:
+                    toward_road *= -1.0
+                var mount := _pt(p, 5.45)
+                var lamp_end := mount + toward_road * 0.90
+                _batch_quad("crossarm", mount + Vector3.UP * 0.06,
+                    lamp_end + Vector3.UP * 0.06,
+                    lamp_end - Vector3.UP * 0.06, mount - Vector3.UP * 0.06)
+                _batch_box("lamp_shade", lamp_end + Vector3.DOWN * 0.25,
+                    Vector3(0.56, 0.18, 0.48))
+                _batch_box("lamp_glass", lamp_end + Vector3.DOWN * 0.43,
+                    Vector3(0.35, 0.25, 0.35))
+                _street_lamp_heads += 1
+                # Real-time light count stays low for the Godot Compatibility Web build.
+                if _street_lights < 6:
+                    var lantern := OmniLight3D.new()
+                    lantern.name = "Жёлтый деревенский фонарь"
+                    lantern.position = lamp_end + Vector3.DOWN * 0.43
+                    lantern.light_color = Color("#f3c77b")
+                    lantern.light_energy = 0.58
+                    lantern.light_specular = 0.0
+                    lantern.omni_range = 8.5
+                    lantern.shadow_enabled = false
+                    add_child(lantern)
+                    _street_lights += 1
             if previous != Vector2(INF, INF):
                 var horizontal := Vector3(perpendicular.x, 0.0, -perpendicular.y)
                 for offset in [-0.42, 0.42]:
