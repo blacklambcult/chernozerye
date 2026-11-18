@@ -51,5 +51,18 @@ func _run() -> void:
     if not clear_passage.is_empty():
         _fail("unbuilt gate opening is blocked by invisible collision")
         return
-    print("COLLISION_REGRESSION_OK: house=solid fence=solid gap=open")
+    # Cosmetic action is separate from movement and has no health benefits.
+    var actor := CharacterBody3D.new()
+    actor.name = "PlayerCosmeticHarness"
+    actor.set_script(load("res://player.gd"))
+    get_root().add_child(actor)
+    actor.call("_start_character_idle")
+    if float(actor.get("_idle_smoke_timer")) <= 0.0:
+        _fail("character gesture did not start from button action")
+        return
+    var prop := actor.get("_smoke_prop") as Node3D
+    if prop == null or not prop.visible:
+        _fail("character idle prop not visible during action")
+        return
+    print("COLLISION_REGRESSION_OK: house=solid fence=solid gap=open player_idle=cosmetic")
     quit(0)
