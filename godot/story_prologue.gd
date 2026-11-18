@@ -210,15 +210,23 @@ func _build_hud() -> void:
     objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
     layer.add_child(objective_label)
     prompt_label = Label.new()
-    prompt_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-    prompt_label.position = Vector2(16, -95)
+    prompt_label.anchor_top = 1.0
+    prompt_label.anchor_bottom = 1.0
+    prompt_label.offset_left = 16.0
+    prompt_label.offset_right = 620.0
+    prompt_label.offset_top = -95.0
+    prompt_label.offset_bottom = -63.0
     prompt_label.add_theme_color_override("font_color", Color("#f0d9ab"))
     prompt_label.add_theme_font_size_override("font_size", 16)
     prompt_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
     layer.add_child(prompt_label)
     message_label = Label.new()
-    message_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-    message_label.position = Vector2(16, -67)
+    message_label.anchor_top = 1.0
+    message_label.anchor_bottom = 1.0
+    message_label.offset_left = 16.0
+    message_label.offset_right = 740.0
+    message_label.offset_top = -63.0
+    message_label.offset_bottom = -8.0
     message_label.custom_minimum_size = Vector2(720, 52)
     message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     message_label.add_theme_color_override("font_color", Color("#c8c9c5"))
