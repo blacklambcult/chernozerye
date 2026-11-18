@@ -6,6 +6,7 @@ const MAP_FILE := "res://world_data.json"
 const MANUAL_FILE := "res://manual_layout.json"
 const GAME_TITLE := "Fearless Knights of the Cordon"
 const GAME_STAGE := "Pre-Alpha 0.3.9"
+const SEASON := "NOVEMBER"
 const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.3.9 · ЧЕРНОЗЁРЬЕ · 314 ОБЪЕКТОВ"
 var manual_mode := false
 var manual_button: Button
@@ -68,6 +69,53 @@ func _ready() -> void:
     # Load the manual 314-object village from the first playable frame.
     # The original sector/preview buttons are no longer part of the player HUD.
     _activate_default_village()
+    _create_november_snow()
+
+func _create_november_snow() -> void:
+    # CPUParticles3D works in the GL Compatibility Web renderer. Follow the
+    # player but keep local_coords=false so falling flakes do not teleport
+    # with footsteps. No accumulating snow: November is still wet and muddy.
+    var player := get_node_or_null("Player") as CharacterBody3D
+    if player == null:
+        push_warning("November snow skipped: Player missing")
+        return
+    var snow := CPUParticles3D.new()
+    snow.name = "NovemberSnow"
+    snow.amount = 340
+    snow.lifetime = 11.0
+    snow.preprocess = 11.0
+    snow.explosiveness = 0.0
+    snow.randomness = 0.62
+    snow.local_coords = false
+    snow.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+    snow.emission_box_extents = Vector3(24.0, 8.0, 24.0)
+    snow.position = Vector3(0.0, 13.0, 0.0)
+    snow.direction = Vector3(0.14, -1.0, 0.09)
+    snow.spread = 13.0
+    snow.initial_velocity_min = 0.50
+    snow.initial_velocity_max = 1.05
+    snow.gravity = Vector3(0.07, -0.36, 0.03)
+    snow.scale_amount_min = 0.65
+    snow.scale_amount_max = 1.12
+    snow.visibility_aabb = AABB(Vector3(-40.0, -28.0, -40.0),
+        Vector3(80.0, 50.0, 80.0))
+    var flake := QuadMesh.new()
+    flake.size = Vector2(0.047, 0.072)
+    var snow_material := StandardMaterial3D.new()
+    snow_material.albedo_color = Color(0.84, 0.88, 0.91, 0.78)
+    snow_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+    snow_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    snow_material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+    snow_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+    snow_material.no_depth_test = false
+    snow_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_OPAQUE_ONLY
+    flake.material = snow_material
+    snow.mesh = flake
+    player.add_child(snow)
+    snow.emitting = true
+    print("NOVEMBER_SNOW_READY: cpu=true amount=", snow.amount,
+        " follow_player=true drift=light")
+
 
 func _activate_default_village() -> void:
     if not manual_mode:
@@ -125,8 +173,8 @@ func _create_ground_material() -> StandardMaterial3D:
     return mat
 
 func _create_manual_ground_material() -> StandardMaterial3D:
-    # Preserve the 130 drawn features: only the base terrain between them is tinted.
-    # Coarse, non-checkerboard soil variation gives close-up detail at PS1 resolution.
+    # November: soaked brown-grey earth, almost no summer green. Geography
+    # and ground collisions remain unchanged; only color varies spatially.
     var img := Image.create(128, 128, false, Image.FORMAT_RGBA8)
     var rng := RandomNumberGenerator.new()
     rng.seed = 19961007
@@ -135,10 +183,10 @@ func _create_manual_ground_material() -> StandardMaterial3D:
             var broad := sin(float(x) * 0.11) * cos(float(y) * 0.07) * 0.055
             var swirls := sin(float(x) * 0.28 + float(y) * 0.17) * 0.027
             var noise := rng.randf_range(-0.032, 0.032)
-            var value := clampf(0.49 + broad + swirls + noise, 0.34, 0.63)
-            img.set_pixel(x, y, Color(value * 0.82, value * 0.86, value * 0.72))
+            var value := clampf(0.39 + broad * 0.7 + swirls * 0.65 + noise * 0.6, 0.31, 0.48)
+            img.set_pixel(x, y, Color(value * 0.96, value * 0.87, value * 0.74))
     img.generate_mipmaps()
-    var mat := _material(Color("#a4ab9d"))
+    var mat := _material(Color("#98968c"))
     mat.albedo_texture = ImageTexture.create_from_image(img)
     mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
     mat.uv1_scale = Vector3(21.0, 21.0, 1.0)
@@ -607,33 +655,33 @@ func _toggle_manual_preview() -> void:
     if _night_environment != null:
         _night_environment.background_mode = Environment.BG_COLOR
         # Godot Compatibility Web: artistic depth fog, not unsupported volumetric fog.
-        _night_environment.background_color = Color("#303548") if manual_mode else Color("#575b69")
+        _night_environment.background_color = Color("#303441") if manual_mode else Color("#575b69")
         _night_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-        _night_environment.ambient_light_color = Color("#a0aab2") if manual_mode else Color("#b0a9a4")
-        _night_environment.ambient_light_energy = 0.70 if manual_mode else 0.82
+        _night_environment.ambient_light_color = Color("#a1a6aa") if manual_mode else Color("#b0a9a4")
+        _night_environment.ambient_light_energy = 0.67 if manual_mode else 0.82
         _night_environment.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED if manual_mode else Environment.REFLECTION_SOURCE_BG
         _night_environment.glow_enabled = false
-        _night_environment.tonemap_exposure = 1.04 if manual_mode else 1.0
+        _night_environment.tonemap_exposure = 1.01 if manual_mode else 1.0
         _night_environment.fog_enabled = true
         _night_environment.fog_mode = Environment.FOG_MODE_DEPTH if manual_mode else Environment.FOG_MODE_EXPONENTIAL
-        _night_environment.fog_light_color = Color("#3b4150") if manual_mode else Color("#676976")
-        _night_environment.fog_light_energy = 0.47 if manual_mode else 1.0
+        _night_environment.fog_light_color = Color("#444951") if manual_mode else Color("#676976")
+        _night_environment.fog_light_energy = 0.50 if manual_mode else 1.0
         _night_environment.fog_sun_scatter = 0.0
         _night_environment.fog_aerial_perspective = 0.0
         _night_environment.fog_density = 0.88 if manual_mode else 0.0018
         _night_environment.fog_depth_begin = 28.0 if manual_mode else 24.0
-        _night_environment.fog_depth_end = 162.0 if manual_mode else 118.0
+        _night_environment.fog_depth_end = 148.0 if manual_mode else 118.0
         _night_environment.fog_depth_curve = 1.3
         _night_environment.fog_height = 0.8 if manual_mode else 0.0
         _night_environment.fog_height_density = 0.017 if manual_mode else 0.0
     if _sun_light != null:
-        _sun_light.light_energy = 0.52 if manual_mode else 1.05
+        _sun_light.light_energy = 0.48 if manual_mode else 1.05
         _sun_light.light_specular = 0.0
-        _sun_light.light_color = Color("#a1acb8") if manual_mode else Color("#f0b69a")
+        _sun_light.light_color = Color("#a3a8b0") if manual_mode else Color("#f0b69a")
         # The shadow map produced hard triangular streaks across the road and low-poly trees.
         _sun_light.shadow_enabled = not manual_mode
     if manual_mode:
-        print("MANUAL_NO_GLARE_READY: ambient=0.70, moon=0.52, fog_light=0.47, exposure=1.04")
+        print("MANUAL_NO_GLARE_READY: ambient=0.67, moon=0.48, fog_light=0.50, exposure=1.01")
     print("MANUAL_NIGHT_READY: ", manual_mode,
         " fog=", _night_environment.fog_mode if _night_environment != null else "MISSING_ENV",
         " glow=", _night_environment.glow_enabled if _night_environment != null else "MISSING_ENV",
