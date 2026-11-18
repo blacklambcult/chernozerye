@@ -9,7 +9,9 @@ const ROOF_TONES := ["#282e31", "#373432", "#30383a", "#403933"]
 const DOOR_COLOR := Color("#24221f")
 const FRAME_COLOR := Color("#73796d")
 const WINDOW_COLOR := Color("#131a1f")
-const WINDOW_LIT := Color("#d9c46e")
+const WINDOW_LIT := Color("#b9a16a")
+const WINDOW_OTHERWORLDLY_BLUE := Color("#83aed0")
+const WINDOW_OTHERWORLDLY_GREEN := Color("#77bdab")
 const FENCE_COLOR := Color("#494840")
 const POST_COLOR := Color("#3e3c36")
 const RUT_COLOR := Color("#383029")
@@ -34,6 +36,16 @@ var _detail_batches: Dictionary = {}
 var _textures: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 var _lights_placed: int = 0
+var _house_ordinal := 0
+var _current_house_light_kind := ""
+var _house_light_claimed := false
+var _warm_windows := 0
+var _otherworldly_windows := 0
+var _dark_houses := 0
+var _warm_houses := 0
+var _anomalous_houses := 0
+var _anomaly_lamps: Array[OmniLight3D] = []
+var _anomaly_clock := 0.0
 var _street_lights := 0
 var _street_lamp_heads := 0
 var _balcony_count := 0
@@ -75,6 +87,17 @@ var _carved_count := 0
 var _active_trim_key := "trim"
 var _yard_counts := [0, 0, 0, 0, 0, 0]
 var _clipped_log_segments := 0
+
+func _process(delta: float) -> void:
+    # Barely perceptible asynchronous pulsing is reserved for the two anomalies.
+    # Dark windows stay dark, so the effect is unmistakably out of place.
+    _anomaly_clock += delta
+    for i in range(_anomaly_lamps.size()):
+        var lamp := _anomaly_lamps[i]
+        if is_instance_valid(lamp):
+            var wave := sin(_anomaly_clock * (0.72 + float(i) * 0.19) + float(i) * 2.7)
+            lamp.light_energy = 0.39 + wave * 0.08
+
 
 func decorate(features: Array) -> void:
     _rng.seed = 19960918
@@ -147,6 +170,11 @@ func decorate(features: Array) -> void:
     _create_solid_mesh(_road_ruts, RUT_COLOR, "Дорога / земляные колеи")
     _create_solid_mesh(_overhead_wires, Color("#242d2d"), "Старые кабели / провисшие линии")
     _create_chimney_smoke()
+    print("ABANDONED_VILLAGE_LIGHTS_READY: houses=", _house_ordinal,
+        " dark=", _dark_houses, " warm_houses=", _warm_houses,
+        " anomalous_houses=", _anomalous_houses,
+        " warm_windows=", _warm_windows,
+        " otherworldly_windows=", _otherworldly_windows)
     print("MANUAL_UTILITY_READY: poles=", _utility_pole_count,
         " lamp_heads=", _street_lamp_heads, " warm_lights=", _street_lights,
         " balconies=", _balcony_count,
@@ -334,6 +362,8 @@ func _flush_details() -> void:
     var colors := {
         "window": WINDOW_COLOR,
         "window_lit": WINDOW_LIT,
+        "window_eerie_blue": WINDOW_OTHERWORLDLY_BLUE,
+        "window_eerie_green": WINDOW_OTHERWORLDLY_GREEN,
         "frame": FRAME_COLOR,
         "door": DOOR_COLOR,
         "lintel": Color("#52473f"),
@@ -345,6 +375,7 @@ func _flush_details() -> void:
         "lamp": Color("#df9c52"),
         "lamp_shade": Color("#55463a"),
         "lamp_glass": Color("#f9c96f"),
+        "lamp_glass_off": Color("#343a3b"),
         "bench_wood": Color("#536c70"),
         "bench_dark": Color("#363a37"),
         "flower_stem": Color("#5b5c47"),
@@ -395,8 +426,9 @@ func _flush_details() -> void:
     }
     for key in _detail_batches.keys():
         var verts: PackedVector3Array = _detail_batches[key]
-        if key == "window_lit" or key == "lamp_glass":
-            var lit_mat := _material(WINDOW_LIT if key == "window_lit" else Color("#ffcf79"))
+        if key in ["window_lit", "window_eerie_blue", "window_eerie_green", "lamp_glass"]:
+            var tint: Color = colors[key] if colors.has(key) else Color("#ffcf79")
+            var lit_mat := _material(tint)
             lit_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
             var arrays := []
             arrays.resize(Mesh.ARRAY_MAX)
@@ -580,7 +612,12 @@ func _wall_panel(key: String, start: Vector2, finish: Vector2, normal: Vector3,
 func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
         center_fraction: float, side_length: float, illuminated: bool,
         boarded: bool = false, decay: int = 0, style: int = 0, floor: int = 0) -> void:
-    # Five distinct replaceable modules on the same surveyed wall, including upper-floor windows.
+    # Only one lighted pane per selected house. The overwhelming majority of
+    # buildings are abandoned and must remain completely dark.
+    var light_kind := ""
+    if floor == 0 and not _house_light_claimed and _current_house_light_kind != "":
+        light_kind = _current_house_light_kind
+        _house_light_claimed = true
     var half := minf(0.072, 0.74 / maxf(side_length, 0.1))
     var u0 := center_fraction - half
     var u1 := center_fraction + half
@@ -590,7 +627,12 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
     var trim := "carving" if style == 1 or style == 4 else _active_trim_key
     _wall_panel("frame", start, finish, normal, u0 - 0.017, u1 + 0.017,
         low, high, 0.115)
-    _wall_panel("window_lit" if illuminated else "window",
+    var glass_key := "window"
+    if light_kind == "warm":
+        glass_key = "window_lit"
+    elif light_kind == "eerie":
+        glass_key = "window_eerie_blue" if _house_ordinal % 2 == 0 else "window_eerie_green"
+    _wall_panel(glass_key,
         start, finish, normal, u0, u1, low + 0.11, high - 0.11, 0.142)
     # Window muntins: divided, imperfect Soviet-era panes, not luminous squares.
     _wall_panel("muntin", start, finish, normal,
@@ -626,8 +668,9 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
         _wall_panel("shutter_dark", start, finish, normal,
             u0 - 0.080, u0 - 0.030, low + 0.38, low + 0.46, 0.196)
         _shutter_count += 1
-    elif style == 3:
-        # Boarded windows with crude, uneven boards.
+    elif style == 3 and light_kind == "":
+        # Boarded windows with crude, uneven boards. The anomalous window
+        # has no boards, making the rare glow visible from the road.
         _wall_panel("board", start, finish, normal, u0, u1,
             low + 0.26, low + 0.48, 0.195)
         _wall_panel("board", start, finish, normal, u0, u1,
@@ -638,20 +681,29 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
             u0 - 0.034, u1 + 0.034, high + 0.13, high + 0.24, 0.182)
         _wall_panel("frame", start, finish, normal, u0 + half * 0.90,
             u0 + half * 1.12, low + 0.10, high - 0.10, 0.160)
-    if boarded or decay % 9 == 0:
+    if light_kind == "" and (boarded or decay % 9 == 0):
         _wall_panel("cross_board", start, finish, normal, u0, u1,
             low + 0.47, low + 0.57, 0.198)
-    if illuminated and _lights_placed < 9:
+    if light_kind != "" and _lights_placed < 10:
         _lights_placed += 1
         var center := start.lerp(finish, center_fraction)
         var lamp := OmniLight3D.new()
-        lamp.name = "Тёплый свет окна"
-        lamp.position = _pt(center, low + 0.92) + normal * 1.1
-        lamp.light_color = Color("#e6cf86")
-        lamp.light_energy = 0.34
+        lamp.position = _pt(center, low + 0.92) + normal * 0.85
         lamp.light_specular = 0.0
-        lamp.omni_range = 5.2
         lamp.shadow_enabled = false
+        if light_kind == "eerie":
+            _otherworldly_windows += 1
+            lamp.name = "Потустороннее свечение в покинутом доме"
+            lamp.light_color = WINDOW_OTHERWORLDLY_BLUE if _house_ordinal % 2 == 0 else WINDOW_OTHERWORLDLY_GREEN
+            lamp.light_energy = 0.48
+            lamp.omni_range = 6.4
+            _anomaly_lamps.append(lamp)
+        else:
+            _warm_windows += 1
+            lamp.name = "Редкий обитаемый дом"
+            lamp.light_color = Color("#c6a772")
+            lamp.light_energy = 0.23
+            lamp.omni_range = 4.1
         add_child(lamp)
 
 func _raised_log(a: Vector2, b: Vector2, normal: Vector3, y: float) -> void:
@@ -755,6 +807,20 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
         return
     _building_count += 1
     var index := _building_count
+    # Exactly two anomalous houses and ~7 sparsely occupied houses in the
+    # 92-home manual survey; all others have no interior illumination.
+    _current_house_light_kind = ""
+    _house_light_claimed = false
+    if category == "house":
+        _house_ordinal += 1
+        if _house_ordinal == 19 or _house_ordinal == 62:
+            _current_house_light_kind = "eerie"
+            _anomalous_houses += 1
+        elif _house_ordinal % 13 == 5:
+            _current_house_light_kind = "warm"
+            _warm_houses += 1
+        else:
+            _dark_houses += 1
     var recipe: Dictionary = IZBA_VARIANTS.recipe(points) if category == "house" else {
         "floor_count": 1, "body": 0, "roof": 0, "window": 0, "entrance": 0
     }
@@ -1267,30 +1333,33 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
         _batch_box("chimney", chimney_at, Vector3(0.70, 1.10, 0.70))
         _batch_box("chimney_cap", chimney_at + Vector3.UP * 0.62,
             Vector3(0.87, 0.16, 0.87))
-        _chimney_smoke_sources.append(chimney_at + Vector3.UP * 0.82)
+        # Chimneys are mostly cold. Smoke is possible only from a few houses
+        # with warm windows, never from supernatural or fully dark buildings.
+        if _current_house_light_kind == "warm":
+            _chimney_smoke_sources.append(chimney_at + Vector3.UP * 0.82)
 
 func _create_chimney_smoke() -> void:
-    # November: a few inhabited izbas are heated. Only the 7 nearest visible
-    # chimneys create smoke, keeping the WebGL/Compatibility particle budget low.
+    # The village is deserted: no more than one distant hearth is burning.
+    # All other physical chimneys are cold and inactive.
     var spawn := Vector3(-789.7, 0.0, -268.6)
     _chimney_smoke_sources.sort_custom(func(a: Vector3, b: Vector3) -> bool:
         return a.distance_squared_to(spawn) < b.distance_squared_to(spawn))
     var smoke_mesh := QuadMesh.new()
-    smoke_mesh.size = Vector2(0.34, 0.34)
+    smoke_mesh.size = Vector2(0.26, 0.26)
     var smoke_material := StandardMaterial3D.new()
-    smoke_material.albedo_color = Color(0.67, 0.68, 0.69, 0.20)
+    smoke_material.albedo_color = Color(0.61, 0.65, 0.68, 0.13)
     smoke_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
     smoke_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
     smoke_material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
     smoke_material.cull_mode = BaseMaterial3D.CULL_DISABLED
     smoke_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_OPAQUE_ONLY
     smoke_mesh.material = smoke_material
-    var smoke_limit := mini(7, _chimney_smoke_sources.size())
+    var smoke_limit := mini(1, _chimney_smoke_sources.size())
     for index in range(smoke_limit):
         var smoke := CPUParticles3D.new()
         smoke.name = "NovemberChimneySmoke_" + str(index)
         smoke.position = _chimney_smoke_sources[index]
-        smoke.amount = 13
+        smoke.amount = 8
         smoke.lifetime = 5.5
         smoke.preprocess = 5.5
         smoke.randomness = 0.48
@@ -1310,7 +1379,7 @@ func _create_chimney_smoke() -> void:
         _chimneys_smoking += 1
     print("NOVEMBER_SMOKE_READY: active=", _chimneys_smoking,
         " candidates=", _chimney_smoke_sources.size(),
-        " particles_per_chimney=13")
+        " particles_per_chimney=8")
 
 
 func _box_faces(verts: PackedVector3Array, center: Vector3, size: Vector3) -> void:
@@ -1821,18 +1890,21 @@ func _decorate_utility_poles(points: PackedVector2Array) -> void:
                     lamp_end - Vector3.UP * 0.06, mount - Vector3.UP * 0.06)
                 _batch_box("lamp_shade", lamp_end + Vector3.DOWN * 0.25,
                     Vector3(0.56, 0.18, 0.48))
-                _batch_box("lamp_glass", lamp_end + Vector3.DOWN * 0.43,
-                    Vector3(0.35, 0.25, 0.35))
                 _street_lamp_heads += 1
-                # Real-time light count stays low for the Godot Compatibility Web build.
-                if _street_lights < 6:
+                # Unpowered Soviet street lamps: only two scattered survivors
+                # emit dim light; the other glass housings remain black.
+                var live_lamp := _street_lights < 2 and _street_lamp_heads % 7 == 4
+                _batch_box("lamp_glass" if live_lamp else "lamp_glass_off",
+                    lamp_end + Vector3.DOWN * 0.43,
+                    Vector3(0.35, 0.25, 0.35))
+                if live_lamp:
                     var lantern := OmniLight3D.new()
                     lantern.name = "Жёлтый деревенский фонарь"
                     lantern.position = lamp_end + Vector3.DOWN * 0.43
                     lantern.light_color = Color("#f3c77b")
-                    lantern.light_energy = 0.58
+                    lantern.light_energy = 0.27
                     lantern.light_specular = 0.0
-                    lantern.omni_range = 8.5
+                    lantern.omni_range = 6.0
                     lantern.shadow_enabled = false
                     add_child(lantern)
                     _street_lights += 1
