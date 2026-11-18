@@ -727,8 +727,10 @@ func _toggle_manual_preview() -> void:
             player_camera.far = MANUAL_CAMERA_FAR if manual_mode else 2300.0
             if manual_mode:
                 var capsule := character.get_node_or_null("CollisionShape3D") as CollisionShape3D
-                var shape := capsule.shape as CapsuleShape3D if capsule != null else null
-                var radius := shape.radius if shape != null else 0.0
+                var shape: CapsuleShape3D = null
+                if capsule != null:
+                    shape = capsule.shape as CapsuleShape3D
+                var radius: float = shape.radius if shape != null else 0.0
                 if radius <= player_camera.near + 0.20:
                     push_error("CAMERA_CLIP_GUARD_FAILED: camera near plane too far into walls")
                 print("CAMERA_CLIP_GUARD_READY: near=", player_camera.near,
