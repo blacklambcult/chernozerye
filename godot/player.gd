@@ -1,7 +1,9 @@
 extends CharacterBody3D
 
-const SPEED := 6.0
-const SPRINT_SPEED := 10.0
+const SPEED := 3.35
+const SPRINT_SPEED := 5.15
+const WALK_ACCELERATION := 9.0
+const WALK_FRICTION := 12.0
 const JUMP := 4.5
 const MOUSE_SENS := 0.002
 
@@ -121,27 +123,34 @@ func _build_character_idle_prop() -> void:
     _smoke_prop.visible = false
     camera.add_child(_smoke_prop)
     _gesture_upper = _view_segment(_smoke_prop, "UpperArmSleeve",
-        Vector3(0.47, -0.70, 0.12), Vector3(0.52, -0.77, -0.46),
-        0.108, 0.092, Color("#41483f"))
+        Vector3(0.46, -0.72, 0.12), Vector3(0.54, -0.69, -0.31),
+        0.088, 0.076, Color("#48443f"))
     _gesture_lower = _view_segment(_smoke_prop, "BentForearmSleeve",
-        Vector3(0.52, -0.77, -0.46), Vector3(0.41, -0.65, -0.82),
-        0.093, 0.071, Color("#3b433c"))
+        Vector3(0.54, -0.69, -0.31), Vector3(0.40, -0.66, -0.65),
+        0.077, 0.058, Color("#48443f"))
     _gesture_elbow = _view_round(_smoke_prop, "ElbowJoint",
-        Vector3(0.52, -0.77, -0.46), 0.095, Color("#3b433c"))
+        Vector3(0.54, -0.69, -0.31), 0.075, Color("#353330"))
     _gesture_hand = Node3D.new()
     _gesture_hand.name = "AnimatedHand"
-    _gesture_hand.position = Vector3(0.41, -0.65, -0.82)
+    _gesture_hand.position = Vector3(0.40, -0.66, -0.65)
     _smoke_prop.add_child(_gesture_hand)
-    _view_round(_gesture_hand, "Palm", Vector3.ZERO,
-        0.069, Color("#aa9079"), Vector3(0.87, 1.13, 0.75))
-    _view_round(_gesture_hand, "Thumb", Vector3(-0.068, 0.001, -0.012),
-        0.029, Color("#aa9079"))
+    # Small mitten-like placeholder palm with articulated slim fingers;
+    # avoid the giant round fist that dominated the earlier web build.
+    var palm := MeshInstance3D.new()
+    palm.name = "Palm"
+    var palm_mesh := BoxMesh.new()
+    palm_mesh.size = Vector3(0.088, 0.098, 0.048)
+    palm.mesh = palm_mesh
+    palm.material_override = _appearance_material(Color("#756a5c"))
+    _gesture_hand.add_child(palm)
+    _view_round(_gesture_hand, "Thumb", Vector3(-0.053, 0.002, -0.010),
+        0.022, Color("#756a5c"), Vector3(0.85, 1.12, 0.8))
     for finger in range(4):
         var side := float(finger) - 1.5
         _view_segment(_gesture_hand, "Finger" + str(finger),
-            Vector3(side * 0.028, 0.036, -0.022),
-            Vector3(side * 0.024, 0.086, -0.048),
-            0.016, 0.012, Color("#aa9079"))
+            Vector3(side * 0.022, 0.036, -0.016),
+            Vector3(side * 0.022, 0.080, -0.047),
+            0.011, 0.009, Color("#756a5c"))
 
     var cigarette := Node3D.new()
     cigarette.name = "PeriodCharacterProp"
@@ -202,17 +211,19 @@ func _apply_idle_pose(weight: float) -> void:
     if _gesture_upper == null or _gesture_lower == null or _gesture_hand == null:
         return
     var t := clampf(weight, 0.0, 1.0)
-    var shoulder := Vector3(0.49, -0.78, 0.15)
-    var elbow := Vector3(0.52, -0.75, -0.49).lerp(
-        Vector3(0.50, -0.48, -0.43), t)
-    var wrist := Vector3(0.41, -0.65, -0.82).lerp(
-        Vector3(0.13, -0.17, -0.36), t)
+    # A fixed shoulder; elbow remains at the player's right side while the
+    # hand travels up toward face height. Both segments bend independently.
+    var shoulder := Vector3(0.46, -0.70, 0.16)
+    var elbow := Vector3(0.54, -0.70, -0.30).lerp(
+        Vector3(0.48, -0.48, -0.32), t)
+    var wrist := Vector3(0.40, -0.66, -0.65).lerp(
+        Vector3(0.115, -0.135, -0.285), t)
     _orient_arm_segment(_gesture_upper, shoulder, elbow)
     _orient_arm_segment(_gesture_lower, elbow, wrist)
     _gesture_elbow.position = elbow
     _gesture_hand.position = wrist
-    _gesture_hand.rotation.z = -0.16 * t
-    _gesture_hand.rotation.x = -0.08 * t
+    _gesture_hand.rotation.z = -0.10 * t
+    _gesture_hand.rotation.x = -0.12 * t
 
 func _start_character_idle() -> void:
     if controls_locked or _idle_smoke_timer > 0.0 or _smoke_prop == null:
@@ -241,10 +252,10 @@ func _process(delta: float) -> void:
     var elapsed := _idle_smoke_duration - _idle_smoke_timer
     var t := clampf(elapsed / _idle_smoke_duration, 0.0, 1.0)
     var pose := 1.0
-    if t < 0.26:
-        pose = smoothstep(0.0, 0.26, t)
-    elif t > 0.73:
-        pose = 1.0 - smoothstep(0.73, 1.0, t)
+    if t < 0.34:
+        pose = smoothstep(0.0, 0.34, t)
+    elif t > 0.69:
+        pose = 1.0 - smoothstep(0.69, 1.0, t)
     # Jointed IK-like visual pose with a fixed shoulder and bending elbow.
     _apply_idle_pose(pose)
     _smoke_particles.emitting = t > 0.35 and t < 0.80
@@ -292,6 +303,10 @@ func _input(event: InputEvent) -> void:
         if key.pressed and key.keycode == KEY_ESCAPE:
             Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
+func _movement_speed(sprinting: bool) -> float:
+    return SPRINT_SPEED if sprinting else SPEED
+
+
 func _physics_process(delta: float) -> void:
     if not is_on_floor():
         velocity.y -= 17.0 * delta
@@ -308,9 +323,11 @@ func _physics_process(delta: float) -> void:
     if pressed["a"] or Input.is_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_A): axis.x -= 1.0
     if pressed["d"] or Input.is_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_D): axis.x += 1.0
     var direction := (transform.basis * Vector3(axis.x, 0.0, axis.y)).normalized()
-    var speed := SPRINT_SPEED if Input.is_key_pressed(KEY_SHIFT) else SPEED
-    velocity.x = direction.x * speed
-    velocity.z = direction.z * speed
+    var speed := _movement_speed(Input.is_key_pressed(KEY_SHIFT))
+    var desired := direction * speed
+    var acceleration := WALK_FRICTION if direction.length_squared() < 0.01 else WALK_ACCELERATION
+    velocity.x = move_toward(velocity.x, desired.x, acceleration * delta)
+    velocity.z = move_toward(velocity.z, desired.z, acceleration * delta)
     move_and_slide()
     if is_instance_valid(status_label):
         status_label.text = "INPUT DIAGNOSTICS 0.6\nLast: %s\nAxis: %s | Pos: (%.1f, %.1f)\nMouse: %s\nClick on game, then press W / M" % [last_event, str(axis), position.x, position.z, str(Input.mouse_mode)]
