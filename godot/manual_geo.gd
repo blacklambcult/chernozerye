@@ -61,6 +61,12 @@ func _build_manual() -> void:
                     _add_area(points, 0.12, COLORS[category], "Объект")
         object_count += 1
     _build_forest_instances()
+    # Separate, reversible decorative layer; manual survey coordinates remain untouched.
+    var art := Node3D.new()
+    art.name = "VillageArt22"
+    art.set_script(preload("res://manual_art.gd"))
+    add_child(art)
+    art.call("decorate", features)
     print("MANUAL_LAYOUT_READY: ", object_count)
 
 func _points(raw: Array) -> PackedVector2Array:
