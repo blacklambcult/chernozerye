@@ -18,6 +18,7 @@ var left_arm: Node3D
 var right_arm: Node3D
 var walk_phase := 0.0
 var hide_right_hand := false
+var pelvis_root: Node3D
 
 func _material(color: Color) -> StandardMaterial3D:
     var mat := StandardMaterial3D.new()
@@ -90,69 +91,72 @@ func _segment(parent: Node3D, name: String,
     parent.add_child(node)
     return node
 
-func _leg(side: float, label: String) -> Node3D:
+func _leg(side: float, label: String, root: Node3D) -> Node3D:
+    # Both hips and the jacket share the SAME pelvis coordinate frame.
+    # No visible ball-shaped hip joints: fabric runs continuously into thighs.
     var pivot := Node3D.new()
     pivot.name = label
-    pivot.position = Vector3(side * 0.165, 0.80, -0.045)
-    add_child(pivot)
-    _sphere(pivot, "HipJoint", Vector3.ZERO, 0.16, PANTS)
+    pivot.position = Vector3(side * 0.145, -0.055, 0.0)
+    root.add_child(pivot)
     _segment(pivot, "TrouserThigh", Vector3.ZERO,
-        Vector3(side * 0.016, -0.39, -0.027), 0.148, 0.125, PANTS)
-    _sphere(pivot, "Knee", Vector3(side * 0.016, -0.40, -0.026),
-        0.128, PANTS)
-    _segment(pivot, "TrouserCalf", Vector3(side * 0.016, -0.42, -0.026),
-        Vector3(side * 0.025, -0.69, -0.036), 0.12, 0.105, PANTS)
-    _box(pivot, "Boot", Vector3(0.23, 0.17, 0.35),
-        Vector3(side * 0.025, -0.725, -0.12), BOOTS)
-    _box(pivot, "BootSole", Vector3(0.245, 0.055, 0.37),
-        Vector3(side * 0.025, -0.80, -0.12), BELT)
+        Vector3(side * 0.012, -0.325, -0.028), 0.107, 0.097, PANTS)
+    _box(pivot, "FabricAtKnee", Vector3(0.196, 0.12, 0.165),
+        Vector3(side * 0.012, -0.353, -0.026), PANTS)
+    _segment(pivot, "TrouserCalf",
+        Vector3(side * 0.012, -0.365, -0.030),
+        Vector3(side * 0.02, -0.610, -0.038), 0.096, 0.081, PANTS)
+    _box(pivot, "Boot", Vector3(0.205, 0.157, 0.31),
+        Vector3(side * 0.02, -0.674, -0.09), BOOTS)
+    _box(pivot, "BootSole", Vector3(0.215, 0.046, 0.325),
+        Vector3(side * 0.02, -0.747, -0.09), BELT)
     return pivot
 
-func _arm(side: float, label: String) -> Node3D:
+
+func _arm(side: float, label: String, root: Node3D) -> Node3D:
     var pivot := Node3D.new()
     pivot.name = label
-    # Shift shoulders backward and below the eye. Previously these spheres
-    # filled the image when the user looked down into the body.
-    pivot.position = Vector3(side * 0.295, 1.155, 0.20)
-    add_child(pivot)
-    _sphere(pivot, "Shoulder", Vector3.ZERO, 0.105, COAT)
+    pivot.position = Vector3(side * 0.255, 0.375, 0.040)
+    root.add_child(pivot)
+    _sphere(pivot, "Shoulder", Vector3.ZERO, 0.098, COAT)
     _segment(pivot, "Sleeve", Vector3.ZERO,
-        Vector3(side * 0.065, -0.29, -0.04), 0.105, 0.088, COAT)
-    _sphere(pivot, "Elbow", Vector3(side * 0.065, -0.29, -0.04),
-        0.09, COAT_SHADOW)
+        Vector3(side * 0.060, -0.27, -0.03), 0.098, 0.083, COAT)
+    _sphere(pivot, "Elbow", Vector3(side * 0.060, -0.27, -0.03),
+        0.082, COAT_SHADOW)
     _segment(pivot, "LowerSleeve",
-        Vector3(side * 0.065, -0.30, -0.04),
-        Vector3(side * 0.09, -0.51, -0.16), 0.088, 0.066, COAT)
-    _sphere(pivot, "Hand", Vector3(side * 0.09, -0.565, -0.185),
-        0.072, GLOVES, Vector3(1.0, 1.18, 0.75))
-    for n in range(3):
-        _segment(pivot, "Finger" + str(n),
-            Vector3(side * 0.09 + (float(n) - 1.0) * 0.035,
-                -0.615, -0.20),
-            Vector3(side * 0.09 + (float(n) - 1.0) * 0.035,
-                -0.674, -0.22), 0.017, 0.012, GLOVES)
+        Vector3(side * 0.060, -0.28, -0.030),
+        Vector3(side * 0.08, -0.48, -0.13), 0.081, 0.062, COAT)
+    _sphere(pivot, "Hand", Vector3(side * 0.080, -0.52, -0.135),
+        0.065, GLOVES, Vector3(0.95, 1.1, 0.75))
     return pivot
+
 
 func _ready() -> void:
     name = "FirstPersonFullBody"
-    # Eye at y=1.55, z=0. The chest is narrow, flat and behind the
-    # camera rather than a giant green torso intersecting the viewing cone.
-    # Visible when looking straight down: the waist of an ordinary coat,
-    # trousers and shoes. No plated vest, collar, or separate chest pockets.
-    _tapered_coat(self, "ChestAndShoulders",
-        Vector3(0.0, 1.075, 0.25), 0.37, 0.215, 0.235)
-    _box(self, "LowerJacket", Vector3(0.43, 0.215, 0.21),
-        Vector3(0.0, 0.81, 0.235), COAT)
-    _box(self, "CoatHem", Vector3(0.455, 0.038, 0.23),
-        Vector3(0.0, 0.700, 0.235), COAT_SHADOW)
-    # A thin vertical fabric seam, not a belt buckle or armor plate.
-    _box(self, "CoatSeam", Vector3(0.015, 0.20, 0.012),
-        Vector3(0.0, 0.835, 0.121), COAT_SHADOW)
-    left_leg = _leg(-1.0, "LeftLeg")
-    right_leg = _leg(1.0, "RightLeg")
-    left_arm = _arm(-1.0, "LeftArm")
-    right_arm = _arm(1.0, "RightArm")
-    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true")
+    # Camera is only pitched at Camera3D; this pelvis remains attached to
+    # CharacterBody3D and follows yaw without lifting legs or moving the waist.
+    pelvis_root = Node3D.new()
+    pelvis_root.name = "PelvisRoot"
+    pelvis_root.position = Vector3(0.0, 0.80, 0.105)
+    add_child(pelvis_root)
+
+    # One continuous dark civilian coat joined to the trouser pelvis.
+    _tapered_coat(pelvis_root, "ChestAndShoulders",
+        Vector3(0.0, 0.285, 0.0), 0.35, 0.207, 0.226)
+    _box(pelvis_root, "LowerJacket", Vector3(0.415, 0.205, 0.23),
+        Vector3(0.0, 0.090, 0.0), COAT)
+    _box(pelvis_root, "CoatHem", Vector3(0.435, 0.058, 0.24),
+        Vector3(0.0, -0.022, 0.0), COAT_SHADOW)
+    _box(pelvis_root, "HipFabric", Vector3(0.39, 0.135, 0.225),
+        Vector3(0.0, -0.093, 0.0), PANTS)
+    _box(pelvis_root, "CoatSeam", Vector3(0.012, 0.18, 0.012),
+        Vector3(0.0, 0.145, -0.119), COAT_SHADOW)
+
+    left_leg = _leg(-1.0, "LeftLeg", pelvis_root)
+    right_leg = _leg(1.0, "RightLeg", pelvis_root)
+    left_arm = _arm(-1.0, "LeftArm", pelvis_root)
+    right_arm = _arm(1.0, "RightArm", pelvis_root)
+    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true pelvis_aligned=true")
+
 
 func set_right_hand_occupied(value: bool) -> void:
     hide_right_hand = value
