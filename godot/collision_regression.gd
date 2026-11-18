@@ -105,7 +105,7 @@ func _run() -> void:
     # The camera's downward ray must not begin inside or directly hit a huge
     # chest mesh. Verify the torso is below eye height and shifted behind view.
     var chest := avatar.get_node_or_null("ChestAndShoulders") as MeshInstance3D
-    if chest == null or not chest.mesh is BoxMesh:
+    if chest == null or not (chest.mesh is BoxMesh):
         _fail("upper torso must be a compact box, not a head-sized sphere")
         return
     var torso_box := chest.mesh as BoxMesh
