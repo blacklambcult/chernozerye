@@ -5,9 +5,11 @@ const LOGO_DATA = preload("res://logo_data.gd")
 const MAP_FILE := "res://world_data.json"
 const MANUAL_FILE := "res://manual_layout.json"
 const GAME_TITLE := "Fearless Knights of the Cordon"
-const GAME_STAGE := "Pre-Alpha 0.4.2"
+const GAME_STAGE := "Pre-Alpha 0.4.3"
+const MANUAL_CAMERA_NEAR := 0.16
+const MANUAL_CAMERA_FAR := 250.0
 const SEASON := "NOVEMBER"
-const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.4.2 · ЧЕРНОЗЁРЬЕ · 314 ОБЪЕКТОВ"
+const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.4.3 · ЧЕРНОЗЁРЬЕ · 314 ОБЪЕКТОВ"
 var manual_mode := false
 var manual_button: Button
 var _status_label: Label
@@ -715,12 +717,22 @@ func _toggle_manual_preview() -> void:
     if character != null:
         character.velocity = Vector3.ZERO
         character.global_position = Vector3(-789.7, 0.22, -268.6) if manual_mode else Vector3(130.0, 0.22, -82.0)
-        # Short depth range plus a slightly farther near plane reduces roof/fascia
-        # depth-buffer jitter in Godot Compatibility Web when looking up close.
+        # The old 0.60 m near plane extended beyond the 0.46 m player capsule
+        # and visibly sliced walls/windows even though collisions were working.
+        # Keep the near plane well INSIDE the capsule, and shorten the far plane
+        # instead to limit roof Z-fighting in Compatibility/WebGL.
         var player_camera := character.get_node_or_null("Camera3D") as Camera3D
         if player_camera != null:
-            player_camera.near = 0.60 if manual_mode else 0.25
-            player_camera.far = 390.0 if manual_mode else 2300.0
+            player_camera.near = MANUAL_CAMERA_NEAR if manual_mode else 0.25
+            player_camera.far = MANUAL_CAMERA_FAR if manual_mode else 2300.0
+            if manual_mode:
+                var capsule := character.get_node_or_null("CollisionShape3D") as CollisionShape3D
+                var shape := capsule.shape as CapsuleShape3D if capsule != null else null
+                var radius := shape.radius if shape != null else 0.0
+                if radius <= player_camera.near + 0.20:
+                    push_error("CAMERA_CLIP_GUARD_FAILED: camera near plane too far into walls")
+                print("CAMERA_CLIP_GUARD_READY: near=", player_camera.near,
+                    " far=", player_camera.far, " radius=", radius)
     overview_layer.visible = false
     Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
