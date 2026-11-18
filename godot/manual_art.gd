@@ -405,7 +405,7 @@ func _fence_span_clear(a: Vector2, b: Vector2) -> bool:
 func _entry_clear(mid: Vector3, tangent: Vector3, outward: Vector3,
         extension: float, half_width: float) -> bool:
     for side in [-1.0, 0.0, 1.0]:
-        var test := mid + outward * extension + tangent * side * half_width
+        var test: Vector3 = mid + outward * extension + tangent * float(side) * half_width
         var p := Vector2(test.x, -test.z)
         if _road_surface_gap(p) < 0.48 or _plot_boundary_gap(p) < 0.38:
             return false
