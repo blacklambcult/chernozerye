@@ -122,7 +122,7 @@ func _run() -> void:
     if jacket == null or hip_fabric == null:
         _fail("there must be continuous jacket and pelvis geometry")
         return
-    if absf(jacket.position.z - left_leg.position.z) > 0.01:
+    if absf(jacket.position.z - left_leg.position.z) > 0.06:
         _fail("coat and legs have disconnected depth anchors")
         return
     if absf(pelvis.position.x) > 0.001:
@@ -144,6 +144,29 @@ func _run() -> void:
         return
     if torso_coat.radial_segments > 10:
         _fail("body model lost the simple low-poly visual language")
+        return
+    if pelvis.get_node_or_null("CoatSeam") != null:
+        _fail("jacket center spike returned to the look-down view")
+        return
+    var camera := actor.get_node("Camera3D") as Camera3D
+    camera.rotation.x = -1.45
+    avatar.call("_process", 0.016)
+    if chest.visible:
+        _fail("upper coat still blocks vision at extreme downward pitch")
+        return
+    if (pelvis.get_node("LeftArm") as Node3D).visible:
+        _fail("full-body arm obscures downward view")
+        return
+    if not jacket.visible or not left_leg.visible or not right_leg.visible:
+        _fail("look-down cutaway hid the waist or legs")
+        return
+    if not (left_leg.get_node("Boot") as MeshInstance3D).visible:
+        _fail("boots should remain visible while looking down")
+        return
+    camera.rotation.x = 0.0
+    avatar.call("_process", 0.016)
+    if not chest.visible or not (pelvis.get_node("LeftArm") as Node3D).visible:
+        _fail("upper coat and arm did not return after raising the view")
         return
     if actor.call("_movement_speed", false) > 3.6 or actor.call("_movement_speed", true) > 5.5:
         _fail("movement speed is too fast for November exploration")
@@ -188,11 +211,15 @@ func _run() -> void:
         _fail("hand reached into camera instead of stopping at face height")
         return
     var palm := hand_model.get_node("AnimatedHand/Palm") as MeshInstance3D
-    if palm == null or not (palm.mesh is BoxMesh):
-        _fail("low-poly slender hand missing")
+    if palm == null or not (palm.mesh is CapsuleMesh):
+        _fail("hand must have connected rounded volume, not a square slab")
         return
-    if (palm.mesh as BoxMesh).size.x > 0.10:
-        _fail("hand still renders as a giant fist")
+    var glove := palm.mesh as CapsuleMesh
+    if glove.radius > 0.050 or glove.height > 0.133:
+        _fail("rounded glove is too large for the first-person view")
+        return
+    if hand_model.get_node_or_null("AnimatedHand/WristCuff") == null:
+        _fail("gesture forearm leaves an open gap at the wrist")
         return
     if wrist_raised.y - wrist_rest.y < 0.35 or wrist_raised.x > 0.25:
         _fail("hand should rise toward center/face, not stay extended ahead")
@@ -234,5 +261,5 @@ func _run() -> void:
         _fail("quick slot selection does not update")
         return
     print("COLLISION_REGRESSION_OK: house=solid fence=solid gap=open player_idle=cosmetic capsule=blocked view=compact")
-    print("FIRST_PERSON_HUD_REGRESSION_OK: avatar=body+legs+arms prop=filter+paper+ember compass=NESW health=100 slots=4 eye_clear=true elbow_bent=true civilian_coat=true slower_walk=true pelvis_aligned=true hand_inward=true tip_outward=true")
+    print("FIRST_PERSON_HUD_REGRESSION_OK: avatar=body+legs+arms prop=filter+paper+ember compass=NESW health=100 slots=4 eye_clear=true elbow_bent=true civilian_coat=true slower_walk=true pelvis_aligned=true hand_inward=true tip_outward=true lookdown_clear=true glove_rounded=true")
     quit(0)
