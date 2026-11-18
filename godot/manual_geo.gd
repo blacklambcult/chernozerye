@@ -7,7 +7,7 @@ const COLORS := {
     "road": Color("#796e60"),
     "path": Color("#66645c"),
     "plot": Color("#333b32"),
-    "forest": Color("#1c3228"),
+    "forest": Color("#38483d"),
     "water": Color("#234253"),
     "object": Color("#9c9ca1"),
     "house": Color("#bb8b73"),
@@ -104,6 +104,7 @@ func _mat(color: Color) -> StandardMaterial3D:
     var m := StandardMaterial3D.new()
     m.albedo_color = color
     m.roughness = 1.0
+    m.specular = 0.0
     m.cull_mode = BaseMaterial3D.CULL_DISABLED
     return m
 
@@ -244,7 +245,7 @@ func _scatter_forest(points: PackedVector2Array) -> void:
         var rotation := rng.randf_range(-PI, PI)
         var basis := Basis().rotated(Vector3.UP, rotation).scaled(Vector3.ONE * scale)
         if count % 4 == 0:
-            broad_canopies.append(Transform3D(basis, _pos(p, 5.7 * scale)))
+            broad_canopies.append(Transform3D(basis, _pos(p, 4.4 * scale)))
         else:
             forest_positions.append(Transform3D(basis, _pos(p, 5.0 * scale)))
         tree_trunks.append(Transform3D(basis, _pos(p, 1.65 * scale)))
@@ -264,9 +265,8 @@ func _instanced_tree(mesh: Mesh, transforms: Array[Transform3D], color: Color, l
     node.multimesh = multi
     var tree_mat := _mat(color)
     tree_mat.specular = 0.0
-    # Keep the foliage silhouettes stable: no directional highlights or harsh self-shadows.
-    if not label.contains("стволы"):
-        tree_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    # Diffuse lighting restores the faceted PS1 look; unshaded green stood out against the dusk fog.
+    # Keep specular reflections and cast shadows disabled to avoid web-rendering artifacts.
     node.material_override = tree_mat
     node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     add_child(node)
@@ -287,7 +287,7 @@ func _build_forest_instances() -> void:
     lowest.height = 3.5
     lowest.radial_segments = 6
     _instanced_tree(lowest, _layer_transforms(forest_positions, -1.4),
-        Color("#263d36"), "Ели / нижние лапы")
+        Color("#24342f"), "Ели / нижние лапы")
 
     var middle := CylinderMesh.new()
     middle.top_radius = 0.22
@@ -295,7 +295,7 @@ func _build_forest_instances() -> void:
     middle.height = 2.9
     middle.radial_segments = 6
     _instanced_tree(middle, _layer_transforms(forest_positions, 0.65),
-        Color("#2a4539"), "Ели / средние лапы")
+        Color("#293b34"), "Ели / средние лапы")
 
     var top := CylinderMesh.new()
     top.top_radius = 0.0
@@ -303,7 +303,7 @@ func _build_forest_instances() -> void:
     top.height = 2.5
     top.radial_segments = 5
     _instanced_tree(top, _layer_transforms(forest_positions, 2.3),
-        Color("#304a3c"), "Ели / кроны")
+        Color("#33463a"), "Ели / кроны")
 
     # Aspen canopy is irregular, compact, and visually distinct from conifers.
     var broad := SphereMesh.new()
@@ -311,14 +311,14 @@ func _build_forest_instances() -> void:
     broad.height = 3.0
     broad.radial_segments = 6
     broad.rings = 3
-    _instanced_tree(broad, broad_canopies, Color("#3b5446"), "Осинник / кроны")
+    _instanced_tree(broad, broad_canopies, Color("#36463e"), "Осинник / кроны")
     var smaller := SphereMesh.new()
     smaller.radius = 1.1
     smaller.height = 2.1
     smaller.radial_segments = 5
     smaller.rings = 2
     _instanced_tree(smaller, _layer_transforms(broad_canopies, 1.3),
-        Color("#435d49"), "Осинник / верхушки")
+        Color("#3b4c40"), "Осинник / верхушки")
     var trunk := CylinderMesh.new()
     trunk.top_radius = 0.25
     trunk.bottom_radius = 0.40
