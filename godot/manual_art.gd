@@ -42,6 +42,9 @@ var _house_light_claimed := false
 var _warm_windows := 0
 var _otherworldly_windows := 0
 var _dark_houses := 0
+var _new_boarded_windows := 0
+var _sealed_entries := 0
+var _eerie_motes := 0
 var _warm_houses := 0
 var _anomalous_houses := 0
 var _anomaly_lamps: Array[OmniLight3D] = []
@@ -175,6 +178,8 @@ func decorate(features: Array) -> void:
         " anomalous_houses=", _anomalous_houses,
         " warm_windows=", _warm_windows,
         " otherworldly_windows=", _otherworldly_windows)
+    print("ABANDONMENT_FACADE_READY: boarded_windows=", _new_boarded_windows,
+        " sealed_entries=", _sealed_entries, " anomaly_motes=", _eerie_motes)
     print("MANUAL_UTILITY_READY: poles=", _utility_pole_count,
         " lamp_heads=", _street_lamp_heads, " warm_lights=", _street_lights,
         " balconies=", _balcony_count,
@@ -366,6 +371,8 @@ func _flush_details() -> void:
         "window_eerie_green": WINDOW_OTHERWORLDLY_GREEN,
         "frame": FRAME_COLOR,
         "door": DOOR_COLOR,
+        "rotted_plank": Color("#49433b"),
+        "cracked_pane": Color("#333f43"),
         "lintel": Color("#52473f"),
         "chimney": Color("#704a3e"),
         "chimney_cap": Color("#34383a"),
@@ -684,6 +691,22 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
     if light_kind == "" and (boarded or decay % 9 == 0):
         _wall_panel("cross_board", start, finish, normal, u0, u1,
             low + 0.47, low + 0.57, 0.198)
+    # Randomly placed decayed planks are the dominant visual on empty homes.
+    # Keep them behind the scarce supernatural / warm-lit windows.
+    if light_kind == "" and _current_house_light_kind == "" and (
+            (_house_ordinal * 17 + decay * 7 + floor * 11) % 5 <= 1):
+        _wall_panel("rotted_plank", start, finish, normal,
+            u0 + 0.01 * half, u1 - 0.01 * half,
+            low + 0.17, low + 0.39, 0.214)
+        _wall_panel("rotted_plank", start, finish, normal,
+            u0 + 0.01 * half, u1 - 0.01 * half,
+            low + 0.88, low + 1.09, 0.216)
+        _new_boarded_windows += 1
+    elif light_kind == "" and _current_house_light_kind == "" and (
+            (decay * 7 + _house_ordinal) % 6 == 0):
+        _wall_panel("cracked_pane", start, finish, normal,
+            center_fraction - 0.003, center_fraction + 0.003,
+            low + 0.21, high - 0.16, 0.205)
     if light_kind != "" and _lights_placed < 10:
         _lights_placed += 1
         var center := start.lerp(finish, center_fraction)
@@ -698,6 +721,7 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
             lamp.light_energy = 0.48
             lamp.omni_range = 6.4
             _anomaly_lamps.append(lamp)
+            _create_eerie_window_dust(lamp.position, _house_ordinal % 2 == 0)
         else:
             _warm_windows += 1
             lamp.name = "Редкий обитаемый дом"
@@ -705,6 +729,41 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
             lamp.light_energy = 0.23
             lamp.omni_range = 4.1
         add_child(lamp)
+
+func _create_eerie_window_dust(location: Vector3, blue: bool) -> void:
+    # Soft motes, not monsters or a bright magic effect. Exactly two emitters,
+    # each bound to one of the already-surveyed anomalous homes.
+    var particles := CPUParticles3D.new()
+    particles.name = "RareAnomalyMotes"
+    particles.position = location + Vector3.UP * 0.2
+    particles.amount = 17
+    particles.lifetime = 6.8
+    particles.preprocess = 6.8
+    particles.randomness = 0.65
+    particles.local_coords = false
+    particles.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+    particles.emission_box_extents = Vector3(0.95, 0.60, 0.95)
+    particles.direction = Vector3(0.10, 1.0, 0.08)
+    particles.spread = 17.0
+    particles.initial_velocity_min = 0.09
+    particles.initial_velocity_max = 0.26
+    particles.gravity = Vector3(0.01, 0.015, -0.01)
+    particles.scale_amount_min = 0.45
+    particles.scale_amount_max = 1.1
+    var dust_mesh := QuadMesh.new()
+    dust_mesh.size = Vector2(0.095, 0.095)
+    var dust_mat := StandardMaterial3D.new()
+    dust_mat.albedo_color = Color(0.54, 0.75, 0.85, 0.27) if blue else Color(0.48, 0.78, 0.68, 0.26)
+    dust_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+    dust_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    dust_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+    dust_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+    dust_mesh.material = dust_mat
+    particles.mesh = dust_mesh
+    add_child(particles)
+    particles.emitting = true
+    _eerie_motes += 1
+
 
 func _raised_log(a: Vector2, b: Vector2, normal: Vector3, y: float) -> void:
     # Old horizontal timber, three PS1 facets, softer than the giant 3.2 teeth.
@@ -876,6 +935,15 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
                 0.5 + door_half + 0.02, 0.1, 2.23)
             _wall_panel("door", a, b, normal, 0.5 - door_half,
                 0.5 + door_half, 0.12, 2.13, 0.15)
+            # Some deserted houses were sealed long ago. These are facade
+            # decorations only, not colliders or changes to surveyed entrances.
+            if category == "house" and _current_house_light_kind == "" and index % 4 == 1:
+                for plank in range(3):
+                    var bottom := 0.50 + float(plank) * 0.50
+                    _wall_panel("rotted_plank", a, b, normal,
+                        0.5 - door_half * 1.10, 0.5 + door_half * 1.10,
+                        bottom, bottom + 0.19, 0.215)
+                _sealed_entries += 1
             if category == "house" and length > 7.0:
                 _make_window(a, b, normal, 0.19, length, index % 5 != 1,
                     index % 11 == 0, index + i, window_style)
