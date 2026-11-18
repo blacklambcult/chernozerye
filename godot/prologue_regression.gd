@@ -35,7 +35,7 @@ func _run_tests() -> void:
     if not bool(story.get("inside_home")):
         _fail("interact E cannot enter home")
         return
-    var room: Vector3 = story.get("ROOM_ORIGIN")
+    var room := Vector3(3200.0, 0.0, 3200.0)
     player.global_position = room + Vector3(-2.1, 0.25, -0.55)
     story.call("_interact")
     if not bool(story.get("note_found")):
