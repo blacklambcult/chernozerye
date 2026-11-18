@@ -17,6 +17,10 @@ const COLORS := {
 }
 var object_count: int = 0
 var forest_positions: Array[Transform3D] = []
+var broad_canopies: Array[Transform3D] = []
+var tree_trunks: Array[Transform3D] = []
+var manual_roads: Array = []
+var _base_buildings: Node3D
 
 func _ready() -> void:
     visible = false
@@ -32,6 +36,15 @@ func _build_manual() -> void:
         push_error("GeoLab manual layout invalid")
         return
     var features: Array = data.get("features", [])
+    _base_buildings = Node3D.new()
+    _base_buildings.name = "UnstyledBuildingBlockout"
+    _base_buildings.visible = false
+    add_child(_base_buildings)
+    for f in features:
+        if f is Dictionary and str(f.get("type", "")) == "road":
+            var polyline := _points(f.get("points", []))
+            for i in range(polyline.size() - 1):
+                manual_roads.append([polyline[i], polyline[i + 1]])
     for f in features:
         if not f is Dictionary:
             continue
@@ -99,7 +112,10 @@ func _mesh_from_triangles(vertices: PackedVector3Array, color: Color, label: Str
     instance.mesh = mesh
     instance.material_override = _mat(color)
     instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-    add_child(instance)
+    if label.ends_with("_walls") or label.ends_with("_roof"):
+        _base_buildings.add_child(instance)
+    else:
+        add_child(instance)
 
 func _put_triangle(output: PackedVector3Array, a: Vector3, b: Vector3, c: Vector3) -> void:
     output.append_array(PackedVector3Array([a, b, c]))
@@ -174,50 +190,79 @@ func _add_car(point: Array, _feature: Dictionary) -> void:
     node.material_override = _mat(COLORS["car"])
     add_child(node)
 
+func _nearest_road(point: Vector2) -> float:
+    var best := INF
+    for segment in manual_roads:
+        var close := Geometry2D.get_closest_point_to_segment(point, segment[0], segment[1])
+        best = minf(best, point.distance_to(close))
+    return best
+
 func _scatter_forest(points: PackedVector2Array) -> void:
     var min_p := Vector2(INF, INF)
     var max_p := Vector2(-INF, -INF)
     var twice_area := 0.0
     for i in range(points.size()):
         var p: Vector2 = points[i]
-        min_p.x = minf(min_p.x, p.x)
-        min_p.y = minf(min_p.y, p.y)
-        max_p.x = maxf(max_p.x, p.x)
-        max_p.y = maxf(max_p.y, p.y)
+        min_p = min_p.min(p)
+        max_p = max_p.max(p)
         var q: Vector2 = points[(i + 1) % points.size()]
-        twice_area += p.x*q.y - q.x*p.y
+        twice_area += p.x * q.y - q.x * p.y
     var area_m2 := absf(twice_area) * 0.5
-    var desired := mini(125, int(area_m2 / 700.0))
+    # Batching keeps large forest polygons viable on Web without thousands of nodes.
+    var desired := mini(950, int(area_m2 / 115.0))
     var rng := RandomNumberGenerator.new()
     rng.seed = 20261118 + points.size() * 103 + int(absf(min_p.x) * 10.0)
     var count := 0
-    for attempt in range(desired * 18):
+    for attempt in range(desired * 20):
         if count >= desired:
             break
         var p := Vector2(rng.randf_range(min_p.x, max_p.x), rng.randf_range(min_p.y, max_p.y))
         if not Geometry2D.is_point_in_polygon(p, points):
             continue
-        var scale := rng.randf_range(0.75, 1.5)
-        forest_positions.append(Transform3D(
-            Basis().rotated(Vector3.UP, rng.randf_range(-PI, PI)).scaled(Vector3.ONE * scale),
-            _pos(p, 5.0 * scale)))
+        if _nearest_road(p) < 7.0:
+            continue
+        var scale := rng.randf_range(0.70, 1.45)
+        var rotation := rng.randf_range(-PI, PI)
+        var basis := Basis().rotated(Vector3.UP, rotation).scaled(Vector3.ONE * scale)
+        if count % 4 == 0:
+            broad_canopies.append(Transform3D(basis, _pos(p, 5.7 * scale)))
+        else:
+            forest_positions.append(Transform3D(basis, _pos(p, 5.0 * scale)))
+        tree_trunks.append(Transform3D(basis, _pos(p, 1.65 * scale)))
         count += 1
 
-func _build_forest_instances() -> void:
-    if forest_positions.is_empty():
+func _instanced_tree(mesh: Mesh, transforms: Array[Transform3D], color: Color, label: String) -> void:
+    if transforms.is_empty():
         return
-    var canopy := CylinderMesh.new()
-    canopy.top_radius = 0.0
-    canopy.bottom_radius = 2.7
-    canopy.height = 7.0
-    var forest_mesh := MultiMesh.new()
-    forest_mesh.transform_format = MultiMesh.TRANSFORM_3D
-    forest_mesh.mesh = canopy
-    forest_mesh.instance_count = forest_positions.size()
-    for i in range(forest_positions.size()):
-        forest_mesh.set_instance_transform(i, forest_positions[i])
+    var multi := MultiMesh.new()
+    multi.transform_format = MultiMesh.TRANSFORM_3D
+    multi.mesh = mesh
+    multi.instance_count = transforms.size()
+    for i in range(transforms.size()):
+        multi.set_instance_transform(i, transforms[i])
     var node := MultiMeshInstance3D.new()
-    node.name = "Ручной лес / деревья"
-    node.multimesh = forest_mesh
-    node.material_override = _mat(Color("#35513b"))
+    node.name = label
+    node.multimesh = multi
+    node.material_override = _mat(color)
     add_child(node)
+
+func _build_forest_instances() -> void:
+    var fir := CylinderMesh.new()
+    fir.top_radius = 0.0
+    fir.bottom_radius = 3.3
+    fir.height = 8.0
+    fir.radial_segments = 5
+    _instanced_tree(fir, forest_positions, Color("#233b31"), "Тёмные ели / массив")
+    var broad := CylinderMesh.new()
+    broad.top_radius = 0.52
+    broad.bottom_radius = 3.5
+    broad.height = 8.5
+    broad.radial_segments = 7
+    _instanced_tree(broad, broad_canopies, Color("#354d3d"), "Ели / широкие кроны")
+    var trunk := CylinderMesh.new()
+    trunk.top_radius = 0.25
+    trunk.bottom_radius = 0.44
+    trunk.height = 3.3
+    trunk.radial_segments = 5
+    _instanced_tree(trunk, tree_trunks, Color("#37352f"), "Лес / стволы")
+    print("MANUAL_FOREST_READY: trees=", tree_trunks.size())
