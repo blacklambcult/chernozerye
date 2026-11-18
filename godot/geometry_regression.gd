@@ -72,7 +72,7 @@ func _initialize() -> void:
     geo.call("_add_road_wear", line, 0.145)
     var ruts: MeshInstance3D = null
     for child in geo.get_children():
-        if child is MeshInstance3D and child.name == "Дорога / мягкие прерывистые колеи":
+        if child is MeshInstance3D and str(child.name).contains("прерывистые колеи"):
             ruts = child
             break
     if ruts == null or ruts.mesh == null:
