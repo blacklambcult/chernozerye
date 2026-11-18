@@ -67,6 +67,7 @@ func _build_manual() -> void:
     # long dark ruts are drawn underneath a small circular junction patch
     # and re-emerge as a hard X through the intersection.
     _detect_road_intersections()
+    var road_draw_index := 0
     for f in features:
         if not f is Dictionary:
             continue
@@ -77,7 +78,14 @@ func _build_manual() -> void:
         if category == "car":
             _add_car(raw[0], f)
         elif category == "road" or category == "path":
-            _add_strip(raw, 3.8 if category == "road" else 1.6, 0.11, COLORS[category], category)
+            if category == "road":
+                # Each surveyed road sits on a slightly different depth layer.
+                # No overlapping coplanar road planes and no giant round caps.
+                _add_strip(raw, 3.8, _road_elevation(road_draw_index),
+                    COLORS["road"], "road")
+                road_draw_index += 1
+            else:
+                _add_strip(raw, 1.6, 0.105, COLORS["path"], "path")
         else:
             var points := _points(raw)
             if points.size() < 3:
@@ -97,8 +105,8 @@ func _build_manual() -> void:
                 "object":
                     _add_area(points, 0.12, COLORS[category], "Объект")
         object_count += 1
-    # Intersection caps sit above the individual road surfaces: same-height
-    # crossing quads previously z-fought and produced black triangles on WebGL.
+    # Surveyed centre lines remain untouched. No visible round junction caps:
+    # crossings are handled by small elevation separation + track clearance.
     _build_road_intersections()
     _build_forest_instances()
     # Separate, reversible decorative layer; manual survey coordinates remain untouched.
@@ -210,6 +218,12 @@ func _append_joined_ribbon(vertices: PackedVector3Array, points: PackedVector2Ar
         _put_triangle(vertices, left0, right1, left1)
 
 
+func _road_elevation(road_id: int) -> float:
+    # Up to 18 surveyed roads, max height difference ≈ 6 cm.
+    # Separates overlapping Godot WebGL polygons with no circular junction discs.
+    return 0.11 + float(road_id) * 0.0036
+
+
 func _add_strip(raw: Array, width: float, height: float, tint: Color, label: String) -> void:
     var points := _clean_road_points(_points(raw))
     if points.size() < 2:
@@ -276,7 +290,10 @@ func _add_village_roadside(points: PackedVector2Array, width: float, height: flo
     # A modest batched budget keeps the Web Compatibility renderer responsive.
     var shoulders := PackedVector3Array()
     # Joined base apron sits 2.5 cm under the road and remains visible on both sides.
-    _append_joined_ribbon(shoulders, points, width + 1.45, 0.0, height - 0.025)
+    # Keep every road's shoulder below even the lowest road surface, regardless
+    # of render-layer bias, to avoid another dark X at the junction.
+    var shoulder_height := 0.072 + maxf(0.0, height - 0.11) * 0.10
+    _append_joined_ribbon(shoulders, points, width + 1.45, 0.0, shoulder_height)
     var stones := PackedVector3Array()
     var weeds := PackedVector3Array()
     var dried := PackedVector3Array()
@@ -346,7 +363,7 @@ func _register_road_junction(point: Vector2, radius: float) -> void:
     # intersection prevents overlapping coplanar junction fans.
     for n in range(_junctions.size()):
         var old: Dictionary = _junctions[n]
-        if point.distance_to(old["center"]) < 6.5:
+        if point.distance_to(old["center"]) < 2.2:
             old["radius"] = maxf(float(old["radius"]), radius)
             _junctions[n] = old
             return
@@ -370,7 +387,7 @@ func _detect_road_intersections() -> void:
             var d: Vector2 = two[1]
             var db := (d - c).normalized()
             var sine := absf(da.cross(db))
-            if sine < 0.26:
+            if sine < 0.45:
                 continue
             # Cheap segment AABB before Geometry2D's exact intersection.
             if maxf(a.x, b.x) + 2.1 < minf(c.x, d.x) or (
@@ -401,44 +418,17 @@ func _detect_road_intersections() -> void:
                     continue
                 junction = best_point
             # At shallow angles, the crossing road strips occupy a wider area.
-            var patch_radius := clampf(3.7 / maxf(sine, 0.40), 4.1, 8.0)
+            var patch_radius := clampf(2.2 / maxf(sine, 0.70), 2.2, 3.2)
             _register_road_junction(junction, patch_radius)
 
 
-func _junction_fan(center: Vector2, radius: float, height: float,
-        verts: PackedVector3Array, salt: int) -> void:
-    var sides := 16
-    for i in range(sides):
-        var a0 := float(i) * TAU / float(sides)
-        var a1 := float(i + 1) * TAU / float(sides)
-        var r0 := radius * (0.965 + 0.035 * sin(float(i * 13 + salt)))
-        var r1 := radius * (0.965 + 0.035 * sin(float((i + 1) * 13 + salt)))
-        var p0 := center + Vector2(cos(a0), sin(a0)) * r0
-        var p1 := center + Vector2(cos(a1), sin(a1)) * r1
-        _put_triangle(verts, _pos(center, height),
-            _pos(p0, height), _pos(p1, height))
-
-
 func _build_road_intersections() -> void:
-    # Detection runs before wheel mark generation so junction clearance can
-    # avoid visible X-shaped overlaps, not only hide them afterwards.
-    if _junctions.is_empty():
-        print("MANUAL_ROAD_JUNCTIONS_READY: total=0")
-        return
-    var outer := PackedVector3Array()
-    var packed := PackedVector3Array()
-    for index in range(_junctions.size()):
-        var entry: Dictionary = _junctions[index]
-        var point: Vector2 = entry["center"]
-        var radius: float = entry["radius"]
-        # Raise above road at 0.11, tracks at 0.145, grass at 0.159 and
-        # gravel at 0.162. Avoid all coplanar crosses, but add no collider.
-        _junction_fan(point, radius + 0.55, 0.184, outer, index)
-        _junction_fan(point, radius, 0.205, packed, index)
-    _mesh_from_triangles(outer, Color("#474235"), "Перекрёстки / грунтовые переходы")
-    _mesh_from_triangles(packed, COLORS["road"], "Перекрёстки / единая поверхность")
-    _junction_mesh_count = _junctions.size()
-    print("MANUAL_ROAD_JUNCTIONS_READY: total=", _junction_mesh_count)
+    # Deliberately NO junction mesh. The earlier 16-sided cap produced huge
+    # discs across the road and over the vegetation. Road surfaces already
+    # use separate depth layers, while wheel ruts stop before intersections.
+    _junction_mesh_count = 0
+    print("MANUAL_ROAD_JUNCTIONS_READY: total=", _junctions.size(),
+        " cap_meshes=", _junction_mesh_count)
 
 
 func _add_outline(points: PackedVector2Array, width: float, height: float, tint: Color, label: String) -> void:
