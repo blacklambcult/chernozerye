@@ -92,6 +92,21 @@ func _run() -> void:
     if smoke_quad == null or smoke_quad.size.x > 0.05:
         _fail("cosmetic particles still cover too much of first-person view")
         return
+    var avatar := actor.get_node_or_null("FirstPersonFullBody") as Node3D
+    if avatar == null:
+        _fail("full-body first-person avatar missing")
+        return
+    if avatar.get_node_or_null("LeftLeg") == null or avatar.get_node_or_null("RightLeg") == null:
+        _fail("feet and legs are not modeled")
+        return
+    if avatar.get_node_or_null("LeftArm") == null or avatar.get_node_or_null("RightArm") == null:
+        _fail("first-person arms are not modeled")
+        return
+    var hand_model := actor.get("_smoke_prop") as Node3D
+    for detail in ["BrownFilter", "WhitePaper", "RedEmber"]:
+        if hand_model.get_node_or_null("PeriodCharacterProp/" + detail) == null:
+            _fail("missing close-up character prop detail: " + detail)
+            return
     actor.call("_start_character_idle")
     if float(actor.get("_idle_smoke_timer")) <= 0.0:
         _fail("character gesture did not start from button action")
@@ -100,5 +115,31 @@ func _run() -> void:
     if prop == null or not prop.visible:
         _fail("character idle prop not visible during action")
         return
+    if (avatar.get_node("RightArm") as Node3D).visible:
+        _fail("right full-body arm remains duplicated while gesturing")
+        return
+    actor.call("_process", 6.0)
+    if not (avatar.get_node("RightArm") as Node3D).visible:
+        _fail("right arm is not restored after gesture")
+        return
+    var hud_layer := CanvasLayer.new()
+    hud_layer.name = "HUDTestLayer"
+    get_root().add_child(hud_layer)
+    var hud := Control.new()
+    hud.name = "SurvivalHUD"
+    hud.set_script(load("res://gameplay_hud.gd"))
+    hud_layer.add_child(hud)
+    hud.set("player", actor)
+    if int(hud.get("current_health")) != 100:
+        _fail("initial health not 100")
+        return
+    if str(hud.call("_compass_name", 90)) != "E":
+        _fail("compass cardinal directions incorrect")
+        return
+    hud.call("choose_slot", 2)
+    if int(hud.get("selected_slot")) != 2:
+        _fail("quick slot selection does not update")
+        return
     print("COLLISION_REGRESSION_OK: house=solid fence=solid gap=open player_idle=cosmetic capsule=blocked view=compact")
+    print("FIRST_PERSON_HUD_REGRESSION_OK: avatar=body+legs+arms prop=filter+paper+ember compass=NESW health=100 slots=4")
     quit(0)
