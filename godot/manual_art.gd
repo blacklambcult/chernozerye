@@ -352,7 +352,7 @@ func _decorate_showcase_yard(points: PackedVector2Array, front_edge: int) -> voi
     # Leave roadside clear and build a porch only if the house is set back enough.
     if _nearest_road_distance((a + b) * 0.5) < 4.5:
         return
-    var orientation := -1.0 if _signed_area(points) > 0.0 else 1.0
+    var orientation := 1.0 if _signed_area(points) > 0.0 else -1.0
     var outward_2d := Vector2(side.y, -side.x).normalized() * orientation
     var vout := Vector3(outward_2d.x, 0, -outward_2d.y)
     var tangent := Vector3(side.x, 0, -side.y).normalized()
