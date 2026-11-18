@@ -134,43 +134,56 @@ func _build_character_idle_prop() -> void:
     _gesture_hand.name = "AnimatedHand"
     _gesture_hand.position = Vector3(0.40, -0.66, -0.65)
     _smoke_prop.add_child(_gesture_hand)
-    # Small mitten-like placeholder palm with articulated slim fingers;
-    # avoid the giant round fist that dominated the earlier web build.
+    # The palm faces inward toward the character while the two raised fingers
+    # are separated around the decorative prop. This is only an animation.
     var palm := MeshInstance3D.new()
     palm.name = "Palm"
     var palm_mesh := BoxMesh.new()
-    palm_mesh.size = Vector3(0.088, 0.098, 0.048)
+    palm_mesh.size = Vector3(0.085, 0.092, 0.047)
     palm.mesh = palm_mesh
     palm.material_override = _appearance_material(Color("#756a5c"))
     _gesture_hand.add_child(palm)
-    _view_round(_gesture_hand, "Thumb", Vector3(-0.053, 0.002, -0.010),
-        0.022, Color("#756a5c"), Vector3(0.85, 1.12, 0.8))
-    for finger in range(4):
-        var side := float(finger) - 1.5
-        _view_segment(_gesture_hand, "Finger" + str(finger),
-            Vector3(side * 0.022, 0.036, -0.016),
-            Vector3(side * 0.022, 0.080, -0.047),
-            0.011, 0.009, Color("#756a5c"))
+    _view_round(_gesture_hand, "Thumb",
+        Vector3(0.053, 0.0, -0.004), 0.022,
+        Color("#756a5c"), Vector3(0.8, 1.12, 0.75))
+    # Named fingers for the animation rig and automated pose checks.
+    _view_segment(_gesture_hand, "IndexFinger",
+        Vector3(0.022, 0.035, -0.012),
+        Vector3(0.022, 0.099, -0.045),
+        0.011, 0.009, Color("#756a5c"))
+    _view_segment(_gesture_hand, "MiddleFinger",
+        Vector3(-0.022, 0.035, -0.012),
+        Vector3(-0.022, 0.098, -0.045),
+        0.011, 0.009, Color("#756a5c"))
+    _view_segment(_gesture_hand, "RingFinger",
+        Vector3(-0.052, 0.032, -0.012),
+        Vector3(-0.055, 0.071, 0.002),
+        0.010, 0.008, Color("#756a5c"))
+    _view_segment(_gesture_hand, "LittleFinger",
+        Vector3(-0.069, 0.015, 0.006),
+        Vector3(-0.065, 0.050, 0.018),
+        0.008, 0.007, Color("#756a5c"))
 
     var cigarette := Node3D.new()
     cigarette.name = "PeriodCharacterProp"
-    cigarette.position = Vector3(0.012, 0.090, -0.06)
-    cigarette.rotation.x = -0.18
+    # Centered between the index and middle fingers. Its visible tip points
+    # outwards, away from the camera/face when the arm is raised.
+    cigarette.position = Vector3(0.0, 0.086, -0.050)
     _gesture_hand.add_child(cigarette)
-    # Unbranded decorative prop. No buffs, resources or health effects.
+    var pointing_out := Vector3(0.43, 0.24, -0.87).normalized()
     _view_segment(cigarette, "BrownFilter",
-        Vector3(0, -0.022, 0), Vector3(0, 0.018, 0),
-        0.009, 0.009, Color("#916b4d"))
+        pointing_out * -0.018, pointing_out * 0.027,
+        0.0085, 0.0085, Color("#916b4d"))
     _view_segment(cigarette, "WhitePaper",
-        Vector3(0, 0.018, 0), Vector3(0, 0.120, 0),
-        0.0085, 0.0085, Color("#eee8dc"))
+        pointing_out * 0.027, pointing_out * 0.145,
+        0.008, 0.008, Color("#eee8dc"))
     var ember := _view_round(cigarette, "RedEmber",
-        Vector3(0, 0.132, 0), 0.012, Color("#b95231"),
-        Vector3(1.0, 0.48, 1.0))
+        pointing_out * 0.155, 0.011, Color("#b95231"),
+        Vector3(1.0, 0.62, 1.0))
     ember.material_override = _appearance_material(Color("#b95231"), true)
     _smoke_particles = CPUParticles3D.new()
     _smoke_particles.name = "FaintCharacterSmoke"
-    _smoke_particles.position = Vector3(0, 0.145, 0)
+    _smoke_particles.position = pointing_out * 0.168
     _smoke_particles.amount = 4
     _smoke_particles.lifetime = 1.15
     _smoke_particles.randomness = 0.65
@@ -222,8 +235,11 @@ func _apply_idle_pose(weight: float) -> void:
     _orient_arm_segment(_gesture_lower, elbow, wrist)
     _gesture_elbow.position = elbow
     _gesture_hand.position = wrist
-    _gesture_hand.rotation.z = -0.10 * t
-    _gesture_hand.rotation.x = -0.12 * t
+    # Local palm normal +Z turns toward the viewer's face at full extension;
+    # the free end of the decorative prop stays oriented out and to the right.
+    _gesture_hand.rotation.y = -0.40 * t
+    _gesture_hand.rotation.z = -0.20 * t
+    _gesture_hand.rotation.x = -0.10 * t
 
 func _start_character_idle() -> void:
     if controls_locked or _idle_smoke_timer > 0.0 or _smoke_prop == null:
