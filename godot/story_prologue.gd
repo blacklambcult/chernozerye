@@ -30,6 +30,8 @@ var focus := ""
 var outside_rotation := 0.0
 var _last_prompt := ""
 var _last_objective := ""
+var _approach_stage := 0
+var _approach_triggers := 0
 
 func _ready() -> void:
     player = get_parent().get_node_or_null("Player") as CharacterBody3D
@@ -297,17 +299,36 @@ func _target_position(id: String) -> Vector3:
     return _gate_location()
 
 func _home_bearing() -> String:
-    # Simple relative direction, not an unsafe straight-line navigation path
-    # through houses or fences. The existing waypoint stays at the road.
+    # Text instead of arrow glyphs: the built-in Godot Web font does not
+    # contain all Unicode arrow characters and renders them as square boxes.
+    # Indicates a rough bearing, not an obstacle-free path.
     if player == null:
-        return "•"
+        return "НЕТ ДАННЫХ"
     var delta := _gate_location() - player.global_position
     delta.y = 0.0
     if delta.length_squared() < 0.01:
-        return "•"
+        return "ЗДЕСЬ"
     var front := -player.global_transform.basis.z
     var right := player.global_transform.basis.x
-    return ("↑" if delta.dot(front) >= 0.0 else "↓") if absf(delta.dot(front)) >= absf(delta.dot(right)) else ("→" if delta.dot(right) >= 0.0 else "←")
+    if absf(delta.dot(front)) >= absf(delta.dot(right)):
+        return "ПРЯМО" if delta.dot(front) >= 0.0 else "НАЗАД"
+    return "СПРАВА" if delta.dot(right) >= 0.0 else "СЛЕВА"
+
+
+func _update_approach() -> void:
+    if player == null or inside_home or chapter_completed:
+        return
+    var distance := player.global_position.distance_to(_gate_location())
+    if _approach_stage == 0 and distance <= 38.0:
+        _approach_stage = 1
+        _approach_triggers += 1
+        _say("Знакомые избы едва различимы в тумане. Но ни дыма, ни голосов.")
+        print("STORY_APPROACH_READY: stage=first_houses")
+    elif _approach_stage == 1 and distance <= 13.0:
+        _approach_stage = 2
+        _approach_triggers += 1
+        _say("Где-то здесь был мой двор. Ни лая Найды, ни шагов за окном.")
+        print("STORY_APPROACH_READY: stage=home_yard")
 
 
 func _update_focus() -> void:
@@ -356,6 +377,7 @@ func _update_focus() -> void:
         _last_objective = obj
 
 func _process(_delta: float) -> void:
+    _update_approach()
     _update_focus()
 
 func _enter_home() -> void:
