@@ -8,6 +8,8 @@ var manual_button: Button
 var _status_label: Label
 var _night_environment: Environment
 var _sun_light: DirectionalLight3D
+var _day_ground_material: Material
+var _manual_ground_material: StandardMaterial3D
 
 func _process(_delta: float) -> void:
     if not is_instance_valid(_status_label):
@@ -71,6 +73,7 @@ func _create_ground() -> void:
     instance.mesh = mesh
     instance.name = "BaseGround"
     instance.material_override = _create_ground_material()
+    _day_ground_material = instance.material_override
     add_child(instance)
     var ground := StaticBody3D.new()
     ground.position.y = -0.2
@@ -98,6 +101,26 @@ func _create_ground_material() -> StandardMaterial3D:
     mat.albedo_texture = ImageTexture.create_from_image(img)
     mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
     mat.uv1_scale = Vector3(10.0, 10.0, 1.0)
+    return mat
+
+func _create_manual_ground_material() -> StandardMaterial3D:
+    # Preserve the 130 drawn features: only the base terrain between them is tinted.
+    # Coarse, non-checkerboard soil variation gives close-up detail at PS1 resolution.
+    var img := Image.create(128, 128, false, Image.FORMAT_RGBA8)
+    var rng := RandomNumberGenerator.new()
+    rng.seed = 19961007
+    for y in range(128):
+        for x in range(128):
+            var broad := sin(float(x) * 0.11) * cos(float(y) * 0.07) * 0.055
+            var swirls := sin(float(x) * 0.28 + float(y) * 0.17) * 0.027
+            var noise := rng.randf_range(-0.032, 0.032)
+            var value := clampf(0.49 + broad + swirls + noise, 0.34, 0.63)
+            img.set_pixel(x, y, Color(value * 0.82, value * 0.86, value * 0.72))
+    img.generate_mipmaps()
+    var mat := _material(Color("#a4ab9d"))
+    mat.albedo_texture = ImageTexture.create_from_image(img)
+    mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+    mat.uv1_scale = Vector3(21.0, 21.0, 1.0)
     return mat
 
 func _create_lighting() -> void:
@@ -520,32 +543,37 @@ func _toggle_manual_preview() -> void:
     if osm_roads != null:
         osm_roads.visible = not manual_mode
     manual_button.text = "ВЕРНУТЬ СТАРУЮ МЕСТНОСТЬ" if manual_mode else "РУЧНАЯ РАЗМЕТКА · 130 ОБЪЕКТОВ"
+    var terrain := get_node_or_null("BaseGround") as MeshInstance3D
+    if terrain != null:
+        if manual_mode and _manual_ground_material == null:
+            _manual_ground_material = _create_manual_ground_material()
+        terrain.material_override = _manual_ground_material if manual_mode else _day_ground_material
     # The procedural WorldEnvironment/Light nodes had no explicit names in older builds.
     # Hold direct references so toggling scenes always changes the actual light and sky.
     if _night_environment != null:
         _night_environment.background_mode = Environment.BG_COLOR
         # Godot Compatibility Web: artistic depth fog, not unsupported volumetric fog.
-        _night_environment.background_color = Color("#1b2634") if manual_mode else Color("#575b69")
+        _night_environment.background_color = Color("#17232f") if manual_mode else Color("#575b69")
         _night_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-        _night_environment.ambient_light_color = Color("#8999a7") if manual_mode else Color("#b0a9a4")
-        _night_environment.ambient_light_energy = 0.40 if manual_mode else 0.82
+        _night_environment.ambient_light_color = Color("#8797a2") if manual_mode else Color("#b0a9a4")
+        _night_environment.ambient_light_energy = 0.46 if manual_mode else 0.82
         _night_environment.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED if manual_mode else Environment.REFLECTION_SOURCE_BG
         _night_environment.glow_enabled = false
         _night_environment.fog_enabled = true
         _night_environment.fog_mode = Environment.FOG_MODE_DEPTH if manual_mode else Environment.FOG_MODE_EXPONENTIAL
-        _night_environment.fog_light_color = Color("#273441") if manual_mode else Color("#676976")
+        _night_environment.fog_light_color = Color("#2b3a46") if manual_mode else Color("#676976")
         _night_environment.fog_light_energy = 0.85 if manual_mode else 1.0
         _night_environment.fog_sun_scatter = 0.0
         _night_environment.fog_aerial_perspective = 0.0
-        _night_environment.fog_density = 0.91 if manual_mode else 0.0018
-        _night_environment.fog_depth_begin = 22.0
-        _night_environment.fog_depth_end = 135.0
-        _night_environment.fog_depth_curve = 1.15
+        _night_environment.fog_density = 0.88 if manual_mode else 0.0018
+        _night_environment.fog_depth_begin = 24.0
+        _night_environment.fog_depth_end = 118.0
+        _night_environment.fog_depth_curve = 1.3
         _night_environment.fog_height = 0.8 if manual_mode else 0.0
-        _night_environment.fog_height_density = 0.012 if manual_mode else 0.0
+        _night_environment.fog_height_density = 0.017 if manual_mode else 0.0
     if _sun_light != null:
-        _sun_light.light_energy = 0.37 if manual_mode else 1.05
-        _sun_light.light_color = Color("#96a7ba") if manual_mode else Color("#f0b69a")
+        _sun_light.light_energy = 0.42 if manual_mode else 1.05
+        _sun_light.light_color = Color("#94a4b2") if manual_mode else Color("#f0b69a")
         # The shadow map produced hard triangular streaks across the road and low-poly trees.
         _sun_light.shadow_enabled = not manual_mode
     print("MANUAL_NIGHT_READY: ", manual_mode,
@@ -560,7 +588,7 @@ func _toggle_manual_preview() -> void:
         if control != null:
             control.visible = not manual_mode
     if is_instance_valid(_status_label):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 2.6 / ЛЕСНОЙ ТУМАН · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 2.7 / ГЛУХИЕ СУМЕРКИ · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
     var character := get_node_or_null("Player") as CharacterBody3D
     if character != null:
         character.velocity = Vector3.ZERO
