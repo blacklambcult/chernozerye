@@ -121,23 +121,23 @@ jobs:
         run: |
           set -euo pipefail
           # Versioned asset directory prevents stale .wasm/.pck files in browsers.
-          mkdir -p build/web/v37
-          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v37/index.html"
-          test -s build/web/v37/index.html
-          test -f build/web/v37/index.wasm
-          test -f build/web/v37/index.pck
+          mkdir -p build/web/v38
+          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v38/index.html"
+          test -s build/web/v38/index.html
+          test -f build/web/v38/index.wasm
+          test -f build/web/v38/index.pck
           cat > build/web/index.html <<'HTML'
           <!doctype html>
           <html lang="ru">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta http-equiv="refresh" content="0; url=./v37/">
+            <meta http-equiv="refresh" content="0; url=./v38/">
             <title>Чернозёрье — загрузка новой версии</title>
           </head>
           <body>
-            <p><a href="./v37/">Открыть Чернозёрье 3.7</a></p>
-            <script>window.location.replace("./v37/");</script>
+            <p><a href="./v38/">Открыть Чернозёрье 3.8</a></p>
+            <script>window.location.replace("./v38/");</script>
           </body>
           </html>
           HTML
