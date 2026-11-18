@@ -33,6 +33,9 @@ var _fence_count := 0
 var _road_count := 0
 var _feature_house_center := Vector2(INF, INF)
 var _feature_house_distance := INF
+var _building_polygons: Array[PackedVector2Array] = []
+var _plot_props_count := 0
+var _canopy_count := 0
 
 func decorate(features: Array) -> void:
     _rng.seed = 19960918
@@ -40,10 +43,16 @@ func decorate(features: Array) -> void:
     # This is a visual showcase, not an invented new geographic footprint.
     var player_spawn_2d := Vector2(-789.7, 268.6)
     for item in features:
-        if not item is Dictionary or str(item.get("type", "")) != "house":
+        if not item is Dictionary:
+            continue
+        var kind: String = str(item.get("type", ""))
+        if kind not in ["house", "sauna", "shed"]:
             continue
         var points := _local_points(item.get("points", []))
         if points.size() < 3:
+            continue
+        _building_polygons.append(points)
+        if kind != "house":
             continue
         var centroid := Vector2.ZERO
         for p in points:
@@ -85,6 +94,8 @@ func decorate(features: Array) -> void:
     _create_forest_assets()
     print("MANUAL_ART_READY: buildings=", _building_count,
         " plots=", _fence_count, " roads=", _road_count, " lamps=", _lights_placed)
+    print("MANUAL_VILLAGE_DETAIL_READY: canopies=", _canopy_count,
+        " plot_props=", _plot_props_count, " crooked_fences=", _fence_count)
 
 func _local_points(raw: Array) -> PackedVector2Array:
     var points := PackedVector2Array()
@@ -231,6 +242,7 @@ func _flush_details() -> void:
         "lamp": Color("#df9c52"),
         "trim": Color("#596363"),
         "rust": Color("#604039"),
+        "awning": Color("#343433"),
         "pole": Color("#413b35"),
         "crossarm": Color("#343531")
     }
@@ -386,7 +398,33 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
         category + " / pixel-wood")
     _decorate_roof(points, category, walls_height, roof_tex, index)
     if category == "house":
+        if index % 4 == 2 and points[front_index].distance_to(points[(front_index + 1) % points.size()]) > 4.8:
+            var start: Vector2 = points[front_index]
+            var finish: Vector2 = points[(front_index + 1) % points.size()]
+            var facade := finish - start
+            var outward := Vector2(facade.y, -facade.x).normalized()
+            if signed < 0.0:
+                outward *= -1.0
+            _decorate_entry_canopy(start, finish, Vector3(outward.x, 0.0, -outward.y))
         _decorate_showcase_yard(points, front_index)
+
+func _decorate_entry_canopy(a: Vector2, b: Vector2, outward: Vector3) -> void:
+    # A crooked sheet-metal porch awning for selected *real* house outlines.
+    # Visual-only, projects less than one metre: no extra houses or map edits.
+    var line := _pt(b, 0.0) - _pt(a, 0.0)
+    if line.length_squared() < 0.1:
+        return
+    var tangent := line.normalized()
+    var back := _pt((a + b) * 0.5, 2.71) + outward * 0.18
+    var front := back + outward * 0.90 + Vector3.DOWN * 0.22
+    _batch_quad("awning", back - tangent * 1.12, back + tangent * 1.12,
+        front + tangent * 1.08, front - tangent * 1.08)
+    # Bent posts are a small silhouette cue; avoid extra light sources.
+    _batch_box("porch", front - tangent * 1.00 + Vector3.DOWN * 0.48,
+        Vector3(0.10, 0.95, 0.10))
+    _batch_box("porch", front + tangent * 1.00 + Vector3.DOWN * 0.48,
+        Vector3(0.10, 0.95, 0.10))
+    _canopy_count += 1
 
 func _decorate_showcase_yard(points: PackedVector2Array, front_edge: int) -> void:
     # Only a single actual surveyed house near spawn receives the atmospheric micro-scene.
@@ -515,6 +553,22 @@ func _batch_box(key: String, center: Vector3, size: Vector3) -> void:
 func _append_box_to(verts: PackedVector3Array, center: Vector3, size: Vector3) -> void:
     _box_faces(verts, center, size)
 
+func _append_crooked_post(verts: PackedVector3Array, p: Vector2,
+        height: float, tilt: Vector2) -> void:
+    # Eight vertices make the whole post lean, rather than sliding an upright box.
+    var foot := _pt(p, 0.12)
+    var head := _pt(p + tilt, 0.12 + height)
+    var xx := Vector3(0.085, 0.0, 0.0)
+    var zz := Vector3(0.0, 0.0, 0.085)
+    var corners := [
+        foot - xx - zz, foot + xx - zz, foot + xx + zz, foot - xx + zz,
+        head - xx - zz, head + xx - zz, head + xx + zz, head - xx + zz
+    ]
+    for face in [[0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6],
+            [3, 0, 4, 7], [4, 5, 6, 7], [3, 2, 1, 0]]:
+        _push_tri(verts, corners[face[0]], corners[face[1]], corners[face[2]])
+        _push_tri(verts, corners[face[0]], corners[face[2]], corners[face[3]])
+
 func _fence_edge(a: Vector2, b: Vector2, gate_center: bool) -> void:
     var length := a.distance_to(b)
     if length < 0.35:
@@ -531,10 +585,15 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool) -> void:
         var dist := length * t
         if gate_center and dist >= gate_a and dist <= gate_b:
             continue
+        # Missing posts and subtly different heights break up perfect suburban grids.
+        if _fence_count % 5 == 2 and (i * 11 + _fence_count) % 17 == 0:
+            continue
         var p := a.lerp(b, t)
-        var leaning := 0.05 * sin(float(i * 19))
-        _append_box_to(_fence_posts, _pt(p, 0.82) + Vector3(leaning, 0, 0),
-            Vector3(0.16, 1.58, 0.16))
+        var h := 1.40 + 0.25 * sin(float(i * 13 + _fence_count * 7))
+        var tilt := Vector2(
+            0.20 * sin(float(i * 19 + _fence_count)),
+            0.15 * cos(float(i * 17 + _fence_count * 3)))
+        _append_crooked_post(_fence_posts, p, h, tilt)
     for i in range(count):
         var from_dist := length * float(i) / float(count)
         var to_dist := length * float(i + 1) / float(count)
@@ -544,7 +603,7 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool) -> void:
         var start := a + tang * from_dist
         var finish := a + tang * to_dist
         # Some plots have an irregular full picket fence; others keep the old open rails.
-        if _fence_count % 4 == 1:
+        if _fence_count % 3 == 1:
             var slat_count := maxi(1, int(ceil((to_dist - from_dist) / 0.74)))
             for j in range(slat_count):
                 if (i * 7 + j * 13 + _fence_count) % 17 == 0:
@@ -564,6 +623,40 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool) -> void:
             _push_tri(_fence_rails, v0 + toward - down, v1 + toward - down, v1 + toward + down)
             _push_tri(_fence_rails, v0 + toward - down, v1 + toward + down, v0 + toward + down)
 
+func _clear_of_buildings(p: Vector2, gap: float) -> bool:
+    for footprint in _building_polygons:
+        if Geometry2D.is_point_in_polygon(p, footprint):
+            return false
+        for i in range(footprint.size()):
+            var q := Geometry2D.get_closest_point_to_segment(p,
+                footprint[i], footprint[(i + 1) % footprint.size()])
+            if p.distance_to(q) < gap:
+                return false
+    return true
+
+func _decorate_plot_props(points: PackedVector2Array) -> void:
+    # Place one small deterministic cluster in some surveyed plot polygons only.
+    var center := Vector2.ZERO
+    for p in points:
+        center += p
+    center /= float(points.size())
+    for dx in [-7.0, -3.5, 0.0, 3.5, 7.0]:
+        for dy in [-5.0, -1.5, 2.0, 5.5]:
+            var p: Vector2 = center + Vector2(dx, dy)
+            if not Geometry2D.is_point_in_polygon(p, points):
+                continue
+            if _nearest_road_distance(p) < 6.5 or not _clear_of_buildings(p, 2.6):
+                continue
+            # Rusty drum and stacked firewood, scaled to village yards.
+            _batch_box("rust", _pt(p, 0.60), Vector3(0.70, 1.05, 0.70))
+            for n in range(3):
+                var firewood := p + Vector2(1.10 + float(n % 2) * 0.4, 0.3 * float(n))
+                if Geometry2D.is_point_in_polygon(firewood, points) and _clear_of_buildings(firewood, 1.8):
+                    _batch_box("porch", _pt(firewood, 0.18 + float(n) * 0.17),
+                        Vector3(0.85, 0.22, 0.32))
+            _plot_props_count += 1
+            return
+
 func _decorate_fence(points: PackedVector2Array) -> void:
     if points.size() < 3:
         return
@@ -578,15 +671,7 @@ func _decorate_fence(points: PackedVector2Array) -> void:
     for i in range(points.size()):
         _fence_edge(points[i], points[(i + 1) % points.size()], i == gate_edge)
     if _fence_count % 3 == 0:
-        var centroid := Vector2.ZERO
-        for point in points:
-            centroid += point
-        centroid /= float(points.size())
-        if Geometry2D.is_point_in_polygon(centroid, points) and _nearest_road_distance(centroid) > 5.0:
-            for i in range(3):
-                var offset := Vector2(float(i) * 0.72, float(i % 2) * 0.46)
-                _append_box_to(_yard_details, _pt(centroid + offset, 0.23),
-                    Vector3(0.55, 0.45, 0.5))
+        _decorate_plot_props(points)
 
 func _decorate_road(points: PackedVector2Array) -> void:
     if points.size() < 2:

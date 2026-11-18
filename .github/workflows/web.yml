@@ -79,6 +79,8 @@ jobs:
           grep -q "OVERTURE_3D_A_READY:" /tmp/world-smoke.log
           grep -q "MANUAL_LAYOUT_READY: 130" /tmp/world-smoke.log
           grep -q "MANUAL_ART_READY: buildings=59 plots=34 roads=18" /tmp/world-smoke.log
+          grep -q "MANUAL_VILLAGE_DETAIL_READY: canopies=" /tmp/world-smoke.log
+          grep -q "MANUAL_NO_GLARE_READY: ambient=0.42, moon=0.35, fog_light=0.36, exposure=0.98" /tmp/world-smoke.log
           grep -q "MANUAL_FOREST_READY: trees=" /tmp/world-smoke.log
           grep -q "clearance=roads13/buildings6.5" /tmp/world-smoke.log
           grep -q "MANUAL_SHOWCASE_YARD_READY:" /tmp/world-smoke.log
@@ -92,23 +94,23 @@ jobs:
         run: |
           set -euo pipefail
           # Versioned asset directory prevents stale .wasm/.pck files in browsers.
-          mkdir -p build/web/v281
-          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v281/index.html"
-          test -s build/web/v281/index.html
-          test -f build/web/v281/index.wasm
-          test -f build/web/v281/index.pck
+          mkdir -p build/web/v29
+          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v29/index.html"
+          test -s build/web/v29/index.html
+          test -f build/web/v29/index.wasm
+          test -f build/web/v29/index.pck
           cat > build/web/index.html <<'HTML'
           <!doctype html>
           <html lang="ru">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta http-equiv="refresh" content="0; url=./v281/">
+            <meta http-equiv="refresh" content="0; url=./v29/">
             <title>Чернозёрье — загрузка новой версии</title>
           </head>
           <body>
-            <p><a href="./v281/">Открыть Чернозёрье 2.8.1</a></p>
-            <script>window.location.replace("./v281/");</script>
+            <p><a href="./v29/">Открыть Чернозёрье 2.9</a></p>
+            <script>window.location.replace("./v29/");</script>
           </body>
           </html>
           HTML
