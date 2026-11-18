@@ -53,6 +53,8 @@ var _feature_house_distance := INF
 var _building_polygons: Array[PackedVector2Array] = []
 var _building_bounds: Array[Rect2] = []
 var _plot_props_count := 0
+var _flower_patches := 0
+var _front_walkways := 0
 var _canopy_count := 0
 var _lean_to_count := 0
 var _roof_patch_count := 0
@@ -138,7 +140,8 @@ func decorate(features: Array) -> void:
     _create_solid_mesh(_overhead_wires, Color("#242d2d"), "Старые кабели / провисшие линии")
     print("MANUAL_UTILITY_READY: poles=", _utility_pole_count,
         " lamp_heads=", _street_lamp_heads, " warm_lights=", _street_lights,
-        " balconies=", _balcony_count)
+        " balconies=", _balcony_count,
+        " flower_patches=", _flower_patches, " walks=", _front_walkways)
     _create_forest_assets()
     print("MANUAL_ART_READY: buildings=", _building_count,
         " plots=", _fence_count, " roads=", _road_count, " lamps=", _lights_placed)
@@ -332,6 +335,8 @@ func _flush_details() -> void:
         "bench_dark": Color("#363a37"),
         "flower_stem": Color("#5c744b"),
         "flower_pink": Color("#966278"),
+        "flower_white": Color("#c4c3ad"),
+        "flower_leaf": Color("#40533d"),
         "trim": Color("#6c7167"),
         "rust": Color("#604039"),
         "awning": Color("#343433"),
@@ -754,6 +759,9 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
             _decorate_modular_entrance(front_a, front_b, front_normal, entrance_style)
             if floors == 2 and front_a.distance_to(front_b) > 6.8 and index % 2 == 0:
                 _decorate_balcony(front_a, front_b, front_normal)
+            # Not every home has a paved approach: retain the village's dirt yards.
+            if index % 3 == 0:
+                _decorate_house_walk(front_a, front_b, front_normal)
         _decorate_showcase_yard(points, front_index)
 
 func _decorate_modular_entrance(a: Vector2, b: Vector2,
@@ -814,6 +822,31 @@ func _decorate_modular_entrance(a: Vector2, b: Vector2,
             mid + tangent * wide + Vector3.UP * 2.72,
             front + tangent * wide + Vector3.UP * 2.42,
             front - tangent * wide + Vector3.UP * 2.42)
+
+func _decorate_house_walk(a: Vector2, b: Vector2, outward: Vector3) -> void:
+    # Irregular, sparse stepping stones, never a new road or surveyed plot edge.
+    var axis := _pt(b, 0.0) - _pt(a, 0.0)
+    if axis.length() < 4.0:
+        return
+    var tangent := axis.normalized()
+    var origin := _pt((a + b) * 0.5, 0.17)
+    var stones := 0
+    for i in range(6):
+        var center := origin + outward * (1.25 + float(i) * 0.54)
+        center += tangent * (0.13 * sin(float(i) * 1.67))
+        var p := Vector2(center.x, -center.z)
+        if _road_surface_gap(p) < 0.68:
+            break
+        if _plot_boundary_gap(p) < 0.26 or not _clear_of_buildings(p, 0.23):
+            continue
+        var half := tangent * (0.29 + 0.03 * cos(float(i) * 2.1))
+        var deep := outward * 0.19
+        _batch_quad("path_stone", center - half - deep, center + half - deep,
+            center + half + deep, center - half + deep)
+        stones += 1
+    if stones > 0:
+        _front_walkways += 1
+
 
 func _decorate_balcony(a: Vector2, b: Vector2, outward: Vector3) -> void:
     # Compact two-storey wooden balcony like the supplied evening village concepts.
@@ -1497,6 +1530,22 @@ func _yard_spot_ok(p: Vector2, polygon: PackedVector2Array,
     return true
 
 
+func _flower_patch(p: Vector2, salt: int) -> void:
+    # Pink lupins, faded white flowers and dark leaves, assembled as cheap boxes.
+    for j in range(3):
+        var angle := float(salt * 7 + j * 13) * 1.7
+        var stem_p := p + Vector2(cos(angle), sin(angle)) * (0.12 + 0.13 * float(j))
+        var height := 0.40 + 0.13 * float((salt + j) % 4)
+        _batch_box("flower_stem", _pt(stem_p, height * 0.5 + 0.10),
+            Vector3(0.055, height, 0.055))
+        _batch_box("flower_leaf", _pt(stem_p + Vector2(0.08, 0.02), 0.24),
+            Vector3(0.31, 0.16, 0.18))
+        var flower_key := "flower_white" if (salt + j) % 6 == 0 else "flower_pink"
+        _batch_box(flower_key, _pt(stem_p, height + 0.16),
+            Vector3(0.18, 0.19, 0.17))
+    _flower_patches += 1
+
+
 func _decorate_plot_props(points: PackedVector2Array) -> void:
     # No procedural houses, only household props inside the 34 surveyed plots.
     # Seed is fixed per plot to keep the same yard every time the level loads.
@@ -1525,6 +1574,29 @@ func _decorate_plot_props(points: PackedVector2Array) -> void:
         _yard_counts[kind] += 1
         _plot_props_count += 1
         placed.append({"center": p, "radius": _yard_radius(kind)})
+    # Bounded flower patches: well away from buildings, fences and road surfaces.
+    var flower_goal := clampi(int((high.x - low.x) * (high.y - low.y) / 225.0), 2, 6)
+    var flowers_placed := 0
+    for trial in range(flower_goal * 24):
+        if flowers_placed >= flower_goal:
+            break
+        var p := Vector2(rng.randf_range(low.x, high.x),
+            rng.randf_range(low.y, high.y))
+        if not Geometry2D.is_point_in_polygon(p, points):
+            continue
+        if _road_surface_gap(p) < 0.72 or _plot_boundary_gap(p) < 0.70:
+            continue
+        if not _clear_of_buildings(p, 0.83):
+            continue
+        var blocked := false
+        for prop in placed:
+            if p.distance_to(prop["center"]) < float(prop["radius"]) + 0.75:
+                blocked = true
+                break
+        if blocked:
+            continue
+        _flower_patch(p, _fence_count * 31 + trial)
+        flowers_placed += 1
 
 
 func _decorate_fence(points: PackedVector2Array) -> void:
