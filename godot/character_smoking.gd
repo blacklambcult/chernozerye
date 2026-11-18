@@ -127,8 +127,13 @@ func _ready() -> void:
 
     mouth_prop = Node3D.new()
     mouth_prop.name = "NearFaceProp"
-    mouth_prop.position = Vector3(0.105,-0.145,-0.30)
-    mouth_prop.rotation_degrees = Vector3(67.0,0.0,-32.0)
+    # The mouth lies BELOW and slightly BEHIND the first-person near plane.
+    # Most of the prop is naturally clipped by the camera, with only a small
+    # forward tip briefly visible along the lower edge. The previous position
+    # projected a large detached prop into the middle of the screen.
+    mouth_prop.position = Vector3(0.035,-0.155,-0.14)
+    mouth_prop.rotation_degrees = Vector3(-68.0,0.0,-14.0)
+    mouth_prop.scale = Vector3(0.80,0.80,0.80)
     add_child(mouth_prop)
     mouth_paper = _prop(mouth_prop,"FadingProp")
     embers = mouth_paper.get_node("DimEmber") as MeshInstance3D
@@ -155,7 +160,7 @@ func _ready() -> void:
     mouth_prop.add_child(smoke)
     smoke.emitting = false
     _render_phase()
-    print("CHARACTER_SEQUENCE_READY: cosmetic=true selected_slot_required=true duration=120 states=8")
+    print("CHARACTER_SEQUENCE_READY: cosmetic=true selected_slot_required=true duration=120 states=8 face_socket=true")
 
 func _phase_length() -> float:
     match phase:
@@ -233,7 +238,12 @@ func _render_phase() -> void:
         Phase.LIGHT_CUT,Phase.MOVE_TO_FACE,Phase.LOWER,Phase.DISCARD]
     pack.visible = phase in [Phase.PACK,Phase.RETRIEVE]
     lighter.visible = phase == Phase.LIGHT_CUT
-    mouth_prop.visible = phase == Phase.BURN
+    var view_camera := get_parent() as Camera3D
+    var gaze_down := view_camera != null and view_camera.rotation.x < -0.75
+    # Looking down moves the actual mouth outside the visible field; the
+    # camera-anchored visual must follow that occlusion instead of floating
+    # across the player's torso.
+    mouth_prop.visible = phase == Phase.BURN and not gaze_down
     hand_prop.visible = phase in [Phase.RETRIEVE,Phase.LIGHT_CUT,
         Phase.MOVE_TO_FACE,Phase.LOWER,Phase.DISCARD]
     if gesture.visible:
@@ -253,7 +263,7 @@ func _render_phase() -> void:
         hand.rotation = Vector3(-0.12,-0.25,-0.24)
         if phase == Phase.MOVE_TO_FACE:
             hand.rotation.y = -0.35
-    smoke.emitting = phase == Phase.BURN
+    smoke.emitting = phase == Phase.BURN and mouth_prop.visible
     if phase == Phase.BURN:
         var portion := clampf(burn_elapsed/BURN_SECONDS,0,1)
         mouth_paper.scale.y = lerpf(1.0,0.28,portion)
