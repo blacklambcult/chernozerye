@@ -14,7 +14,12 @@ const FENCE_COLOR := Color("#494840")
 const POST_COLOR := Color("#3e3c36")
 const RUT_COLOR := Color("#423a32")
 
+# Hand-surveyed geometry remains fixed; clearance affects decorative objects only.
 var _roads: Array = []
+var _plot_edges: Array = []
+var _fence_panels_skipped := 0
+var _yard_positions_rejected := 0
+var _roof_joints_sealed := 0
 var _detail_batches: Dictionary = {}
 var _textures: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
@@ -80,10 +85,17 @@ func decorate(features: Array) -> void:
     for item in features:
         if not item is Dictionary:
             continue
-        if str(item.get("type", "")) == "road":
+        var kind: String = str(item.get("type", ""))
+        if kind in ["road", "path"]:
             var road_points := _local_points(item.get("points", []))
+            var width := 5.1 if kind == "road" else 1.6
             for i in range(road_points.size() - 1):
-                _roads.append([road_points[i], road_points[i + 1]])
+                _roads.append([road_points[i], road_points[i + 1], width])
+        elif kind == "plot":
+            var plot_points := _local_points(item.get("points", []))
+            if plot_points.size() >= 3:
+                for i in range(plot_points.size()):
+                    _plot_edges.append([plot_points[i], plot_points[(i + 1) % plot_points.size()]])
     for item in features:
         if not item is Dictionary:
             continue
@@ -122,6 +134,9 @@ func decorate(features: Array) -> void:
     print("VILLAGE_YARDS_READY: wells=", _yard_counts[0],
         " beds=", _yard_counts[1], " greenhouses=", _yard_counts[2],
         " firewood=", _yard_counts[3], " scrap=", _yard_counts[4])
+    print("VILLAGE_CLEARANCE_READY: rejected_fence_panels=", _fence_panels_skipped,
+        " rejected_yard_positions=", _yard_positions_rejected,
+        " sealed_roof_joints=", _roof_joints_sealed)
 
 func _local_points(raw: Array) -> PackedVector2Array:
     var points := PackedVector2Array()
@@ -320,7 +335,8 @@ func _flush_details() -> void:
         "porch_deck": Color("#50483f"),
         "annex_dark": Color("#303632"),
         "pole": Color("#413b35"),
-        "crossarm": Color("#343531")
+        "crossarm": Color("#343531"),
+        "gable_planks": Color("#3b4748")
     }
     for key in _detail_batches.keys():
         var verts: PackedVector3Array = _detail_batches[key]
@@ -355,6 +371,46 @@ func _nearest_road_distance(p: Vector2) -> float:
         var nearest := Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1])
         best = minf(best, p.distance_to(nearest))
     return best
+
+func _road_surface_gap(p: Vector2) -> float:
+    # Clearance to the rendered road edge (roads 5.1 m, footpaths 1.6 m).
+    var best := INF
+    for seg in _roads:
+        var nearest := Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1])
+        best = minf(best, p.distance_to(nearest) - float(seg[2]) * 0.5)
+    return best
+
+
+func _plot_boundary_gap(p: Vector2) -> float:
+    var best := INF
+    for edge in _plot_edges:
+        var nearest := Geometry2D.get_closest_point_to_segment(p, edge[0], edge[1])
+        best = minf(best, p.distance_to(nearest))
+    return best
+
+
+func _fence_point_clear(p: Vector2) -> bool:
+    return _road_surface_gap(p) >= 0.55 and _clear_of_buildings(p, 0.42)
+
+
+func _fence_span_clear(a: Vector2, b: Vector2) -> bool:
+    for t in [0.0, 0.25, 0.5, 0.75, 1.0]:
+        if not _fence_point_clear(a.lerp(b, t)):
+            return false
+    return true
+
+
+func _entry_clear(mid: Vector3, tangent: Vector3, outward: Vector3,
+        extension: float, half_width: float) -> bool:
+    for side in [-1.0, 0.0, 1.0]:
+        var test := mid + outward * extension + tangent * side * half_width
+        var p := Vector2(test.x, -test.z)
+        if _road_surface_gap(p) < 0.48 or _plot_boundary_gap(p) < 0.38:
+            return false
+        if not _clear_of_buildings(p, 0.35):
+            return false
+    return true
+
 
 func _building_front_edge(points: PackedVector2Array) -> int:
     var best_index := 0
@@ -837,7 +893,10 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
             2: rise = 2.45  # Tall pointed gable
             3: rise = 1.58  # Four-sided hip
             4: rise = 0.96  # Asymmetric lean-to
-    var eave := base + 0.12
+    # Roof bearing overlaps the wall instead of floating above it.
+    var eave := base - 0.09
+    if category == "house":
+        _roof_joints_sealed += 1
     # Visual roof only expands 0.28m beyond the unchanged manual building polygon.
     var footprint_center := Vector2.ZERO
     for p in points:
@@ -871,17 +930,21 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
             # One continuous sloping panel and end walls: recognisably a shed roof.
             _roof_face(v, uv, a, b, c, eave + rise, eave + rise, eave)
             _roof_face(v, uv, a, c, d, eave + rise, eave, eave)
-            _roof_face(v, uv, d, a, (d + a) * 0.5, eave, eave + rise, eave + rise * 0.5)
-            _roof_face(v, uv, c, b, (c + b) * 0.5, eave, eave + rise, eave + rise * 0.5)
-            _batch_quad("panel_patch", _pt(a, eave), _pt(b, eave),
+            # A single-slope roof needs timber infill below the raised side.
+            _batch_quad("gable_planks", _pt(a, base - 0.10), _pt(b, base - 0.10),
                 _pt(b, eave + rise), _pt(a, eave + rise))
+            _batch_tri("gable_planks", _pt(d, eave), _pt(a, eave),
+                _pt(a, eave + rise))
+            _batch_tri("gable_planks", _pt(b, eave), _pt(c, eave),
+                _pt(b, eave + rise))
         else:
             _roof_face(v, uv, a, b, ridge1, eave, eave, eave + rise)
             _roof_face(v, uv, a, ridge1, ridge0, eave, eave + rise, eave + rise)
             _roof_face(v, uv, d, ridge0, ridge1, eave, eave + rise, eave + rise)
             _roof_face(v, uv, d, ridge1, c, eave, eave + rise, eave)
-            _roof_face(v, uv, a, ridge0, d, eave, eave + rise, eave)
-            _roof_face(v, uv, b, c, ridge1, eave, eave, eave + rise)
+            # Close both gables with solid wood so the roof reads as one building.
+            _batch_tri("gable_planks", _pt(a, eave), _pt(ridge0, eave + rise), _pt(d, eave))
+            _batch_tri("gable_planks", _pt(b, eave), _pt(c, eave), _pt(ridge1, eave + rise))
             if category == "house" and index % 3 == 1:
                 _decorate_roof_patch(a, b, ridge0, ridge1, eave, rise)
     else:
