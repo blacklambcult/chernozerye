@@ -204,8 +204,8 @@ func _run() -> void:
     if float(actor.get("_idle_smoke_timer")) <= 0.0:
         _fail("character gesture did not start from button action")
         return
-    var prop := actor.get("_smoke_prop") as Node3D
-    if prop == null or not prop.visible:
+    var active_gesture := actor.get("_smoke_prop") as Node3D
+    if active_gesture == null or not active_gesture.visible:
         _fail("character idle prop not visible during action")
         return
     if (pelvis.get_node("RightArm") as Node3D).visible:
