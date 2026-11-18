@@ -4,8 +4,8 @@ extends Node3D
 # Visuals are blockout placeholders; outline shapes and positions are preserved.
 const SOURCE := "res://manual_layout.json"
 const COLORS := {
-    "road": Color("#5b544d"),
-    "path": Color("#51534e"),
+    "road": Color("#4d463d"),
+    "path": Color("#49493f"),
     "plot": Color("#333b32"),
     "forest": Color("#38483d"),
     "water": Color("#234253"),
@@ -157,6 +157,49 @@ func _add_strip(raw: Array, width: float, height: float, tint: Color, label: Str
         _put_triangle(verts, a-sideways, a+sideways, b+sideways)
         _put_triangle(verts, a-sideways, b+sideways, b-sideways)
     _mesh_from_triangles(verts, tint, label)
+    if label == "road":
+        _add_road_wear(points, height + 0.012)
+
+
+func _add_road_wear(points: PackedVector2Array, height: float) -> void:
+    # Dirt lane with separate worn tire tracks and short, irregular centre grass.
+    # Geometry follows the Geo Lab road exactly; there is no new road network.
+    var tracks := PackedVector3Array()
+    var grass := PackedVector3Array()
+    for i in range(points.size() - 1):
+        var a := points[i]
+        var b := points[i + 1]
+        var delta := b - a
+        var length := delta.length()
+        if length < 0.2:
+            continue
+        var normal := Vector2(-delta.y, delta.x).normalized()
+        var steps := maxi(1, int(ceil(length / 4.5)))
+        for step in range(steps):
+            var u0 := float(step) / float(steps)
+            var u1 := minf(1.0, (float(step) + 0.78) / float(steps))
+            var from := a.lerp(b, u0)
+            var to := a.lerp(b, u1)
+            for sign in [-1.0, 1.0]:
+                var lane_shift := normal * float(sign) * 1.15
+                var w := normal * (0.23 + 0.04 * sin(float(step * 13 + i * 7)))
+                var p0 := _pos(from + lane_shift - w, height)
+                var p1 := _pos(from + lane_shift + w, height)
+                var p2 := _pos(to + lane_shift + w, height)
+                var p3 := _pos(to + lane_shift - w, height)
+                _put_triangle(tracks, p0, p1, p2)
+                _put_triangle(tracks, p0, p2, p3)
+            if (step + i * 3) % 3 != 0:
+                var patch_w := normal * 0.29
+                var g0 := _pos(from - patch_w, height + 0.002)
+                var g1 := _pos(from + patch_w, height + 0.002)
+                var g2 := _pos(to + patch_w, height + 0.002)
+                var g3 := _pos(to - patch_w, height + 0.002)
+                _put_triangle(grass, g0, g1, g2)
+                _put_triangle(grass, g0, g2, g3)
+    _mesh_from_triangles(tracks, Color("#3b362f"), "Дорога / две грунтовые колеи")
+    _mesh_from_triangles(grass, Color("#454b3c"), "Дорога / трава между колеями")
+
 
 func _add_outline(points: PackedVector2Array, width: float, height: float, tint: Color, label: String) -> void:
     var ring: Array = []
