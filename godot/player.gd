@@ -10,6 +10,14 @@ var status_label: Label
 var last_event := "none"
 var pressed := {"w": false, "a": false, "s": false, "d": false, "m": false}
 var map_open := false
+var controls_locked := false
+
+func set_controls_locked(value: bool) -> void:
+    controls_locked = value
+    pressed = {"w": false, "a": false, "s": false, "d": false, "m": false}
+    if controls_locked:
+        velocity.x = 0.0
+        velocity.z = 0.0
 
 func _ready() -> void:
     camera = Camera3D.new()
@@ -77,6 +85,11 @@ func _physics_process(delta: float) -> void:
         velocity.y -= 17.0 * delta
     if (Input.is_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_SPACE)) and is_on_floor():
         velocity.y = JUMP
+    if controls_locked:
+        velocity.x = 0.0
+        velocity.z = 0.0
+        move_and_slide()
+        return
     var axis := Vector2.ZERO
     if pressed["w"] or Input.is_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_W): axis.y -= 1.0
     if pressed["s"] or Input.is_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_S): axis.y += 1.0
