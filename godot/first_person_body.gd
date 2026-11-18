@@ -139,27 +139,26 @@ func _ready() -> void:
     # CharacterBody3D and follows yaw without lifting legs or moving the waist.
     pelvis_root = Node3D.new()
     pelvis_root.name = "PelvisRoot"
-    pelvis_root.position = Vector3(0.0, 0.80, 0.105)
+    pelvis_root.position = Vector3(0.0, 0.80, -0.040)
     add_child(pelvis_root)
 
-    # One continuous dark civilian coat joined to the trouser pelvis.
-    # A small jacket reads as civilian clothing when viewed obliquely.
-    # At extreme downward pitch its upper section is hidden as a cutaway,
-    # as it would otherwise fill the near field rather than show the legs.
+    # Both halves of a plain autumn jacket remain visible when looking down.
+    # They meet at the waist and overlap the leg attachment; unlike a cutaway
+    # they never disappear, and unlike a huge chest block they stay below eyes.
     upper_coat = _tapered_coat(pelvis_root, "ChestAndShoulders",
-        Vector3(0.0, 0.232, 0.095), 0.225, 0.180, 0.205)
-    lower_jacket = _box(pelvis_root, "LowerJacket",
-        Vector3(0.365, 0.175, 0.185), Vector3(0.0, 0.052, 0.030), COAT)
-    _box(pelvis_root, "CoatHem", Vector3(0.390, 0.038, 0.195),
-        Vector3(0.0, -0.040, 0.025), COAT_SHADOW)
-    _box(pelvis_root, "HipFabric", Vector3(0.350, 0.120, 0.195),
-        Vector3(0.0, -0.112, -0.004), PANTS)
+        Vector3(0.0, 0.305, -0.012), 0.315, 0.172, 0.191)
+    lower_jacket = _tapered_coat(pelvis_root, "LowerJacket",
+        Vector3(0.0, 0.070, 0.005), 0.255, 0.185, 0.204)
+    _box(pelvis_root, "CoatHem", Vector3(0.386, 0.034, 0.210),
+        Vector3(0.0, -0.053, 0.005), COAT_SHADOW)
+    _box(pelvis_root, "HipFabric", Vector3(0.337, 0.113, 0.192),
+        Vector3(0.0, -0.113, -0.005), PANTS)
 
     left_leg = _leg(-1.0, "LeftLeg", pelvis_root)
     right_leg = _leg(1.0, "RightLeg", pelvis_root)
     left_arm = _arm(-1.0, "LeftArm", pelvis_root)
     right_arm = _arm(1.0, "RightArm", pelvis_root)
-    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true pelvis_aligned=true lookdown_cutaway=true")
+    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true pelvis_aligned=true torso_visible=true")
 
 
 func set_right_hand_occupied(value: bool) -> void:
@@ -173,14 +172,12 @@ func _process(delta: float) -> void:
         return
     var camera := actor.get_node_or_null("Camera3D") as Camera3D
     if camera != null:
-        # Deliberate FPS cutaway: near-camera shoulders and chest are removed
-        # at extreme pitch, but the shared waist, thighs and boots stay drawn.
-        # Keeps downward inspection from looking inside the character mesh.
-        var look_down := camera.rotation.x < -1.00
-        if look_down != view_down_cutaway:
-            view_down_cutaway = look_down
-        if upper_coat != null:
-            upper_coat.visible = not look_down
+        # Body is anchored below the camera, so no chest hiding is needed.
+        # At steep angles only raised arms are suppressed to preserve clarity.
+        var look_down := camera.rotation.x < -1.18
+        view_down_cutaway = look_down
+        upper_coat.visible = true
+        lower_jacket.visible = true
         left_arm.visible = not look_down
         right_arm.visible = not look_down and not hide_right_hand
     var planar_speed := Vector2(actor.velocity.x, actor.velocity.z).length()
