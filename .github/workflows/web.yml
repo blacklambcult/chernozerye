@@ -1,4 +1,4 @@
-name: Build and deploy Chernozerye (Godot Web)
+name: Build and deploy Fearless Knights of the Cordon (Godot Web)
 
 on:
   push:
@@ -85,6 +85,13 @@ jobs:
           grep -q "WORLD_READY: geometry complete" /tmp/world-smoke.log
           grep -q "OVERTURE_3D_A_READY:" /tmp/world-smoke.log
           grep -q "MANUAL_LAYOUT_READY: 314" /tmp/world-smoke.log
+          # Boot must already be in the manually surveyed village, without
+          # a click on any preview/legacy map button.
+          grep -q "FEARLESS_KNIGHTS_STARTUP_READY:" /tmp/world-smoke.log
+          grep -q "manual_mode=true" /tmp/world-smoke.log
+          grep -q "MANUAL_NIGHT_READY: true" /tmp/world-smoke.log
+          grep -q '^    _activate_default_village()' godot/world.gd
+          grep -q 'config/name="Fearless Knights of the Cordon"' godot/project.godot
           grep -q "MANUAL_ART_READY: buildings=162 plots=88 roads=18" /tmp/world-smoke.log
           grep -q "MANUAL_VILLAGE_DETAIL_READY: canopies=" /tmp/world-smoke.log
           grep -q "MANUAL_FACADE_READY: lean_tos=" /tmp/world-smoke.log
@@ -94,7 +101,7 @@ jobs:
           grep -q "VILLAGE_ENTRANCES_READY: reserved=" /tmp/world-smoke.log
           grep -q "MANUAL_STREETSCAPE_READY:" /tmp/world-smoke.log
           grep -q "VILLAGE_CLEARANCE_READY: rejected_fence_panels=" /tmp/world-smoke.log
-          grep -q "CHERNOZERYE_LOGO_READY:" /tmp/world-smoke.log
+          grep -q "FEARLESS_KNIGHTS_LOGO_READY:" /tmp/world-smoke.log
           # Guard against removing most plot boundaries again (v3.4 skipped 328).
           python - <<'PY'
           import re
@@ -130,23 +137,23 @@ jobs:
         run: |
           set -euo pipefail
           # Versioned asset directory prevents stale .wasm/.pck files in browsers.
-          mkdir -p build/web/v39
-          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v39/index.html"
-          test -s build/web/v39/index.html
-          test -f build/web/v39/index.wasm
-          test -f build/web/v39/index.pck
+          mkdir -p build/web/pre-alpha-0.3.9
+          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/pre-alpha-0.3.9/index.html"
+          test -s build/web/pre-alpha-0.3.9/index.html
+          test -f build/web/pre-alpha-0.3.9/index.wasm
+          test -f build/web/pre-alpha-0.3.9/index.pck
           cat > build/web/index.html <<'HTML'
           <!doctype html>
           <html lang="ru">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta http-equiv="refresh" content="0; url=./v39/">
-            <title>Чернозёрье — загрузка новой версии</title>
+            <meta http-equiv="refresh" content="0; url=./pre-alpha-0.3.9/">
+            <title>Fearless Knights of the Cordon — Pre-Alpha 0.3.9</title>
           </head>
           <body>
-            <p><a href="./v39/">Открыть Чернозёрье 3.9</a></p>
-            <script>window.location.replace("./v39/");</script>
+            <p><a href="./pre-alpha-0.3.9/">Открыть Fearless Knights of the Cordon — Pre-Alpha 0.3.9</a></p>
+            <script>window.location.replace("./pre-alpha-0.3.9/");</script>
           </body>
           </html>
           HTML
