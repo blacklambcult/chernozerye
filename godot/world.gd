@@ -631,7 +631,7 @@ func _toggle_manual_preview() -> void:
         if control != null:
             control.visible = not manual_mode
     if is_instance_valid(_status_label):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 3.8 / СУМЕРЕЧНАЯ ДЕРЕВНЯ · 314 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 3.9 / ГЕОМЕТРИЧЕСКАЯ СТАБИЛИЗАЦИЯ · 314 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
     var character := get_node_or_null("Player") as CharacterBody3D
     if character != null:
         character.velocity = Vector3.ZERO
@@ -640,8 +640,8 @@ func _toggle_manual_preview() -> void:
         # depth-buffer jitter in Godot Compatibility Web when looking up close.
         var player_camera := character.get_node_or_null("Camera3D") as Camera3D
         if player_camera != null:
-            player_camera.near = 0.36 if manual_mode else 0.25
-            player_camera.far = 680.0 if manual_mode else 2300.0
+            player_camera.near = 0.60 if manual_mode else 0.25
+            player_camera.far = 390.0 if manual_mode else 2300.0
     overview_layer.visible = false
     Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
