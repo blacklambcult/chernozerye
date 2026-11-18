@@ -114,8 +114,27 @@ func _run() -> void:
     if absf(jacket.position.z - left_leg.position.z) > 0.09:
         _fail("waist and legs use mismatched depth anchors")
         return
-    if left_leg.position.z > -0.04 or right_leg.position.z > -0.04:
-        _fail("thighs must attach slightly forward of the pelvis")
+    if absf(left_leg.position.z) > 0.04 or absf(right_leg.position.z) > 0.04:
+        _fail("hips are offset forward or backward from torso")
+        return
+    var left_knee := left_leg.get_node_or_null("KneeFabric") as MeshInstance3D
+    var right_knee := right_leg.get_node_or_null("KneeFabric") as MeshInstance3D
+    var left_calf := left_leg.get_node_or_null("TrouserCalf") as MeshInstance3D
+    var toe := left_leg.get_node_or_null("BootToe") as MeshInstance3D
+    if left_knee == null or right_knee == null or left_calf == null or toe == null:
+        _fail("complete thigh-knee-calf-boot geometry must remain")
+        return
+    if absf(left_knee.position.z) > 0.13 or absf(right_knee.position.z) > 0.13:
+        _fail("knees protrude too far forward of standing hips")
+        return
+    if absf(left_calf.position.z - left_knee.position.z) > 0.09:
+        _fail("lower leg is bent too sharply compared with the knee")
+        return
+    if toe.position.z < -0.34 or toe.position.z > -0.18:
+        _fail("boot toe projects too far out or retracts into the leg")
+        return
+    if absf(left_knee.position.x + right_knee.position.x) > 0.001:
+        _fail("knees are asymmetric under the pelvis")
         return
     var camera := actor.get_node("Camera3D") as Camera3D
     var max_coat_y := pelvis.position.y + 0.448
@@ -241,6 +260,6 @@ func _run() -> void:
         _fail("cosmetic character sequence changed game health")
         return
     print("COLLISION_REGRESSION_OK: house=solid fence=solid gap=open capsule=blocked")
-    print("FIRST_PERSON_HUD_REGRESSION_OK: torso=visible_looking_down legs=2 jacket=front_panels compass=NESW health=100 slots=4 boots_project_above_waist=true arms=visible")
+    print("FIRST_PERSON_HUD_REGRESSION_OK: torso=visible_looking_down legs=2 jacket=front_panels compass=NESW health=100 slots=4 boots_project_above_waist=true arms=visible legs_upright=true")
     print("CHARACTER_SEQUENCE_REGRESSION_OK: selected_slot=required staged=true burn_seconds=120 hands_clear=true auto_discard=true no_buffs=true face_occluded_lookdown=true")
     quit(0)
