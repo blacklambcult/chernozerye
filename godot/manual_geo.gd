@@ -19,6 +19,7 @@ var object_count: int = 0
 var forest_positions: Array[Transform3D] = []
 var broad_canopies: Array[Transform3D] = []
 var tree_trunks: Array[Transform3D] = []
+var _tree_collision_total := 0
 var manual_roads: Array = []
 var building_footprints: Array[PackedVector2Array] = []
 var _roadside_tufts := 0
@@ -542,12 +543,19 @@ func _add_car(point: Array, _feature: Dictionary) -> void:
     var p := Vector2(float(point[0]), float(point[1]))
     var box := BoxMesh.new()
     box.size = Vector3(2.0, 1.35, 4.0)
-    var node := MeshInstance3D.new()
-    node.name = "Машина"
-    node.mesh = box
-    node.position = _pos(p, 0.78)
-    node.material_override = _mat(COLORS["car"])
-    add_child(node)
+    var body := StaticBody3D.new()
+    body.name = "Машина"
+    body.position = _pos(p, 0.78)
+    var visual := MeshInstance3D.new()
+    visual.mesh = box
+    visual.material_override = _mat(COLORS["car"])
+    body.add_child(visual)
+    var collider := CollisionShape3D.new()
+    var shape := BoxShape3D.new()
+    shape.size = box.size
+    collider.shape = shape
+    body.add_child(collider)
+    add_child(body)
 
 func _nearest_road(point: Vector2) -> float:
     var best := INF
@@ -628,6 +636,38 @@ func _layer_transforms(source: Array[Transform3D], local_rise: float) -> Array[T
         layers.append(Transform3D(t.basis, t.origin + t.basis * Vector3(0.0, local_rise, 0.0)))
     return layers
 
+func _build_trunk_collision() -> void:
+    # One batched trimesh for the entire instanced forest (not thousands of
+    # StaticBody nodes). Low-sided trunks approximate visible 40cm tree bases.
+    var faces := PackedVector3Array()
+    var sides := 5
+    for transform in tree_trunks:
+        var scale := transform.basis.get_scale().x
+        var at := transform.origin
+        var floor_y := 0.09
+        var top_y := maxf(1.1, 3.20 * scale)
+        for side in range(sides):
+            var angle0 := float(side) * TAU / float(sides)
+            var angle1 := float(side + 1) * TAU / float(sides)
+            var radius := 0.33 * scale
+            var p0 := Vector3(at.x + cos(angle0) * radius, floor_y, at.z + sin(angle0) * radius)
+            var p1 := Vector3(at.x + cos(angle1) * radius, floor_y, at.z + sin(angle1) * radius)
+            _put_triangle(faces, p0, p1, Vector3(p1.x, top_y, p1.z))
+            _put_triangle(faces, p0, Vector3(p1.x, top_y, p1.z), Vector3(p0.x, top_y, p0.z))
+    if not faces.is_empty():
+        var trunk_body := StaticBody3D.new()
+        trunk_body.name = "CollisionForestTrunks"
+        var collision := CollisionShape3D.new()
+        var shape := ConcavePolygonShape3D.new()
+        shape.set_faces(faces)
+        shape.backface_collision = true
+        collision.shape = shape
+        trunk_body.add_child(collision)
+        add_child(trunk_body)
+    _tree_collision_total = tree_trunks.size()
+    print("FOREST_COLLISION_READY: trunks=", _tree_collision_total)
+
+
 func _build_forest_instances() -> void:
     # Three staggered bough layers read as old pines instead of a single giant cone.
     # All layers reuse the original surveyed forest point positions.
@@ -675,4 +715,5 @@ func _build_forest_instances() -> void:
     trunk.height = 3.3
     trunk.radial_segments = 5
     _instanced_tree(trunk, tree_trunks, Color("#3b3b34"), "Лес / стволы")
+    _build_trunk_collision()
     print("MANUAL_FOREST_READY: trees=", tree_trunks.size(), " clearance=roads13/buildings6.5")
