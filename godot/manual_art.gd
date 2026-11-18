@@ -6,10 +6,10 @@ extends Node3D
 const WOOD_TONES := ["#454941", "#51473e", "#3b4039", "#4e433c", "#43463d", "#525047"]
 const ROOF_TONES := ["#282e31", "#373432", "#30383a", "#403933"]
 const DOOR_COLOR := Color("#24221f")
-const FRAME_COLOR := Color("#5a564d")
+const FRAME_COLOR := Color("#494943")
 const WINDOW_COLOR := Color("#131a1f")
 const WINDOW_LIT := Color("#efac5d")
-const FENCE_COLOR := Color("#5a544a")
+const FENCE_COLOR := Color("#494840")
 const POST_COLOR := Color("#3e3c36")
 const RUT_COLOR := Color("#423a32")
 
@@ -318,8 +318,9 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
         lamp.name = "Тусклая лампа / окно"
         lamp.position = _pt(center, 2.3) + normal * 1.1
         lamp.light_color = Color("#ffbc7e")
-        lamp.light_energy = 0.49
-        lamp.omni_range = 11.0
+        lamp.light_energy = 0.42
+        lamp.light_specular = 0.0
+        lamp.omni_range = 9.0
         lamp.shadow_enabled = false
         add_child(lamp)
 
@@ -340,7 +341,7 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
             walls_height = 4.45
         elif index % 5 == 0:
             wall_style = 2
-            tone = Color("#646c67")  # limewash
+            tone = Color("#505955")  # weathered limewash, no white nighttime washout
         elif index % 3 == 0:
             wall_style = 1
             tone = Color("#5a5044")  # horizontal logs
@@ -433,8 +434,9 @@ func _decorate_showcase_yard(points: PackedVector2Array, front_edge: int) -> voi
     light.name = "Старая лампа у крыльца"
     light.position = lamp_origin + Vector3.UP * 3.05
     light.light_color = Color("#ffb46d")
-    light.light_energy = 0.43
-    light.omni_range = 8.0
+    light.light_energy = 0.38
+    light.light_specular = 0.0
+    light.omni_range = 7.5
     light.shadow_enabled = false
     add_child(light)
     print("MANUAL_SHOWCASE_YARD_READY: ", centroid)

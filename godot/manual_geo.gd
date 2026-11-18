@@ -4,8 +4,8 @@ extends Node3D
 # Visuals are blockout placeholders; outline shapes and positions are preserved.
 const SOURCE := "res://manual_layout.json"
 const COLORS := {
-    "road": Color("#796e60"),
-    "path": Color("#66645c"),
+    "road": Color("#5b544d"),
+    "path": Color("#51534e"),
     "plot": Color("#333b32"),
     "forest": Color("#38483d"),
     "water": Color("#234253"),
