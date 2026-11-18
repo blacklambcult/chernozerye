@@ -4,6 +4,9 @@ const PLAYER_SCRIPT = preload("res://player.gd")
 const LOGO_DATA = preload("res://logo_data.gd")
 const MAP_FILE := "res://world_data.json"
 const MANUAL_FILE := "res://manual_layout.json"
+const GAME_TITLE := "Fearless Knights of the Cordon"
+const GAME_STAGE := "Pre-Alpha 0.3.9"
+const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.3.9 · ЧЕРНОЗЁРЬЕ · 314 ОБЪЕКТОВ"
 var manual_mode := false
 var manual_button: Button
 var _status_label: Label
@@ -13,11 +16,15 @@ var _day_ground_material: Material
 var _manual_ground_material: StandardMaterial3D
 
 func _process(_delta: float) -> void:
+    # Never replace the title after the default village has been selected.
+    if manual_mode:
+        set_process(false)
+        return
     if not is_instance_valid(_status_label):
         return
     var geo := get_node_or_null("GeographyBlockoutV07")
     if geo != null and bool(geo.get("generated_ready")):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 1.8 АДРЕСНАЯ ГЕОГРАФИЯ  |  Клик — осмотр  |  WASD/ЦФЫВ — ходьба  |  M/Ь — карта"
+        _status_label.text = GAME_HUD_TITLE
         set_process(false)
 
 func _ready() -> void:
@@ -58,8 +65,15 @@ func _ready() -> void:
     _create_label()
     _create_brand_watermark()
     _create_overview_map()
-    _create_quick_navigation()
-    _create_manual_navigation()
+    # Load the manual 314-object village from the first playable frame.
+    # The original sector/preview buttons are no longer part of the player HUD.
+    _activate_default_village()
+
+func _activate_default_village() -> void:
+    if not manual_mode:
+        _toggle_manual_preview()
+    print("FEARLESS_KNIGHTS_STARTUP_READY: title=", GAME_TITLE,
+        " version=", GAME_STAGE, " manual_mode=", manual_mode)
 
 func _material(color: Color) -> StandardMaterial3D:
     var m := StandardMaterial3D.new()
@@ -275,7 +289,7 @@ func _create_player() -> void:
 func _create_label() -> void:
     var layer := CanvasLayer.new()
     var label := Label.new()
-    label.text = "ЧЕРНОЗЁРЬЕ 1.8  |  Загрузка домов и леса..."
+    label.text = GAME_HUD_TITLE
     label.position = Vector2(16, 16)
     layer.add_child(label)
     add_child(layer)
@@ -287,14 +301,14 @@ func _create_brand_watermark() -> void:
     var jpg_bytes := Marshalls.base64_to_raw(LOGO_DATA.BASE64)
     var err := img.load_jpg_from_buffer(jpg_bytes)
     if err != OK:
-        push_warning("CHERNOZERYE logo image could not be decoded: " + str(err))
+        push_warning("Fearless Knights of the Cordon logo could not be decoded: " + str(err))
         return
     var layer := CanvasLayer.new()
     layer.name = "BrandWatermark"
     layer.layer = 15
     add_child(layer)
     var emblem := TextureRect.new()
-    emblem.name = "ChernozeryeEmblem"
+    emblem.name = "FearlessKnightsEmblem"
     emblem.texture = ImageTexture.create_from_image(img)
     emblem.anchor_left = 1.0
     emblem.anchor_right = 1.0
@@ -309,7 +323,7 @@ func _create_brand_watermark() -> void:
     emblem.mouse_filter = Control.MOUSE_FILTER_IGNORE
     emblem.modulate.a = 0.92
     layer.add_child(emblem)
-    print("CHERNOZERYE_LOGO_READY: original user emblem, hud=156px")
+    print("FEARLESS_KNIGHTS_LOGO_READY: original user emblem, hud=156px")
 
 # Trees only in OSM forest polygons, never randomly across the whole map.
 func _create_forest_from_osm(features: Array) -> void:
@@ -581,7 +595,8 @@ func _toggle_manual_preview() -> void:
         overture.visible = not manual_mode
     if osm_roads != null:
         osm_roads.visible = not manual_mode
-    manual_button.text = "ВЕРНУТЬ СТАРУЮ МЕСТНОСТЬ" if manual_mode else "РУЧНАЯ РАЗМЕТКА · 314 ОБЪЕКТОВ"
+    if manual_button != null:
+        manual_button.text = "ВЕРНУТЬ СТАРУЮ МЕСТНОСТЬ" if manual_mode else "РУЧНАЯ РАЗМЕТКА · 314 ОБЪЕКТОВ"
     var terrain := get_node_or_null("BaseGround") as MeshInstance3D
     if terrain != null:
         if manual_mode and _manual_ground_material == null:
@@ -631,7 +646,7 @@ func _toggle_manual_preview() -> void:
         if control != null:
             control.visible = not manual_mode
     if is_instance_valid(_status_label):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 3.9 / ГЕОМЕТРИЧЕСКАЯ СТАБИЛИЗАЦИЯ · 314 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
+        _status_label.text = GAME_HUD_TITLE
     var character := get_node_or_null("Player") as CharacterBody3D
     if character != null:
         character.velocity = Vector3.ZERO
