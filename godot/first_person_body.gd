@@ -131,28 +131,31 @@ func _segment(parent: Node3D, name: String,
     return node
 
 func _leg(side: float, label: String, root: Node3D) -> Node3D:
-    # Hip -> thigh -> bent knee -> shin -> boot: receding forward through
-    # the view rather than two short vertical pipes directly under the eye.
+    # Keep hips directly below the waist. A mostly vertical thigh and shin
+    # read as natural standing legs rather than a crouch with feet kicked out.
+    # Only the boot toe extends modestly forward from the vertical leg axis.
     var pivot := Node3D.new()
     pivot.name = label
-    pivot.position = Vector3(side * 0.154, -0.106, -0.060)
+    pivot.position = Vector3(side * 0.132, -0.118, -0.018)
     root.add_child(pivot)
+
     _segment(pivot, "TrouserThigh", Vector3.ZERO,
-        Vector3(side * 0.012, -0.313, -0.205), 0.114, 0.105, PANTS)
-    _sphere(pivot, "KneeFabric", Vector3(side * 0.012, -0.321, -0.208),
-        0.102, PANTS, Vector3(1.0, 0.85, 0.96))
+        Vector3(side * 0.010, -0.325, -0.095), 0.108, 0.098, PANTS)
+    _sphere(pivot, "KneeFabric",
+        Vector3(side * 0.010, -0.333, -0.100),
+        0.088, PANTS, Vector3(1.0, 0.88, 0.96))
     _segment(pivot, "TrouserCalf",
-        Vector3(side * 0.012, -0.332, -0.207),
-        Vector3(side * 0.024, -0.592, -0.390), 0.102, 0.076, PANTS)
-    _box(pivot, "Boot", Vector3(0.198, 0.145, 0.245),
-        Vector3(side * 0.024, -0.652, -0.446), BOOTS)
-    _box(pivot, "BootToe", Vector3(0.202, 0.073, 0.222),
-        Vector3(side * 0.024, -0.693, -0.571), BOOTS)
-    _box(pivot, "BootSole", Vector3(0.206, 0.038, 0.245),
-        Vector3(side * 0.024, -0.731, -0.538), BELT)
+        Vector3(side * 0.010, -0.340, -0.102),
+        Vector3(side * 0.018, -0.585, -0.175),
+        0.092, 0.070, PANTS)
+
+    _box(pivot, "Boot", Vector3(0.162, 0.118, 0.188),
+        Vector3(side * 0.018, -0.650, -0.212), BOOTS)
+    _box(pivot, "BootToe", Vector3(0.172, 0.060, 0.150),
+        Vector3(side * 0.018, -0.684, -0.286), BOOTS)
+    _box(pivot, "BootSole", Vector3(0.176, 0.028, 0.168),
+        Vector3(side * 0.018, -0.710, -0.268), BELT)
     return pivot
-
-
 
 func _arm(side: float, label: String, root: Node3D) -> Node3D:
     # Side-hanging arms frame the lower corners of an extreme downwards view.
@@ -229,8 +232,8 @@ func _process(delta: float) -> void:
         walk_phase += delta * (5.0 + moving * 1.1)
     var swing := sin(walk_phase) * moving
     # In-place walk cycle: never change colliders or actual foot placement.
-    left_leg.rotation.x = swing * 0.19
-    right_leg.rotation.x = -swing * 0.19
+    left_leg.rotation.x = swing * 0.12
+    right_leg.rotation.x = -swing * 0.12
     left_arm.rotation.x = -swing * 0.085
     right_arm.rotation.x = swing * 0.085
     position.y = 0.005 * absf(sin(walk_phase)) * moving
