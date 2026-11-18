@@ -3,12 +3,12 @@ extends Node3D
 # All spatial placements derive from the user's manual GeoJSON features.
 # Decorative features are deterministic and never modify the survey geometry.
 
-const WOOD_TONES := ["#635c50", "#71675b", "#5b514a", "#65564f", "#746959"]
-const ROOF_TONES := ["#484b4b", "#574947", "#535651", "#544942"]
+const WOOD_TONES := ["#454941", "#51473e", "#3b4039", "#4e433c", "#43463d", "#525047"]
+const ROOF_TONES := ["#282e31", "#373432", "#30383a", "#403933"]
 const DOOR_COLOR := Color("#24221f")
-const FRAME_COLOR := Color("#a5957d")
-const WINDOW_COLOR := Color("#222b2f")
-const WINDOW_LIT := Color("#d4a369")
+const FRAME_COLOR := Color("#736859")
+const WINDOW_COLOR := Color("#131a1f")
+const WINDOW_LIT := Color("#efac5d")
 const FENCE_COLOR := Color("#786a56")
 const POST_COLOR := Color("#524b43")
 const RUT_COLOR := Color("#423a32")
@@ -20,6 +20,8 @@ var _rng := RandomNumberGenerator.new()
 var _lights_placed: int = 0
 var _fence_posts: PackedVector3Array = PackedVector3Array()
 var _fence_rails: PackedVector3Array = PackedVector3Array()
+var _fence_slats: PackedVector3Array = PackedVector3Array()
+var _yard_details: PackedVector3Array = PackedVector3Array()
 var _road_ruts: PackedVector3Array = PackedVector3Array()
 var _bush_positions: Array[Transform3D] = []
 var _aspen_positions: Array[Transform3D] = []
@@ -52,7 +54,9 @@ func decorate(features: Array) -> void:
                 _decorate_forest(polygon)
     _flush_details()
     _create_solid_mesh(_fence_posts, Color("#554a40"), "Забор / столбы")
-    _create_solid_mesh(_fence_rails, Color("#736656"), "Забор / рейки")
+    _create_solid_mesh(_fence_rails, Color("#5a5247"), "Забор / рейки")
+    _create_solid_mesh(_fence_slats, Color("#49483e"), "Забор / обветшавший штакетник")
+    _create_solid_mesh(_yard_details, Color("#48443b"), "Старый деревенский быт / ящики и дрова")
     _create_solid_mesh(_road_ruts, RUT_COLOR, "Дорога / земляные колеи")
     _create_forest_assets()
     print("MANUAL_ART_READY: buildings=", _building_count,
@@ -172,11 +176,27 @@ func _flush_details() -> void:
         "frame": FRAME_COLOR,
         "door": DOOR_COLOR,
         "lintel": Color("#52473f"),
-        "chimney": Color("#5c5150")
+        "chimney": Color("#444442"),
+        "board": Color("#50493e")
     }
     for key in _detail_batches.keys():
         var verts: PackedVector3Array = _detail_batches[key]
-        _create_solid_mesh(verts, colors.get(key, Color.WHITE), "Детали фасада / " + str(key))
+        if key == "window_lit":
+            var lit_mat := _material(WINDOW_LIT)
+            lit_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+            var arrays := []
+            arrays.resize(Mesh.ARRAY_MAX)
+            arrays[Mesh.ARRAY_VERTEX] = verts
+            var mesh := ArrayMesh.new()
+            mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+            var lit_node := MeshInstance3D.new()
+            lit_node.name = "Редкие янтарные окна"
+            lit_node.mesh = mesh
+            lit_node.material_override = lit_mat
+            lit_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+            add_child(lit_node)
+        else:
+            _create_solid_mesh(verts, colors.get(key, Color.WHITE), "Детали фасада / " + str(key))
 
 func _signed_area(points: PackedVector2Array) -> float:
     var area := 0.0
@@ -220,7 +240,7 @@ func _wall_panel(key: String, start: Vector2, finish: Vector2, normal: Vector3,
     _batch_quad(key, aa, bb, cc, dd)
 
 func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
-        center_fraction: float, side_length: float, illuminated: bool) -> void:
+        center_fraction: float, side_length: float, illuminated: bool, boarded: bool = false) -> void:
     var half := minf(0.07, 0.72 / maxf(side_length, 0.1))
     var u0 := center_fraction - half
     var u1 := center_fraction + half
@@ -228,6 +248,9 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
     _wall_panel("window_lit" if illuminated else "window",
         start, finish, normal, u0, u1, 1.47, 2.66, 0.142)
     _wall_panel("lintel", start, finish, normal, u0, u1, 1.97, 2.04, 0.157)
+    if boarded:
+        _wall_panel("board", start, finish, normal, u0, u1, 1.68, 1.94, 0.170)
+        _wall_panel("board", start, finish, normal, u0, u1, 2.23, 2.43, 0.174)
     if illuminated and _lights_placed < 7:
         _lights_placed += 1
         var center := start.lerp(finish, center_fraction)
@@ -235,8 +258,8 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
         lamp.name = "Тусклая лампа / окно"
         lamp.position = _pt(center, 2.3) + normal * 1.1
         lamp.light_color = Color("#ffbc7e")
-        lamp.light_energy = 0.34
-        lamp.omni_range = 9.0
+        lamp.light_energy = 0.72
+        lamp.omni_range = 11.0
         lamp.shadow_enabled = false
         add_child(lamp)
 
@@ -245,14 +268,13 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
         return
     _building_count += 1
     var index := _building_count
-    # The underlying survey blockout uses 5.0 / 3.1 / 2.6 m tops.
-    # Place textured walls slightly in front and roofs above those tops to avoid bright clipping.
-    var walls_height := 5.06 if category == "house" else (3.16 if category == "sauna" else 2.66)
+    # The bright survey blockout is hidden in manual_geo.gd; art can use natural 1-storey proportions.
+    var walls_height := 3.9 if category == "house" else (2.7 if category == "sauna" else 2.35)
     var tone := Color(WOOD_TONES[(index * 7) % WOOD_TONES.size()])
     if category == "sauna":
-        tone = Color("#554c45")
+        tone = Color("#38362f")
     elif category == "shed":
-        tone = Color("#6f6253")
+        tone = Color("#49453f")
     var wall_tex := _pixel_texture(tone, 8021 + int(index % 5), false)
     var roof_tex := _pixel_texture(Color(ROOF_TONES[index % ROOF_TONES.size()]), 9121 + int(index % 4), true)
     var wall_verts := PackedVector3Array()
@@ -280,10 +302,11 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
             _wall_panel("door", a, b, normal, 0.5 - door_half,
                 0.5 + door_half, 0.12, 2.13, 0.15)
             if category == "house" and length > 7.0:
-                _make_window(a, b, normal, 0.19, length, index % 6 == 0)
-                _make_window(a, b, normal, 0.81, length, index % 9 == 0)
+                _make_window(a, b, normal, 0.19, length, index % 6 == 0, index % 5 == 0)
+                _make_window(a, b, normal, 0.81, length, index % 9 == 0, index % 7 == 0)
         elif category == "house" and length > 5.0:
-            _make_window(a, b, normal, 0.5, length, index % 11 == 0 and i % 2 == 0)
+            _make_window(a, b, normal, 0.5, length, index % 11 == 0 and i % 2 == 0,
+                (index + i) % 8 == 0)
     _make_textured_mesh(wall_verts, wall_uvs, _material(Color.WHITE, wall_tex),
         category + " / pixel-wood")
     _decorate_roof(points, category, walls_height, roof_tex, index)
@@ -298,7 +321,7 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
         tex: Texture2D, index: int) -> void:
     var v := PackedVector3Array()
     var uv := PackedVector2Array()
-    var rise := 1.25 if category == "house" else 0.58
+    var rise := (1.75 if index % 3 != 0 else 1.25) if category == "house" else 0.7
     var eave := base + 0.12
     if points.size() == 4:
         var across_0 := points[0].distance_to(points[1])
@@ -390,6 +413,17 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool) -> void:
             continue
         var start := a + tang * from_dist
         var finish := a + tang * to_dist
+        # Some plots have an irregular full picket fence; others keep the old open rails.
+        if _fence_count % 4 == 1:
+            var slat_count := maxi(1, int(ceil((to_dist - from_dist) / 0.74)))
+            for j in range(slat_count):
+                if (i * 7 + j * 13 + _fence_count) % 17 == 0:
+                    continue
+                var fraction := (float(j) + 0.5) / float(slat_count)
+                var center := start.lerp(finish, fraction)
+                var h := 1.10 + 0.3 * sin(float(i * 19 + j * 17))
+                _append_box_to(_fence_slats, _pt(center, h * 0.5 + 0.12),
+                    Vector3(0.13, h, 0.13))
         for y in [0.52, 1.1]:
             var v0 := _pt(start, y)
             var v1 := _pt(finish, y)
@@ -410,6 +444,16 @@ func _decorate_fence(points: PackedVector2Array) -> void:
             gate_edge = i
     for i in range(points.size()):
         _fence_edge(points[i], points[(i + 1) % points.size()], i == gate_edge)
+    if _fence_count % 3 == 0:
+        var centroid := Vector2.ZERO
+        for point in points:
+            centroid += point
+        centroid /= float(points.size())
+        if Geometry2D.is_point_in_polygon(centroid, points) and _nearest_road_distance(centroid) > 5.0:
+            for i in range(3):
+                var offset := Vector2(float(i) * 0.72, float(i % 2) * 0.46)
+                _append_box_to(_yard_details, _pt(centroid + offset, 0.23),
+                    Vector3(0.55, 0.45, 0.5))
 
 func _decorate_road(points: PackedVector2Array) -> void:
     if points.size() < 2:
