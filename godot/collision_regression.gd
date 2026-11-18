@@ -96,24 +96,50 @@ func _run() -> void:
     if avatar == null:
         _fail("full-body first-person avatar missing")
         return
-    if avatar.get_node_or_null("LeftLeg") == null or avatar.get_node_or_null("RightLeg") == null:
-        _fail("feet and legs are not modeled")
+    var pelvis := avatar.get_node_or_null("PelvisRoot") as Node3D
+    if pelvis == null or pelvis.get_parent() != avatar:
+        _fail("one common pelvis root must drive torso and legs")
         return
-    if avatar.get_node_or_null("LeftArm") == null or avatar.get_node_or_null("RightArm") == null:
-        _fail("first-person arms are not modeled")
+    var left_leg := pelvis.get_node_or_null("LeftLeg") as Node3D
+    var right_leg := pelvis.get_node_or_null("RightLeg") as Node3D
+    if left_leg == null or right_leg == null:
+        _fail("both legs must be attached to the shared pelvis")
+        return
+    if pelvis.get_node_or_null("LeftArm") == null or pelvis.get_node_or_null("RightArm") == null:
+        _fail("both arms must follow the shared body root")
+        return
+    if absf(left_leg.position.x + right_leg.position.x) > 0.001:
+        _fail("hips should be symmetrical under the jacket")
+        return
+    if absf(left_leg.position.z - right_leg.position.z) > 0.001:
+        _fail("legs have different depth anchors")
+        return
+    if left_leg.get_node_or_null("HipJoint") != null or right_leg.get_node_or_null("HipJoint") != null:
+        _fail("old oversized spherical hip geometry returned")
+        return
+    var jacket := pelvis.get_node_or_null("LowerJacket") as MeshInstance3D
+    var hip_fabric := pelvis.get_node_or_null("HipFabric") as MeshInstance3D
+    if jacket == null or hip_fabric == null:
+        _fail("there must be continuous jacket and pelvis geometry")
+        return
+    if absf(jacket.position.z - left_leg.position.z) > 0.01:
+        _fail("coat and legs have disconnected depth anchors")
+        return
+    if absf(pelvis.position.x) > 0.001:
+        _fail("pelvis is offset from the center of the player")
         return
     # The camera's downward ray must not begin inside or directly hit a huge
     # chest mesh. Verify the torso is below eye height and shifted behind view.
-    var chest := avatar.get_node_or_null("ChestAndShoulders") as MeshInstance3D
+    var chest := pelvis.get_node_or_null("ChestAndShoulders") as MeshInstance3D
     if chest == null or not (chest.mesh is CylinderMesh):
         _fail("torso must use a taper instead of an armor-like square box")
         return
     var torso_coat := chest.mesh as CylinderMesh
     var eye_height := (actor.get_node("Camera3D") as Camera3D).position.y
-    if chest.position.y + torso_coat.height * 0.5 >= eye_height - 0.20:
+    if pelvis.position.y + chest.position.y + torso_coat.height * 0.5 >= eye_height - 0.20:
         _fail("torso intrudes into look-down camera")
         return
-    if chest.position.z - torso_coat.bottom_radius * chest.scale.z < 0.065:
+    if pelvis.position.z + chest.position.z - torso_coat.bottom_radius * chest.scale.z < -0.085:
         _fail("torso front must stay behind the eye when looking down")
         return
     if torso_coat.radial_segments > 10:
@@ -130,6 +156,16 @@ func _run() -> void:
         if hand_model.get_node_or_null("AnimatedHand/PeriodCharacterProp/" + detail) == null:
             _fail("missing close-up character prop detail: " + detail)
             return
+    var hand := hand_model.get_node("AnimatedHand") as Node3D
+    if hand.get_node_or_null("IndexFinger") == null or hand.get_node_or_null("MiddleFinger") == null:
+        _fail("separated index and middle fingers missing")
+        return
+    var index_finger := hand.get_node("IndexFinger") as Node3D
+    var middle_finger := hand.get_node("MiddleFinger") as Node3D
+    var prop := hand.get_node("PeriodCharacterProp") as Node3D
+    if index_finger.position.x * middle_finger.position.x >= 0.0 or absf(prop.position.x) > 0.005:
+        _fail("decorative prop must sit between index and middle fingers")
+        return
     var wrist := hand_model.get_node("AnimatedHand") as Node3D
     var elbow := hand_model.get_node("ElbowJoint") as Node3D
     actor.call("_apply_idle_pose", 0.0)
@@ -137,6 +173,17 @@ func _run() -> void:
     actor.call("_apply_idle_pose", 1.0)
     var wrist_raised := wrist.position
     var elbow_raised := elbow.position
+    var camera_view := actor.get_node("Camera3D") as Camera3D
+    var toward_face := (camera_view.global_position - wrist.global_position).normalized()
+    var palm_front := wrist.global_transform.basis.z.normalized()
+    if palm_front.dot(toward_face) < 0.45:
+        _fail("palm is not turned toward the face when raised")
+        return
+    var filter := prop.get_node("BrownFilter") as Node3D
+    var ember := prop.get_node("RedEmber") as Node3D
+    if ember.global_position.distance_to(camera_view.global_position) <= filter.global_position.distance_to(camera_view.global_position) + 0.055:
+        _fail("lit end points toward the face instead of outward")
+        return
     if wrist_raised.y > -0.08 or wrist_raised.z > -0.20:
         _fail("hand reached into camera instead of stopping at face height")
         return
@@ -161,11 +208,11 @@ func _run() -> void:
     if prop == null or not prop.visible:
         _fail("character idle prop not visible during action")
         return
-    if (avatar.get_node("RightArm") as Node3D).visible:
+    if (pelvis.get_node("RightArm") as Node3D).visible:
         _fail("right full-body arm remains duplicated while gesturing")
         return
     actor.call("_process", 6.0)
-    if not (avatar.get_node("RightArm") as Node3D).visible:
+    if not (pelvis.get_node("RightArm") as Node3D).visible:
         _fail("right arm is not restored after gesture")
         return
     var hud_layer := CanvasLayer.new()
@@ -187,5 +234,5 @@ func _run() -> void:
         _fail("quick slot selection does not update")
         return
     print("COLLISION_REGRESSION_OK: house=solid fence=solid gap=open player_idle=cosmetic capsule=blocked view=compact")
-    print("FIRST_PERSON_HUD_REGRESSION_OK: avatar=body+legs+arms prop=filter+paper+ember compass=NESW health=100 slots=4 eye_clear=true elbow_bent=true civilian_coat=true slower_walk=true")
+    print("FIRST_PERSON_HUD_REGRESSION_OK: avatar=body+legs+arms prop=filter+paper+ember compass=NESW health=100 slots=4 eye_clear=true elbow_bent=true civilian_coat=true slower_walk=true pelvis_aligned=true hand_inward=true tip_outward=true")
     quit(0)
