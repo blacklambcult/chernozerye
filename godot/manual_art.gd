@@ -894,6 +894,19 @@ func _roof_face(verts: PackedVector3Array, uvs: PackedVector2Array,
         Vector2(0, 0), Vector2(a.distance_to(b) / 5.0, 0),
         Vector2(a.distance_to(c) / 5.0, 1.0))
 
+func _roof_quad(verts: PackedVector3Array, uvs: PackedVector2Array,
+        a: Vector2, b: Vector2, c: Vector2, d: Vector2,
+        ah: float, bh: float, ch: float, dh: float) -> void:
+    # Both triangles use a single UV frame. Resetting UV for each triangle
+    # created a diagonal texture discontinuity and apparent roof shimmer.
+    var u := maxf(0.25, a.distance_to(b) / 5.0)
+    var v := maxf(0.25, a.distance_to(d) / 5.0)
+    _face(verts, uvs, _pt(a, ah), _pt(b, bh), _pt(c, ch),
+        Vector2(0.0, 0.0), Vector2(u, 0.0), Vector2(u, v))
+    _face(verts, uvs, _pt(a, ah), _pt(c, ch), _pt(d, dh),
+        Vector2(0.0, 0.0), Vector2(u, v), Vector2(0.0, v))
+
+
 func _decorate_roof_patch(eave_a: Vector2, eave_b: Vector2,
         ridge_a: Vector2, ridge_b: Vector2, eave: float, rise: float) -> void:
     # Uneven patch of repaired sheet metal follows the existing roof slope.
@@ -948,16 +961,16 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
             # Hip: short inset ridge, four visible slopes.
             var hip0 := ridge0.lerp(ridge1, 0.20)
             var hip1 := ridge0.lerp(ridge1, 0.80)
-            _roof_face(v, uv, a, b, hip1, eave, eave, eave + rise)
-            _roof_face(v, uv, a, hip1, hip0, eave, eave + rise, eave + rise)
-            _roof_face(v, uv, d, hip0, hip1, eave, eave + rise, eave + rise)
-            _roof_face(v, uv, d, hip1, c, eave, eave + rise, eave)
+            _roof_quad(v, uv, a, b, hip1, hip0,
+                eave, eave, eave + rise, eave + rise)
+            _roof_quad(v, uv, d, c, hip1, hip0,
+                eave, eave, eave + rise, eave + rise)
             _roof_face(v, uv, a, hip0, d, eave, eave + rise, eave)
             _roof_face(v, uv, b, c, hip1, eave, eave, eave + rise)
         elif category == "house" and roof_style == 4:
             # One continuous sloping panel and end walls: recognisably a shed roof.
-            _roof_face(v, uv, a, b, c, eave + rise, eave + rise, eave)
-            _roof_face(v, uv, a, c, d, eave + rise, eave, eave)
+            _roof_quad(v, uv, a, b, c, d,
+                eave + rise, eave + rise, eave, eave)
             # A single-slope roof needs timber infill below the raised side.
             _batch_quad("gable_planks", _pt(a, base - 0.10), _pt(b, base - 0.10),
                 _pt(b, eave + rise), _pt(a, eave + rise))
@@ -966,10 +979,10 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
             _batch_tri("gable_planks", _pt(b, eave), _pt(c, eave),
                 _pt(b, eave + rise))
         else:
-            _roof_face(v, uv, a, b, ridge1, eave, eave, eave + rise)
-            _roof_face(v, uv, a, ridge1, ridge0, eave, eave + rise, eave + rise)
-            _roof_face(v, uv, d, ridge0, ridge1, eave, eave + rise, eave + rise)
-            _roof_face(v, uv, d, ridge1, c, eave, eave + rise, eave)
+            _roof_quad(v, uv, a, b, ridge1, ridge0,
+                eave, eave, eave + rise, eave + rise)
+            _roof_quad(v, uv, d, c, ridge1, ridge0,
+                eave, eave, eave + rise, eave + rise)
             # Close both gables with solid wood so the roof reads as one building.
             _batch_tri("gable_planks", _pt(a, eave), _pt(ridge0, eave + rise), _pt(d, eave))
             _batch_tri("gable_planks", _pt(b, eave), _pt(c, eave), _pt(ridge1, eave + rise))
