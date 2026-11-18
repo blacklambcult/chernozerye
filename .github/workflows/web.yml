@@ -85,6 +85,22 @@ jobs:
           grep -q "IZBA_DETAIL_READY: log_courses=" /tmp/world-smoke.log
           grep -q "VILLAGE_YARDS_READY: wells=" /tmp/world-smoke.log
           grep -q "VILLAGE_CLEARANCE_READY: rejected_fence_panels=" /tmp/world-smoke.log
+          # Guard against removing most plot boundaries again (v3.4 skipped 328).
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          log = Path('/tmp/world-smoke.log').read_text()
+          m = re.search(
+              r'VILLAGE_CLEARANCE_READY: rejected_fence_panels=(\d+)'
+              r' relocated_fence_panels=(\d+).* sealed_roof_joints=(\d+)',
+              log)
+          assert m, 'Missing village geometry counts'
+          missing, relocated, sealed = map(int, m.groups())
+          assert missing < 250, ('Too many fence sections removed', missing)
+          assert relocated > 20, ('No roadside fence correction performed', relocated)
+          assert sealed == 35, ('Unexpected house roof count', sealed)
+          print('VILLAGE_GEOMETRY_AUDIT_OK:', missing, relocated, sealed)
+          PY
           # The new lighting mode is enabled only after the player selects the manual village.
           # Assert its configuration statically; startup smoke has not clicked that button.
           grep -q 'ambient_light_energy = 0.48 if manual_mode' godot/world.gd
@@ -102,23 +118,23 @@ jobs:
         run: |
           set -euo pipefail
           # Versioned asset directory prevents stale .wasm/.pck files in browsers.
-          mkdir -p build/web/v35
-          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v35/index.html"
-          test -s build/web/v35/index.html
-          test -f build/web/v35/index.wasm
-          test -f build/web/v35/index.pck
+          mkdir -p build/web/v36
+          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v36/index.html"
+          test -s build/web/v36/index.html
+          test -f build/web/v36/index.wasm
+          test -f build/web/v36/index.pck
           cat > build/web/index.html <<'HTML'
           <!doctype html>
           <html lang="ru">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta http-equiv="refresh" content="0; url=./v35/">
+            <meta http-equiv="refresh" content="0; url=./v36/">
             <title>Чернозёрье — загрузка новой версии</title>
           </head>
           <body>
-            <p><a href="./v35/">Открыть Чернозёрье 3.5</a></p>
-            <script>window.location.replace("./v35/");</script>
+            <p><a href="./v36/">Открыть Чернозёрье 3.6</a></p>
+            <script>window.location.replace("./v36/");</script>
           </body>
           </html>
           HTML
