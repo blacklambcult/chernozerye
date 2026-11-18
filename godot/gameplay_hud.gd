@@ -148,7 +148,7 @@ func _draw_slots(view_width: float, view_height: float) -> void:
         else:
             draw_line(Vector2(x + 20, y + 31),
                 Vector2(x + 37, y + 31), Color("#565850"), 1.0)
-    _write(x0, y + 72, "1: СИГАРЕТЫ     V: ЖЕСТ", 11, MUTED)
+    _write(x0, y + 72, "1: ПАЧКА     V: ДЕЙСТВИЕ", 11, MUTED)
 
 func _draw() -> void:
     if size.x < 320.0 or size.y < 240.0:
