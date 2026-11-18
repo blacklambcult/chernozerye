@@ -235,7 +235,8 @@ func _add_village_roadside(points: PackedVector2Array, width: float, height: flo
             var t1 := float(j + 1) / float(steps)
             var first := a.lerp(b, t0)
             var last := a.lerp(b, t1)
-            for sign in [-1.0, 1.0]:
+            # Use integer signs: GDScript's % operator rejects float operands.
+            for sign in [-1, 1]:
                 var sgn := float(sign)
                 var inner := side * sgn * (width * 0.5 - 0.04)
                 var outer0 := side * sgn * (width * 0.5 + 0.62 +
