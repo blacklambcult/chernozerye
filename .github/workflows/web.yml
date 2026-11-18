@@ -80,6 +80,7 @@ jobs:
           grep -q "MANUAL_LAYOUT_READY: 130" /tmp/world-smoke.log
           grep -q "MANUAL_ART_READY: buildings=59 plots=34 roads=18" /tmp/world-smoke.log
           grep -q "MANUAL_FOREST_READY: trees=" /tmp/world-smoke.log
+          grep -q "clearance=roads13/buildings6.5" /tmp/world-smoke.log
           grep -q "MANUAL_SHOWCASE_YARD_READY:" /tmp/world-smoke.log
           if grep -E "SCRIPT ERROR|FATAL ERROR|out of memory" /tmp/world-smoke.log; then
             exit 1
@@ -90,23 +91,23 @@ jobs:
         run: |
           set -euo pipefail
           # Versioned asset directory prevents stale .wasm/.pck files in browsers.
-          mkdir -p build/web/v25
-          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v25/index.html"
-          test -s build/web/v25/index.html
-          test -f build/web/v25/index.wasm
-          test -f build/web/v25/index.pck
+          mkdir -p build/web/v26
+          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v26/index.html"
+          test -s build/web/v26/index.html
+          test -f build/web/v26/index.wasm
+          test -f build/web/v26/index.pck
           cat > build/web/index.html <<'HTML'
           <!doctype html>
           <html lang="ru">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta http-equiv="refresh" content="0; url=./v25/">
+            <meta http-equiv="refresh" content="0; url=./v26/">
             <title>Чернозёрье — загрузка новой версии</title>
           </head>
           <body>
-            <p><a href="./v25/">Открыть Чернозёрье 2.5</a></p>
-            <script>window.location.replace("./v25/");</script>
+            <p><a href="./v26/">Открыть Чернозёрье 2.6</a></p>
+            <script>window.location.replace("./v26/");</script>
           </body>
           </html>
           HTML
