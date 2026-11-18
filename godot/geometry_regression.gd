@@ -44,14 +44,40 @@ func _initialize() -> void:
     if (crossings[0]["center"] as Vector2).length() > 0.01:
         _fail("crossing patch is not centred on the intersection")
         return
+    if not geo.call("_near_junction", Vector2(1.0, 0.0), 2.8):
+        _fail("wheel ruts must be suppressed at a crossing")
+        return
+    if geo.call("_near_junction", Vector2(50.0, 50.0), 2.8):
+        _fail("junction suppression may not erase a distant road")
+        return
+    # A full 2D crossing must cover the road edges and the adjacent shoulders.
+    var main_radius: float = crossings[0]["radius"]
+    if main_radius < 4.0:
+        _fail("crossing cap does not cover the visible road shoulders")
+        return
     var junction_fan := PackedVector3Array()
-    geo.call("_junction_fan", Vector2.ZERO, 3.5, 0.193, junction_fan, 0)
+    geo.call("_junction_fan", Vector2.ZERO, 3.5, 0.205, junction_fan, 0)
     if junction_fan.size() != 48:
         _fail("junction cap must be a closed 16-triangle fan")
         return
     for vertex in junction_fan:
-        if absf(vertex.y - 0.193) > 0.001:
+        if absf(vertex.y - 0.205) > 0.001:
             _fail("junction cap is not separated from overlapping road meshes")
+            return
+    # Confirm the generated interrupted track geometry stays entirely outside
+    # the reserved crossing radius + taper distance.
+    var line := PackedVector2Array([
+        Vector2(-14.0, 0.0), Vector2(14.0, 0.0)
+    ])
+    geo.call("_add_road_wear", line, 0.145)
+    var ruts := geo.get_node_or_null("Дорога / мягкие прерывистые колеи") as MeshInstance3D
+    if ruts == null or ruts.mesh == null:
+        _fail("no road wheel marks generated for the regression segment")
+        return
+    var vertices: PackedVector3Array = ruts.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+    for p in vertices:
+        if Vector2(p.x, -p.z).length() < main_radius + 1.2:
+            _fail("wheel-mark geometry crosses the protected junction")
             return
     # Almost touching endpoints should form a small T-junction cover.
     geo.set("manual_roads", [
