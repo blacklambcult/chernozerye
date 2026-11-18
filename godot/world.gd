@@ -6,6 +6,8 @@ const MANUAL_FILE := "res://manual_layout.json"
 var manual_mode := false
 var manual_button: Button
 var _status_label: Label
+var _night_environment: Environment
+var _sun_light: DirectionalLight3D
 
 func _process(_delta: float) -> void:
     if not is_instance_valid(_status_label):
@@ -79,24 +81,27 @@ func _create_ground() -> void:
     add_child(ground)
 
 func _create_ground_material() -> StandardMaterial3D:
-    # Small repeating pixel-grime ground texture: dirty olive patches, not uniform grass.
-    var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+    # Subtle, irregular soil instead of enormous visible repeated pixel squares.
+    var img := Image.create(128, 128, false, Image.FORMAT_RGBA8)
     var rng := RandomNumberGenerator.new()
     rng.seed = 19950328
-    for y in range(64):
-        for x in range(64):
-            var noise := rng.randf_range(-0.065, 0.065)
-            var patch := sin(float(x) * 0.26) * cos(float(y) * 0.22) * 0.055
-            var tone := clampf(0.23 + noise + patch, 0.13, 0.31)
-            img.set_pixel(x, y, Color(tone * 0.92, tone, tone * 0.78))
-    var mat := _material(Color("#e1e5d8"))
+    for y in range(128):
+        for x in range(128):
+            var broad := sin(float(x) * 0.092) * cos(float(y) * 0.085) * 0.014
+            var mottled := sin(float(x * 3 + y) * 0.13) * 0.009
+            var fine := rng.randf_range(-0.009, 0.009)
+            var tone := clampf(0.21 + broad + mottled + fine, 0.15, 0.27)
+            img.set_pixel(x, y, Color(tone * 0.88, tone * 0.93, tone * 0.75))
+    img.generate_mipmaps()
+    var mat := _material(Color("#b8c1b5"))
     mat.albedo_texture = ImageTexture.create_from_image(img)
-    mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-    mat.uv1_scale = Vector3(110.0, 110.0, 1.0)
+    mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+    mat.uv1_scale = Vector3(10.0, 10.0, 1.0)
     return mat
 
 func _create_lighting() -> void:
     var environment := WorldEnvironment.new()
+    environment.name = "WorldEnvironment"
     var env := Environment.new()
     env.background_mode = Environment.BG_COLOR
     env.background_color = Color("#575b69")
@@ -107,8 +112,11 @@ func _create_lighting() -> void:
     env.fog_light_color = Color("#676976")
     env.fog_density = 0.0018
     environment.environment = env
+    _night_environment = env
     add_child(environment)
     var sun := DirectionalLight3D.new()
+    sun.name = "DirectionalLight3D"
+    _sun_light = sun
     sun.rotation_degrees = Vector3(-12, -35, 0)
     sun.light_energy = 1.05
     sun.shadow_enabled = true
@@ -511,18 +519,24 @@ func _toggle_manual_preview() -> void:
     if osm_roads != null:
         osm_roads.visible = not manual_mode
     manual_button.text = "ВЕРНУТЬ СТАРУЮ МЕСТНОСТЬ" if manual_mode else "РУЧНАЯ РАЗМЕТКА · 130 ОБЪЕКТОВ"
-    var sky := get_node_or_null("WorldEnvironment") as WorldEnvironment
-    if sky != null and sky.environment != null:
-        var env: Environment = sky.environment
-        env.background_color = Color("#202734") if manual_mode else Color("#575b69")
-        env.ambient_light_color = Color("#7d8ba0") if manual_mode else Color("#b0a9a4")
-        env.ambient_light_energy = 0.42 if manual_mode else 0.82
-        env.fog_light_color = Color("#273442") if manual_mode else Color("#676976")
-        env.fog_density = 0.0043 if manual_mode else 0.0018
-    var sun := get_node_or_null("DirectionalLight3D") as DirectionalLight3D
-    if sun != null:
-        sun.light_energy = 0.38 if manual_mode else 1.05
-        sun.light_color = Color("#899cb3") if manual_mode else Color("#f0b69a")
+    # The procedural WorldEnvironment/Light nodes had no explicit names in older builds.
+    # Hold direct references so toggling scenes always changes the actual light and sky.
+    if _night_environment != null:
+        _night_environment.background_mode = Environment.BG_COLOR
+        _night_environment.background_color = Color("#171e2b") if manual_mode else Color("#575b69")
+        _night_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+        _night_environment.ambient_light_color = Color("#637589") if manual_mode else Color("#b0a9a4")
+        _night_environment.ambient_light_energy = 0.30 if manual_mode else 0.82
+        _night_environment.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED if manual_mode else Environment.REFLECTION_SOURCE_BG
+        _night_environment.fog_enabled = true
+        _night_environment.fog_light_color = Color("#202d39") if manual_mode else Color("#676976")
+        _night_environment.fog_density = 0.005 if manual_mode else 0.0018
+    if _sun_light != null:
+        _sun_light.light_energy = 0.30 if manual_mode else 1.05
+        _sun_light.light_color = Color("#9aacc7") if manual_mode else Color("#f0b69a")
+    print("MANUAL_NIGHT_READY: ", manual_mode,
+        " bg=", _night_environment.background_color if _night_environment != null else "MISSING_ENV")
+
     if map_panel != null:
         map_panel.set("show_manual", manual_mode)
         map_panel.queue_redraw()
@@ -530,7 +544,7 @@ func _toggle_manual_preview() -> void:
         if control != null:
             control.visible = not manual_mode
     if is_instance_valid(_status_label):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 2.3 / НОЧНОЙ ПОСЁЛОК · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 2.4 / СУМЕРЕЧНЫЙ КВАРТАЛ · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
     var character := get_node_or_null("Player") as CharacterBody3D
     if character != null:
         character.velocity = Vector3.ZERO
