@@ -66,7 +66,8 @@ func _create_ground() -> void:
     mesh.size = Vector2(2600, 2600)
     var instance := MeshInstance3D.new()
     instance.mesh = mesh
-    instance.material_override = _material(Color("#435443"))
+    instance.name = "BaseGround"
+    instance.material_override = _create_ground_material()
     add_child(instance)
     var ground := StaticBody3D.new()
     ground.position.y = -0.2
@@ -76,6 +77,23 @@ func _create_ground() -> void:
     collider.shape = shape
     ground.add_child(collider)
     add_child(ground)
+
+func _create_ground_material() -> StandardMaterial3D:
+    # Small repeating pixel-grime ground texture: dirty olive patches, not uniform grass.
+    var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+    var rng := RandomNumberGenerator.new()
+    rng.seed = 19950328
+    for y in range(64):
+        for x in range(64):
+            var noise := rng.randf_range(-0.065, 0.065)
+            var patch := sin(float(x) * 0.26) * cos(float(y) * 0.22) * 0.055
+            var tone := clampf(0.23 + noise + patch, 0.13, 0.31)
+            img.set_pixel(x, y, Color(tone * 0.92, tone, tone * 0.78))
+    var mat := _material(Color("#e1e5d8"))
+    mat.albedo_texture = ImageTexture.create_from_image(img)
+    mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+    mat.uv1_scale = Vector3(110.0, 110.0, 1.0)
+    return mat
 
 func _create_lighting() -> void:
     var environment := WorldEnvironment.new()
@@ -496,15 +514,15 @@ func _toggle_manual_preview() -> void:
     var sky := get_node_or_null("WorldEnvironment") as WorldEnvironment
     if sky != null and sky.environment != null:
         var env: Environment = sky.environment
-        env.background_color = Color("#3d4350") if manual_mode else Color("#575b69")
-        env.ambient_light_color = Color("#7d8995") if manual_mode else Color("#b0a9a4")
-        env.ambient_light_energy = 0.64 if manual_mode else 0.82
-        env.fog_light_color = Color("#47515d") if manual_mode else Color("#676976")
-        env.fog_density = 0.0027 if manual_mode else 0.0018
+        env.background_color = Color("#202734") if manual_mode else Color("#575b69")
+        env.ambient_light_color = Color("#7d8ba0") if manual_mode else Color("#b0a9a4")
+        env.ambient_light_energy = 0.42 if manual_mode else 0.82
+        env.fog_light_color = Color("#273442") if manual_mode else Color("#676976")
+        env.fog_density = 0.0043 if manual_mode else 0.0018
     var sun := get_node_or_null("DirectionalLight3D") as DirectionalLight3D
     if sun != null:
-        sun.light_energy = 0.56 if manual_mode else 1.05
-        sun.light_color = Color("#aab7bd") if manual_mode else Color("#f0b69a")
+        sun.light_energy = 0.38 if manual_mode else 1.05
+        sun.light_color = Color("#899cb3") if manual_mode else Color("#f0b69a")
     if map_panel != null:
         map_panel.set("show_manual", manual_mode)
         map_panel.queue_redraw()
@@ -512,7 +530,7 @@ func _toggle_manual_preview() -> void:
         if control != null:
             control.visible = not manual_mode
     if is_instance_valid(_status_label):
-        _status_label.text = "ЧЕРНОЗЁРЬЕ 2.2 / PS1 ДЕРЕВНЯ · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
+        _status_label.text = "ЧЕРНОЗЁРЬЕ 2.3 / НОЧНОЙ ПОСЁЛОК · 130 ОБЪЕКТОВ" if manual_mode else "ЧЕРНОЗЁРЬЕ 2.1 / ОСНОВНОЙ ПРОТОТИП"
     var character := get_node_or_null("Player") as CharacterBody3D
     if character != null:
         character.velocity = Vector3.ZERO
