@@ -105,16 +105,25 @@ func _run() -> void:
     # The camera's downward ray must not begin inside or directly hit a huge
     # chest mesh. Verify the torso is below eye height and shifted behind view.
     var chest := avatar.get_node_or_null("ChestAndShoulders") as MeshInstance3D
-    if chest == null or not (chest.mesh is BoxMesh):
-        _fail("upper torso must be a compact box, not a head-sized sphere")
+    if chest == null or not (chest.mesh is CylinderMesh):
+        _fail("torso must use a taper instead of an armor-like square box")
         return
-    var torso_box := chest.mesh as BoxMesh
+    var torso_coat := chest.mesh as CylinderMesh
     var eye_height := (actor.get_node("Camera3D") as Camera3D).position.y
-    if chest.position.y + torso_box.size.y * 0.5 >= eye_height - 0.20:
-        _fail("head/torso clearance insufficient for look-down camera")
+    if chest.position.y + torso_coat.height * 0.5 >= eye_height - 0.20:
+        _fail("torso intrudes into look-down camera")
         return
-    if chest.position.z - torso_box.size.z * 0.5 < 0.01:
+    if chest.position.z - torso_coat.bottom_radius * chest.scale.z < 0.065:
         _fail("torso front must stay behind the eye when looking down")
+        return
+    if torso_coat.radial_segments > 10:
+        _fail("body model lost the simple low-poly visual language")
+        return
+    if actor.call("_movement_speed", false) > 3.6 or actor.call("_movement_speed", true) > 5.5:
+        _fail("movement speed is too fast for November exploration")
+        return
+    if actor.call("_movement_speed", false) < 2.8:
+        _fail("movement speed became excessively slow")
         return
     var hand_model := actor.get("_smoke_prop") as Node3D
     for detail in ["BrownFilter", "WhitePaper", "RedEmber"]:
@@ -128,6 +137,16 @@ func _run() -> void:
     actor.call("_apply_idle_pose", 1.0)
     var wrist_raised := wrist.position
     var elbow_raised := elbow.position
+    if wrist_raised.y > -0.08 or wrist_raised.z > -0.20:
+        _fail("hand reached into camera instead of stopping at face height")
+        return
+    var palm := hand_model.get_node("AnimatedHand/Palm") as MeshInstance3D
+    if palm == null or not (palm.mesh is BoxMesh):
+        _fail("low-poly slender hand missing")
+        return
+    if (palm.mesh as BoxMesh).size.x > 0.10:
+        _fail("hand still renders as a giant fist")
+        return
     if wrist_raised.y - wrist_rest.y < 0.35 or wrist_raised.x > 0.25:
         _fail("hand should rise toward center/face, not stay extended ahead")
         return
@@ -168,5 +187,5 @@ func _run() -> void:
         _fail("quick slot selection does not update")
         return
     print("COLLISION_REGRESSION_OK: house=solid fence=solid gap=open player_idle=cosmetic capsule=blocked view=compact")
-    print("FIRST_PERSON_HUD_REGRESSION_OK: avatar=body+legs+arms prop=filter+paper+ember compass=NESW health=100 slots=4 eye_clear=true elbow_bent=true")
+    print("FIRST_PERSON_HUD_REGRESSION_OK: avatar=body+legs+arms prop=filter+paper+ember compass=NESW health=100 slots=4 eye_clear=true elbow_bent=true civilian_coat=true slower_walk=true")
     quit(0)
