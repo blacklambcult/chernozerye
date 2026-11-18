@@ -18,6 +18,7 @@ const RUT_COLOR := Color("#423a32")
 var _roads: Array = []
 var _plot_edges: Array = []
 var _fence_panels_skipped := 0
+var _fence_panels_total := 0
 var _fence_panels_relocated := 0
 var _yard_positions_rejected := 0
 var _roof_joints_sealed := 0
@@ -42,6 +43,7 @@ var _road_count := 0
 var _feature_house_center := Vector2(INF, INF)
 var _feature_house_distance := INF
 var _building_polygons: Array[PackedVector2Array] = []
+var _building_bounds: Array[Rect2] = []
 var _plot_props_count := 0
 var _canopy_count := 0
 var _lean_to_count := 0
@@ -74,6 +76,12 @@ func decorate(features: Array) -> void:
         if points.size() < 3:
             continue
         _building_polygons.append(points)
+        var pmin := Vector2(INF, INF)
+        var pmax := Vector2(-INF, -INF)
+        for p in points:
+            pmin = pmin.min(p)
+            pmax = pmax.max(p)
+        _building_bounds.append(Rect2(pmin, pmax - pmin))
         if kind != "house":
             continue
         var centroid := Vector2.ZERO
@@ -138,6 +146,7 @@ func decorate(features: Array) -> void:
         " beds=", _yard_counts[1], " greenhouses=", _yard_counts[2],
         " firewood=", _yard_counts[3], " scrap=", _yard_counts[4])
     print("VILLAGE_CLEARANCE_READY: rejected_fence_panels=", _fence_panels_skipped,
+        " total_fence_panels=", _fence_panels_total,
         " relocated_fence_panels=", _fence_panels_relocated,
         " rejected_yard_positions=", _yard_positions_rejected,
         " sealed_roof_joints=", _roof_joints_sealed)
@@ -401,7 +410,7 @@ func _fence_point_clear(p: Vector2) -> bool:
 
 func _fence_span_clear(a: Vector2, b: Vector2,
         polygon: PackedVector2Array) -> bool:
-    for t in [0.0, 0.25, 0.5, 0.75, 1.0]:
+    for t in [0.06, 0.50, 0.94]:
         var p := a.lerp(b, t)
         if not Geometry2D.is_point_in_polygon(p, polygon) or not _fence_point_clear(p):
             return false
@@ -1005,7 +1014,11 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
                 _pt(q, eave - 0.19), _pt(q, eave + 0.06),
                 _pt(p, eave + 0.06))
             _eaves_count += 1
-    _make_textured_mesh(v, uv, _material(Color.WHITE, tex),
+    var roof_mat := _material(Color.WHITE, tex)
+    # Roof edges are seen at grazing angles; nearest filtering makes pixels crawl
+    # at the camera's subpixel movement. Use mipmapped linear roof filtering only.
+    roof_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+    _make_textured_mesh(v, uv, roof_mat,
         category + " / modular roof " + str(roof_style))
     if category == "house" and index % 3 != 0:
         var center := Vector2.ZERO
@@ -1076,7 +1089,7 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool,
     var length := a.distance_to(b)
     if length < 0.35:
         return
-    var count := maxi(1, int(ceil(length / 2.30)))
+    var count := maxi(1, int(ceil(length / 1.65)))
     var tangent := (b - a) / length
     var side := 1.0 if _signed_area(polygon) > 0.0 else -1.0
     var inward := Vector2(-tangent.y, tangent.x) * side
@@ -1090,15 +1103,16 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool,
         var from_dist := length * float(i) / float(count)
         var to_dist := length * float(i + 1) / float(count)
         var segment_mid := (from_dist + to_dist) * 0.5
-        if gate_center and segment_mid >= gate_a and segment_mid <= gate_b:
+        if gate_center and to_dist > gate_a and from_dist < gate_b:
             continue
+        _fence_panels_total += 1
         var raw_start := a + tangent * from_dist
         var raw_finish := a + tangent * to_dist
         var start := raw_start
         var finish := raw_finish
         var inset_used := -1.0
         # Try a shallow setback first; larger setbacks only on overlapping roads.
-        for inset in [0.18, 0.45, 0.80, 1.20, 1.75, 2.35, 3.00]:
+        for inset in [0.18, 0.36, 0.65, 1.00, 1.45, 1.95, 2.50, 3.10, 3.80, 4.55]:
             var p := raw_start + inward * float(inset)
             var q := raw_finish + inward * float(inset)
             if _fence_span_clear(p, q, polygon):
@@ -1143,7 +1157,14 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool,
                 v1 + outward3 + span, v0 + outward3 + span)
 
 func _clear_of_buildings(p: Vector2, gap: float) -> bool:
-    for footprint in _building_polygons:
+    for j in range(_building_polygons.size()):
+        var bb: Rect2 = _building_bounds[j]
+        # Cheap bounding rectangle avoids hundreds of polygon tests for far houses.
+        if p.x < bb.position.x - gap or p.x > bb.end.x + gap:
+            continue
+        if p.y < bb.position.y - gap or p.y > bb.end.y + gap:
+            continue
+        var footprint: PackedVector2Array = _building_polygons[j]
         if Geometry2D.is_point_in_polygon(p, footprint):
             return false
         for i in range(footprint.size()):
