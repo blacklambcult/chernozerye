@@ -50,6 +50,10 @@ func _tapered_coat(parent: Node3D, name: String, pos: Vector3,
     coat.bottom_radius = bottom_width
     coat.height = height
     coat.radial_segments = 8
+    # CylinderMesh top caps produced the giant octagon in look-down screenshots.
+    # Keep the garment shell, but let the camera see inside its open neckline.
+    coat.cap_top = false
+    coat.cap_bottom = false
     var visible_coat := MeshInstance3D.new()
     visible_coat.name = name
     visible_coat.mesh = coat
@@ -148,7 +152,11 @@ func _ready() -> void:
     upper_coat = _tapered_coat(pelvis_root, "ChestAndShoulders",
         Vector3(0.0, 0.305, -0.012), 0.315, 0.172, 0.191)
     lower_jacket = _tapered_coat(pelvis_root, "LowerJacket",
-        Vector3(0.0, 0.070, 0.005), 0.255, 0.185, 0.204)
+        Vector3(0.0, 0.075, 0.005), 0.255, 0.185, 0.204)
+    # The narrow vertical strip suggests the front fastening of a winter coat
+    # without an opaque horizontal plane blocking the view to the thighs.
+    _box(pelvis_root, "CoatFrontSeam", Vector3(0.014, 0.21, 0.011),
+        Vector3(0.0, 0.12, -0.137), COAT_SHADOW)
     _box(pelvis_root, "CoatHem", Vector3(0.386, 0.034, 0.210),
         Vector3(0.0, -0.053, 0.005), COAT_SHADOW)
     _box(pelvis_root, "HipFabric", Vector3(0.337, 0.113, 0.192),
@@ -158,7 +166,7 @@ func _ready() -> void:
     right_leg = _leg(1.0, "RightLeg", pelvis_root)
     left_arm = _arm(-1.0, "LeftArm", pelvis_root)
     right_arm = _arm(1.0, "RightArm", pelvis_root)
-    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true pelvis_aligned=true torso_visible=true")
+    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true pelvis_aligned=true torso_visible=true open_coat_neck=true")
 
 
 func set_right_hand_occupied(value: bool) -> void:
