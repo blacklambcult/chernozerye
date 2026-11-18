@@ -100,6 +100,17 @@ jobs:
           grep -q "VILLAGE_YARDS_READY: wells=" /tmp/world-smoke.log
           grep -q "VILLAGE_ENTRANCES_READY: reserved=" /tmp/world-smoke.log
           grep -q "MANUAL_STREETSCAPE_READY:" /tmp/world-smoke.log
+          # Crossroads are detected before village art is built and must produce
+          # some continuous intersection surfaces for the 18 surveyed roads.
+          grep -q "MANUAL_ROAD_JUNCTIONS_READY: total=" /tmp/world-smoke.log
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          log = Path('/tmp/world-smoke.log').read_text()
+          hits = re.findall(r'MANUAL_ROAD_JUNCTIONS_READY: total=(\d+)', log)
+          assert hits and int(hits[-1]) > 0, ('No junction patches built', hits)
+          print('JUNCTION_VISUAL_AUDIT_OK:', hits[-1])
+          PY
           grep -q "VILLAGE_CLEARANCE_READY: rejected_fence_panels=" /tmp/world-smoke.log
           grep -q "FEARLESS_KNIGHTS_LOGO_READY:" /tmp/world-smoke.log
           # Guard against removing most plot boundaries again (v3.4 skipped 328).
@@ -120,9 +131,9 @@ jobs:
           assert sealed == 92, ('Unexpected house roof count', sealed)
           print('VILLAGE_GEOMETRY_AUDIT_OK:', missing, attempted, relocated, sealed)
           PY
-          # The new lighting mode is enabled only after the player selects the manual village.
-          # Assert its configuration statically; startup smoke has not clicked that button.
-          grep -q 'ambient_light_energy = 0.48 if manual_mode' godot/world.gd
+          # Manual village mode is enabled by default during scene startup.
+          # Assert the new twilight configuration without an artificial UI click.
+          grep -q 'ambient_light_energy = 0.70 if manual_mode' godot/world.gd
           grep -q 'light_specular = 0.0' godot/world.gd
           grep -q "MANUAL_FOREST_READY: trees=" /tmp/world-smoke.log
           grep -q "clearance=roads13/buildings6.5" /tmp/world-smoke.log
