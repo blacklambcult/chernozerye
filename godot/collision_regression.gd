@@ -59,6 +59,13 @@ func _run() -> void:
     # Raycasts can pass while a CharacterBody's actual capsule still clips
     # through a wall. Exercise the same player shape used in the browser.
     actor.set_physics_process(false)
+    # World camera configuration locates these nodes by name, not by class.
+    if actor.get_node_or_null("Camera3D") == null:
+        _fail("camera must have stable name for near-plane correction")
+        return
+    if actor.get_node_or_null("CollisionShape3D") == null:
+        _fail("capsule must have stable name for clipping guard")
+        return
     var capsule: CapsuleShape3D = null
     for child in actor.get_children():
         if child is CollisionShape3D:
