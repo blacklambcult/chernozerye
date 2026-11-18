@@ -89,7 +89,7 @@ jobs:
           # Versioned asset directory prevents stale .wasm/.pck files in browsers.
           mkdir -p build/web/v21
           godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v21/index.html"
-          test -s build/web/v18/index.html
+          test -s build/web/v21/index.html
           test -f build/web/v21/index.wasm
           test -f build/web/v21/index.pck
           cat > build/web/index.html <<'HTML'
