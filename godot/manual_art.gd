@@ -1,5 +1,5 @@
 extends Node3D
-# CHERNOZERYE 3.2 / MODULAR IZBA GEOMETRY
+# CHERNOZERYE 3.3 / VILLAGE MODULAR ART AND INHABITED YARDS
 # All spatial placements derive from the user's manual GeoJSON features.
 # Decorative features are deterministic and never modify the survey geometry.
 
@@ -9,7 +9,7 @@ const ROOF_TONES := ["#282e31", "#373432", "#30383a", "#403933"]
 const DOOR_COLOR := Color("#24221f")
 const FRAME_COLOR := Color("#494943")
 const WINDOW_COLOR := Color("#131a1f")
-const WINDOW_LIT := Color("#876149")
+const WINDOW_LIT := Color("#a5b95c")
 const FENCE_COLOR := Color("#494840")
 const POST_COLOR := Color("#3e3c36")
 const RUT_COLOR := Color("#423a32")
@@ -48,6 +48,9 @@ var _entrance_counts := [0, 0, 0, 0, 0]
 var _log_courses_count := 0
 var _eaves_count := 0
 var _carved_count := 0
+var _active_trim_key := "trim"
+var _yard_counts := [0, 0, 0, 0, 0]
+var _clipped_log_segments := 0
 
 func decorate(features: Array) -> void:
     _rng.seed = 19960918
@@ -114,7 +117,11 @@ func decorate(features: Array) -> void:
         " body=", _body_counts, " roof=", _roof_counts,
         " windows=", _window_counts, " entrances=", _entrance_counts)
     print("IZBA_DETAIL_READY: log_courses=", _log_courses_count,
-        " roof_eaves=", _eaves_count, " carved=", _carved_count)
+        " roof_eaves=", _eaves_count, " carved=", _carved_count,
+        " clipped_segments=", _clipped_log_segments)
+    print("VILLAGE_YARDS_READY: wells=", _yard_counts[0],
+        " beds=", _yard_counts[1], " greenhouses=", _yard_counts[2],
+        " firewood=", _yard_counts[3], " scrap=", _yard_counts[4])
 
 func _local_points(raw: Array) -> PackedVector2Array:
     var points := PackedVector2Array()
@@ -289,6 +296,24 @@ func _flush_details() -> void:
         "log_lower": Color("#302c29"),
         "fascia": Color("#2e3332"),
         "muntin": Color("#383b35"),
+        "trim_blue": Color("#5c7775"),
+        "trim_green": Color("#62745e"),
+        "trim_red": Color("#76534d"),
+        "trim_cream": Color("#898778"),
+        "well_stone": Color("#4b504b"),
+        "well_wood": Color("#5e5441"),
+        "soil": Color("#453a30"),
+        "bed_edge": Color("#534839"),
+        "sprout": Color("#485c3d"),
+        "greenhouse_glass": Color("#526a63"),
+        "greenhouse_frame": Color("#7a8276"),
+        "greenhouse_roof": Color("#687970"),
+        "woodpile": Color("#514336"),
+        "wood_end": Color("#77705b"),
+        "yard_tin": Color("#525c5d"),
+        "yard_rust": Color("#6b4a39"),
+        "yard_tool": Color("#767c72"),
+        "yard_tire": Color("#232624"),
         "panel_patch": Color("#464943"),
         "carving": Color("#5c6259"),
         "cross_board": Color("#494238"),
@@ -308,7 +333,7 @@ func _flush_details() -> void:
             var mesh := ArrayMesh.new()
             mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
             var lit_node := MeshInstance3D.new()
-            lit_node.name = "Редкие янтарные окна"
+            lit_node.name = "Редкие болезненно-зелёные окна"
             lit_node.mesh = mesh
             lit_node.material_override = lit_mat
             lit_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -367,7 +392,7 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
     var y := float(floor) * 3.08
     var low := 1.36 + y
     var high := 2.77 + y
-    var trim := "carving" if style == 1 or style == 4 else "trim"
+    var trim := "carving" if style == 1 or style == 4 else _active_trim_key
     _wall_panel("frame", start, finish, normal, u0 - 0.017, u1 + 0.017,
         low, high, 0.115)
     _wall_panel("window_lit" if illuminated else "window",
@@ -421,52 +446,101 @@ func _make_window(start: Vector2, finish: Vector2, normal: Vector3,
     if boarded or decay % 9 == 0:
         _wall_panel("cross_board", start, finish, normal, u0, u1,
             low + 0.47, low + 0.57, 0.198)
-    if illuminated and _lights_placed < 7:
+    if illuminated and _lights_placed < 9:
         _lights_placed += 1
         var center := start.lerp(finish, center_fraction)
         var lamp := OmniLight3D.new()
-        lamp.name = "Тусклая лампа / окно"
+        lamp.name = "Нездоровое свечение в окне"
         lamp.position = _pt(center, low + 0.92) + normal * 1.1
-        lamp.light_color = Color("#ffbc7e")
-        lamp.light_energy = 0.22
+        lamp.light_color = Color("#bdc870")
+        lamp.light_energy = 0.30
         lamp.light_specular = 0.0
-        lamp.omni_range = 6.0
+        lamp.omni_range = 5.5
         lamp.shadow_enabled = false
         add_child(lamp)
 
 func _raised_log(a: Vector2, b: Vector2, normal: Vector3, y: float) -> void:
-    # PS1 construction: three flat-shaded sides produce visible horizontal depth.
-    # No cylinders, PBR or additional draw calls per timber: batched by material.
+    # Old horizontal timber, three PS1 facets, softer than the giant 3.2 teeth.
     var p := _pt(a, y)
     var q := _pt(b, y)
-    var back := normal * 0.09
-    var front := normal * 0.225
-    _batch_quad("log_upper", p + back + Vector3.UP * 0.24,
-        q + back + Vector3.UP * 0.24,
-        q + front + Vector3.UP * 0.08,
-        p + front + Vector3.UP * 0.08)
-    _batch_quad("log_front", p + front + Vector3.UP * 0.08,
-        q + front + Vector3.UP * 0.08,
-        q + front - Vector3.UP * 0.08,
-        p + front - Vector3.UP * 0.08)
-    _batch_quad("log_lower", p + front - Vector3.UP * 0.08,
-        q + front - Vector3.UP * 0.08,
-        q + back - Vector3.UP * 0.23,
-        p + back - Vector3.UP * 0.23)
+    var back := normal * 0.085
+    var front := normal * 0.166
+    _batch_quad("log_upper", p + back + Vector3.UP * 0.245,
+        q + back + Vector3.UP * 0.245,
+        q + front + Vector3.UP * 0.075,
+        p + front + Vector3.UP * 0.075)
+    _batch_quad("log_front", p + front + Vector3.UP * 0.075,
+        q + front + Vector3.UP * 0.075,
+        q + front - Vector3.UP * 0.075,
+        p + front - Vector3.UP * 0.075)
+    _batch_quad("log_lower", p + front - Vector3.UP * 0.075,
+        q + front - Vector3.UP * 0.075,
+        q + back - Vector3.UP * 0.225,
+        p + back - Vector3.UP * 0.225)
     _log_courses_count += 1
 
 
+func _log_openings(length: float, is_front: bool, floors: int, y: float) -> Array[Vector2]:
+    # Holes in the *raised* timber face, matching window and door geometry below.
+    # Crucial: v3.2 timber strips passed directly over all windows and doors.
+    var openings: Array[Vector2] = []
+    if is_front and y < 2.48:
+        var half_door := (0.55 + 0.20) / length
+        openings.append(Vector2(0.5 - half_door, 0.5 + half_door))
+    var window_level := (y > 1.08 and y < 3.28)
+    var upper_level := floors == 2 and (y > 4.20 and y < 6.32)
+    if is_front:
+        if window_level and length > 7.0:
+            for center_frac in [0.19, 0.81]:
+                var half_window := minf(0.072, 0.74 / length) + 0.26 / length
+                openings.append(Vector2(center_frac - half_window, center_frac + half_window))
+        if upper_level and length > 5.0:
+            for center_frac in [0.30, 0.70]:
+                var half_window := minf(0.072, 0.74 / length) + 0.26 / length
+                openings.append(Vector2(center_frac - half_window, center_frac + half_window))
+    elif length > 5.0 and (window_level or upper_level):
+        var half_window := minf(0.072, 0.74 / length) + 0.26 / length
+        openings.append(Vector2(0.5 - half_window, 0.5 + half_window))
+    return openings
+
+
+func _clipped_log(a: Vector2, b: Vector2, normal: Vector3,
+        y: float, holes: Array[Vector2]) -> void:
+    # Keep the relief on most of each surveyed wall, but remove all intervals
+    # where windows, carved surrounds, doors or lintels are visible.
+    var segments: Array[Vector2] = [Vector2(0.0, 1.0)]
+    for hole in holes:
+        var remaining: Array[Vector2] = []
+        for segment in segments:
+            if hole.y <= segment.x or hole.x >= segment.y:
+                remaining.append(segment)
+            else:
+                if hole.x > segment.x + 0.004:
+                    remaining.append(Vector2(segment.x, minf(hole.x, segment.y)))
+                if hole.y < segment.y - 0.004:
+                    remaining.append(Vector2(maxf(hole.y, segment.x), segment.y))
+        segments = remaining
+    for segment in segments:
+        if (segment.y - segment.x) * a.distance_to(b) > 0.22:
+            _raised_log(a.lerp(b, segment.x), a.lerp(b, segment.y), normal, y)
+            if not holes.is_empty():
+                _clipped_log_segments += 1
+
+
 func _decorate_wall_module(a: Vector2, b: Vector2, normal: Vector3,
-        height: float, style: int, salt: int) -> void:
+        height: float, style: int, salt: int,
+        is_front: bool = false, floors: int = 1) -> void:
     match style:
         0:
             # Vertical rough corner posts (old board walls).
             _wall_panel("panel_patch", a, b, normal, 0.011, 0.023, 0.20, height, 0.098)
         1:
-            # Each rough-hewn timber has three actual facets, with 0.22m relief.
+            # More log houses, and windows are no longer obscured by facade strips.
             var rows := int(floorf((height - 0.25) / 0.58))
             for n in range(rows):
-                _raised_log(a, b, normal, 0.42 + float(n) * 0.58)
+                var y := 0.42 + float(n) * 0.58
+                _clipped_log(a, b, normal, y,
+                    _log_openings(a.distance_to(b), is_front, floors, y))
         2:
             # Flaked plaster remnants.
             _wall_panel("panel_patch", a, b, normal, 0.06, 0.19,
@@ -502,9 +576,16 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
         _entrance_counts[entrance_style] += 1
     var walls_height := (6.52 if floors == 2 else 3.78) if category == "house" else (2.7 if category == "sauna" else 2.35)
     var wall_style := body_style if category == "house" else (1 if category == "sauna" else 0)
-    var tones := ["#505047", "#55463a", "#62645e", "#59473d", "#49534d"]
-    var tone := Color(tones[body_style]) if category == "house" else Color("#39382f" if category == "sauna" else "#47413b")
-    var roof_tones := ["#31383c", "#423933", "#34312e", "#34383a", "#454139"]
+    # From the supplied Russian village photographs: dark logs, faded paint,
+    # mint-green fences, dull blue gables, rusty metal and pale limewash.
+    var tones := ["#545047", "#594735", "#6e736d", "#5b4940", "#4b5652"]
+    var painted_tones := ["#50453c", "#486260", "#62665d", "#675044", "#596878", "#706544"]
+    var color_index := (index * 7 + body_style * 3) % painted_tones.size()
+    var tone := Color(painted_tones[color_index]) if category == "house" else Color("#39382f" if category == "sauna" else "#47413b")
+    if category == "house" and body_style == 1:
+        tone = Color(tones[1]) # Exposed logs, no paint on the timber crests.
+    _active_trim_key = ["trim_blue", "trim_green", "trim_red", "trim_cream"][(index + body_style) % 4]
+    var roof_tones := ["#3b4244", "#5c4237", "#34312e", "#3e4548", "#474640"]
     var wall_tex := _pixel_texture(tone, 8021 + body_style * 11 + index % 3, false, wall_style)
     var roof_tex := _pixel_texture(Color(roof_tones[roof_style]), 9121 + roof_style * 13, true, roof_style)
     var wall_verts := PackedVector3Array()
@@ -526,7 +607,8 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
         _quad(wall_verts, wall_uvs, _pt(a, 0.12) + offset, _pt(b, 0.12) + offset,
             _pt(b, walls_height) + offset, _pt(a, walls_height) + offset)
         if category == "house":
-            _decorate_wall_module(a, b, normal, walls_height, body_style, index + i)
+            _decorate_wall_module(a, b, normal, walls_height, body_style,
+                index + i, i == front_index, floors)
         if i == front_index and length > 3.3:
             var door_half := 0.55 / length
             _wall_panel("frame", a, b, normal, 0.5 - door_half - 0.02,
@@ -934,28 +1016,156 @@ func _clear_of_buildings(p: Vector2, gap: float) -> bool:
                 return false
     return true
 
+func _yard_box(key: String, center: Vector2, offset: Vector2,
+        elevation: float, size: Vector3, rotation: float) -> void:
+    # Oriented 3D batch primitive; no separate MeshInstance per rake / planter.
+    var faces := PackedVector3Array()
+    _box_faces(faces, Vector3.ZERO, size)
+    var basis := Basis(Vector3.UP, rotation)
+    var pos := _pt(center, elevation) + basis * Vector3(offset.x, 0, offset.y)
+    var current: PackedVector3Array = _detail_batches.get(key, PackedVector3Array())
+    for vertex in faces:
+        current.append(pos + basis * vertex)
+    _detail_batches[key] = current
+
+
+func _yard_quad(key: String, center: Vector2, rotation: float,
+        a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
+    var basis := Basis(Vector3.UP, rotation)
+    var origin := _pt(center, 0.0)
+    _batch_quad(key, origin + basis * a, origin + basis * b,
+        origin + basis * c, origin + basis * d)
+
+
+func _yard_prop(center: Vector2, kind: int, rotation: float, salt: int) -> void:
+    match kind:
+        0:
+            # Rough timber well with a sloping cover, bucket, and hand crank.
+            for side in [-1.0, 1.0]:
+                _yard_box("well_stone", center, Vector2(side * 0.58, 0.0),
+                    0.59, Vector3(0.23, 0.99, 1.34), rotation)
+                _yard_box("well_stone", center, Vector2(0.0, side * 0.58),
+                    0.59, Vector3(1.12, 0.99, 0.23), rotation)
+                _yard_box("well_wood", center, Vector2(side * 0.75, 0.0),
+                    1.43, Vector3(0.15, 2.8, 0.15), rotation)
+            _yard_box("well_wood", center, Vector2.ZERO,
+                2.57, Vector3(1.78, 0.15, 0.17), rotation)
+            _yard_quad("yard_tin", center, rotation,
+                Vector3(-1.03, 2.59, -0.96), Vector3(0, 3.03, -0.96),
+                Vector3(0, 3.03, 0.96), Vector3(-1.03, 2.59, 0.96))
+            _yard_quad("yard_tin", center, rotation,
+                Vector3(0, 3.03, -0.96), Vector3(1.03, 2.59, -0.96),
+                Vector3(1.03, 2.59, 0.96), Vector3(0, 3.03, 0.96))
+            _yard_box("yard_rust", center, Vector2(0.0, 0.08),
+                1.25, Vector3(0.27, 0.42, 0.30), rotation)
+        1:
+            # Three vegetable beds, low timber edging and sparse 90s vegetable sprouts.
+            for lane in range(3):
+                var x := -1.25 + float(lane) * 1.24
+                _yard_box("soil", center, Vector2(x, 0),
+                    0.185, Vector3(0.84, 0.22, 3.12), rotation)
+                for side in [-1.0, 1.0]:
+                    _yard_box("bed_edge", center, Vector2(x + side * 0.43, 0),
+                        0.21, Vector3(0.095, 0.29, 3.28), rotation)
+                for seedling in range(4):
+                    var z := -1.15 + float(seedling) * 0.72
+                    if (salt + seedling + lane) % 4 != 0:
+                        _yard_box("sprout", center, Vector2(x, z), 0.49,
+                            Vector3(0.23, 0.39, 0.23), rotation)
+        2:
+            # Low polygonal greenhouse, matte dirty glazing and real A-frame roof.
+            for side in [-1.0, 1.0]:
+                _yard_box("greenhouse_glass", center, Vector2(side * 1.10, 0.0),
+                    1.01, Vector3(0.10, 1.72, 3.73), rotation)
+            for end in [-1.0, 1.0]:
+                _yard_box("greenhouse_frame", center, Vector2(0.0, end * 1.82),
+                    0.99, Vector3(2.29, 1.85, 0.08), rotation)
+            for z in [-1.8, 0.0, 1.8]:
+                for side in [-1.0, 1.0]:
+                    _yard_box("greenhouse_frame", center, Vector2(side * 1.11, z),
+                        1.00, Vector3(0.12, 1.9, 0.12), rotation)
+            _yard_quad("greenhouse_roof", center, rotation,
+                Vector3(-1.18, 1.93, -1.95), Vector3(0, 2.65, -1.95),
+                Vector3(0, 2.65, 1.95), Vector3(-1.18, 1.93, 1.95))
+            _yard_quad("greenhouse_roof", center, rotation,
+                Vector3(0, 2.65, -1.95), Vector3(1.18, 1.93, -1.95),
+                Vector3(1.18, 1.93, 1.95), Vector3(0, 2.65, 1.95))
+        3:
+            # Stack of cut firewood with pale endgrain; wood shelter from old planks.
+            for layer in range(3):
+                for log in range(5):
+                    var x := -1.34 + float(log) * 0.62
+                    var z := -0.52 + float(layer % 2) * 0.14
+                    _yard_box("woodpile", center, Vector2(x, z),
+                        0.27 + float(layer) * 0.37,
+                        Vector3(0.46, 0.34, 1.28), rotation)
+                    _yard_box("wood_end", center, Vector2(x, z + 0.68),
+                        0.27 + float(layer) * 0.37,
+                        Vector3(0.37, 0.26, 0.08), rotation)
+            _yard_box("yard_tin", center, Vector2(0.0, -0.52),
+                1.41, Vector3(3.65, 0.13, 1.62), rotation)
+        4:
+            # Abandoned oil barrel, bent corrugated sheet, shovel, scraps, tire.
+            _yard_box("yard_rust", center, Vector2(-0.79, 0.54),
+                0.56, Vector3(0.62, 1.08, 0.62), rotation)
+            _yard_box("yard_tin", center, Vector2(0.61, -0.10),
+                0.23, Vector3(1.65, 0.12, 1.36), rotation + 0.31)
+            _yard_box("woodpile", center, Vector2(0.78, 0.74),
+                0.24, Vector3(1.22, 0.19, 0.24), rotation - 0.2)
+            _yard_box("well_wood", center, Vector2(0.66, 1.03),
+                0.89, Vector3(0.09, 1.62, 0.10), rotation + 0.25)
+            _yard_box("yard_tool", center, Vector2(0.66, 1.03),
+                0.17, Vector3(0.29, 0.28, 0.10), rotation + 0.25)
+            _yard_box("yard_tire", center, Vector2(-0.15, -1.09),
+                0.23, Vector3(0.74, 0.46, 0.65), rotation)
+
+
+func _yard_spot_ok(p: Vector2, polygon: PackedVector2Array,
+        other: Array[Vector2]) -> bool:
+    if not Geometry2D.is_point_in_polygon(p, polygon):
+        return false
+    if _nearest_road_distance(p) < 4.4 or not _clear_of_buildings(p, 3.5):
+        return false
+    # Keep bulky objects inside the user's hand-drawn plot, not across fence lines.
+    for i in range(polygon.size()):
+        var q := Geometry2D.get_closest_point_to_segment(p, polygon[i],
+            polygon[(i + 1) % polygon.size()])
+        if p.distance_to(q) < 2.65:
+            return false
+    for previous in other:
+        if p.distance_to(previous) < 5.0:
+            return false
+    return true
+
+
 func _decorate_plot_props(points: PackedVector2Array) -> void:
-    # Place one small deterministic cluster in some surveyed plot polygons only.
-    var center := Vector2.ZERO
+    # No procedural houses, only household props inside the 34 surveyed plots.
+    # Seed is fixed per plot to keep the same yard every time the level loads.
+    if points.size() < 3:
+        return
+    var low := Vector2(INF, INF)
+    var high := Vector2(-INF, -INF)
     for p in points:
-        center += p
-    center /= float(points.size())
-    for dx in [-7.0, -3.5, 0.0, 3.5, 7.0]:
-        for dy in [-5.0, -1.5, 2.0, 5.5]:
-            var p: Vector2 = center + Vector2(dx, dy)
-            if not Geometry2D.is_point_in_polygon(p, points):
-                continue
-            if _nearest_road_distance(p) < 6.5 or not _clear_of_buildings(p, 2.6):
-                continue
-            # Rusty drum and stacked firewood, scaled to village yards.
-            _batch_box("rust", _pt(p, 0.60), Vector3(0.70, 1.05, 0.70))
-            for n in range(3):
-                var firewood := p + Vector2(1.10 + float(n % 2) * 0.4, 0.3 * float(n))
-                if Geometry2D.is_point_in_polygon(firewood, points) and _clear_of_buildings(firewood, 1.8):
-                    _batch_box("porch", _pt(firewood, 0.18 + float(n) * 0.17),
-                        Vector3(0.85, 0.22, 0.32))
-            _plot_props_count += 1
-            return
+        low = low.min(p)
+        high = high.max(p)
+    var rng := RandomNumberGenerator.new()
+    rng.seed = 1996001 + _fence_count * 8191
+    var target := 1 + _fence_count % 3
+    var placed: Array[Vector2] = []
+    var attempts := 0
+    while placed.size() < target and attempts < 120:
+        attempts += 1
+        var p := Vector2(rng.randf_range(low.x, high.x),
+            rng.randf_range(low.y, high.y))
+        if not _yard_spot_ok(p, points, placed):
+            continue
+        var kind := (_fence_count * 3 + placed.size() * 2) % 5
+        var rotation := float(rng.randi_range(0, 3)) * PI * 0.5
+        _yard_prop(p, kind, rotation, _fence_count + attempts)
+        _yard_counts[kind] += 1
+        _plot_props_count += 1
+        placed.append(p)
+
 
 func _decorate_fence(points: PackedVector2Array) -> void:
     if points.size() < 3:
@@ -970,8 +1180,7 @@ func _decorate_fence(points: PackedVector2Array) -> void:
             gate_edge = i
     for i in range(points.size()):
         _fence_edge(points[i], points[(i + 1) % points.size()], i == gate_edge)
-    if _fence_count % 3 == 0:
-        _decorate_plot_props(points)
+    _decorate_plot_props(points)
 
 func _decorate_road(points: PackedVector2Array) -> void:
     if points.size() < 2:

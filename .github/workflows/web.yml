@@ -83,6 +83,7 @@ jobs:
           grep -q "MANUAL_FACADE_READY: lean_tos=" /tmp/world-smoke.log
           grep -q "IZBA_GENERATOR_READY: floor_counts=" /tmp/world-smoke.log
           grep -q "IZBA_DETAIL_READY: log_courses=" /tmp/world-smoke.log
+          grep -q "VILLAGE_YARDS_READY: wells=" /tmp/world-smoke.log
           # The new lighting mode is enabled only after the player selects the manual village.
           # Assert its configuration statically; startup smoke has not clicked that button.
           grep -q 'ambient_light_energy = 0.48 if manual_mode' godot/world.gd
@@ -100,23 +101,23 @@ jobs:
         run: |
           set -euo pipefail
           # Versioned asset directory prevents stale .wasm/.pck files in browsers.
-          mkdir -p build/web/v32
-          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v32/index.html"
-          test -s build/web/v32/index.html
-          test -f build/web/v32/index.wasm
-          test -f build/web/v32/index.pck
+          mkdir -p build/web/v33
+          godot --headless --path godot --export-release "Web" "$(pwd)/build/web/v33/index.html"
+          test -s build/web/v33/index.html
+          test -f build/web/v33/index.wasm
+          test -f build/web/v33/index.pck
           cat > build/web/index.html <<'HTML'
           <!doctype html>
           <html lang="ru">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta http-equiv="refresh" content="0; url=./v32/">
+            <meta http-equiv="refresh" content="0; url=./v33/">
             <title>Чернозёрье — загрузка новой версии</title>
           </head>
           <body>
-            <p><a href="./v32/">Открыть Чернозёрье 3.2</a></p>
-            <script>window.location.replace("./v32/");</script>
+            <p><a href="./v33/">Открыть Чернозёрье 3.3</a></p>
+            <script>window.location.replace("./v33/");</script>
           </body>
           </html>
           HTML

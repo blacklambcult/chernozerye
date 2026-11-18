@@ -1,5 +1,5 @@
 extends RefCounted
-# CHERNOZERYE 3.1 / modular village house recipe
+# CHERNOZERYE 3.3 / modular village house recipe
 # Four independently selected sets of five visual parts; the hand-drawn footprints never change.
 # Recipe is stable for each surveyed location, not for iteration order.
 
@@ -33,7 +33,9 @@ static func recipe(points: PackedVector2Array) -> Dictionary:
         floors = 2
     return {
         "floor_count": floors,
-        "body": _mix(key + 1009) % VARIANTS,
+        # More log cabins than in v3.2 (only 3 of 35 were timber relief).
+        # Still 5 independent body designs; distributions are deliberately weighted.
+        "body": [1, 1, 1, 1, 0, 0, 2, 3, 4, 4][_mix(key + 1009) % 10],
         "roof": _mix(key + 2017) % VARIANTS,
         "window": _mix(key + 3019) % VARIANTS,
         "entrance": _mix(key + 4013) % VARIANTS
