@@ -672,9 +672,9 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
             _wall_panel("door", a, b, normal, 0.5 - door_half,
                 0.5 + door_half, 0.12, 2.13, 0.15)
             if category == "house" and length > 7.0:
-                _make_window(a, b, normal, 0.19, length, index % 9 == 0,
+                _make_window(a, b, normal, 0.19, length, index % 5 == 0,
                     index % 11 == 0, index + i, window_style)
-                _make_window(a, b, normal, 0.81, length, index % 13 == 0,
+                _make_window(a, b, normal, 0.81, length, index % 6 == 0,
                     index % 10 == 0, index + i + 3, window_style)
             if category == "house" and floors == 2 and length > 5.0:
                 _make_window(a, b, normal, 0.3, length, false, false,
@@ -682,7 +682,7 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
                 _make_window(a, b, normal, 0.7, length, false, false,
                     index + i + 4, window_style, 1)
         elif category == "house" and length > 5.0:
-            _make_window(a, b, normal, 0.5, length, index % 13 == 0 and i % 2 == 0,
+            _make_window(a, b, normal, 0.5, length, index % 7 == 0 and i % 2 == 0,
                 (index + i) % 11 == 0, index + i, window_style)
             if floors == 2:
                 _make_window(a, b, normal, 0.5, length, false, false,
@@ -1204,20 +1204,35 @@ func _yard_prop(center: Vector2, kind: int, rotation: float, salt: int) -> void:
                 0.23, Vector3(0.74, 0.46, 0.65), rotation)
 
 
+func _yard_radius(kind: int) -> float:
+    # Entire assembled prop fits within this radius, including its roof.
+    match kind:
+        0: return 1.65  # Well
+        1: return 2.45  # Three raised garden beds
+        2: return 2.45  # Greenhouse
+        3: return 2.15  # Firewood shelter
+        _: return 2.05  # Scrap, barrels and tools
+
+
 func _yard_spot_ok(p: Vector2, polygon: PackedVector2Array,
-        other: Array[Vector2]) -> bool:
+        other: Array, kind: int) -> bool:
+    var radius := _yard_radius(kind)
     if not Geometry2D.is_point_in_polygon(p, polygon):
         return false
-    if _nearest_road_distance(p) < 4.4 or not _clear_of_buildings(p, 3.5):
+    # Test the whole item's bounding radius instead of its centre.
+    if _road_surface_gap(p) < radius + 0.45:
         return false
-    # Keep bulky objects inside the user's hand-drawn plot, not across fence lines.
+    if not _clear_of_buildings(p, radius + 0.45):
+        return false
+    if _plot_boundary_gap(p) < radius + 0.32:
+        return false
     for i in range(polygon.size()):
         var q := Geometry2D.get_closest_point_to_segment(p, polygon[i],
             polygon[(i + 1) % polygon.size()])
-        if p.distance_to(q) < 2.65:
+        if p.distance_to(q) < radius + 0.32:
             return false
     for previous in other:
-        if p.distance_to(previous) < 5.0:
+        if p.distance_to(previous["center"]) < radius + float(previous["radius"]) + 0.5:
             return false
     return true
 
@@ -1235,20 +1250,21 @@ func _decorate_plot_props(points: PackedVector2Array) -> void:
     var rng := RandomNumberGenerator.new()
     rng.seed = 1996001 + _fence_count * 8191
     var target := 1 + _fence_count % 3
-    var placed: Array[Vector2] = []
+    var placed: Array = []
     var attempts := 0
-    while placed.size() < target and attempts < 120:
+    while placed.size() < target and attempts < 160:
         attempts += 1
         var p := Vector2(rng.randf_range(low.x, high.x),
             rng.randf_range(low.y, high.y))
-        if not _yard_spot_ok(p, points, placed):
-            continue
         var kind := (_fence_count * 3 + placed.size() * 2) % 5
         var rotation := float(rng.randi_range(0, 3)) * PI * 0.5
+        if not _yard_spot_ok(p, points, placed, kind):
+            _yard_positions_rejected += 1
+            continue
         _yard_prop(p, kind, rotation, _fence_count + attempts)
         _yard_counts[kind] += 1
         _plot_props_count += 1
-        placed.append(p)
+        placed.append({"center": p, "radius": _yard_radius(kind)})
 
 
 func _decorate_fence(points: PackedVector2Array) -> void:
