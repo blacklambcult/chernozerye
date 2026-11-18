@@ -20,6 +20,11 @@ var _plot_edges: Array = []
 var _fence_panels_skipped := 0
 var _fence_panels_total := 0
 var _fence_panels_relocated := 0
+var _fence_short_spans_recovered := 0
+var _fence_joints_joined := 0
+var _last_fence_endpoint := Vector2(INF, INF)
+var _first_fence_endpoint := Vector2(INF, INF)
+var _last_fence_post := Vector2(INF, INF)
 var _yard_positions_rejected := 0
 var _roof_joints_sealed := 0
 var _detail_batches: Dictionary = {}
@@ -145,6 +150,8 @@ func decorate(features: Array) -> void:
     print("VILLAGE_YARDS_READY: wells=", _yard_counts[0],
         " beds=", _yard_counts[1], " greenhouses=", _yard_counts[2],
         " firewood=", _yard_counts[3], " scrap=", _yard_counts[4])
+    print("VILLAGE_FENCE_JOINTS_READY: bridged=", _fence_joints_joined,
+        " short_spans_recovered=", _fence_short_spans_recovered)
     print("VILLAGE_CLEARANCE_READY: rejected_fence_panels=", _fence_panels_skipped,
         " total_fence_panels=", _fence_panels_total,
         " relocated_fence_panels=", _fence_panels_relocated,
@@ -1015,9 +1022,9 @@ func _decorate_roof(points: PackedVector2Array, category: String, base: float,
                 _pt(p, eave + 0.06))
             _eaves_count += 1
     var roof_mat := _material(Color.WHITE, tex)
-    # Roof edges are seen at grazing angles; nearest filtering makes pixels crawl
-    # at the camera's subpixel movement. Use mipmapped linear roof filtering only.
-    roof_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+    # Oblique slate roofs should use anisotropic mipmaps: nearest roof texels
+    # shimmer during close camera movement despite a correctly sealed ridge.
+    roof_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
     _make_textured_mesh(v, uv, roof_mat,
         category + " / modular roof " + str(roof_style))
     if category == "house" and index % 3 != 0:
@@ -1084,10 +1091,93 @@ func _fence_chainlink(a: Vector2, b: Vector2) -> void:
         _fence_wire(_pt(p, 1.24), _pt(q, 0.37))
 
 
+func _fence_fit_span(a: Vector2, b: Vector2, inward: Vector2,
+        polygon: PackedVector2Array) -> Array:
+    # Find the smallest safe setback for a section, retaining surveyed plot lines.
+    for inset in [0.18, 0.36, 0.65, 1.00, 1.45, 1.95, 2.50, 3.10, 3.80, 4.55]:
+        var start := a + inward * float(inset)
+        var finish := b + inward * float(inset)
+        if _fence_span_clear(start, finish, polygon):
+            return [start, finish, float(inset)]
+    return []
+
+
+func _fence_bridge_gap(a: Vector2, b: Vector2,
+        polygon: PackedVector2Array) -> void:
+    # Adjacent setbacks used to create conspicuous discontinuities at each
+    # boundary segment. Connect only short, entirely safe stretches; never
+    # close a deliberate gate or bridge across a road/building.
+    var gap := a.distance_to(b)
+    if gap < 0.12 or gap > 2.65:
+        return
+    if not _fence_span_clear(a, b, polygon):
+        return
+    var tangent := (b - a).normalized()
+    var sideways := Vector3(-tangent.y, 0.0, -tangent.x) * 0.04
+    var half_thickness := Vector3.UP * 0.085
+    for height in [0.50, 1.06]:
+        var v0 := _pt(a, float(height)) + sideways
+        var v1 := _pt(b, float(height)) + sideways
+        _push_tri(_fence_rails, v0 - half_thickness,
+            v1 - half_thickness, v1 + half_thickness)
+        _push_tri(_fence_rails, v0 - half_thickness,
+            v1 + half_thickness, v0 + half_thickness)
+    if gap > 1.55:
+        _append_crooked_post(_fence_posts, (a + b) * 0.5, 1.24, Vector2(0.04, -0.02))
+    _fence_chainlink(a, b)
+    _fence_joints_joined += 1
+
+
+func _fence_draw_span(start: Vector2, finish: Vector2, ordinal: int,
+        polygon: PackedVector2Array) -> void:
+    if _last_fence_endpoint != Vector2(INF, INF):
+        _fence_bridge_gap(_last_fence_endpoint, start, polygon)
+    if _first_fence_endpoint == Vector2(INF, INF):
+        _first_fence_endpoint = start
+    # Adjacent panels use shared posts instead of flickering doubled geometry.
+    for endpoint in range(2):
+        var p: Vector2 = start if endpoint == 0 else finish
+        if p.distance_to(_last_fence_post) < 0.08:
+            continue
+        var height := 1.35 + 0.22 * sin(float(ordinal * 13 + endpoint * 7 + _fence_count))
+        var tilt := Vector2(0.10 * sin(float(ordinal * 17 + endpoint)),
+            0.09 * cos(float(ordinal * 11 + _fence_count)))
+        _append_crooked_post(_fence_posts, p, height, tilt)
+        _last_fence_post = p
+    if _fence_count % 3 == 0:
+        _fence_chainlink(start, finish)
+    elif _fence_count % 3 == 1:
+        var slats := maxi(1, int(ceil(start.distance_to(finish) / 0.47)))
+        for j in range(slats):
+            if (ordinal * 7 + j * 13 + _fence_count) % 19 == 0:
+                continue
+            var p := start.lerp(finish, (float(j) + 0.5) / float(slats))
+            var height := 1.05 + 0.27 * sin(float(ordinal * 19 + j * 17))
+            _append_box_to(_fence_slats, _pt(p, height * 0.5 + 0.12),
+                Vector3(0.125, height, 0.125))
+    var tangent := (finish - start).normalized()
+    var outward3 := Vector3(-tangent.y, 0, -tangent.x) * 0.04
+    var half_thickness := Vector3.UP * 0.085
+    for height in [0.50, 1.06]:
+        var v0 := _pt(start, float(height)) + outward3
+        var v1 := _pt(finish, float(height)) + outward3
+        _push_tri(_fence_rails, v0 - half_thickness,
+            v1 - half_thickness, v1 + half_thickness)
+        _push_tri(_fence_rails, v0 - half_thickness,
+            v1 + half_thickness, v0 + half_thickness)
+    _last_fence_endpoint = finish
+
+
+func _fence_break() -> void:
+    _last_fence_endpoint = Vector2(INF, INF)
+    _last_fence_post = Vector2(INF, INF)
+
+
 func _fence_edge(a: Vector2, b: Vector2, gate_center: bool,
         polygon: PackedVector2Array) -> void:
     var length := a.distance_to(b)
     if length < 0.35:
+        _fence_break()
         return
     var count := maxi(1, int(ceil(length / 1.65)))
     var tangent := (b - a) / length
@@ -1098,63 +1188,41 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool,
     if gate_center and length >= 6.0:
         gate_a = length * 0.5 - 1.85
         gate_b = length * 0.5 + 1.85
-    var last_post := Vector2(INF, INF)
     for i in range(count):
         var from_dist := length * float(i) / float(count)
         var to_dist := length * float(i + 1) / float(count)
-        var segment_mid := (from_dist + to_dist) * 0.5
         if gate_center and to_dist > gate_a and from_dist < gate_b:
+            _fence_break()
             continue
         _fence_panels_total += 1
         var raw_start := a + tangent * from_dist
         var raw_finish := a + tangent * to_dist
-        var start := raw_start
-        var finish := raw_finish
-        var inset_used := -1.0
-        # Try a shallow setback first; larger setbacks only on overlapping roads.
-        for inset in [0.18, 0.36, 0.65, 1.00, 1.45, 1.95, 2.50, 3.10, 3.80, 4.55]:
-            var p := raw_start + inward * float(inset)
-            var q := raw_finish + inward * float(inset)
-            if _fence_span_clear(p, q, polygon):
-                start = p
-                finish = q
-                inset_used = float(inset)
-                break
-        if inset_used < 0.0:
-            _fence_panels_skipped += 1
+        var fit := _fence_fit_span(raw_start, raw_finish, inward, polygon)
+        if not fit.is_empty():
+            _fence_draw_span(fit[0], fit[1], i, polygon)
+            if float(fit[2]) >= 0.45:
+                _fence_panels_relocated += 1
             continue
-        if inset_used >= 0.45:
-            _fence_panels_relocated += 1
-        # Endpoints and rails use the same adjusted edge: no floating panels.
-        for endpoint in range(2):
-            var p: Vector2 = start if endpoint == 0 else finish
-            if p.distance_to(last_post) < 0.08:
+        # An entire 1.65 m panel may fail near a road corner even though
+        # one half can safely stand. Salvage short parts rather than leaving
+        # the whole boundary blank.
+        var recovered := 0
+        for half in range(2):
+            var p := raw_start.lerp(raw_finish, float(half) * 0.5)
+            var q := raw_start.lerp(raw_finish, float(half + 1) * 0.5)
+            var short_fit := _fence_fit_span(p, q, inward, polygon)
+            if short_fit.is_empty():
+                _fence_break()
                 continue
-            var height := 1.35 + 0.22 * sin(float(i * 13 + endpoint * 7 + _fence_count))
-            var tilt := Vector2(0.10 * sin(float(i * 17 + endpoint)),
-                0.09 * cos(float(i * 11 + _fence_count)))
-            _append_crooked_post(_fence_posts, p, height, tilt)
-            last_post = p
-        if _fence_count % 3 == 0:
-            _fence_chainlink(start, finish)
-        elif _fence_count % 3 == 1:
-            var slats := maxi(1, int(ceil(start.distance_to(finish) / 0.47)))
-            for j in range(slats):
-                if (i * 7 + j * 13 + _fence_count) % 19 == 0:
-                    continue
-                var p := start.lerp(finish, (float(j) + 0.5) / float(slats))
-                var height := 1.05 + 0.27 * sin(float(i * 19 + j * 17))
-                _append_box_to(_fence_slats, _pt(p, height * 0.5 + 0.12),
-                    Vector3(0.125, height, 0.125))
-        for rail_height in [0.50, 1.06]:
-            var v0 := _pt(start, rail_height)
-            var v1 := _pt(finish, rail_height)
-            var outward3 := Vector3(-tangent.y, 0, -tangent.x) * 0.04
-            var span := Vector3.UP * 0.085
-            _push_tri(_fence_rails, v0 + outward3 - span,
-                v1 + outward3 - span, v1 + outward3 + span)
-            _push_tri(_fence_rails, v0 + outward3 - span,
-                v1 + outward3 + span, v0 + outward3 + span)
+            _fence_draw_span(short_fit[0], short_fit[1], i * 2 + half, polygon)
+            if float(short_fit[2]) >= 0.45:
+                _fence_panels_relocated += 1
+            recovered += 1
+        if recovered == 0:
+            _fence_panels_skipped += 1
+        else:
+            _fence_short_spans_recovered += recovered
+
 
 func _clear_of_buildings(p: Vector2, gap: float) -> bool:
     for j in range(_building_polygons.size()):
@@ -1345,6 +1413,8 @@ func _decorate_fence(points: PackedVector2Array) -> void:
     if points.size() < 3:
         return
     _fence_count += 1
+    _first_fence_endpoint = Vector2(INF, INF)
+    _fence_break()
     var gate_edge := 0
     var near := INF
     for i in range(points.size()):
@@ -1354,6 +1424,8 @@ func _decorate_fence(points: PackedVector2Array) -> void:
             gate_edge = i
     for i in range(points.size()):
         _fence_edge(points[i], points[(i + 1) % points.size()], i == gate_edge, points)
+    if _last_fence_endpoint != Vector2(INF, INF) and _first_fence_endpoint != Vector2(INF, INF):
+        _fence_bridge_gap(_last_fence_endpoint, _first_fence_endpoint, points)
     _decorate_plot_props(points)
 
 func _decorate_road(points: PackedVector2Array) -> void:
