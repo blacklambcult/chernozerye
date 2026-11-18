@@ -11,6 +11,13 @@ var last_event := "none"
 var pressed := {"w": false, "a": false, "s": false, "d": false, "m": false}
 var map_open := false
 var controls_locked := false
+# Optional period-appropriate adult character animation. Visual-only: no
+# health, focus, combat or PTSD modifiers. Not a gameplay reward or treatment.
+var _idle_smoke_timer := 0.0
+var _idle_smoke_duration := 5.3
+var _smoke_prop: Node3D
+var _smoke_particles: CPUParticles3D
+var _smoke_animation_count := 0
 
 func set_controls_locked(value: bool) -> void:
     controls_locked = value
@@ -47,6 +54,101 @@ func _ready() -> void:
     status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
     hud.add_child(status_label)
     status_label.visible = false
+    _build_character_idle_prop()
+
+func _build_character_idle_prop() -> void:
+    _smoke_prop = Node3D.new()
+    _smoke_prop.name = "AdultCharacterIdleProp"
+    _smoke_prop.visible = false
+    camera.add_child(_smoke_prop)
+    var sleeve := MeshInstance3D.new()
+    var sleeve_mesh := BoxMesh.new()
+    sleeve_mesh.size = Vector3(0.13, 0.34, 0.19)
+    sleeve.mesh = sleeve_mesh
+    sleeve.position = Vector3(0.31, -0.51, -1.02)
+    var cloth := StandardMaterial3D.new()
+    cloth.albedo_color = Color("#3a3932")
+    cloth.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    sleeve.material_override = cloth
+    _smoke_prop.add_child(sleeve)
+    var hand := MeshInstance3D.new()
+    var glove_mesh := BoxMesh.new()
+    glove_mesh.size = Vector3(0.14, 0.10, 0.11)
+    hand.mesh = glove_mesh
+    hand.position = Vector3(0.30, -0.31, -1.04)
+    var glove_mat := StandardMaterial3D.new()
+    glove_mat.albedo_color = Color("#5a5448")
+    glove_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    hand.material_override = glove_mat
+    _smoke_prop.add_child(hand)
+    var cigarette := MeshInstance3D.new()
+    cigarette.name = "PeriodCharacterProp"
+    var stick := CylinderMesh.new()
+    stick.top_radius = 0.012
+    stick.bottom_radius = 0.012
+    stick.height = 0.17
+    cigarette.mesh = stick
+    cigarette.position = Vector3(0.28, -0.20, -1.09)
+    cigarette.rotation_degrees.z = -30.0
+    var paper := StandardMaterial3D.new()
+    paper.albedo_color = Color("#b8b2a5")
+    paper.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    cigarette.material_override = paper
+    _smoke_prop.add_child(cigarette)
+    _smoke_particles = CPUParticles3D.new()
+    _smoke_particles.name = "FaintCharacterSmoke"
+    _smoke_particles.position = Vector3(0.23, -0.12, -1.10)
+    _smoke_particles.amount = 7
+    _smoke_particles.lifetime = 1.7
+    _smoke_particles.randomness = 0.7
+    _smoke_particles.direction = Vector3(0.15, 1.0, 0.12)
+    _smoke_particles.spread = 23.0
+    _smoke_particles.initial_velocity_min = 0.12
+    _smoke_particles.initial_velocity_max = 0.27
+    _smoke_particles.gravity = Vector3(0.0, 0.06, 0.0)
+    _smoke_particles.emitting = false
+    var smoke_quad := QuadMesh.new()
+    smoke_quad.size = Vector2(0.10, 0.10)
+    var smoke_mat := StandardMaterial3D.new()
+    smoke_mat.albedo_color = Color(0.70, 0.72, 0.73, 0.18)
+    smoke_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+    smoke_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    smoke_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+    smoke_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+    smoke_quad.material = smoke_mat
+    _smoke_particles.mesh = smoke_quad
+    _smoke_prop.add_child(_smoke_particles)
+
+
+func _start_character_idle() -> void:
+    if controls_locked or _idle_smoke_timer > 0.0 or _smoke_prop == null:
+        return
+    var story := get_parent().get_node_or_null("StoryPrologue")
+    if story != null and bool(story.get("journal_open")):
+        return
+    var map := get_parent().get_node_or_null("MapOverlay") as CanvasLayer
+    if map != null and map.visible:
+        return
+    _idle_smoke_timer = _idle_smoke_duration
+    _smoke_prop.visible = true
+    _smoke_particles.emitting = true
+    _smoke_animation_count += 1
+    print("CHARACTER_IDLE_READY: cosmetic=true buffs=0 count=", _smoke_animation_count)
+
+
+func _process(delta: float) -> void:
+    if _idle_smoke_timer <= 0.0:
+        return
+    _idle_smoke_timer = maxf(0.0, _idle_smoke_timer - delta)
+    if _smoke_prop != null:
+        # Brief understated hand movement: no instructional lighting sequence.
+        var elapsed := _idle_smoke_duration - _idle_smoke_timer
+        _smoke_prop.position.y = 0.02 * sin(elapsed * 2.1)
+        _smoke_prop.rotation.z = 0.03 * sin(elapsed * 1.4)
+        if _idle_smoke_timer <= 0.0:
+            _smoke_particles.emitting = false
+            _smoke_prop.visible = false
+
 
 func _matches(event: InputEventKey, latin: int, cyrillic: String) -> bool:
     return event.physical_keycode == latin or event.keycode == latin or (event.unicode != 0 and char(event.unicode).to_lower() == cyrillic)
@@ -75,6 +177,8 @@ func _input(event: InputEvent) -> void:
         if _matches(key, KEY_S, "ы"): pressed["s"] = key.pressed
         if _matches(key, KEY_D, "в"): pressed["d"] = key.pressed
         if _matches(key, KEY_M, "ь"): pressed["m"] = key.pressed
+        if key.pressed and not key.echo and (key.keycode == KEY_V or key.physical_keycode == KEY_V):
+            _start_character_idle()
         if key.pressed and not key.echo and (key.keycode == KEY_F3 or key.physical_keycode == KEY_F3):
             status_label.visible = not status_label.visible
         if key.pressed and key.keycode == KEY_ESCAPE:
