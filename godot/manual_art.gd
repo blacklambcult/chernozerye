@@ -26,6 +26,7 @@ var _rng := RandomNumberGenerator.new()
 var _lights_placed: int = 0
 var _fence_posts: PackedVector3Array = PackedVector3Array()
 var _fence_rails: PackedVector3Array = PackedVector3Array()
+var _fence_wire_mesh: PackedVector3Array = PackedVector3Array()
 var _fence_slats: PackedVector3Array = PackedVector3Array()
 var _yard_details: PackedVector3Array = PackedVector3Array()
 var _road_ruts: PackedVector3Array = PackedVector3Array()
@@ -113,6 +114,7 @@ func decorate(features: Array) -> void:
     _flush_details()
     _create_solid_mesh(_fence_posts, Color("#423b35"), "Забор / столбы")
     _create_solid_mesh(_fence_rails, Color("#48433d"), "Забор / рейки")
+    _create_solid_mesh(_fence_wire_mesh, Color("#4c6759"), "Старая зелёная рабица")
     _create_solid_mesh(_fence_slats, Color("#3a3b35"), "Забор / обветшавший штакетник")
     _create_solid_mesh(_yard_details, Color("#48443b"), "Старый деревенский быт / ящики и дрова")
     _create_solid_mesh(_road_ruts, RUT_COLOR, "Дорога / земляные колеи")
@@ -1030,6 +1032,22 @@ func _append_crooked_post(verts: PackedVector3Array, p: Vector2,
         _push_tri(verts, corners[face[0]], corners[face[1]], corners[face[2]])
         _push_tri(verts, corners[face[0]], corners[face[2]], corners[face[3]])
 
+func _fence_wire(a: Vector3, b: Vector3) -> void:
+    var thickness := Vector3.UP * 0.012
+    _push_tri(_fence_wire_mesh, a - thickness, a + thickness, b + thickness)
+    _push_tri(_fence_wire_mesh, a - thickness, b + thickness, b - thickness)
+
+
+func _fence_chainlink(a: Vector2, b: Vector2) -> void:
+    # A few green diamond-mesh sections break up the repeated post-and-rail silhouette.
+    # Batched into one Web-friendly mesh and clipped by the same road/building tests.
+    for i in range(4):
+        var p := a.lerp(b, float(i) / 4.0)
+        var q := a.lerp(b, float(i + 1) / 4.0)
+        _fence_wire(_pt(p, 0.37), _pt(q, 1.24))
+        _fence_wire(_pt(p, 1.24), _pt(q, 0.37))
+
+
 func _fence_edge(a: Vector2, b: Vector2, gate_center: bool) -> void:
     var length := a.distance_to(b)
     if length < 0.35:
@@ -1068,7 +1086,9 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool) -> void:
         if not _fence_span_clear(start, finish):
             _fence_panels_skipped += 1
             continue
-        # Some plots have an irregular full picket fence; others keep the old open rails.
+        # Three recognizable village fence types: slats, rails, old green wire mesh.
+        if _fence_count % 3 == 0:
+            _fence_chainlink(start, finish)
         if _fence_count % 3 == 1:
             var slat_count := maxi(1, int(ceil((to_dist - from_dist) / 0.74)))
             for j in range(slat_count):
@@ -1297,7 +1317,7 @@ func _decorate_road(points: PackedVector2Array) -> void:
             var off: Vector2 = perpendicular * float(lane) * 1.18
             var pa := _pt(a + off, 0.134)
             var pb := _pt(b + off, 0.134)
-            var side := Vector3(perpendicular.x, 0, -perpendicular.y) * 0.10
+            var side := Vector3(perpendicular.x, 0, -perpendicular.y) * 0.13
             _push_tri(_road_ruts, pa - side, pa + side, pb + side)
             _push_tri(_road_ruts, pa - side, pb + side, pb - side)
     _decorate_utility_poles(points)
