@@ -99,23 +99,26 @@ func _run() -> void:
     if left_leg == null or right_leg == null or jacket == null or upper == null:
         _fail("coat and two legs must share same pelvis")
         return
-    if not (jacket.mesh is CylinderMesh) or not (upper.mesh is CylinderMesh):
-        _fail("jacket needs joined tapered pieces, not a block")
+    if not (jacket.mesh is ArrayMesh) or not (upper.mesh is ArrayMesh):
+        _fail("jacket should use camera-clear vertical fabric panels")
         return
-    if (jacket.mesh as CylinderMesh).cap_top or (upper.mesh as CylinderMesh).cap_top:
-        _fail("top garment caps must be open to eliminate the large octagon")
+    if (jacket.mesh as ArrayMesh).get_surface_count() != 1:
+        _fail("lower jacket panels were not generated")
         return
-    if (jacket.mesh as CylinderMesh).cap_bottom or (upper.mesh as CylinderMesh).cap_bottom:
-        _fail("garment shells must have no large opaque horizontal caps")
+    if (upper.mesh as ArrayMesh).get_surface_count() != 1:
+        _fail("upper coat panels were not generated")
         return
     if absf(left_leg.position.x + right_leg.position.x) > 0.001:
         _fail("leg placement is not symmetric")
         return
-    if absf(jacket.position.z - left_leg.position.z) > 0.06:
+    if absf(jacket.position.z - left_leg.position.z) > 0.09:
         _fail("waist and legs use mismatched depth anchors")
         return
+    if left_leg.position.z > -0.04 or right_leg.position.z > -0.04:
+        _fail("thighs must attach slightly forward of the pelvis")
+        return
     var camera := actor.get_node("Camera3D") as Camera3D
-    var max_coat_y := pelvis.position.y + upper.position.y + (upper.mesh as CylinderMesh).height * 0.5
+    var max_coat_y := pelvis.position.y + 0.448
     if max_coat_y > camera.position.y - 0.20:
         _fail("torso occupies player eye height")
         return
@@ -126,6 +129,25 @@ func _run() -> void:
         return
     if not left_leg.visible or not right_leg.visible:
         _fail("feet disappear while looking down")
+        return
+    if not (pelvis.get_node("LeftArm") as Node3D).visible:
+        _fail("side-hanging arms are hidden at downward pitch")
+        return
+    var boot := left_leg.get_node_or_null("BootToe") as MeshInstance3D
+    if boot == null:
+        _fail("forward-facing boot toe is missing")
+        return
+    # A screen-space proxy: at extreme downward pitch the boots should
+    # project visibly ABOVE the abdomen, as in the reference images.
+    var foot_camera := camera.to_local(boot.global_position)
+    var abdomen_camera := camera.to_local(pelvis.to_global(Vector3(0, 0.32, 0.11)))
+    if foot_camera.z >= -0.22 or abdomen_camera.z >= -0.22:
+        _fail("body reference points are behind the near camera plane")
+        return
+    var boot_vertical := foot_camera.y / -foot_camera.z
+    var abdomen_vertical := abdomen_camera.y / -abdomen_camera.z
+    if boot_vertical < abdomen_vertical + 0.25:
+        _fail("boots do not project above the jacket at downward pitch")
         return
     camera.rotation.x = 0.0
     avatar.call("_process",0.016)
@@ -219,6 +241,6 @@ func _run() -> void:
         _fail("cosmetic character sequence changed game health")
         return
     print("COLLISION_REGRESSION_OK: house=solid fence=solid gap=open capsule=blocked")
-    print("FIRST_PERSON_HUD_REGRESSION_OK: torso=visible_looking_down legs=2 jacket=connected compass=NESW health=100 slots=4 coat_caps=open")
+    print("FIRST_PERSON_HUD_REGRESSION_OK: torso=visible_looking_down legs=2 jacket=front_panels compass=NESW health=100 slots=4 boots_project_above_waist=true arms=visible")
     print("CHARACTER_SEQUENCE_REGRESSION_OK: selected_slot=required staged=true burn_seconds=120 hands_clear=true auto_discard=true no_buffs=true face_occluded_lookdown=true")
     quit(0)
