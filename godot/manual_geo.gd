@@ -20,6 +20,7 @@ var forest_positions: Array[Transform3D] = []
 var broad_canopies: Array[Transform3D] = []
 var tree_trunks: Array[Transform3D] = []
 var manual_roads: Array = []
+var building_footprints: Array[PackedVector2Array] = []
 var _base_buildings: Node3D
 
 func _ready() -> void:
@@ -41,10 +42,17 @@ func _build_manual() -> void:
     _base_buildings.visible = false
     add_child(_base_buildings)
     for f in features:
-        if f is Dictionary and str(f.get("type", "")) == "road":
+        if not f is Dictionary:
+            continue
+        var kind := str(f.get("type", ""))
+        if kind == "road" or kind == "path":
             var polyline := _points(f.get("points", []))
             for i in range(polyline.size() - 1):
                 manual_roads.append([polyline[i], polyline[i + 1]])
+        elif kind in ["house", "sauna", "shed"]:
+            var footprint := _points(f.get("points", []))
+            if footprint.size() >= 3:
+                building_footprints.append(footprint)
     for f in features:
         if not f is Dictionary:
             continue
@@ -197,6 +205,17 @@ func _nearest_road(point: Vector2) -> float:
         best = minf(best, point.distance_to(close))
     return best
 
+func _near_building(point: Vector2, clearance: float) -> bool:
+    for polygon in building_footprints:
+        if Geometry2D.is_point_in_polygon(point, polygon):
+            return true
+        for i in range(polygon.size()):
+            var closest := Geometry2D.get_closest_point_to_segment(point,
+                polygon[i], polygon[(i + 1) % polygon.size()])
+            if point.distance_to(closest) < clearance:
+                return true
+    return false
+
 func _scatter_forest(points: PackedVector2Array) -> void:
     var min_p := Vector2(INF, INF)
     var max_p := Vector2(-INF, -INF)
@@ -219,9 +238,9 @@ func _scatter_forest(points: PackedVector2Array) -> void:
         var p := Vector2(rng.randf_range(min_p.x, max_p.x), rng.randf_range(min_p.y, max_p.y))
         if not Geometry2D.is_point_in_polygon(p, points):
             continue
-        if _nearest_road(p) < 7.0:
+        if _nearest_road(p) < 13.0 or _near_building(p, 6.5):
             continue
-        var scale := rng.randf_range(0.67, 1.12)
+        var scale := rng.randf_range(0.72, 1.05)
         var rotation := rng.randf_range(-PI, PI)
         var basis := Basis().rotated(Vector3.UP, rotation).scaled(Vector3.ONE * scale)
         if count % 4 == 0:
@@ -243,7 +262,13 @@ func _instanced_tree(mesh: Mesh, transforms: Array[Transform3D], color: Color, l
     var node := MultiMeshInstance3D.new()
     node.name = label
     node.multimesh = multi
-    node.material_override = _mat(color)
+    var tree_mat := _mat(color)
+    tree_mat.specular = 0.0
+    # Keep the foliage silhouettes stable: no directional highlights or harsh self-shadows.
+    if not label.contains("стволы"):
+        tree_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    node.material_override = tree_mat
+    node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     add_child(node)
 
 func _layer_transforms(source: Array[Transform3D], local_rise: float) -> Array[Transform3D]:
@@ -258,41 +283,41 @@ func _build_forest_instances() -> void:
     # All layers reuse the original surveyed forest point positions.
     var lowest := CylinderMesh.new()
     lowest.top_radius = 0.32
-    lowest.bottom_radius = 2.4
-    lowest.height = 4.1
+    lowest.bottom_radius = 2.0
+    lowest.height = 3.5
     lowest.radial_segments = 6
-    _instanced_tree(lowest, _layer_transforms(forest_positions, -1.1),
+    _instanced_tree(lowest, _layer_transforms(forest_positions, -1.4),
         Color("#263d36"), "Ели / нижние лапы")
 
     var middle := CylinderMesh.new()
     middle.top_radius = 0.22
-    middle.bottom_radius = 1.83
-    middle.height = 3.4
+    middle.bottom_radius = 1.55
+    middle.height = 2.9
     middle.radial_segments = 6
-    _instanced_tree(middle, _layer_transforms(forest_positions, 1.1),
+    _instanced_tree(middle, _layer_transforms(forest_positions, 0.65),
         Color("#2a4539"), "Ели / средние лапы")
 
     var top := CylinderMesh.new()
     top.top_radius = 0.0
-    top.bottom_radius = 1.30
-    top.height = 2.9
+    top.bottom_radius = 1.12
+    top.height = 2.5
     top.radial_segments = 5
-    _instanced_tree(top, _layer_transforms(forest_positions, 3.05),
+    _instanced_tree(top, _layer_transforms(forest_positions, 2.3),
         Color("#304a3c"), "Ели / кроны")
 
     # Aspen canopy is irregular, compact, and visually distinct from conifers.
     var broad := SphereMesh.new()
-    broad.radius = 2.15
-    broad.height = 3.5
+    broad.radius = 1.75
+    broad.height = 3.0
     broad.radial_segments = 6
     broad.rings = 3
     _instanced_tree(broad, broad_canopies, Color("#3b5446"), "Осинник / кроны")
     var smaller := SphereMesh.new()
-    smaller.radius = 1.45
-    smaller.height = 2.7
+    smaller.radius = 1.1
+    smaller.height = 2.1
     smaller.radial_segments = 5
     smaller.rings = 2
-    _instanced_tree(smaller, _layer_transforms(broad_canopies, 2.1),
+    _instanced_tree(smaller, _layer_transforms(broad_canopies, 1.3),
         Color("#435d49"), "Осинник / верхушки")
     var trunk := CylinderMesh.new()
     trunk.top_radius = 0.25
@@ -300,4 +325,4 @@ func _build_forest_instances() -> void:
     trunk.height = 3.3
     trunk.radial_segments = 5
     _instanced_tree(trunk, tree_trunks, Color("#3b3b34"), "Лес / стволы")
-    print("MANUAL_FOREST_READY: trees=", tree_trunks.size())
+    print("MANUAL_FOREST_READY: trees=", tree_trunks.size(), " clearance=roads13/buildings6.5")
