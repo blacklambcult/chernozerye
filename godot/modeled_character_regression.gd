@@ -91,7 +91,10 @@ func _run() -> void:
     if toe == null:
         _fail("real imported FPS boot is missing")
         return
-    var camera_toe := camera.to_local(toe.global_position)
+    # Trimesh stores boot shape translation inside its mesh vertices.
+    # The imported node origin is at the ANKLE, not at the toe center.
+    var toe_center := toe.mesh.get_aabb().get_center()
+    var camera_toe := camera.to_local(toe.to_global(toe_center))
     if camera_toe.z >= -camera.near or camera_toe.y / -camera_toe.z < most_central_rim + 0.09:
         _fail("boot projects behind the coat instead of ahead of it")
         return
