@@ -68,7 +68,7 @@ func _build_ui() -> void:
     items.add_theme_constant_override("separation", 12)
     margin.add_child(items)
     items.add_child(_make_label("ЧЕРНОЗЁРЬЕ", 27, INK))
-    items.add_child(_make_label("FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.6.7", 11, MUTED))
+    items.add_child(_make_label("FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.6.8", 11, MUTED))
     items.add_child(_make_label("ПАУЗА", 18, ACCENT))
 
     var resume := Button.new()

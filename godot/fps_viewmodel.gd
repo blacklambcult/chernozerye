@@ -1,6 +1,8 @@
 extends Node3D
-# Camera-attached shoulder, sleeves and hands. The lower-body GLB owns
-# hips and legs. These camera-space arms persist even at maximum downlook.
+# Camera-attached hands, sleeves, and a compact shoulder fold. There is
+# deliberately NO body/leg GLB in gameplay; full body renders only for F4.
+# Keep shoulder meshes entirely past the near plane so clipped cylinders
+# cannot produce giant rectangular blocks in the screen corners.
 # The art is unarmed and deliberately low-poly; it never affects collisions.
 
 const COAT := Color("#676655")
@@ -71,20 +73,22 @@ func _build_arm(side: float, label: String) -> Node3D:
     var root := Node3D.new()
     root.name = label
     add_child(root)
-    # Relaxed unarmed stance. Sleeves originate below/behind the near plane
-    # and follow a bent elbow towards the lower corners, not straight ahead
-    # as if the player were permanently aiming invisible pistols.
-    var lift := 0.030 if side > 0.0 else -0.080
-    var shoulder := Vector3(side * 0.470, -0.820 + lift, -0.120)
-    var elbow := Vector3(side * 0.365, -0.640 + lift, -0.425)
+    # Start sleeves beyond the near clip (z <= -0.32). Previously the
+    # first segment started at -0.12 and was cut by the near plane,
+    # producing the huge flat shoulder polygons in the 0.6.7 screenshot.
+    # Mirror both sides with only a slight hand-height asymmetry.
+    var lift := 0.025 if side > 0.0 else -0.025
+    var shoulder := Vector3(side * 0.455, -0.730 + lift, -0.340)
+    var elbow := Vector3(side * 0.365, -0.640 + lift, -0.450)
     var wrist := Vector3(side * 0.280, -0.535 + lift, -0.720)
+    # This is a short fabric fold fused into the upper sleeve, not a
+    # separate oversized cylinder projecting towards the camera.
     _limb(root, "ShoulderYoke",
-        Vector3(side * 0.520, -0.555 + lift, -0.395),
-        Vector3(side * 0.395, -0.565 + lift, -0.505),
-        0.123, 0.108, COAT)
-    # Angled coat sleeve between shoulder and elbow.
+        Vector3(side * 0.490, -0.635 + lift, -0.435),
+        Vector3(side * 0.440, -0.685 + lift, -0.505),
+        0.064, 0.059, COAT_SHADOW)
     _limb(root, "UpperCoatSleeve", shoulder, elbow,
-        0.105, 0.093, COAT)
+        0.087, 0.083, COAT)
     _limb(root, "ForearmSleeve", elbow, wrist,
         0.097, 0.074, COAT_SHADOW)
     _limb(root, "WristCuff",
@@ -130,7 +134,7 @@ func _ready() -> void:
     player = eye.get_parent() as CharacterBody3D
     left_arm = _build_arm(-1.0, "LeftArm")
     right_arm = _build_arm(1.0, "RightArm")
-    print("FPS_VIEWMODEL_READY: camera_local=true arms=2 unarmed=true lowpoly=true persistent_downlook=true shoulders=true")
+    print("FPS_VIEWMODEL_READY: camera_local=true arms=2 unarmed=true lowpoly=true persistent_downlook=true compact_shoulders=true near_plane_safe=true")
 
 
 func push_look_motion(relative_pixels: Vector2) -> void:
@@ -177,6 +181,7 @@ func _process(delta: float) -> void:
         -step * 0.011 * stride_weight,
         step * 0.012 * stride_weight,
         -0.010 * cos(stride_phase) * stride_weight)
-    # Reveal a shoulder at each screen edge when looking at the feet.
-    right_arm.position += Vector3(0.090, 0.235, -0.105) * downlook_weight
-    left_arm.position += Vector3(-0.090, 0.235, -0.105) * downlook_weight
+    # Reveal a NARROW fabric shoulder fold along each lower screen edge.
+    # The near-plane-safe geometry must never widen into a solid rectangle.
+    right_arm.position += Vector3(0.050, 0.215, -0.075) * downlook_weight
+    left_arm.position += Vector3(-0.050, 0.215, -0.075) * downlook_weight
