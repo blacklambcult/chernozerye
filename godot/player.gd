@@ -16,6 +16,7 @@ var controls_locked := false
 var mouse_sensitivity := MOUSE_SENS
 # Narrative character animation is isolated from player movement and stats.
 var _avatar: Node3D
+var _modeled_character: Node3D
 var _viewmodel: Node3D
 var _character_sequence: Node3D
 
@@ -62,6 +63,10 @@ func _ready() -> void:
     _avatar.name = "FirstPersonFullBody"
     _avatar.set_script(preload("res://first_person_body.gd"))
     add_child(_avatar)
+    _modeled_character = Node3D.new()
+    _modeled_character.name = "ModeledCharacter"
+    _modeled_character.set_script(preload("res://modeled_character.gd"))
+    add_child(_modeled_character)
     _viewmodel = Node3D.new()
     _viewmodel.name = "FPSViewmodel"
     _viewmodel.set_script(preload("res://fps_viewmodel.gd"))

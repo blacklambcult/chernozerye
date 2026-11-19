@@ -5,11 +5,11 @@ const LOGO_DATA = preload("res://logo_data.gd")
 const MAP_FILE := "res://world_data.json"
 const MANUAL_FILE := "res://manual_layout.json"
 const GAME_TITLE := "Fearless Knights of the Cordon"
-const GAME_STAGE := "Pre-Alpha 0.5.9"
+const GAME_STAGE := "Pre-Alpha 0.6.0"
 const MANUAL_CAMERA_NEAR := 0.16
 const MANUAL_CAMERA_FAR := 250.0
 const SEASON := "NOVEMBER"
-const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.5.9 · ЧЕРНОЗЁРЬЕ · 314 ОБЪЕКТОВ"
+const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.6.0 · ЧЕРНОЗЁРЬЕ · 314 ОБЪЕКТОВ"
 var manual_mode := false
 var manual_button: Button
 var _status_label: Label
