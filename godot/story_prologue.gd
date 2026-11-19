@@ -27,6 +27,7 @@ var prompt_label: Label
 var message_label: Label
 var journal_panel: PanelContainer
 var journal_text: Label
+var wood := ShaderMaterial.new()
 var interior: Node3D
 var waypoint: Label3D
 var focus := ""
@@ -128,6 +129,8 @@ func _solid_box(label: String, location: Vector3, dimensions: Vector3,
     mesh.size = dimensions
     mesh_node.mesh = mesh
     mesh_node.material_override = _make_material(color)
+    if label in ["Старые половицы", "Бревенчатая стена", "Старая стена", "Старый стол", "Потолок"]:
+        mesh_node.material_override = wood
     node.add_child(mesh_node)
     interior.add_child(node)
     return node
@@ -147,6 +150,7 @@ func _story_marker(label: String, at: Vector3, color: Color,
     return marker
 
 func _build_interior() -> void:
+    wood.shader = preload("res://cabin_wood.gdshader")
     interior = Node3D.new()
     interior.name = "ChildhoodHomeInterior"
     interior.position = ROOM_ORIGIN
@@ -179,6 +183,25 @@ func _build_interior() -> void:
         Vector3(0.8, 0.85, 0.67), Color("#514438"))
     _solid_box("Старая печь", Vector3(3.0, 1.08, -2.8),
         Vector3(1.65, 2.15, 1.45), Color("#676762"))
+    var pot := StaticBody3D.new()
+    pot.name = "Глиняный горшок"
+    pot.position = Vector3(2.63,2.39,-2.56)
+    var pot_mesh := SphereMesh.new()
+    pot_mesh.radial_segments = 9
+    pot_mesh.rings = 4
+    pot_mesh.radius = 0.24
+    pot_mesh.height = 0.46
+    var pottery := MeshInstance3D.new()
+    pottery.mesh = pot_mesh
+    pottery.material_override = _make_material(Color("#ab6440"))
+    pot.add_child(pottery)
+    var pot_shape := CollisionShape3D.new()
+    var sphere := SphereShape3D.new()
+    sphere.radius = 0.24
+    pot_shape.shape = sphere
+    pot.add_child(pot_shape)
+    pot.add_to_group("breakable_pottery")
+    interior.add_child(pot)
     _solid_box("Деревянная маска", Vector3(0, 1.86, -3.83),
         Vector3(0.78, 1.03, 0.17), Color("#6f5442"), false)
     for x in [-0.19, 0.19]:
@@ -199,6 +222,16 @@ func _build_interior() -> void:
     for depth in [-1.39, -0.55, 0.29]:
         _solid_box("Оконная стойка", Vector3(-4.27, 1.85, depth),
             Vector3(0.14, 1.38, 0.08), Color("#403a31"), false)
+    _solid_box("Свеча", Vector3(-2.74,0.85,-0.89), Vector3(0.07,0.23,0.07), Color("#b9a580"), false)
+    var wick := _solid_box("Огонёк", Vector3(-2.74,0.995,-0.89), Vector3(0.032,0.07,0.032), Color("#ffcd70"), false)
+    var flame := (wick.get_child(0) as MeshInstance3D).material_override as StandardMaterial3D
+    flame.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    var glow := OmniLight3D.new()
+    glow.position = Vector3(-2.74,1.13,-0.89)
+    glow.omni_range = 4.0
+    glow.light_color = Color("#ffa653")
+    glow.light_energy = 2.5
+    interior.add_child(glow)
     var daylight := OmniLight3D.new()
     daylight.position = Vector3(-3.85, 1.88, -0.55)
     daylight.light_color = Color("#bdced9")

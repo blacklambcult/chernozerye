@@ -145,10 +145,20 @@ func _draw_slots(view_width: float, view_height: float) -> void:
             draw_rect(Rect2(x + 19, y + 16, 24, 31), Color("#d6cabb"))
             draw_rect(Rect2(x + 19, y + 31, 24, 8), Color("#97735f"))
             draw_rect(Rect2(x + 22, y + 18, 18, 2), Color("#f1ede1"))
+        elif index == 1:
+            draw_line(Vector2(x+10,y+25),Vector2(x+41,y+25),INK,4)
+            draw_circle(Vector2(x+31,y+29),6,GOLD)
+            draw_line(Vector2(x+39,y+28),Vector2(x+44,y+40),Color("#a37c57"),6)
         else:
             draw_line(Vector2(x + 20, y + 31),
                 Vector2(x + 37, y + 31), Color("#565850"), 1.0)
-    _write(x0, y + 72, "1: ПАЧКА     V: ДЕЙСТВИЕ", 11, MUTED)
+    if selected_slot == 1 and player != null:
+        var gun: Node3D = player.get("revolver")
+        var status := "ПЕРЕЗАРЯДКА" if float(gun.get("reload_left")) > 0 else "%d / 6" % int(gun.get("rounds"))
+        _write(x0, y + 72, status + "    ЛКМ — ОГОНЬ    R — ЗАРЯДИТЬ", 11, GOLD)
+        draw_circle(size * 0.5, 1.6, INK)
+    else:
+        _write(x0, y + 72, "1 ПАЧКА · V ДЕЙСТВИЕ     2 РЕВОЛЬВЕР", 11, MUTED)
 
 func _draw() -> void:
     if size.x < 320.0 or size.y < 240.0:

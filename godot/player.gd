@@ -7,6 +7,7 @@ const WALK_FRICTION := 12.0
 const JUMP := 4.5
 const MOUSE_SENS := 0.002
 
+var revolver := preload("res://revolver.gd").new()
 var camera: Camera3D
 var status_label: Label
 var last_event := "none"
@@ -79,6 +80,7 @@ func _ready() -> void:
     _viewmodel.name = "FPSViewmodel"
     _viewmodel.set_script(preload("res://fps_viewmodel.gd"))
     camera.add_child(_viewmodel)
+    camera.add_child(revolver)
     _character_sequence = Node3D.new()
     _character_sequence.name = "CharacterSmoking"
     _character_sequence.set_script(preload("res://character_smoking.gd"))
@@ -124,7 +126,8 @@ func _toggle_model_inspection() -> void:
     camera.current = not _inspect_enabled
     _inspection_light.visible = _inspect_enabled
     _inspection_hint.visible = _inspect_enabled
-    _viewmodel.visible = not _inspect_enabled
+    revolver.equip(not _inspect_enabled and _armed_slot())
+    _viewmodel.visible = not _inspect_enabled and not revolver.visible
     _viewmodel.set_process(not _inspect_enabled)
     _character_sequence.visible = not _inspect_enabled
     set_controls_locked(_inspect_enabled)
@@ -143,6 +146,10 @@ func _start_character_sequence() -> bool:
     return bool(_character_sequence.call("start_if_selected",slot,controls_locked))
 
 
+func _armed_slot() -> bool:
+    var hud := get_parent().get_node_or_null("GameplayHUD/SurvivalHUD")
+    return hud != null and int(hud.get("selected_slot")) == 1
+
 func _matches(event: InputEventKey, latin: int, cyrillic: String) -> bool:
     return event.physical_keycode == latin or event.keycode == latin or (event.unicode != 0 and char(event.unicode).to_lower() == cyrillic)
 
@@ -152,7 +159,7 @@ func _input(event: InputEvent) -> void:
         if inspect_key.pressed and not inspect_key.echo and (inspect_key.keycode == KEY_F4 or inspect_key.physical_keycode == KEY_F4):
             _toggle_model_inspection()
             return
-    if _inspect_enabled:
+    if _inspect_enabled or controls_locked:
         return
     if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
         # GUI buttons need the click; never capture mouse before their pressed event.
@@ -164,6 +171,8 @@ func _input(event: InputEvent) -> void:
         last_event = "mouse click"
         if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
             Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+        elif revolver.visible:
+            revolver.request_shot()
     elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
         rotate_y(-event.relative.x * mouse_sensitivity)
         camera.rotate_x(-event.relative.y * mouse_sensitivity)
@@ -182,7 +191,13 @@ func _input(event: InputEvent) -> void:
         if key.pressed and not key.echo and key.physical_keycode in [KEY_1, KEY_2, KEY_3, KEY_4]:
             var survival_hud := get_parent().get_node_or_null("GameplayHUD/SurvivalHUD")
             if survival_hud != null:
+                if int(_character_sequence.get("phase")) != 0:
+                    return
                 survival_hud.call("choose_slot", int(key.physical_keycode) - KEY_1)
+                revolver.equip(_armed_slot())
+                _viewmodel.visible = not revolver.visible
+        if key.pressed and not key.echo and _matches(key, KEY_R, "к"):
+            revolver.reload()
         if key.pressed and not key.echo and (key.keycode == KEY_V or key.physical_keycode == KEY_V):
             _start_character_sequence()
         if key.pressed and not key.echo and (key.keycode == KEY_F3 or key.physical_keycode == KEY_F3):
