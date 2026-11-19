@@ -116,6 +116,36 @@ for s,name in ((-1,"Left"),(1,"Right")):
     cube(name+"Eyebrow","HeadPivot",(s*.066,.237,-.131),(.055,.018,.02),"hair")
     cube(name+"EyeShadow","HeadPivot",(s*.066,.206,-.139),(.044,.019,.014),"skin_dark")
 
+# An original first-person CUTAWAY sewn from the SAME garment palette.
+# This face-only variant has no cap/back: it cannot surround or swallow the
+# player's eye. The full winter coat remains intact for F4 model inspection.
+def fp_panel(name, points, shade):
+    v=np.array(points,dtype=float)
+    f=np.array([(0,1,2),(0,2,3),(2,1,0),(3,2,0)])
+    geo(name,"CharacterRoot",trimesh.Trimesh(vertices=v,faces=f,process=False),shade)
+
+fp_panel("FPSCoatUpperLeft", [
+    (-.286,1.295,-.100),(-.012,1.300,-.116),
+    (-.012,.963,-.196),(-.310,.955,-.195)],"coat")
+fp_panel("FPSCoatUpperRight", [
+    (.012,1.300,-.116),(.286,1.295,-.100),
+    (.310,.955,-.195),(.012,.963,-.196)],"edge")
+fp_panel("FPSCoatLowerLeft", [
+    (-.310,.962,-.194),(-.012,.964,-.196),
+    (-.016,.785,-.206),(-.320,.800,-.185)],"dark")
+fp_panel("FPSCoatLowerRight", [
+    (.012,.964,-.196),(.310,.962,-.194),
+    (.320,.800,-.185),(.016,.785,-.206)],"coat")
+# Deliberate overlap: narrow stitching stays near the cloth surface and
+# doesn't close the opening in front of the player's camera.
+cube("FPSCoatCenterSeam","CharacterRoot",(0,1.115,-.207),(.017,.36,.014),"dark")
+for i in range(3):
+    cube("FPSCoatButton"+str(i),"CharacterRoot",(.027,1.240-i*.095,-.216),(.016,.016,.012),"metal")
+cube("FPSCoatLowerHem","CharacterRoot",(0,.798,-.206),(.617,.024,.020),"edge")
+for s,name in ((-1,"L"),(1,"R")):
+    cube("FPSCoatPocket"+name,"CharacterRoot",(s*.208,.916,-.209),(.134,.08,.014),"canvas_dark")
+    cube("FPSCoatPocketFlap"+name,"CharacterRoot",(s*.208,.968,-.218),(.145,.023,.014),"canvas")
+
 dest=Path(sys.argv[1] if len(sys.argv)>1 else "dembel_2005.glb")
 dest.parent.mkdir(parents=True,exist_ok=True)
 dest.write_bytes(scene.export(file_type="glb"))

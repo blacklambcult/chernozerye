@@ -18,6 +18,10 @@ var mouse_sensitivity := MOUSE_SENS
 var _avatar: Node3D
 var _modeled_character: Node3D
 var _viewmodel: Node3D
+var _inspection_camera: Camera3D
+var _inspection_hint: Label
+var _inspection_light: SpotLight3D
+var _inspect_enabled := false
 var _character_sequence: Node3D
 
 func set_controls_locked(value: bool) -> void:
@@ -75,10 +79,55 @@ func _ready() -> void:
     _character_sequence.name = "CharacterSmoking"
     _character_sequence.set_script(preload("res://character_smoking.gd"))
     camera.add_child(_character_sequence)
+    # F4 inspection: camera faces the actual complete imported GLB from
+    # three metres away. It is never used for first-person gameplay.
+    _inspection_camera = Camera3D.new()
+    _inspection_camera.name = "CharacterInspectionCamera"
+    _inspection_camera.position = Vector3(0.0, 1.62, -3.20)
+    _inspection_camera.near = 0.12
+    _inspection_camera.far = 2300.0
+    _inspection_camera.fov = 55.0
+    add_child(_inspection_camera)
+    _inspection_camera.look_at(global_position + Vector3(0, 1.04, 0), Vector3.UP)
+    _inspection_camera.current = false
+    _inspection_light = SpotLight3D.new()
+    _inspection_light.name = "InspectionLight"
+    _inspection_light.light_energy = 3.2
+    _inspection_light.spot_range = 6.0
+    _inspection_light.spot_angle = 50.0
+    _inspection_camera.add_child(_inspection_light)
+    _inspection_light.visible = false
+    _inspection_hint = Label.new()
+    _inspection_hint.name = "InspectionHint"
+    _inspection_hint.text = "F4 — ВЕРНУТЬСЯ В ИГРУ    /    ДЕМБЕЛЬ, 2005"
+    _inspection_hint.position = Vector2(24, 94)
+    _inspection_hint.add_theme_color_override("font_color", Color("#e7dfce"))
+    _inspection_hint.visible = false
+    hud.add_child(_inspection_hint)
     var pause_overlay := CanvasLayer.new()
     pause_overlay.name = "PauseOverlay"
     pause_overlay.set_script(preload("res://pause_overlay.gd"))
     add_child(pause_overlay)
+
+func _toggle_model_inspection() -> void:
+    if _modeled_character == null or not bool(_modeled_character.get("model_loaded")):
+        return
+    if not _inspect_enabled and controls_locked:
+        return
+    _inspect_enabled = not _inspect_enabled
+    _modeled_character.call("set_inspection_mode", _inspect_enabled)
+    _inspection_camera.current = _inspect_enabled
+    camera.current = not _inspect_enabled
+    _inspection_light.visible = _inspect_enabled
+    _inspection_hint.visible = _inspect_enabled
+    _viewmodel.visible = not _inspect_enabled
+    _viewmodel.set_process(not _inspect_enabled)
+    _character_sequence.visible = not _inspect_enabled
+    set_controls_locked(_inspect_enabled)
+    if _inspect_enabled:
+        Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+    print("CHARACTER_INSPECTION_MODE:", _inspect_enabled)
+
 
 func _start_character_sequence() -> bool:
     if _character_sequence == null:
@@ -94,6 +143,13 @@ func _matches(event: InputEventKey, latin: int, cyrillic: String) -> bool:
     return event.physical_keycode == latin or event.keycode == latin or (event.unicode != 0 and char(event.unicode).to_lower() == cyrillic)
 
 func _input(event: InputEvent) -> void:
+    if event is InputEventKey:
+        var inspect_key := event as InputEventKey
+        if inspect_key.pressed and not inspect_key.echo and (inspect_key.keycode == KEY_F4 or inspect_key.physical_keycode == KEY_F4):
+            _toggle_model_inspection()
+            return
+    if _inspect_enabled:
+        return
     if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
         # GUI buttons need the click; never capture mouse before their pressed event.
         if get_viewport().gui_get_hovered_control() is Button:

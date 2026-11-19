@@ -1,14 +1,11 @@
 extends Node3D
-# Imported GLB is kept as editable, standalone 3D geometry.
-# In first-person only its legs and boots render. The world-space legacy
-# first-person COAT renders the chest, and camera-space arms render the hands.
-# This prevents the camera from intersecting the full imported coat/backpack.
+# Full editable GLB asset + first-person-only cutaway from the same mesh.
+# No old procedural coat is rendered when imported GLB succeeds.
+# F4 switches to complete imported hero for honest full-body inspection.
 
 const ASSET_PATH := "res://assets/dembel_2005.glb"
-const LEG_PARTS := [
-    "LeftThigh", "LeftLowerLeg", "LeftBoot",
-    "RightThigh", "RightLowerLeg", "RightBoot"
-]
+const LEG_PARTS := ["LeftThigh", "LeftLowerLeg", "LeftBoot", "RightThigh", "RightLowerLeg", "RightBoot"]
+const FIRST_PERSON_COAT_PREFIX := "FPSCoat"
 
 var actor: CharacterBody3D
 var imported: Node3D
@@ -22,49 +19,79 @@ var right_arm: Node3D
 var phase := 0.0
 var gait_weight := 0.0
 var visible_leg_meshes := 0
+var visible_cutaway_meshes := 0
 var hidden_upper_meshes := 0
+var inspection_mode := false
 
 
 func _part(part_name: String) -> Node3D:
     return imported.find_child(part_name, true, false) as Node3D
 
 
-func _leg_material(name: String) -> StandardMaterial3D:
+func _first_person_part(label: String) -> bool:
+    if label.begins_with(FIRST_PERSON_COAT_PREFIX):
+        return true
+    for prefix in LEG_PARTS:
+        if label.begins_with(prefix):
+            return true
+    return false
+
+
+func _make_material(label: String) -> StandardMaterial3D:
     var mat := StandardMaterial3D.new()
-    if "Boot" in name:
-        mat.albedo_color = Color("#544b3f")
-    elif "LowerLeg" in name:
-        mat.albedo_color = Color("#414a45")
+    if label.begins_with("FPSCoat"):
+        if "LowerLeft" in label or "CenterSeam" in label:
+            mat.albedo_color = Color("#45493c")
+        elif "Button" in label:
+            mat.albedo_color = Color("#b9ad87")
+        elif "Pocket" in label:
+            mat.albedo_color = Color("#81755e")
+        else:
+            mat.albedo_color = Color("#626556")
+        mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+    elif "Boot" in label:
+        mat.albedo_color = Color("#534b41")
+    elif "LowerLeg" in label:
+        mat.albedo_color = Color("#424945")
     else:
-        mat.albedo_color = Color("#586057")
+        mat.albedo_color = Color("#596157")
     mat.roughness = 1.0
     return mat
 
 
-func _restrict_to_legs() -> bool:
-    # Explicit allow-list: only meshes whose identity is a thigh, lower leg
-    # or boot. The jacket's large closed shell must NEVER be visible to the
-    # first-person camera, even if an import adds new parts later.
+func _apply_mode(inspect: bool) -> void:
+    inspection_mode = inspect
     visible_leg_meshes = 0
+    visible_cutaway_meshes = 0
     hidden_upper_meshes = 0
-    var geometries := imported.find_children("*", "MeshInstance3D", true, false)
-    for node in geometries:
+    for node in imported.find_children("*", "MeshInstance3D", true, false):
         var mesh := node as MeshInstance3D
         var label := String(mesh.name)
-        var show := false
-        for prefix in LEG_PARTS:
-            if label.begins_with(prefix):
-                show = true
-                break
-        mesh.visible = show
-        if show:
-            mesh.material_override = _leg_material(label)
-            visible_leg_meshes += 1
+        var first_person := _first_person_part(label)
+        mesh.visible = (not label.begins_with(FIRST_PERSON_COAT_PREFIX)) if inspect else first_person
+        if not inspect and mesh.visible:
+            mesh.material_override = _make_material(label)
+            if label.begins_with(FIRST_PERSON_COAT_PREFIX):
+                visible_cutaway_meshes += 1
+            else:
+                visible_leg_meshes += 1
         else:
-            hidden_upper_meshes += 1
-    # Require actual generated meshes, not just empty pivot nodes. Keep a
-    # safe fallback if a future GLB import renames the rig unexpectedly.
-    return visible_leg_meshes >= 8 and hidden_upper_meshes >= 8
+            mesh.material_override = null
+            if not inspect and not first_person:
+                hidden_upper_meshes += 1
+    var head := _part("HeadPivot")
+    if head != null:
+        head.visible = inspect
+    # The old procedural mesh stays in the tree solely as an API fallback
+    # for earlier interaction animation and headless regression hooks.
+    var legacy := actor.get_node_or_null("FirstPersonFullBody") as Node3D
+    if legacy != null:
+        legacy.visible = false
+
+
+func set_inspection_mode(inspect: bool) -> void:
+    if model_loaded:
+        _apply_mode(inspect)
 
 
 func _ready() -> void:
@@ -72,12 +99,12 @@ func _ready() -> void:
     actor = get_parent() as CharacterBody3D
     var source: Resource = load(ASSET_PATH)
     if not (source is PackedScene):
-        push_warning("MODELED_CHARACTER_FALLBACK: GLB not available")
+        push_warning("MODELED_CHARACTER_FALLBACK: GLB missing")
         visible = false
         return
     imported = (source as PackedScene).instantiate() as Node3D
     if imported == null:
-        push_warning("MODELED_CHARACTER_FALLBACK: GLB scene missing")
+        push_warning("MODELED_CHARACTER_FALLBACK: scene root missing")
         visible = false
         return
     add_child(imported)
@@ -87,34 +114,27 @@ func _ready() -> void:
     right_knee = _part("RightKneePivot")
     left_arm = _part("LeftArmPivot")
     right_arm = _part("RightArmPivot")
-    var head := _part("HeadPivot")
-    if left_hip == null or right_hip == null or left_knee == null or right_knee == null or head == null:
-        push_warning("MODELED_CHARACTER_FALLBACK: leg joints absent")
+    if left_hip == null or right_hip == null or left_knee == null or right_knee == null or _part("HeadPivot") == null:
+        push_warning("MODELED_CHARACTER_FALLBACK: missing GLB joints")
         visible = false
         return
-    head.visible = false
-    if not _restrict_to_legs():
-        push_warning("MODELED_CHARACTER_FALLBACK: unexpected GLB geometry")
+    _apply_mode(false)
+    if visible_leg_meshes < 8 or visible_cutaway_meshes < 8 or hidden_upper_meshes < 8:
+        push_warning("MODELED_CHARACTER_FALLBACK: cutaway or legs missing")
         visible = false
+        var legacy := actor.get_node_or_null("FirstPersonFullBody") as Node3D
+        if legacy != null:
+            legacy.visible = true
         return
     model_loaded = true
-    var legacy := actor.get_node_or_null("FirstPersonFullBody") as Node3D
-    if legacy != null:
-        # Keep the proven narrow first-person coat and side hands. Disable
-        # ONLY its duplicate procedural legs; no change to camera/collision.
-        var pelvis := legacy.get_node_or_null("PelvisRoot") as Node3D
-        if pelvis != null:
-            (pelvis.get_node("LeftLeg") as Node3D).visible = false
-            (pelvis.get_node("RightLeg") as Node3D).visible = false
-    print("MODELED_CHARACTER_READY: imported_glb=true leg_pivots=true head_hidden=true fixed_hips=true fps_legs_only=true meshes=", visible_leg_meshes)
+    print("MODELED_CHARACTER_READY: glb=true first_person_cutaway=true legs=true procedural_coat_hidden=true inspection_f4=true")
 
 
 func _process(delta: float) -> void:
     if not model_loaded or actor == null:
         return
-    # The imported leg joints never move as a consequence of camera pitch.
-    # Only their rotation changes during gait, and the feet stay under the
-    # pelvis when the player is stationary.
+    # Camera pitch NEVER enters leg transforms. No leg or knee positional
+    # correction is applied to create an artificial first-person pose.
     var planar := Vector2(actor.velocity.x, actor.velocity.z).length()
     var target := clampf(planar / 3.35, 0.0, 1.0) if actor.is_on_floor() else 0.0
     gait_weight = move_toward(gait_weight, target, delta * 5.0)
