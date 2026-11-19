@@ -292,7 +292,7 @@ func _render_phase() -> void:
         if phase == Phase.MOVE_TO_FACE:
             hand.position = hand.position.lerp(Vector3(0.14,-0.20,-0.36),
                 smoothstep(0.0,1.0,t))
-         hand.rotation = Vector3(-0.12,-0.25,-0.24)
+        hand.rotation = Vector3(-0.12,-0.25,-0.24)
         if phase == Phase.MOVE_TO_FACE:
             hand.rotation.y = -0.35
     smoke.emitting = phase == Phase.BURN and mouth_prop.visible
