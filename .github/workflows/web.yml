@@ -411,6 +411,18 @@ jobs:
           test -s build/web/quest/index.html
           test -s build/web/quest/quest.js
           test -s build/web/quest/quest-core.js
+          # Model Lab: model format and control logic must pass before deployment.
+          node --check site/model/model-core.js
+          node --check site/model/model.mjs
+          node --test tests/model-core.test.cjs
+          grep -q 'model.mjs?v=1' site/model/index.html
+          grep -q 'href="../model/"' site/quest/index.html
+          grep -q 'href="../model/"' site/map/index.html
+          mkdir -p build/web/model
+          cp -a site/model/. build/web/model/
+          test -s build/web/model/index.html
+          test -s build/web/model/model.mjs
+          test -s build/web/model/model-core.js
           grep -q 'editor.js?v=20' site/map/index.html
           grep -q 'editor-core.js?v=20' site/map/index.html
           mkdir -p build/web/map
@@ -473,8 +485,10 @@ jobs:
               && curl -fsSL --max-time 20 "${SITE_URL}${RELEASE_DIR}/index.html" -o /tmp/pages-game.html \
               && test -s /tmp/pages-game.html \
               && curl -fsSL --max-time 20 "${SITE_URL}quest/index.html" -o /tmp/pages-quest.html \
-              && grep -q 'QUEST LAB' /tmp/pages-quest.html; then
-              echo "LIVE_PAGES_OK: ${SITE_URL}, ${SITE_URL}${RELEASE_DIR}/, ${SITE_URL}quest/"
+              && grep -q 'QUEST LAB' /tmp/pages-quest.html \
+              && curl -fsSL --max-time 20 "${SITE_URL}model/index.html" -o /tmp/pages-model.html \
+              && grep -q 'MODEL LAB' /tmp/pages-model.html; then
+              echo "LIVE_PAGES_OK: ${SITE_URL}, ${SITE_URL}${RELEASE_DIR}/, ${SITE_URL}quest/, ${SITE_URL}model/"
               exit 0
             fi
             echo "Public Pages check ${attempt}/12 not ready"

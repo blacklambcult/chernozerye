@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0c1114">
+  <meta name="description" content="CHERNOZERYE MODEL LAB — редактор low-poly моделей для игры.">
+  <title>Чернозёрье / MODEL LAB 0.1</title>
+  <link rel="stylesheet" href="./model.css?v=1">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="identity">
+      <div class="mark">Ч</div>
+      <div>
+        <div class="micro amber">CHERNOZERYE / DEVELOPMENT TOOLS</div>
+        <h1>MODEL LAB <em>/ 0.1</em></h1>
+      </div>
+    </div>
+    <nav class="navigation" aria-label="Смежные инструменты">
+      <a href="../map/">01 / GEO LAB</a>
+      <a href="../quest/">02 / QUEST LAB</a>
+      <a href="./" aria-current="page">03 / MODEL LAB</a>
+      <a href="../" class="game-link">↗ ИГРА</a>
+    </nav>
+  </header>
+  <div class="workspace">
+    <aside class="left sidebar" aria-label="Список деталей и готовые шаблоны">
+      <section class="section">
+        <div class="micro amber">01 / ОБЪЕКТ</div>
+        <h2>Мастерская объектов</h2>
+        <p class="muted-copy">Собирай игровые пропсы из простых геометрических форм. Масштаб — в метрах, экспорт — GLB для Godot.</p>
+        <label for="model-name">Название модели</label>
+        <input id="model-name" maxlength="90" type="text" value="Новая модель" autocomplete="off">
+      </section>
+      <section class="section">
+        <div class="section-header"><h3>Быстрый старт</h3><span class="tag">ПРЕСЕТЫ</span></div>
+        <div class="preset-grid">
+          <button type="button" data-preset="crate" class="preset"><span class="preset-symbol">▣</span><strong>Ящик</strong><small>5 деталей</small></button>
+          <button type="button" data-preset="lantern" class="preset"><span class="preset-symbol">♧</span><strong>Фонарь</strong><small>5 деталей</small></button>
+          <button type="button" data-preset="marker" class="preset"><span class="preset-symbol">⊞</span><strong>Указатель</strong><small>3 детали</small></button>
+        </div>
+        <p class="hint">Шаблон заменит текущую сцену после подтверждения.</p>
+      </section>
+      <section class="section">
+        <div class="section-header"><h3>Добавить примитив</h3><span class="tag">LOW POLY</span></div>
+        <div class="shape-grid" role="group" aria-label="Примитивы">
+          <button class="shape" data-primitive="box" type="button"><span>▣</span>Куб</button>
+          <button class="shape" data-primitive="cylinder" type="button"><span>▥</span>Цилиндр</button>
+          <button class="shape" data-primitive="sphere" type="button"><span>◉</span>Сфера</button>
+          <button class="shape" data-primitive="cone" type="button"><span>△</span>Конус</button>
+          <button class="shape" data-primitive="plane" type="button"><span>▱</span>Плоскость</button>
+        </div>
+      </section>
+      <section class="section hierarchy-section">
+        <div class="section-header"><h3>Детали модели</h3><span id="part-count" class="count">0</span></div>
+        <div id="object-list" class="object-list" aria-label="Иерархия деталей"></div>
+        <div class="pair">
+          <button id="duplicate" type="button" class="button secondary" disabled>⧉ Дублировать</button>
+          <button id="delete" type="button" class="button danger" disabled>× Удалить</button>
+        </div>
+      </section>
+      <section class="section bottom">
+        <div class="section-header"><h3>Проект</h3><span class="tag">MODEL / JSON</span></div>
+        <button id="new-project" type="button" class="button secondary full">+ Новая модель</button>
+        <button id="save-json" type="button" class="button secondary full">↓ Скачать проект JSON</button>
+        <label class="button secondary full import" for="load-json">↑ Импортировать JSON
+          <input id="load-json" type="file" accept=".json,application/json" hidden>
+        </label>
+        <p class="hint">JSON позволяет продолжить работу позже. GLB — готовая 3D-геометрия для импорта в Godot.</p>
+      </section>
+    </aside>
+
+    <main class="center" aria-label="Трёхмерный редактор">
+      <div class="toolbar">
+        <div class="toolbar-heading">
+          <div class="micro amber">02 / РАБОЧАЯ ОБЛАСТЬ</div>
+          <div class="toolbar-title" id="viewport-title">Новая модель</div>
+        </div>
+        <div class="toolbar-actions" role="group" aria-label="Операции над деталями">
+          <button data-mode="translate" class="tool active" aria-pressed="true" type="button" title="Перемещение (W)">↔ <span>Двигать</span></button>
+          <button data-mode="rotate" class="tool" aria-pressed="false" type="button" title="Вращение (E)">⟳ <span>Вращать</span></button>
+          <button data-mode="scale" class="tool" aria-pressed="false" type="button" title="Размер (R)">⌗ <span>Масштаб</span></button>
+          <span class="toolbar-separator"></span>
+          <button id="toggle-grid" class="tool active" type="button" aria-pressed="true" title="Показать или скрыть сетку">▦ <span>Сетка</span></button>
+          <button id="frame-model" class="tool" type="button" title="Показать всю модель (F)">◎ <span>В кадр</span></button>
+        </div>
+      </div>
+      <div class="stage">
+        <canvas id="viewport" tabindex="0" aria-label="3D-просмотр модели; выберите деталь, чтобы редактировать"></canvas>
+        <div class="stage-corner top-left"><span class="live"></span> MODEL WORKSPACE <span class="dim">/ PERSPECTIVE</span></div>
+        <div class="stage-corner top-right">Y ↑ / X → / Z ◉<span class="dim"> · METERS</span></div>
+        <div id="webgl-error" class="webgl-error" role="alert" hidden>3D-редактор не загрузился. Нужен браузер с WebGL2 и доступ к библиотеке Three.js.</div>
+        <div id="viewport-hint" class="viewport-hint">ЛКМ — выбрать деталь · ПКМ — перемещать обзор · Колёсико — приблизить · W/E/R — инструменты</div>
+        <div class="stage-corner bottom-right" id="selection-caption">НЕТ ВЫДЕЛЕННОЙ ДЕТАЛИ</div>
+      </div>
+      <div class="view-footer">
+        <span><i class="dot orange"></i> ГЕОМЕТРИЯ / LOW POLY</span>
+        <span><i class="dot teal"></i> GLTF 2.0 / GLB</span>
+        <span>1 ЕД. = 1 М</span>
+      </div>
+    </main>
+
+    <aside class="right sidebar" aria-label="Инспектор выбранной детали">
+      <section class="section inspector-header">
+        <div class="micro amber">03 / ИНСПЕКТОР</div>
+        <h2>Свойства детали</h2>
+        <p class="muted-copy">Выбери деталь в списке или нажми на неё в 3D-окне.</p>
+      </section>
+      <div id="empty-inspector" class="empty-inspector">
+        <div class="empty-icon">⌗</div>
+        <h3>Ничего не выбрано</h3>
+        <p>Добавь примитив слева, чтобы увидеть его размеры, материалы и положение.</p>
+      </div>
+      <div id="part-inspector" hidden>
+        <section class="section">
+          <div class="section-header"><h3>Идентификация</h3><span id="part-kind" class="tag">CUBE</span></div>
+          <label for="part-name">Название</label>
+          <input id="part-name" type="text" maxlength="90" autocomplete="off">
+          <p id="part-id" class="id-caption">part-id</p>
+        </section>
+        <section class="section">
+          <div class="section-header"><h3>Трансформация</h3><span class="tag">XYZ</span></div>
+          <div class="field-group">
+            <label>Позиция / м</label>
+            <div class="triplet" id="position-fields">
+              <label class="axis x"><span>X</span><input aria-label="Положение X" type="number" step=".05" data-field="position" data-index="0"></label>
+              <label class="axis y"><span>Y</span><input aria-label="Положение Y" type="number" step=".05" data-field="position" data-index="1"></label>
+              <label class="axis z"><span>Z</span><input aria-label="Положение Z" type="number" step=".05" data-field="position" data-index="2"></label>
+            </div>
+          </div>
+          <div class="field-group">
+            <label>Вращение / °</label>
+            <div class="triplet" id="rotation-fields">
+              <label class="axis x"><span>X</span><input aria-label="Поворот X" type="number" step="5" data-field="rotation" data-index="0"></label>
+              <label class="axis y"><span>Y</span><input aria-label="Поворот Y" type="number" step="5" data-field="rotation" data-index="1"></label>
+              <label class="axis z"><span>Z</span><input aria-label="Поворот Z" type="number" step="5" data-field="rotation" data-index="2"></label>
+            </div>
+          </div>
+          <div class="field-group">
+            <label>Масштаб</label>
+            <div class="triplet" id="scale-fields">
+              <label class="axis x"><span>X</span><input aria-label="Масштаб X" type="number" min=".02" step=".1" data-field="scale" data-index="0"></label>
+              <label class="axis y"><span>Y</span><input aria-label="Масштаб Y" type="number" min=".02" step=".1" data-field="scale" data-index="1"></label>
+              <label class="axis z"><span>Z</span><input aria-label="Масштаб Z" type="number" min=".02" step=".1" data-field="scale" data-index="2"></label>
+            </div>
+          </div>
+          <button id="reset-transform" type="button" class="button secondary full">Сбросить трансформацию</button>
+        </section>
+        <section class="section">
+          <div class="section-header"><h3>Материал</h3><span class="tag">PBR</span></div>
+          <label for="part-color">Цвет поверхности</label>
+          <div class="color-box"><input id="part-color" aria-label="Выбор цвета" type="color"><span id="color-hex">#977256</span></div>
+          <div id="swatches" class="swatches" aria-label="Палитра материалов"></div>
+          <div class="range-row"><label for="metalness">Металличность</label><output id="metalness-output">0%</output></div>
+          <input id="metalness" type="range" min="0" max="1" step=".05">
+          <div class="range-row"><label for="roughness">Шероховатость</label><output id="roughness-output">85%</output></div>
+          <input id="roughness" type="range" min="0" max="1" step=".05">
+        </section>
+      </div>
+      <section class="section export-panel">
+        <div class="section-header"><h3>Экспорт модели</h3><span class="tag">GODOT READY</span></div>
+        <button id="export-glb" class="button primary full" type="button">↓ Экспортировать GLB</button>
+        <p id="save-status" class="save-status" role="status">Локальный проект готов.</p>
+        <p class="hint">GLB содержит меши и материалы; игровые коллизии, анимации и точки крепления добавим позже.</p>
+      </section>
+    </aside>
+  </div>
+  <footer class="footer"><span>CHERNOZERYE <b>MODEL LAB 0.1</b></span><span id="global-status">3D / РЕДАКТОР ПРОПСОВ</span><span>ЛОКАЛЬНОЕ СОХРАНЕНИЕ · JSON + GLB</span></footer>
+</div>
+<script src="./model-core.js?v=1"></script>
+<script type="module" src="./model.mjs?v=1"></script>
+</body>
+</html>
