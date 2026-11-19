@@ -152,8 +152,12 @@ func _run() -> void:
     if not upper.visible or not jacket.visible:
         _fail("body disappears while looking down")
         return
-    if not left_leg.visible or not right_leg.visible:
-        _fail("feet disappear while looking down")
+    var imported_legs := actor.get_node_or_null("ModeledCharacter") as Node3D
+    if imported_legs == null or not bool(imported_legs.get("model_loaded")):
+        _fail("imported feet unavailable while looking down")
+        return
+    if left_leg.visible or right_leg.visible:
+        _fail("procedural legs overlap the imported GLB legs")
         return
     if not (pelvis.get_node("LeftArm") as Node3D).visible:
         _fail("side-hanging arms are hidden at downward pitch")

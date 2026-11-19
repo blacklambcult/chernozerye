@@ -1,4 +1,6 @@
 extends SceneTree
+# Protect actual rendered first-person view; old test only checked pivot
+# stability and missed the full coat that covered the whole viewport.
 
 func _fail(message: String) -> void:
     push_error("MODELED_CHARACTER_REGRESSION_FAILED: " + message)
@@ -27,21 +29,55 @@ func _run() -> void:
         return
     var left_at_rest := left.position
     var right_at_rest := right.position
-    if absf(left.position.x + right.position.x) > 0.001:
-        _fail("legs have asymmetric standing pivots")
+    if absf(left.position.x + right.position.x) > 0.001 or absf(left.position.z - right.position.z) > 0.001:
+        _fail("leg pivots asymmetric or improperly placed")
         return
-    if absf(left.position.z - right.position.z) > 0.001:
-        _fail("one leg protrudes forward of the other")
+
+    # The imported coat used to fill the full screen with white/gray triangles.
+    # Check the RENDERED mesh allow-list, not just joint names/visibilities.
+    var visible_count := 0
+    var hidden_count := 0
+    for node in root.find_children("*", "MeshInstance3D", true, false):
+        var part := node as MeshInstance3D
+        var label := String(part.name)
+        var leg_part := false
+        for prefix in rig.LEG_PARTS:
+            if label.begins_with(prefix):
+                leg_part = true
+                break
+        if part.visible:
+            visible_count += 1
+            if not leg_part:
+                _fail("non-leg imported mesh can cover the first-person camera: " + label)
+                return
+        else:
+            hidden_count += 1
+    if visible_count < 8 or hidden_count < 8:
+        _fail("mesh mask failed to isolate lower body")
         return
+    var old_body := actor.get_node("FirstPersonFullBody") as Node3D
+    var old_pelvis := old_body.get_node("PelvisRoot") as Node3D
+    if not old_body.visible:
+        _fail("verified first-person coat disappeared")
+        return
+    if not (old_pelvis.get_node("LowerJacket") as MeshInstance3D).visible:
+        _fail("first-person jacket is missing")
+        return
+    if (old_pelvis.get_node("LeftLeg") as Node3D).visible or (old_pelvis.get_node("RightLeg") as Node3D).visible:
+        _fail("duplicate legacy legs remain visible")
+        return
+
     var eye := actor.get_node("Camera3D") as Camera3D
-    eye.rotation.x = -1.45
-    for frame in range(30):
-        rig.call("_process",0.016)
-    if left.position.distance_to(left_at_rest) > 0.001 or right.position.distance_to(right_at_rest) > 0.001:
-        _fail("looking down modifies the position of a leg")
-        return
-    if (actor.get_node("FirstPersonFullBody") as Node3D).visible:
-        _fail("procedural body is still rendered over imported GLB")
-        return
-    print("MODELED_CHARACTER_REGRESSION_OK: loaded=true legs_under_hips=true head_hidden=true camera_independent=true legacy_hidden=true")
+    for pitch in [0.0,-0.50,-1.0,-1.45]:
+        eye.rotation.x = pitch
+        for frame in range(30):
+            rig.call("_process",0.016)
+            old_body.call("_process",0.016)
+        if left.position.distance_to(left_at_rest) > 0.001 or right.position.distance_to(right_at_rest) > 0.001:
+            _fail("looking down moves the actual leg joints")
+            return
+        if (old_pelvis.get_node("LeftLeg") as Node3D).visible:
+            _fail("procedural leg became visible at pitch %s" % pitch)
+            return
+    print("MODELED_CHARACTER_REGRESSION_OK: loaded=true legs_under_hips=true head_hidden=true camera_independent=true legacy_coat_visible=true coat_occlusion_blocked=true")
     quit(0)
