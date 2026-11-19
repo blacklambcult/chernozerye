@@ -19,3 +19,11 @@ void fragment(){
     ALBEDO = vec3(0.27,0.155,0.085)*tone*mix(0.35,1.0,seam);
     ROUGHNESS = 0.96;
 }
+
+void light() {
+    float incidence = max(dot(NORMAL, LIGHT), 0.0);
+    float level = 0.35 * smoothstep(0.18, 0.22, incidence)
+                + 0.35 * smoothstep(0.49, 0.54, incidence)
+                + 0.30 * smoothstep(0.78, 0.83, incidence);
+    DIFFUSE_LIGHT += ALBEDO * LIGHT_COLOR * ATTENUATION * level / PI;
+}

@@ -2,6 +2,9 @@ extends Node3D
 # Camera-space prop and arcade interaction with the first solid world surface.
 const REST := Vector3(0.23, -0.19, -0.53)
 const CAPACITY := 6
+const OUTDOOR_REPORT := preload("res://revolver_report.wav")
+const INDOOR_REPORT := preload("res://revolver_report_room.wav")
+var indoors := false
 var rounds := CAPACITY
 var cooldown := 0.0
 var reload_left := 0.0
@@ -71,8 +74,9 @@ func _ready() -> void:
     flash.visible = false
     add_child(flash)
     report.bus = &"Effects"
-    report.stream = preload("res://revolver_report.wav")
-    report.volume_db = -9.0
+    report.stream = OUTDOOR_REPORT
+    report.max_polyphony = 3
+    report.volume_db = -3.0
     add_child(report)
 
 func equip(value: bool) -> void:
@@ -123,6 +127,10 @@ func _shoot() -> void:
     cooldown = 0.24
     cylinder.rotate_object_local(Vector3.UP, PI / 3)
     flash.light_energy = 3.6
+    var shot_stream := INDOOR_REPORT if indoors else OUTDOOR_REPORT
+    if report.stream != shot_stream:
+        report.stream = shot_stream
+    report.pitch_scale = randf_range(0.97, 1.03)
     report.play()
     player.call("emit_noise", 1.0)
     var start := eye.global_position

@@ -272,7 +272,7 @@ jobs:
           PY
           # Manual village mode is enabled by default during scene startup.
           # Assert the new twilight configuration without an artificial UI click.
-          grep -q 'ambient_light_energy = 0.67 if manual_mode' godot/world.gd
+          grep -q 'ambient_light_energy = 0.57 if manual_mode' godot/world.gd
           grep -q 'light_specular = 0.0' godot/world.gd
           grep -q "MANUAL_FOREST_READY: trees=" /tmp/world-smoke.log
           grep -q "clearance=roads13/buildings6.5" /tmp/world-smoke.log
