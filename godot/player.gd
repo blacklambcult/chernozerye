@@ -14,6 +14,7 @@ const MOUSE_SENS := 0.002
 
 var revolver := preload("res://revolver.gd").new()
 var step_sound := AudioStreamPlayer.new()
+var music := preload("res://location_music.gd").new()
 var wind := AudioStreamPlayer.new()
 var step_distance := 0.0
 var noise_level := 0.0
@@ -42,6 +43,7 @@ func set_controls_locked(value: bool) -> void:
         velocity.z = 0.0
 
 func _ready() -> void:
+    add_child(music)
     add_child(step_sound)
     wind.stream = preload("res://village_wind.wav")
     wind.volume_db = -19.0
@@ -254,6 +256,7 @@ func _physics_process(delta: float) -> void:
         status_label.text = "INPUT DIAGNOSTICS 0.6\nLast: %s\nAxis: %s | Pos: (%.1f, %.1f)\nMouse: %s\nClick on game, then press W / M" % [last_event, str(axis), position.x, position.z, str(Input.mouse_mode)]
 
 func set_indoors(value: bool) -> void:
+    music.set_indoors(value)
     wind.volume_db = -34.0 if value else -19.0
     step_sound.stream = BOARD_STEP if value else EARTH_STEP
     step_distance = 0.0

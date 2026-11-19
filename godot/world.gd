@@ -684,11 +684,11 @@ func _toggle_manual_preview() -> void:
     if _night_environment != null:
         if manual_mode and _night_environment.sky == null:
             var dusk := ProceduralSkyMaterial.new()
-            dusk.sky_top_color = Color("#182437")
-            dusk.sky_horizon_color = Color("#68717b")
+            dusk.sky_top_color = Color("#0d1020")
+            dusk.sky_horizon_color = Color("#48404a")
             dusk.ground_horizon_color = dusk.sky_horizon_color
-            dusk.ground_bottom_color = Color("#303039")
-            dusk.sky_curve = 0.20
+            dusk.ground_bottom_color = Color("#23232d")
+            dusk.sky_curve = 0.15
             dusk.sun_angle_max = 0.0
             var sky := Sky.new()
             sky.sky_material = dusk
@@ -704,7 +704,7 @@ func _toggle_manual_preview() -> void:
         _night_environment.tonemap_exposure = 1.01 if manual_mode else 1.0
         _night_environment.fog_enabled = true
         _night_environment.fog_mode = Environment.FOG_MODE_DEPTH if manual_mode else Environment.FOG_MODE_EXPONENTIAL
-        _night_environment.fog_light_color = Color("#576270") if manual_mode else Color("#676976")
+        _night_environment.fog_light_color = Color("#433f50") if manual_mode else Color("#676976")
         _night_environment.fog_light_energy = 0.50 if manual_mode else 1.0
         _night_environment.fog_sky_affect = 0.33 if manual_mode else 1.0
         _night_environment.fog_sun_scatter = 0.0
