@@ -183,7 +183,9 @@ func _input(event: InputEvent) -> void:
         last_event = "mouse click"
         if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
             Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-        elif revolver.visible:
+        # The first click counts as the hammer pull even when focus is captured.
+        # Otherwise the six-round cycle would silently require 13 clicks.
+        if revolver.visible:
             revolver.request_shot()
     elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
         rotate_y(-event.relative.x * mouse_sensitivity)
