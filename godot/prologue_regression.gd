@@ -93,6 +93,15 @@ func _run_tests() -> void:
     player.global_position = room + Vector3(0, 0.25, -2.35)
     camera.look_at(story.call("_target_position", "mask"))
     story.call("_interact")
+    var porch := story.get("porch_sound") as AudioStreamPlayer3D
+    if not porch.playing or porch.position.z <= 4.05:
+        _fail("porch cue must start beyond the door")
+        return
+    var first_motion: Tween = story.get("latch_motion")
+    story.call("_interact")
+    if first_motion != story.get("latch_motion"):
+        _fail("looking at the mask twice replayed the porch cue")
+        return
     if not bool(story.get("mask_found")):
         _fail("mask not interactable")
         return
@@ -101,6 +110,9 @@ func _run_tests() -> void:
     story.call("_interact")
     if bool(story.get("inside_home")) or not bool(story.get("chapter_completed")):
         _fail("prologue does not complete when leaving after both clues")
+        return
+    if porch.playing or first_motion.is_valid():
+        _fail("porch cue continued after leaving")
         return
     var home_point: Vector2 = story.get("home_point")
     if not home_point.is_finite():

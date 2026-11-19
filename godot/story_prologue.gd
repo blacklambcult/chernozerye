@@ -29,6 +29,9 @@ var journal_panel: PanelContainer
 var journal_text: Label
 var wood := ShaderMaterial.new()
 var interior: Node3D
+var porch_sound := AudioStreamPlayer3D.new()
+var door_handle: Node3D
+var latch_motion: Tween
 var waypoint: Label3D
 var focus := ""
 var outside_rotation := 0.0
@@ -202,11 +205,7 @@ func _build_interior() -> void:
     pot.add_child(pot_shape)
     pot.add_to_group("breakable_pottery")
     interior.add_child(pot)
-    _solid_box("Деревянная маска", Vector3(0, 1.86, -3.83),
-        Vector3(0.78, 1.03, 0.17), Color("#6f5442"), false)
-    for x in [-0.19, 0.19]:
-        _solid_box("Тёмное отверстие маски", Vector3(float(x), 1.95, -3.72),
-            Vector3(0.18, 0.16, 0.035), Color("#211d1c"), false)
+    _build_mask()
     _solid_box("Дверная рама", Vector3(0, 1.16, 3.85),
         Vector3(1.35, 2.3, 0.13), Color("#2b2824"), false)
     # A recessed-looking frosted sash on the west wall lights the writing surface.
@@ -241,8 +240,14 @@ func _build_interior() -> void:
     for i in range(3):
         _solid_box("Выцветшие строки", Vector3(-2.16, 0.766, -0.64 + i * 0.068),
             Vector3(0.29 - i * 0.035, 0.004, 0.018), Color("#574f45"), false)
-    _solid_box("Дверная ручка", Vector3(0.46, 1.02, 3.73),
+    door_handle = _solid_box("Дверная ручка", Vector3(0.46, 1.02, 3.73),
         Vector3(0.17, 0.065, 0.12), Color("#827760"), false)
+    door_handle.get_child(0).position.x = 0.07
+    porch_sound.name = "Шаги за дверью"
+    porch_sound.position = Vector3(0.3, 0.65, 4.7)
+    porch_sound.stream = preload("res://porch_steps.wav")
+    porch_sound.unit_size = 5.0
+    interior.add_child(porch_sound)
     var light := OmniLight3D.new()
     light.name = "Остывшая комната"
     light.position = Vector3(0, 3.1, 0.3)
@@ -251,6 +256,46 @@ func _build_interior() -> void:
     light.omni_range = 10.0
     light.shadow_enabled = false
     interior.add_child(light)
+
+func _build_mask() -> void:
+    # Mirrored facets meet along a raised brow and nose ridge. Each eye is
+    # cut into the topology so it stays readable in the low-resolution view.
+    var surface := SurfaceTool.new()
+    surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+    surface.set_smooth_group(-1)
+    var points := PackedVector3Array([
+        Vector3(0,.52,.09), Vector3(.27,.44,.04), Vector3(.37,.17,.04),
+        Vector3(.32,-.16,.04), Vector3(.17,-.38,.05), Vector3(0,-.53,.09),
+        Vector3(0,.19,.21), Vector3(.08,.12,.17), Vector3(.29,.16,.10),
+        Vector3(.20,.04,.15), Vector3(0,-.07,.26), Vector3(0,-.20,.15)])
+    var faces := [[0,1,6],[1,2,8],[1,8,6],[6,8,7],[7,8,9],[8,2,3],
+        [8,3,9],[9,3,4],[7,9,10],[6,7,10],[10,9,11],[11,9,4],[11,4,5]]
+    for side: float in [-1.0, 1.0]:
+        for i in faces.size():
+            surface.set_color(Color("#291e19") if i == 4 else Color("#97724e").darkened(0.055 * (i % 4)))
+            for corner in range(3):
+                var index: int = faces[i][corner if side > 0 else 2 - corner]
+                var vertex := points[index]
+                vertex.x *= side
+                surface.add_vertex(vertex)
+    surface.generate_normals()
+    var mask := MeshInstance3D.new()
+    mask.name = "Резная маска"
+    mask.position = Vector3(0, 1.86, -3.84)
+    mask.mesh = surface.commit()
+    var finish := StandardMaterial3D.new()
+    finish.vertex_color_use_as_albedo = true
+    finish.cull_mode = BaseMaterial3D.CULL_DISABLED
+    mask.material_override = finish
+    interior.add_child(mask)
+
+func _play_porch_steps() -> void:
+    porch_sound.play()
+    latch_motion = create_tween()
+    latch_motion.tween_interval(4.04)
+    latch_motion.tween_property(door_handle, "rotation:z", -0.50, 0.16)
+    latch_motion.tween_interval(0.22)
+    latch_motion.tween_property(door_handle, "rotation:z", 0.0, 0.18)
 
 func _build_waypoint() -> void:
     waypoint = _story_marker("РОДНОЙ ДОМ", _gate_location() + Vector3.UP * 2.9,
@@ -490,6 +535,10 @@ func _enter_home() -> void:
 func _leave_home() -> void:
     if player == null:
         return
+    porch_sound.stop()
+    if latch_motion != null:
+        latch_motion.kill()
+    door_handle.rotation.z = 0.0
     inside_home = false
     interior.visible = false
     player.global_position = _gate_location() + Vector3.UP * 0.12
@@ -519,6 +568,7 @@ func _interact() -> void:
             _update_journal()
         "mask":
             mask_found = true
+            _play_porch_steps()
             _say("В красном углу висит чужая деревянная маска. Снаружи вдруг скрипнули доски крыльца.")
             print("STORY_CLUE_FOUND: mask")
             _update_journal()
