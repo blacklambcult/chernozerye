@@ -1,6 +1,6 @@
 extends Node3D
-# Camera-attached hands only. The full-body rig owns the torso, legs and
-# down-look arms; this separate viewmodel owns the readable FPS silhouettes.
+# Camera-attached shoulder, sleeves and hands. The lower-body GLB owns
+# hips and legs. These camera-space arms persist even at maximum downlook.
 # The art is unarmed and deliberately low-poly; it never affects collisions.
 
 const COAT := Color("#676655")
@@ -9,12 +9,8 @@ const CUFF := Color("#44463c")
 const THREAD := Color("#8b8170")
 const SKIN := Color("#988579")
 const SKIN_SHADOW := Color("#76665e")
-# Look-down hands must leave the screen BEFORE the jacket fills it.
-# The full-body arms take over at -1.04. The short gap between them is
-# intentional: in an unarmed relaxed stance hands hang below the view.
-const LOWER_START := 0.42
-const LOWER_END := 0.76
-const HIDE_PITCH := -0.85
+const DOWNLOOK_BEGIN := 0.38
+const DOWNLOOK_FULL := 1.25
 
 var right_arm: Node3D
 var left_arm: Node3D
@@ -25,7 +21,7 @@ var stride_phase := 0.0
 var stride_weight := 0.0
 var look_impulse := Vector2.ZERO
 var is_gesture_hidden := false
-var is_downlook_hidden := false
+var downlook_weight := 0.0
 
 
 func _mat(tint: Color) -> StandardMaterial3D:
@@ -82,7 +78,11 @@ func _build_arm(side: float, label: String) -> Node3D:
     var shoulder := Vector3(side * 0.470, -0.820 + lift, -0.120)
     var elbow := Vector3(side * 0.365, -0.640 + lift, -0.425)
     var wrist := Vector3(side * 0.280, -0.535 + lift, -0.720)
-    # Unequal radial widths create a tailored, angular canvas coat sleeve.
+    _limb(root, "ShoulderYoke",
+        Vector3(side * 0.520, -0.555 + lift, -0.395),
+        Vector3(side * 0.395, -0.565 + lift, -0.505),
+        0.123, 0.108, COAT)
+    # Angled coat sleeve between shoulder and elbow.
     _limb(root, "UpperCoatSleeve", shoulder, elbow,
         0.105, 0.093, COAT)
     _limb(root, "ForearmSleeve", elbow, wrist,
@@ -130,7 +130,7 @@ func _ready() -> void:
     player = eye.get_parent() as CharacterBody3D
     left_arm = _build_arm(-1.0, "LeftArm")
     right_arm = _build_arm(1.0, "RightArm")
-    print("FPS_VIEWMODEL_READY: camera_local=true arms=2 unarmed=true lowpoly=true body_handoff=true relaxed_pose=true early_lowering=true")
+    print("FPS_VIEWMODEL_READY: camera_local=true arms=2 unarmed=true lowpoly=true persistent_downlook=true shoulders=true")
 
 
 func push_look_motion(relative_pixels: Vector2) -> void:
@@ -151,8 +151,8 @@ func _process(delta: float) -> void:
     # The cinematic has its own hands during short gestures; avoid overlap.
     # The long ambient phase (5) leaves the regular idle arms visible.
     is_gesture_hidden = phase in [1, 2, 3, 4, 6, 7]
-    is_downlook_hidden = eye.rotation.x <= HIDE_PITCH
-    visible = not is_gesture_hidden and not is_downlook_hidden
+    visible = not is_gesture_hidden
+    downlook_weight = smoothstep(DOWNLOOK_BEGIN, DOWNLOOK_FULL, -eye.rotation.x)
 
     var grounded := player.is_on_floor()
     var speed := Vector2(player.velocity.x, player.velocity.z).length()
@@ -177,10 +177,6 @@ func _process(delta: float) -> void:
         -step * 0.011 * stride_weight,
         step * 0.012 * stride_weight,
         -0.010 * cos(stride_phase) * stride_weight)
-    # On modest downward pitch the torso enters the frame. Lower both hands
-    # OUT of frame early; do not leave detached fists on top of the jacket.
-    var lower := smoothstep(LOWER_START, LOWER_END, -eye.rotation.x)
-    right_arm.position.y -= 0.66 * lower
-    left_arm.position.y -= 0.66 * lower
-    right_arm.position.z += 0.10 * lower
-    left_arm.position.z += 0.10 * lower
+    # Reveal a shoulder at each screen edge when looking at the feet.
+    right_arm.position += Vector3(0.090, 0.235, -0.105) * downlook_weight
+    left_arm.position += Vector3(-0.090, 0.235, -0.105) * downlook_weight

@@ -26,22 +26,21 @@ func _run() -> void:
     if not fp.visible or full.visible or legacy.visible:
         _fail("old body visible or FPS asset missing")
         return
-    var chest := fp.find_child("FPTorsoShell",true,false) as MeshInstance3D
-    var waist := fp.find_child("FPWaistInner",true,false) as MeshInstance3D
-    var pelvis := fp.find_child("FPPelvis",true,false) as MeshInstance3D
-    if chest == null or waist == null or pelvis == null:
-        _fail("FPS asset has no closed midsection")
-        return
-    if chest.mesh.get_faces().size() < 90:
-        _fail("FPS torso is still a flat panel")
-        return
-    for mesh in [chest,waist,pelvis]:
-        var mat := mesh.material_override as StandardMaterial3D
-        if mat == null or mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
-            _fail("FPS body material is transparent")
+    for banned in ["FPTorsoShell","FPShirtLining","FPWaistInner","Head","SidorCanvasSack"]:
+        if fp.find_child(banned,true,false) != null:
+            _fail("camera-blocking upper mesh present: " + banned)
             return
-    if fp.find_child("Head",true,false) != null or fp.find_child("SidorCanvasSack",true,false) != null:
-        _fail("camera-safe FPS mesh has head/backpack")
+    for name in ["FPPelvis","FPCrotch","FPCoatHemL","FPCoatHemR"]:
+        var piece := fp.find_child(name,true,false) as MeshInstance3D
+        if piece == null:
+            _fail("lower-body geometry missing: " + name)
+            return
+        var mat := piece.material_override as StandardMaterial3D
+        if mat == null or mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+            _fail("pelvis or coat hem is transparent")
+            return
+    if player.get_node_or_null("Camera3D/FPSViewmodel/LeftArm/ShoulderYoke") == null:
+        _fail("camera-space shoulders missing")
         return
     var left := fp.find_child("LeftLegPivot",true,false) as Node3D
     var right := fp.find_child("RightLegPivot",true,false) as Node3D
@@ -52,51 +51,29 @@ func _run() -> void:
     var right_rest := right.position
     var camera := player.get_node("Camera3D") as Camera3D
     var body_offset := float(rig.get("FPS_BODY_BACK_OFFSET"))
-    if absf(fp.position.z - body_offset) > 0.001 or body_offset < 0.20:
-        _fail("the camera is still directly above the open coat collar")
+    if absf(fp.position.z - body_offset) > 0.001 or absf(body_offset) > 0.10:
+        _fail("lower body is not aligned below the eyes")
         return
     if absf(camera.position.z) > 0.001:
-        _fail("gameplay camera was moved instead of the FPS visual body")
+        _fail("gameplay camera was moved")
         return
-    # Test what actually projects into the screen when looking down.
-    # The old checks only tested material/mesh existence and completely
-    # missed a giant eight-sided collar covering the viewport center.
-    camera.rotation.x = -1.45
-    # AABB corner (maximum y, minimum z) is not necessarily an actual
-    # vertex: our garment tapers at the collar, with a broader lower hem.
-    # Project the genuine collar vertices rather than a phantom box corner.
-    var arrays := chest.mesh.surface_get_arrays(0)
-    var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-    var top := -100.0
-    for vertex in vertices:
-        top = maxf(top, vertex.y)
-    var most_central_rim := -100.0
-    var collar_vertices := 0
-    for vertex in vertices:
-        if vertex.y < top - 0.012:
-            continue
-        collar_vertices += 1
-        var camera_point := camera.to_local(chest.to_global(vertex))
-        if camera_point.z >= -camera.near:
-            _fail("actual coat collar crosses the camera near plane")
+    for n in fp.find_children("*","MeshInstance3D",true,false):
+        var mesh := n as MeshInstance3D
+        var aabb := mesh.get_aabb()
+        var upper := mesh.to_global(Vector3(0,aabb.position.y+aabb.size.y,0)).y - player.global_position.y
+        if upper > 0.96:
+            _fail("upper coat geometry can obstruct the camera: " + String(mesh.name))
             return
-        most_central_rim = maxf(most_central_rim, camera_point.y / -camera_point.z)
-    if collar_vertices < 6:
-        _fail("imported glTF has an incomplete upper collar ring")
-        return
-    if most_central_rim > -0.25:
-        _fail("open coat collar covers the center of downward FPS view")
-        return
+    camera.rotation.x = -1.45
     var toe := fp.find_child("LeftBootToe",true,false) as MeshInstance3D
-    if toe == null:
-        _fail("real imported FPS boot is missing")
+    var pelvis := fp.find_child("FPPelvis",true,false) as MeshInstance3D
+    var camera_toe := camera.to_local(toe.to_global(toe.mesh.get_aabb().get_center()))
+    var camera_pelvis := camera.to_local(pelvis.to_global(pelvis.mesh.get_aabb().get_center()))
+    if camera_toe.z >= -camera.near or camera_pelvis.z >= -camera.near:
+        _fail("leg geometry behind the camera")
         return
-    # Trimesh stores boot shape translation inside its mesh vertices.
-    # The imported node origin is at the ANKLE, not at the toe center.
-    var toe_center := toe.mesh.get_aabb().get_center()
-    var camera_toe := camera.to_local(toe.to_global(toe_center))
-    if camera_toe.z >= -camera.near or camera_toe.y / -camera_toe.z < most_central_rim + 0.09:
-        _fail("boot projects behind the coat instead of ahead of it")
+    if camera_toe.y / -camera_toe.z < camera_pelvis.y / -camera_pelvis.z + 0.04:
+        _fail("boot is hidden behind pelvis at steep downward view")
         return
     for pitch in [0.0,-0.5,-1.0,-1.45]:
         camera.rotation.x = pitch
@@ -116,5 +93,5 @@ func _run() -> void:
     if not fp.visible or full.visible or legacy.visible:
         _fail("F4 return failed")
         return
-    print("MODELED_CHARACTER_REGRESSION_OK: two_glbs=true solid_torso=true closed_pelvis=true separate_f4=true stable_legs=true legacy_hidden=true coat_below_center=true boots_ahead=true")
+    print("MODELED_CHARACTER_REGRESSION_OK: two_glbs=true lower_only=true opaque_pelvis=true separate_f4=true stable_legs=true legacy_hidden=true no_high_coat=true boots_ahead=true")
     quit(0)

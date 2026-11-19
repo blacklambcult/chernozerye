@@ -56,30 +56,24 @@ func _run() -> void:
     if rig.position.length() <= 0.002:
         _fail("mouse look motion did not reach viewmodel sway")
         return
-    # The handoff must begin well before the coat takes up the center
-    # of the screen. Check at an intermediate downward pitch as well as
-    # the maximum camera angle.
-    eye.rotation.x = -0.70
-    rig.call("_process",0.016)
-    body.call("_process",0.016)
-    if not rig.visible:
-        _fail("relaxed hands disappear abruptly at moderate downward pitch")
+    for pitch in [-0.70,-0.90,-1.45]:
+        eye.rotation.x = pitch
+        rig.call("_process",0.016)
+        body.call("_process",0.016)
+        if not rig.visible or body.visible:
+            _fail("FPS arms vanish or old body appears at pitch %s" % pitch)
+            return
+    if float(rig.get("downlook_weight")) < 0.99:
+        _fail("shoulders did not appear at maximum downward pitch")
         return
-    if right.position.y > -0.38 or left.position.y > -0.38:
-        _fail("hands still sit on top of the jacket during downward view")
-        return
-    eye.rotation.x = -0.90
-    rig.call("_process",0.016)
-    body.call("_process",0.016)
-    if rig.visible:
-        _fail("viewmodel hands remain over jacket at downward pitch")
-        return
-    eye.rotation.x = -1.45
-    rig.call("_process",0.016)
-    body.call("_process",0.016)
-    if rig.visible or not (pelvis.get_node("LeftArm") as Node3D).visible:
-        _fail("extreme down-look fails to hand off arms to full body")
-        return
+    for arm in [left,right]:
+        var shoulder := arm.get_node("ShoulderYoke") as MeshInstance3D
+        var palm := arm.get_node("Palm") as MeshInstance3D
+        for part in [shoulder,palm]:
+            var local := eye.to_local(part.global_position)
+            if local.z >= -eye.near or absf(local.y / -local.z) > 0.78 or absf(local.x / -local.z) > 1.35:
+                _fail("FPS shoulder or palm is outside the lookdown frame")
+                return
     eye.rotation.x = 0.0
     rig.call("_process",0.016)
     body.call("_process",0.016)
@@ -97,5 +91,5 @@ func _run() -> void:
     if not rig.visible:
         _fail("viewmodel does not recover in ambient phase")
         return
-    print("VIEWMODEL_REGRESSION_OK: hands=2 coat_sleeves=true lowpoly=true camera_space=true downlook_handoff=true cinematic_safe=true mouse_sway=true early_lowering=true")
+    print("VIEWMODEL_REGRESSION_OK: hands=2 coat_sleeves=true lowpoly=true camera_space=true persistent_downlook=true projected_shoulders=true cinematic_safe=true mouse_sway=true")
     quit(0)

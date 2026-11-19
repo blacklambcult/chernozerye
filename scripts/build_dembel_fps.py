@@ -1,5 +1,5 @@
-"""Create the standalone opaque first-person body (not a cutaway of F4).
-World-space pelvis/leg joints are invariant under camera pitch.
+"""Standalone first-person lower body. Head, torso, shoulders and chest
+are NOT part of this mesh. Viewmodel shoulders follow the camera instead.
 """
 import math
 import sys
@@ -54,36 +54,15 @@ def tube(name,parent,a,b,radius_a,radius_b,shade,segments=10):
     # Open top and bottom: no large circular cap above knees.
     geom(name,parent,trimesh.Trimesh(vertices=vertices,faces=faces,process=False),shade)
 
-# One complete volumetric coat shell, without clipped flat FPSCoat panels.
-# Opening at the neck avoids a roof directly underneath the camera.
-rings=[(1.17,.210,.140),(1.080,.248,.175),(.935,.273,.195),(.815,.286,.205)]
-v=[]
-for height,x,z in rings:
-    v.extend([(-x,height,-z*.68),(-x*.67,height,-z),
-              (x*.67,height,-z),(x,height,-z*.68),
-              (x,height,z*.68),(x*.67,height,z),
-              (-x*.67,height,z),(-x,height,z*.68)])
-f=[]
-for ring in range(len(rings)-1):
-    for j in range(8):
-        k=(j+1)%8
-        a=ring*8+j;b=ring*8+k;c=(ring+1)*8+k;d=(ring+1)*8+j
-        f.extend([(a,b,c),(a,c,d)])
-geom("FPTorsoShell","FPCharacterRoot",
-    trimesh.Trimesh(vertices=v,faces=f,process=False),"cloth")
-# Solid lining / pelvis close the visual hole: these are VOLUMES,
-# not translucent sheets or oversized overhead panels.
-box("FPShirtLining","FPCharacterRoot",(0,1.039,.008),(.275,.050,.200),"lining")
-box("FPWaistInner","FPCharacterRoot",(0,.877,0),(.417,.155,.282),"shadow")
-box("FPCoatHem","FPCharacterRoot",(0,.801,-.115),(.525,.034,.082),"shadow")
-box("FPFrontSeam","FPCharacterRoot",(.012,.961,-.199),(.020,.242,.014),"shadow")
-for j in range(3):
-    box("FPButton%d"%j,"FPCharacterRoot",(.028,1.056-j*.079,-.212),(.018,.018,.017),"metal")
-for side,tag in ((-1,"L"),(1,"R")):
-    box("FPPocket"+tag,"FPCharacterRoot",(side*.175,.892,-.197),(.138,.092,.042),"pocket")
-    box("FPPocketFlap"+tag,"FPCharacterRoot",(side*.175,.954,-.219),(.148,.031,.019),"edge")
+# Only LOWER BODY is drawn by this GLB. No coat collar or chest shell
+# in front of the player's eyes. Camera-attached arms draw the shoulders.
 box("FPPelvis","FPCharacterRoot",(0,.801,.014),(.410,.150,.315),"pants")
 box("FPCrotch","FPCharacterRoot",(0,.712,.006),(.130,.075,.238),"calf")
+for side,tag in ((-1,"L"),(1,"R")):
+    box("FPCoatHem"+tag,"FPCharacterRoot",
+        (side*.213,.805,-.076),(.115,.074,.183),"cloth")
+    box("FPCoatFold"+tag,"FPCharacterRoot",
+        (side*.222,.785,-.161),(.096,.017,.031),"shadow")
 
 for side,name in ((-1,"Left"),(1,"Right")):
     hip=name+"LegPivot"

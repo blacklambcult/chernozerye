@@ -162,8 +162,8 @@ func _run() -> void:
     if not imported_legs.visible or fps_asset == null or not fps_asset.visible:
         _fail("standalone FPS body not active")
         return
-    if fps_asset.find_child("FPTorsoShell",true,false) == null or fps_asset.find_child("FPPelvis",true,false) == null:
-        _fail("standalone FPS chest or pelvis missing")
+    if fps_asset.find_child("FPTorsoShell",true,false) != null or fps_asset.find_child("FPPelvis",true,false) == null:
+        _fail("camera-blocking torso remains or pelvis missing")
         return
     if not (pelvis.get_node("LeftArm") as Node3D).visible:
         _fail("side-hanging arms are hidden at downward pitch")

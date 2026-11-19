@@ -19,15 +19,14 @@ for name,scene in (("full",full),("fps",fp)):
 for part in ("WinterCoat","Head","LeftThigh","RightThigh","SidorCanvasSack","LeftBootToe"):
     assert part in full.geometry,f"full missing {part}"
 assert not any(n.startswith("FP") for n in full.geometry),"full contains FPS cuts"
-for part in ("FPTorsoShell","FPShirtLining","FPWaistInner","FPPelvis","FPCrotch",
+for part in ("FPPelvis","FPCrotch","FPCoatHemL","FPCoatHemR",
              "LeftThigh","RightThigh","LeftCalf","RightCalf","LeftBootToe","RightBootToe"):
     assert part in fp.geometry,f"FPS missing {part}"
-assert not any(n in fp.geometry for n in ("Head","WinterCoat","SidorCanvasSack"))
-torso=fp.geometry["FPTorsoShell"]
-assert len(torso.faces)>=40 and len(torso.vertices)>=24,"FPS torso still a sheet"
-assert torso.bounds[1,1]<=1.20,"FPS chest occupies player's eye"
-for part in ("FPShirtLining","FPWaistInner","FPPelvis","FPCrotch"):
+for banned in ("FPTorsoShell","FPShirtLining","FPWaistInner",
+               "FPSCoatUpperLeft","Head","WinterCoat","SidorCanvasSack"):
+    assert banned not in fp.geometry,f"camera-blocking upper mesh present: {banned}"
+for part in ("FPPelvis","FPCrotch","FPCoatHemL","FPCoatHemR"):
     mesh=fp.geometry[part]
-    assert mesh.is_watertight and mesh.volume>0,f"{part}: not a closed opaque volume"
-assert "FPSCoatUpperLeft" not in fp.geometry
-print("TWO_CHARACTER_ASSETS_OK: separate_glb=true colored_pbr=true volumetric_torso=true closed_waist=true stable_leg_pivots=true")
+    assert mesh.is_watertight and mesh.volume>0,f"{part} must have solid volume"
+assert max(float(mesh.bounds[1,1]) for mesh in fp.geometry.values())<=.91,"FPS GLB reaches into camera"
+print("TWO_CHARACTER_ASSETS_OK: separate_glb=true colored_pbr=true lower_only=true closed_pelvis=true no_high_coat=true")

@@ -1,13 +1,11 @@
 extends Node3D
-# Separate meshes: camera-safe volumetric body and complete F4 character.
-# No per-mesh cutaway filtering, no geometry animated by camera pitch.
+# FPS uses only opaque legs/pelvis, F4 uses the complete character.
+# Camera-attached viewmodel supplies shoulder, sleeve and hand geometry.
 
 const FULL_ASSET_PATH := "res://assets/dembel_full.glb"
 const FPS_ASSET_PATH := "res://assets/dembel_fp.glb"
-# The camera sits at the FRONT of the hero's head; the torso sits behind
-# the eyes. Offset ONLY the first-person visual asset, not the camera,
-# collider, interaction ray or external F4 inspection model.
-const FPS_BODY_BACK_OFFSET := 0.24
+# Keep the pelvis under the eye, rather than stretching it with pitch.
+const FPS_BODY_BACK_OFFSET := 0.02
 
 var actor: CharacterBody3D
 var full_body: Node3D
@@ -99,10 +97,7 @@ func _ready() -> void:
     full_body.name = "FullCharacter"
     add_child(first_person_body)
     add_child(full_body)
-    # At zero offset the viewer looks vertically into the coat's open
-    # collar, turning its 8-sided rim into an enormous central polygon.
-    # With the visual body behind the eyes, jacket stays along the lower
-    # edge and both boots remain farther ahead in downward projection.
+    # Upper torso is absent; only hip and legs remain in this scene.
     first_person_body.position.z = FPS_BODY_BACK_OFFSET
     left_hip = _part(first_person_body,"LeftLegPivot")
     right_hip = _part(first_person_body,"RightLegPivot")
@@ -115,8 +110,11 @@ func _ready() -> void:
     if left_hip == null or right_hip == null or left_knee == null or right_knee == null or full_left_hip == null or full_right_hip == null:
         _fallback("imported GLB is missing pivots")
         return
-    if _part(first_person_body,"FPTorsoShell") == null or _part(first_person_body,"FPPelvis") == null or _part(first_person_body,"FPShirtLining") == null:
-        _fallback("fps body has no opaque waist / torso")
+    if _part(first_person_body,"FPPelvis") == null or _part(first_person_body,"FPCrotch") == null:
+        _fallback("FPS GLB has no pelvis/crotch")
+        return
+    if _part(first_person_body,"FPTorsoShell") != null or _part(first_person_body,"FPShirtLining") != null or _part(first_person_body,"FPWaistInner") != null:
+        _fallback("FPS contains old high coat mesh")
         return
     if _part(first_person_body,"Head") != null or _part(first_person_body,"SidorCanvasSack") != null:
         _fallback("FPS scene contains head or backpack")
@@ -124,8 +122,8 @@ func _ready() -> void:
     if _part(full_body,"WinterCoat") == null or _part(full_body,"Head") == null:
         _fallback("full body lost head or coat")
         return
-    if _opaque_materials(first_person_body) < 22:
-        _fallback("fps has too few body meshes")
+    if _opaque_materials(first_person_body) < 18:
+        _fallback("FPS lower-body geometry incomplete")
         return
     _opaque_materials(full_body)
     first_person_body.visible = true
@@ -134,7 +132,7 @@ func _ready() -> void:
     if legacy != null:
         legacy.visible = false
     model_loaded = true
-    print("MODELED_CHARACTER_READY: separate_glb=true solid_fps_torso=true opaque_pelvis=true full_f4=true legacy_hidden=true camera_forward_of_torso=true")
+    print("MODELED_CHARACTER_READY: separate_glb=true lower_body_only=true opaque_pelvis=true full_f4=true legacy_hidden=true clear_camera=true")
 
 
 func set_inspection_mode(enabled: bool) -> void:
