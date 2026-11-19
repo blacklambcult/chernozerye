@@ -13,8 +13,14 @@ for name,mesh in all_shapes.items():
     if not isinstance(mesh.visual.material,PBRMaterial):
         raise AssertionError(f"{name}: no PBR material")
     c=mesh.visual.material.baseColorFactor
-    if c is None or all(x>=0.98 for x in c[:3]):
-        raise AssertionError(f"{name}: white or missing PBR colour {c}")
+    # Trimesh returns uint8 0..255 when it re-reads GLB PBR factors,
+    # while other versions return 0..1 floats. Normalize both formats.
+    if c is None:
+        raise AssertionError(f"{name}: missing PBR colour")
+    scale=255.0 if max(float(x) for x in c[:3]) > 1.0 else 1.0
+    rgb=[float(x)/scale for x in c[:3]]
+    if all(x >= 0.98 for x in rgb):
+        raise AssertionError(f"{name}: white PBR colour {c}")
 for piece in ["WinterCoat","LeftThigh","RightThigh","LeftBootToe","RightBootToe","FPSCoatUpperLeft","FPSCoatUpperRight"]:
     assert piece in all_shapes,f"Missing mesh {piece}"
 for piece in ["FPSCoatUpperLeft","FPSCoatUpperRight","FPSCoatLowerLeft","FPSCoatLowerRight"]:
