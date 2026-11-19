@@ -154,35 +154,24 @@ func _run() -> void:
     if avatar.visible:
         _fail("old procedural coat still renders over GLB cutaway")
         return
-    var imported_legs := actor.get_node_or_null("ModeledCharacter") as Node3D
-    if imported_legs == null or not bool(imported_legs.get("model_loaded")):
-        _fail("imported feet unavailable while looking down")
+    var character := actor.get_node_or_null("ModeledCharacter") as Node3D
+    if character == null or not bool(character.get("model_loaded")):
+        _fail("F4 full-body resource unavailable")
         return
-    var fps_asset := imported_legs.get("first_person_body") as Node3D
-    if not imported_legs.visible or fps_asset == null or not fps_asset.visible:
-        _fail("standalone FPS body not active")
+    if character.get("first_person_body") != null:
+        _fail("first-person body was instantiated despite being disabled")
         return
-    if fps_asset.find_child("FPTorsoShell",true,false) != null or fps_asset.find_child("FPPelvis",true,false) == null:
-        _fail("camera-blocking torso remains or pelvis missing")
+    var full := character.get("full_body") as Node3D
+    if full == null or full.visible or avatar.visible:
+        _fail("body obstructs camera while looking down")
         return
-    if not (pelvis.get_node("LeftArm") as Node3D).visible:
-        _fail("side-hanging arms are hidden at downward pitch")
+    var fps_arms := actor.get_node_or_null("Camera3D/FPSViewmodel") as Node3D
+    if fps_arms == null:
+        _fail("camera-space hands missing")
         return
-    var boot := left_leg.get_node_or_null("KneeJoint/AnkleJoint/BootToe") as MeshInstance3D
-    if boot == null:
-        _fail("forward-facing boot toe is missing")
-        return
-    # A screen-space proxy: at extreme downward pitch the boots should
-    # project visibly ABOVE the abdomen, as in the reference images.
-    var foot_camera := camera.to_local(boot.global_position)
-    var abdomen_camera := camera.to_local(pelvis.to_global(Vector3(0, 0.32, 0.11)))
-    if foot_camera.z >= -0.22 or abdomen_camera.z >= -0.22:
-        _fail("body reference points are behind the near camera plane")
-        return
-    var boot_vertical := foot_camera.y / -foot_camera.z
-    var abdomen_vertical := abdomen_camera.y / -abdomen_camera.z
-    if boot_vertical < abdomen_vertical + 0.25:
-        _fail("boots do not project above the jacket at downward pitch")
+    fps_arms.call("_process",0.016)
+    if not fps_arms.visible:
+        _fail("hands absent when looking down")
         return
     camera.rotation.x = 0.0
     avatar.call("_process",0.016)
@@ -285,6 +274,6 @@ func _run() -> void:
         _fail("cosmetic character sequence changed game health")
         return
     print("COLLISION_REGRESSION_OK: house=solid fence=solid gap=open capsule=blocked")
-    print("FIRST_PERSON_HUD_REGRESSION_OK: torso=visible_looking_down legs=2 jacket=front_panels compass=NESW health=100 slots=4 boots_project_above_waist=true arms=visible legs_upright=true")
+    print("FIRST_PERSON_HUD_REGRESSION_OK: body=absent full_model=f4_only arms=visible compass=NESW health=100 slots=4")
     print("CHARACTER_SEQUENCE_REGRESSION_OK: selected_slot=required staged=true burn_seconds=120 hands_clear=true auto_discard=true no_buffs=true face_occluded_lookdown=true")
     quit(0)

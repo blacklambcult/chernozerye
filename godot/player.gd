@@ -67,6 +67,10 @@ func _ready() -> void:
     _avatar.name = "FirstPersonFullBody"
     _avatar.set_script(preload("res://first_person_body.gd"))
     add_child(_avatar)
+    # No first-person body rendering. Keep this hidden compatibility node
+    # for scripted cinematics only, never as a fallback for the model.
+    _avatar.visible = false
+    _avatar.set_process(false)
     _modeled_character = Node3D.new()
     _modeled_character.name = "ModeledCharacter"
     _modeled_character.set_script(preload("res://modeled_character.gd"))
