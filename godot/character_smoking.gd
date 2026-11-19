@@ -174,6 +174,7 @@ func _ready() -> void:
     quad.size = Vector2(0.020,0.020)
     var sm := _material(Color(0.68,0.70,0.71,0.16),true)
     sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+    sm.vertex_color_use_as_albedo = true
     sm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
     sm.cull_mode = BaseMaterial3D.CULL_DISABLED
     quad.material = sm
