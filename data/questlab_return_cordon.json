@@ -1,0 +1,43 @@
+{
+  "format": "chernozerye.questlab",
+  "version": 1,
+  "coordinates": "WGS84",
+  "selectedId": "quest-3b18f578c8614551b461563fc328e8c4",
+  "quests": [
+    {
+      "id": "quest-3b18f578c8614551b461563fc328e8c4",
+      "type": "main",
+      "title": "ВОЗВРАЩЕНИЕ НА ЧЕРНЫЙ КОРДОН",
+      "description": "",
+      "spawn": {
+        "lon": 55.8402765,
+        "lat": 54.6724289,
+        "bearing": 0
+      },
+      "steps": [
+        {
+          "id": "step-ac9265ee1063440fbfaa4ce2ed3daf5d",
+          "type": "reach",
+          "title": "Добраться до Черного Кордона",
+          "text": "Ты дома. Почти.",
+          "target": {
+            "lon": 55.8450312,
+            "lat": 54.6749814
+          },
+          "objectId": ""
+        },
+        {
+          "id": "step-8d81181126ea4380a5debb88bc355b48",
+          "type": "reach",
+          "title": "Найти дом старосты",
+          "text": "Что же происходит?",
+          "target": {
+            "lon": 55.8450454,
+            "lat": 54.6760084
+          },
+          "objectId": ""
+        }
+      ]
+    }
+  ]
+}

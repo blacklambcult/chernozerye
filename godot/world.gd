@@ -74,12 +74,21 @@ func _ready() -> void:
     _activate_default_village()
     _create_november_snow()
     _create_story_prologue()
+    _create_questlab_runtime()
 
 func _create_story_prologue() -> void:
     var story := Node.new()
     story.name = "StoryPrologue"
     story.set_script(preload("res://story_prologue.gd"))
     add_child(story)
+
+
+func _create_questlab_runtime() -> void:
+    # F6 opens a Quest Lab playtest. Default StoryPrologue remains intact.
+    var quest_runtime := Node.new()
+    quest_runtime.name = "QuestLabRuntime"
+    quest_runtime.set_script(preload("res://questlab_runtime.gd"))
+    add_child(quest_runtime)
 
 
 func _create_november_snow() -> void:

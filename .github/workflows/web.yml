@@ -44,6 +44,20 @@ jobs:
           print('MANUAL_SOURCE_VERIFIED:', len(d['features']))
           PY
 
+      - name: Convert Quest Lab project to Godot mission coordinates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p test_convert_questlab.py
+          python scripts/convert_questlab.py data/questlab_return_cordon.json --output godot/questlab_runtime.json
+          python - <<'PY'
+          import json
+          doc = json.load(open('godot/questlab_runtime.json', encoding='utf-8'))
+          assert doc['schema'] == 'chernozerye.questlab.runtime-1'
+          assert len(doc['quests']) == 1 and len(doc['quests'][0]['steps']) == 2
+          print('QUESTLAB_DATA_READY: quests=1 steps=2')
+          PY
+
       - name: Build separate full and FPS low-poly GLBs
         shell: bash
         run: |
@@ -78,7 +92,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for script in world.gd player.gd geography_v07.gd live_map_v08.gd overture_3d_a.gd manual_geo.gd manual_art.gd izba_variants.gd logo_data.gd story_prologue.gd collision_regression.gd first_person_body.gd modeled_character.gd modeled_character_regression.gd fps_viewmodel.gd viewmodel_regression.gd gameplay_hud.gd character_smoking.gd revolver.gd revolver_cycle_regression.gd pause_overlay.gd pause_regression.gd body_gait_regression.gd body_view_regression.gd; do
+          for script in world.gd player.gd geography_v07.gd live_map_v08.gd overture_3d_a.gd manual_geo.gd manual_art.gd izba_variants.gd logo_data.gd story_prologue.gd collision_regression.gd first_person_body.gd modeled_character.gd modeled_character_regression.gd fps_viewmodel.gd viewmodel_regression.gd gameplay_hud.gd character_smoking.gd revolver.gd revolver_cycle_regression.gd questlab_runtime.gd questlab_regression.gd pause_overlay.gd pause_regression.gd body_gait_regression.gd body_view_regression.gd; do
             echo "Checking ${script}"
             godot --headless --path godot --check-only --script "res://${script}"
           done
@@ -96,6 +110,13 @@ jobs:
           set -euo pipefail
           godot --headless --path godot --script res://prologue_regression.gd 2>&1 | tee /tmp/prologue-regression.log
           grep -q "PROLOGUE_REGRESSION_OK: surveyed_home=true room=true note=true mask=true exit=true cues=2 bearing=readable" /tmp/prologue-regression.log
+
+      - name: Regression-test imported Quest Lab mission and F6 playtest
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path godot --script res://questlab_regression.gd 2>&1 | tee /tmp/questlab-regression.log
+          grep -q "QUESTLAB_REGRESSION_OK: imported=true spawn=true steps=2 sequential=true restored=true" /tmp/questlab-regression.log
 
       - name: Regression-test building and fence physics
         shell: bash
@@ -159,6 +180,7 @@ jobs:
           # a click on any preview/legacy map button.
           grep -q "FEARLESS_KNIGHTS_STARTUP_READY:" /tmp/world-smoke.log
           grep -q "STORY_PROLOGUE_READY:" /tmp/world-smoke.log
+          grep -q "QUESTLAB_RUNTIME_READY: quests=1 steps=2 key=F6" /tmp/world-smoke.log
           grep -q "FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2" /tmp/world-smoke.log
           grep -q "MODELED_CHARACTER_READY: fps_body=disabled full_body=f4_only fps_arms=independent" /tmp/world-smoke.log
           grep -q "CHARACTER_SEQUENCE_READY: cosmetic=true selected_slot_required=true duration=120 states=8" /tmp/world-smoke.log

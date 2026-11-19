@@ -93,13 +93,20 @@ func _draw_compass(view_width: float) -> void:
     _draw_quest_bearing(center, top, heading)
 
 func _draw_quest_bearing(center: float, top: float, heading: float) -> void:
-    var story := get_parent().get_parent().get_node_or_null("StoryPrologue")
-    if story == null or player == null or bool(story.get("chapter_completed")):
+    if player == null:
         return
-    if bool(story.get("inside_home")):
-        return
-    var gate: Vector3 = story.call("_gate_location")
-    var direction := gate - player.global_position
+    var target := Vector3.ZERO
+    var questlab := get_parent().get_parent().get_node_or_null("QuestLabRuntime")
+    if questlab != null and bool(questlab.get("preview_active")):
+        if not bool(questlab.call("has_target")):
+            return
+        target = questlab.call("get_target_world")
+    else:
+        var story := get_parent().get_parent().get_node_or_null("StoryPrologue")
+        if story == null or bool(story.get("chapter_completed")) or bool(story.get("inside_home")):
+            return
+        target = story.call("_gate_location")
+    var direction := target - player.global_position
     if Vector2(direction.x, direction.z).length() < 1.5:
         return
     var bearing := fposmod(rad_to_deg(atan2(direction.x, -direction.z)), 360.0)
