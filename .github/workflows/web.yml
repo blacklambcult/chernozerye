@@ -301,6 +301,7 @@ jobs:
           test -s "build/web/${RELEASE_DIR}/index.html"
           test -f "build/web/${RELEASE_DIR}/index.wasm"
           test -f "build/web/${RELEASE_DIR}/index.pck"
+          test -f "build/web/${RELEASE_DIR}/index.html"
           cat > build/web/index.html <<HTML
           <!doctype html>
           <html lang="ru">
@@ -318,6 +319,36 @@ jobs:
           </html>
           HTML
           echo "WEB_RELEASE_READY: ${RELEASE_DIR}"
+          # Pages discards previous commit-specific directories during each
+          # deployment. GitHub Pages serves 404.html for stale bookmarks, so
+          # direct old links back to the stable root instead of a dead end.
+          cat > build/web/404.html <<'HTML'
+          <!doctype html>
+          <html lang="ru">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Чернозёрье — актуальная версия</title>
+          </head>
+          <body style="margin:0;background:#111827;color:#e5e7eb;font:16px system-ui,sans-serif">
+            <main style="max-width:640px;margin:12vh auto;padding:24px">
+              <h1>Старая ссылка на сборку</h1>
+              <p>Игра обновилась. Актуальная версия доступна по постоянной ссылке.</p>
+              <p><a style="color:#ffc27b" href="/chernozerye/">Перейти в Чернозёрье</a></p>
+            </main>
+            <script>
+              // Redirect *only* retired HTML release links. Missing engine
+              // resources keep a real 404 so broken builds are not hidden.
+              if (/^\\/chernozerye\\/(?:pre-alpha-[^\\/]+|v[0-9]+)\\/?$/.test(location.pathname)) {
+                location.replace("/chernozerye/");
+              }
+            </script>
+          </body>
+          </html>
+          HTML
+          test -s build/web/index.html
+          test -s build/web/404.html
+          test -s "build/web/${RELEASE_DIR}/index.html"
           touch build/web/.nojekyll
 
       - name: Prepare the satellite geography viewer
@@ -391,3 +422,27 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Verify public Pages entry and active game build
+        shell: bash
+        env:
+          SITE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          # Deployment success only confirms artifact upload. Verify the live
+          # HTTP endpoint and the exact hash-specific Godot directory as well.
+          RELEASE_DIR="pre-alpha-0.5.4-${GITHUB_SHA:0:8}"
+          SITE_URL="${SITE_URL%/}/"
+          for attempt in $(seq 1 12); do
+            if curl -fsSL --max-time 20 --retry 2 --retry-delay 2 "${SITE_URL}?build=${GITHUB_SHA:0:8}" -o /tmp/pages-root.html \
+              && grep -q 'window.location.replace' /tmp/pages-root.html \
+              && curl -fsSL --max-time 20 "${SITE_URL}${RELEASE_DIR}/index.html" -o /tmp/pages-game.html \
+              && test -s /tmp/pages-game.html; then
+              echo "LIVE_PAGES_OK: ${SITE_URL} and ${SITE_URL}${RELEASE_DIR}/"
+              exit 0
+            fi
+            echo "Public Pages check ${attempt}/12 not ready"
+            sleep 5
+          done
+          echo "::error::GitHub Pages deployed but its public index or game build returned 404"
+          exit 1
