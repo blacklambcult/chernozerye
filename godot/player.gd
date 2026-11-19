@@ -18,7 +18,7 @@ var mouse_sensitivity := MOUSE_SENS
 # Narrative character animation is isolated from player movement and stats.
 var _avatar: Node3D
 var _modeled_character: Node3D
-var _viewmodel: Node3D
+var recoil_pitch := 0.0
 var _inspection_camera: Camera3D
 var _inspection_hint: Label
 var _inspection_light: SpotLight3D
@@ -76,10 +76,6 @@ func _ready() -> void:
     _modeled_character.name = "ModeledCharacter"
     _modeled_character.set_script(preload("res://modeled_character.gd"))
     add_child(_modeled_character)
-    _viewmodel = Node3D.new()
-    _viewmodel.name = "FPSViewmodel"
-    _viewmodel.set_script(preload("res://fps_viewmodel.gd"))
-    camera.add_child(_viewmodel)
     camera.add_child(revolver)
     _character_sequence = Node3D.new()
     _character_sequence.name = "CharacterSmoking"
@@ -127,8 +123,6 @@ func _toggle_model_inspection() -> void:
     _inspection_light.visible = _inspect_enabled
     _inspection_hint.visible = _inspect_enabled
     revolver.equip(not _inspect_enabled and _armed_slot())
-    _viewmodel.visible = not _inspect_enabled and not revolver.visible
-    _viewmodel.set_process(not _inspect_enabled)
     _character_sequence.visible = not _inspect_enabled
     set_controls_locked(_inspect_enabled)
     if _inspect_enabled:
@@ -177,8 +171,6 @@ func _input(event: InputEvent) -> void:
         rotate_y(-event.relative.x * mouse_sensitivity)
         camera.rotate_x(-event.relative.y * mouse_sensitivity)
         camera.rotation.x = clampf(camera.rotation.x, -1.45, 1.45)
-        if _viewmodel != null:
-            _viewmodel.call("push_look_motion", event.relative)
         last_event = "mouse movement"
     elif event is InputEventKey:
         var key := event as InputEventKey
@@ -195,7 +187,6 @@ func _input(event: InputEvent) -> void:
                     return
                 survival_hud.call("choose_slot", int(key.physical_keycode) - KEY_1)
                 revolver.equip(_armed_slot())
-                _viewmodel.visible = not revolver.visible
         if key.pressed and not key.echo and _matches(key, KEY_R, "к"):
             revolver.reload()
         if key.pressed and not key.echo and (key.keycode == KEY_V or key.physical_keycode == KEY_V):
@@ -203,11 +194,19 @@ func _input(event: InputEvent) -> void:
         if key.pressed and not key.echo and (key.keycode == KEY_F3 or key.physical_keycode == KEY_F3):
             status_label.visible = not status_label.visible
 
+func kick_view() -> void:
+    var kick := minf(deg_to_rad(2.3), 1.45 - camera.rotation.x)
+    camera.rotation.x += kick
+    recoil_pitch += kick
+
 func _movement_speed(sprinting: bool) -> float:
     return SPRINT_SPEED if sprinting else SPEED
 
 
 func _physics_process(delta: float) -> void:
+    var recovery := minf(recoil_pitch, delta * deg_to_rad(7.0))
+    camera.rotation.x = maxf(-1.45, camera.rotation.x - recovery)
+    recoil_pitch -= recovery
     if not is_on_floor():
         velocity.y -= 17.0 * delta
     if (Input.is_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_SPACE)) and is_on_floor():

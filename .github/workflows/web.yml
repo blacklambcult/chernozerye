@@ -103,7 +103,7 @@ jobs:
           set -euo pipefail
           godot --headless --path godot --script res://collision_regression.gd 2>&1 | tee /tmp/collision-regression.log
           grep -q "COLLISION_REGRESSION_OK: house=solid fence=solid gap=open capsule=blocked" /tmp/collision-regression.log
-          grep -q "FIRST_PERSON_HUD_REGRESSION_OK: body=absent full_model=f4_only arms=visible compass=NESW health=100 slots=4" /tmp/collision-regression.log
+          grep -q "FIRST_PERSON_HUD_REGRESSION_OK: body=absent full_model=f4_only arms=item_only compass=NESW health=100 slots=4" /tmp/collision-regression.log
           grep -q "CHARACTER_SEQUENCE_REGRESSION_OK: selected_slot=required staged=true burn_seconds=120 hands_clear=true auto_discard=true no_buffs=true face_occluded_lookdown=true" /tmp/collision-regression.log
 
       - name: Regression-test first-person leg articulation
@@ -123,14 +123,14 @@ jobs:
         run: |
           set -euo pipefail
           godot --headless --path godot --script res://modeled_character_regression.gd 2>&1 | tee /tmp/model-regression.log
-          grep -q "MODELED_CHARACTER_REGRESSION_OK: fps_body_absent=true legacy_hidden=true arms_visible_downlook=true full_model_f4_only=true f4_roundtrip=true" /tmp/model-regression.log
+          grep -q "MODELED_CHARACTER_REGRESSION_OK: fps_body_absent=true legacy_hidden=true unarmed_clear=true full_model_f4_only=true f4_roundtrip=true" /tmp/model-regression.log
 
       - name: Regression-test first-person viewmodel arms
         shell: bash
         run: |
           set -euo pipefail
           godot --headless --path godot --script res://viewmodel_regression.gd 2>&1 | tee /tmp/viewmodel-regression.log
-          grep -q "VIEWMODEL_REGRESSION_OK: hands=2 coat_sleeves=true lowpoly=true camera_space=true persistent_downlook=true shoulder_blocks_absent=true cinematic_safe=true mouse_sway=true" /tmp/viewmodel-regression.log
+          grep -q "VIEWMODEL_REGRESSION_OK: item_only=true spread=true recoil=true" /tmp/viewmodel-regression.log
 
       - name: Regression-test pause and mouse sensitivity
         shell: bash
@@ -153,7 +153,6 @@ jobs:
           grep -q "FEARLESS_KNIGHTS_STARTUP_READY:" /tmp/world-smoke.log
           grep -q "STORY_PROLOGUE_READY:" /tmp/world-smoke.log
           grep -q "FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2" /tmp/world-smoke.log
-          grep -q "FPS_VIEWMODEL_READY: camera_local=true arms=2 unarmed=true" /tmp/world-smoke.log
           grep -q "MODELED_CHARACTER_READY: fps_body=disabled full_body=f4_only fps_arms=independent" /tmp/world-smoke.log
           grep -q "CHARACTER_SEQUENCE_READY: cosmetic=true selected_slot_required=true duration=120 states=8" /tmp/world-smoke.log
           grep -q "SURVIVAL_HUD_READY: compass=center hp=100 hotbar=4 cigarette_pack=slot1" /tmp/world-smoke.log

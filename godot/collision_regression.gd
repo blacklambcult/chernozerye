@@ -166,12 +166,8 @@ func _run() -> void:
         _fail("body obstructs camera while looking down")
         return
     var fps_arms := actor.get_node_or_null("Camera3D/FPSViewmodel") as Node3D
-    if fps_arms == null:
-        _fail("camera-space hands missing")
-        return
-    fps_arms.call("_process",0.016)
-    if not fps_arms.visible:
-        _fail("hands absent when looking down")
+    if fps_arms != null:
+        _fail("unexpected idle hands")
         return
     camera.rotation.x = 0.0
     avatar.call("_process",0.016)
@@ -260,12 +256,8 @@ func _run() -> void:
         _fail("world-space right arm overlaps with the camera viewmodel at level gaze")
         return
     var fps_rig := actor.get_node_or_null("Camera3D/FPSViewmodel") as Node3D
-    if fps_rig == null:
-        _fail("camera-space arms missing after cinematic")
-        return
-    fps_rig.call("_process",0.016)
-    if not fps_rig.visible:
-        _fail("viewmodel arms failed to restore after cinematic")
+    if fps_rig != null:
+        _fail("idle hands appeared after cinematic")
         return
     if get_nodes_in_group("DiscardedScenicProps").is_empty():
         _fail("automatic final ground prop missing")
@@ -274,6 +266,6 @@ func _run() -> void:
         _fail("cosmetic character sequence changed game health")
         return
     print("COLLISION_REGRESSION_OK: house=solid fence=solid gap=open capsule=blocked")
-    print("FIRST_PERSON_HUD_REGRESSION_OK: body=absent full_model=f4_only arms=visible compass=NESW health=100 slots=4")
+    print("FIRST_PERSON_HUD_REGRESSION_OK: body=absent full_model=f4_only arms=item_only compass=NESW health=100 slots=4")
     print("CHARACTER_SEQUENCE_REGRESSION_OK: selected_slot=required staged=true burn_seconds=120 hands_clear=true auto_discard=true no_buffs=true face_occluded_lookdown=true")
     quit(0)

@@ -19,7 +19,7 @@ func _run() -> void:
     var legacy := player.get_node_or_null("FirstPersonFullBody") as Node3D
     var arms := player.get_node_or_null("Camera3D/FPSViewmodel") as Node3D
     var eye := player.get_node_or_null("Camera3D") as Camera3D
-    if rig == null or legacy == null or arms == null or eye == null:
+    if rig == null or legacy == null or arms != null or eye == null:
         _fail("player visuals were not instantiated")
         return
     if legacy.visible or legacy.is_processing():
@@ -40,11 +40,7 @@ func _run() -> void:
         return
     for pitch in [0.0, -0.5, -1.0, -1.45]:
         eye.rotation.x = pitch
-        arms.call("_process", 0.016)
         rig.call("_process", 0.016)
-        if not arms.visible:
-            _fail("FPS hands disappear when looking down")
-            return
         if full.visible or legacy.visible or rig.get("first_person_body") != null:
             _fail("body mesh entered first-person view at pitch %s" % pitch)
             return
@@ -52,13 +48,12 @@ func _run() -> void:
     if not full.visible or not (player.get_node("CharacterInspectionCamera") as Camera3D).current:
         _fail("F4 did not activate the full model/camera")
         return
-    if arms.visible or legacy.visible:
+    if legacy.visible:
         _fail("FPS arms or old body overlap the F4 inspector")
         return
     player.call("_toggle_model_inspection")
-    arms.call("_process", 0.016)
-    if full.visible or legacy.visible or not arms.visible or rig.get("first_person_body") != null:
+    if full.visible or legacy.visible or rig.get("first_person_body") != null:
         _fail("F4 return did not restore hands-only gameplay")
         return
-    print("MODELED_CHARACTER_REGRESSION_OK: fps_body_absent=true legacy_hidden=true arms_visible_downlook=true full_model_f4_only=true f4_roundtrip=true")
+    print("MODELED_CHARACTER_REGRESSION_OK: fps_body_absent=true legacy_hidden=true unarmed_clear=true full_model_f4_only=true f4_roundtrip=true")
     quit(0)

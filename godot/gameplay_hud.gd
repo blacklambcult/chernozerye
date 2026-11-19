@@ -156,9 +156,26 @@ func _draw_slots(view_width: float, view_height: float) -> void:
         var gun: Node3D = player.get("revolver")
         var status := "ПЕРЕЗАРЯДКА" if float(gun.get("reload_left")) > 0 else "%d / 6" % int(gun.get("rounds"))
         _write(x0, y + 72, status + "    ЛКМ — ОГОНЬ    R — ЗАРЯДИТЬ", 11, GOLD)
-        draw_circle(size * 0.5, 1.6, INK)
     else:
         _write(x0, y + 72, "1 ПАЧКА · V ДЕЙСТВИЕ     2 РЕВОЛЬВЕР", 11, MUTED)
+
+func _draw_reticle() -> void:
+    if player == null or bool(player.get("controls_locked")):
+        return
+    var overlay := player.get_parent().get_node_or_null("MapOverlay") as CanvasLayer
+    if overlay != null and overlay.visible:
+        return
+    var center := size * 0.5
+    draw_circle(center, 2.4, Color("#282522"))
+    draw_circle(center, 1.35, INK)
+    var gun: Node3D = player.get("revolver")
+    if not gun.visible:
+        return
+    var eye := gun.get_parent() as Camera3D
+    var gap := maxf(3.0, size.y * 0.5 * tan(float(gun.call("spread_angle"))) / tan(deg_to_rad(eye.fov * 0.5)))
+    for axis: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
+        draw_line(center + axis * gap, center + axis * (gap + 6), Color("#272522"), 3.0)
+        draw_line(center + axis * gap, center + axis * (gap + 6), INK, 1.4)
 
 func _draw() -> void:
     if size.x < 320.0 or size.y < 240.0:
@@ -167,3 +184,4 @@ func _draw() -> void:
     _draw_compass(size.x)
     _draw_health(size.y)
     _draw_slots(size.x, size.y)
+    _draw_reticle()

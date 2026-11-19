@@ -5,6 +5,7 @@ const CAPACITY := 6
 var rounds := CAPACITY
 var cooldown := 0.0
 var reload_left := 0.0
+var bloom := 0.0
 var pending := false
 var eye: Camera3D
 var player: CharacterBody3D
@@ -85,6 +86,7 @@ func reload() -> void:
         reload_left = 0.95
 
 func _physics_process(delta: float) -> void:
+    bloom = move_toward(bloom, 0.0, delta * 1.9)
     cooldown = maxf(0, cooldown - delta)
     if not visible:
         return
@@ -101,6 +103,15 @@ func _physics_process(delta: float) -> void:
     rotation = Vector3(kick * 0.28,0.19,-0.46 * sin(PI * reload_left / 0.95))
     flash.visible = cooldown > 0.19
 
+func spread_angle() -> float:
+    var speed := Vector2(player.velocity.x, player.velocity.z).length()
+    return deg_to_rad(0.32 + minf(speed * 0.31, 1.8) + bloom)
+
+func _shot_direction() -> Vector3:
+    var angle := randf() * TAU
+    var radius := sqrt(randf()) * tan(spread_angle())
+    return (eye.global_basis * Vector3(cos(angle)*radius, sin(angle)*radius, -1)).normalized()
+
 func _shoot() -> void:
     rounds -= 1
     cooldown = 0.24
@@ -108,7 +119,10 @@ func _shoot() -> void:
     flash.light_energy = 3.6
     report.play()
     var start := eye.global_position
-    var ray := PhysicsRayQueryParameters3D.create(start, start - eye.global_basis.z * 90, 0xffffffff, [player.get_rid()])
+    var direction := _shot_direction()
+    bloom = minf(2.5, bloom + 1.05)
+    player.call("kick_view")
+    var ray := PhysicsRayQueryParameters3D.create(start, start + direction * 90, 0xffffffff, [player.get_rid()])
     var hit := eye.get_world_3d().direct_space_state.intersect_ray(ray)
     if hit.is_empty():
         return
