@@ -15,6 +15,11 @@
     }
   }
   </script>
+  <script>if(new URLSearchParams(location.search).has("studio"))document.documentElement.classList.add("studio-embedded");</script>
+  <style>
+    html.studio-embedded .topbar, html.studio-embedded .footer { display:none!important; }
+    html.studio-embedded .app { height:100vh!important; min-height:0!important; }
+  </style>
 </head>
 <body>
 <div class="app">
@@ -30,6 +35,7 @@
       <a href="../map/">01 / GEO LAB</a>
       <a href="../quest/">02 / QUEST LAB</a>
       <a href="./" aria-current="page">03 / MODEL LAB</a>
+      <a href="../studio/">◈ STUDIO</a>
       <a href="../" class="game-link">↗ ИГРА</a>
     </nav>
   </header>

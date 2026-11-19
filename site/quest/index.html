@@ -8,6 +8,11 @@
   <title>ЧЕРНОЗЁРЬЕ / QUEST LAB 0.1</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="./quest.css?v=1">
+  <script>if(new URLSearchParams(location.search).has("studio"))document.documentElement.classList.add("studio-embedded");</script>
+  <style>
+    html.studio-embedded .topbar, html.studio-embedded .statusbar { display:none!important; }
+    html.studio-embedded .studio { height:100vh!important; min-height:0!important; }
+  </style>
 </head>
 <body>
 <div class="studio">
@@ -23,6 +28,7 @@
       <a href="../map/">01 / GEO LAB</a>
       <a href="./" class="current" aria-current="page">02 / QUEST LAB</a>
       <a href="../model/">03 / MODEL LAB</a>
+      <a href="../studio/">◈ STUDIO</a>
       <a href="../" class="play-link">↗ ИГРА</a>
     </nav>
   </header>

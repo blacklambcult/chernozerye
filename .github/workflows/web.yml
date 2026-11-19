@@ -423,6 +423,19 @@ jobs:
           test -s build/web/model/index.html
           test -s build/web/model/model.mjs
           test -s build/web/model/model-core.js
+          # Studio combines the three existing editors without migrating local drafts.
+          node --check site/studio/studio-state.js
+          node --check site/studio/studio.js
+          node --test tests/studio-state.test.cjs
+          grep -q 'studio-state.js?v=1' site/studio/index.html
+          grep -q 'href="../studio/"' site/map/index.html
+          grep -q 'href="../studio/"' site/quest/index.html
+          grep -q 'href="../studio/"' site/model/index.html
+          mkdir -p build/web/studio
+          cp -a site/studio/. build/web/studio/
+          test -s build/web/studio/index.html
+          test -s build/web/studio/studio-state.js
+          test -s build/web/studio/studio.js
           grep -q 'editor.js?v=20' site/map/index.html
           grep -q 'editor-core.js?v=20' site/map/index.html
           mkdir -p build/web/map
@@ -487,8 +500,12 @@ jobs:
               && curl -fsSL --max-time 20 "${SITE_URL}quest/index.html" -o /tmp/pages-quest.html \
               && grep -q 'QUEST LAB' /tmp/pages-quest.html \
               && curl -fsSL --max-time 20 "${SITE_URL}model/index.html" -o /tmp/pages-model.html \
-              && grep -q 'MODEL LAB' /tmp/pages-model.html; then
-              echo "LIVE_PAGES_OK: ${SITE_URL}, ${SITE_URL}${RELEASE_DIR}/, ${SITE_URL}quest/, ${SITE_URL}model/"
+              && grep -q 'MODEL LAB' /tmp/pages-model.html \
+              && curl -fsSL --max-time 20 "${SITE_URL}studio/index.html" -o /tmp/pages-studio.html \
+              && grep -q 'CHERNOZERYE' /tmp/pages-studio.html \
+              && curl -fsSL --max-time 20 "${SITE_URL}studio/studio.js" -o /tmp/pages-studio.js \
+              && grep -q 'CHERNOZERYE_STUDIO_READY' /tmp/pages-studio.js; then
+              echo "LIVE_PAGES_OK: ${SITE_URL}, ${SITE_URL}${RELEASE_DIR}/, geo/, quest/, model/, studio/"
               exit 0
             fi
             echo "Public Pages check ${attempt}/12 not ready"

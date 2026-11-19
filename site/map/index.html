@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="./style.css?v=19">
   <link rel="stylesheet" href="./editor.css?v=20">
+  <script>if(new URLSearchParams(location.search).has("studio"))document.documentElement.classList.add("studio-embedded");</script>
+  <style>html.studio-embedded,html.studio-embedded body{height:100%!important;overflow:hidden!important}html.studio-embedded .workspace{height:100vh!important;min-height:0!important}</style>
 </head>
 <body>
   <main class="workspace">
@@ -160,6 +162,7 @@
           </div>
         </section>
         <footer class="sidebar-footer">
+          <a href="../studio/">◈ CHERNOZERYE STUDIO — единый центр <span aria-hidden="true">↗</span></a>
           <a href="../quest/">Открыть QUEST LAB — конструктор квестов <span aria-hidden="true">↗</span></a>
           <a href="../model/">Открыть MODEL LAB — 3D-конструктор <span aria-hidden="true">↗</span></a>
           <a href="../" target="_blank" rel="noopener">Открыть актуальную 3D-игру <span aria-hidden="true">↗</span></a>

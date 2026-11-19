@@ -1,5 +1,13 @@
 # Fearless Knights of the Cordon
 
+### CHERNOZERYE STUDIO 0.1 — единая оболочка трёх инструментов
+
+- Центр управления: https://blacklambcult.github.io/chernozerye/studio/
+- В одном окне доступны Geo Lab, Quest Lab и Model Lab. Редакторы подгружаются по мере обращения; после переключения открытые iframe сохраняются, без сброса текущей сцены и состояния камеры.
+- Существующие локальные данные **не переносятся и не удаляются**: Studio читает прежние ключи `chernozerye_manual_geojson_v2`, `chernozerye.questlab.v1`, `chernozerye.modellab.v1`, показывает счётчики и оставляет оригинальные редакторы доступными по прежним ссылкам.
+- Deep links: `/studio/#geo`, `/studio/#quest`, `/studio/#model`, `/studio/#home`; переключение: Alt+1 / Alt+2 / Alt+3 (Alt+0 — старт).
+- Первый этап — оболочка и переключение. **Общей библиотеки объектов, автоматического обмена моделями/квестами и синхронизации файлов между редакторами пока нет** — это следующий этап.
+
 ### Model Lab 0.1 — самостоятельный браузерный конструктор 3D-пропсов
 
 - Онлайн-редактор: https://blacklambcult.github.io/chernozerye/model/
