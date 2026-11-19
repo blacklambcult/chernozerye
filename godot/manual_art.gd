@@ -1935,6 +1935,11 @@ func _yard_spot_ok(p: Vector2, polygon: PackedVector2Array,
 
 
 func _flower_patch(p: Vector2, salt: int) -> void:
+    # Across 209 abandoned plots, only a few old perennials survive in
+    # November. An absolute cap prevents the expanded Geo Lab map from
+    # accidentally looking like a blooming summer village.
+    if _flower_patches >= 28:
+        return
     # Pink lupins, faded white flowers and dark leaves, assembled as cheap boxes.
     for j in range(3):
         var angle := float(salt * 7 + j * 13) * 1.7
