@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1114">
+  <meta name="description" content="Чернозёрье Studio — единое рабочее пространство Geo Lab, Quest Lab и Model Lab.">
+  <title>Чернозёрье / STUDIO 0.1</title>
+  <link rel="stylesheet" href="./studio.css?v=1">
+</head>
+<body>
+<div class="studio">
+  <header class="top">
+    <div class="identity">
+      <div class="sigil" aria-hidden="true">Ч</div>
+      <div class="brand">
+        <span class="eyebrow">FEARLESS KNIGHTS OF THE CORDON / DEV TOOLS</span>
+        <h1>CHERNOZERYE <span>STUDIO</span></h1>
+      </div>
+      <span class="version">BUILD 0.1</span>
+    </div>
+    <div class="topright">
+      <span class="connection"><span class="light"></span> LOCAL WORKSPACE</span>
+      <a class="game-link" href="../" target="_blank" rel="noopener">↗ ЗАПУСТИТЬ ИГРУ</a>
+    </div>
+  </header>
+
+  <div class="main">
+    <nav class="rail" aria-label="Разделы студии">
+      <div class="rail-label">WORKSPACE / 01</div>
+      <button class="navitem" data-target="home" type="button">
+        <span class="navindex">00</span><span class="nav-icon">▤</span>
+        <span class="navcopy"><strong>Центр управления</strong><small>Обзор инструментов</small></span>
+      </button>
+      <div class="rail-separator">ПРОГРАММЫ</div>
+      <button class="navitem" data-target="geo" type="button">
+        <span class="navindex">01</span><span class="nav-icon">⌗</span>
+        <span class="navcopy"><strong>GEO LAB</strong><small>География и мир</small></span>
+        <span class="nav-arrow">↗</span>
+      </button>
+      <button class="navitem" data-target="quest" type="button">
+        <span class="navindex">02</span><span class="nav-icon">◇</span>
+        <span class="navcopy"><strong>QUEST LAB</strong><small>Квесты и события</small></span>
+        <span class="nav-arrow">↗</span>
+      </button>
+      <button class="navitem" data-target="model" type="button">
+        <span class="navindex">03</span><span class="nav-icon">⬡</span>
+        <span class="navcopy"><strong>MODEL LAB</strong><small>3D-модели и пропсы</small></span>
+        <span class="nav-arrow">↗</span>
+      </button>
+      <div class="rail-spacer"></div>
+      <div class="library">
+        <div class="rail-label">ЛОКАЛЬНАЯ БИБЛИОТЕКА</div>
+        <div class="library-line"><span>Геообъекты</span><b id="geo-count">—</b></div>
+        <div class="library-line"><span>Квесты</span><b id="quest-count">—</b></div>
+        <div class="library-line"><span>Детали модели</span><b id="model-count">—</b></div>
+        <p>Счётчики отражают данные браузера. Перед сменой устройства скачивай проекты в файлы.</p>
+      </div>
+      <div class="rail-footer">◈ DATA IS LOCAL <span>/</span> CHERNOZERYE</div>
+    </nav>
+
+    <main class="content" aria-label="Рабочая область студии">
+      <div class="context">
+        <div class="context-left">
+          <span class="section-kicker" id="section-kicker">SYSTEM / OVERVIEW</span>
+          <h2 id="section-title">ЦЕНТР УПРАВЛЕНИЯ</h2>
+        </div>
+        <div class="context-actions">
+          <span class="working-status"><span class="working-led"></span><span id="frame-status">ВСЁ ГОТОВО</span></span>
+          <button class="context-button" type="button" id="reload-editor" hidden title="Перезагрузить открытый редактор">↻ ОБНОВИТЬ</button>
+          <a class="context-button" id="external-editor" href="../map/" target="_blank" rel="noopener" hidden>↗ ОТКРЫТЬ ОТДЕЛЬНО</a>
+        </div>
+      </div>
+
+      <section class="overview" id="overview">
+        <div class="intro">
+          <div class="intro-index">3 МОДУЛЯ · 1 РАБОЧЕЕ ПРОСТРАНСТВО</div>
+          <h3>ТРИ ЛАБОРАТОРИИ.<br><em>ОДИН МИР.</em></h3>
+          <p>Создавай географию, сценарии и трёхмерные объекты в одной студии. Переключайся между редакторами — они сохраняют открытые сцены и черновики в браузере.</p>
+          <span class="intro-footnote">PRE-ALPHA / EDITOR SUITE 0.1</span>
+        </div>
+        <div class="module-grid">
+          <button type="button" data-open="geo" class="module-card">
+            <span class="card-top"><span class="card-number">/ 01</span><span class="card-icon">⌗</span></span>
+            <span class="card-content"><strong>GEO LAB</strong><small>Карта / Планировка / Объекты</small><span class="card-desc">Дороги, здания, участки и пространственная разметка территории Чернозёрья.</span></span>
+            <span class="card-bottom">ОТКРЫТЬ РЕДАКТОР <span>↗</span></span>
+          </button>
+          <button type="button" data-open="quest" class="module-card">
+            <span class="card-top"><span class="card-number">/ 02</span><span class="card-icon">◇</span></span>
+            <span class="card-content"><strong>QUEST LAB</strong><small>Сценарии / Задачи / Триггеры</small><span class="card-desc">Главные и побочные квесты, точки появления, сообщения и последовательность целей.</span></span>
+            <span class="card-bottom">ОТКРЫТЬ РЕДАКТОР <span>↗</span></span>
+          </button>
+          <button type="button" data-open="model" class="module-card">
+            <span class="card-top"><span class="card-number">/ 03</span><span class="card-icon">⬡</span></span>
+            <span class="card-content"><strong>MODEL LAB</strong><small>Геометрия / Материалы / GLB</small><span class="card-desc">Low-poly объекты из примитивов, 3D-просмотр, материалы и экспорт моделей в Godot.</span></span>
+            <span class="card-bottom">ОТКРЫТЬ РЕДАКТОР <span>↗</span></span>
+          </button>
+        </div>
+        <div class="bottom-notes">
+          <div><span class="little">01 / СОХРАНЕНИЕ</span><p>Редакторы хранят данные раздельно в одном браузере. Существующие черновики остаются на месте.</p></div>
+          <div><span class="little">02 / ФОРМАТЫ</span><p>GEO LAB — GeoJSON · QUEST LAB — JSON · MODEL LAB — JSON / GLB.</p></div>
+          <div><span class="little">03 / СЛЕДУЮЩИЙ ШАГ</span><p>Общая библиотека ID и объектов, размещение моделей в Geo Lab и события в Quest Lab.</p></div>
+        </div>
+      </section>
+      <div id="editors" class="editors" hidden aria-label="Встроенные редакторы"></div>
+    </main>
+  </div>
+  <footer class="statusbar">
+    <span><i class="pulse"></i> CHERNOZERYE STUDIO / READY</span>
+    <span id="last-status">СЕССИЯ / ВАШ БРАУЗЕР</span>
+    <span>ALT+1 / GEO · ALT+2 / QUEST · ALT+3 / MODEL</span>
+  </footer>
+</div>
+<script src="./studio.js?v=1"></script>
+</body>
+</html>
