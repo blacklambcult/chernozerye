@@ -21,6 +21,13 @@ func _run() -> void:
     if gun.get("cock_audio").stream == null or gun.get("cylinder_audio").stream == null or gun.get("report").stream == null:
         _fail("one of the supplied sound effects was not assigned")
         return
+    for clip_path in ["res://audio/revolver_cock.ogg", "res://audio/revolver_shot.ogg", "res://audio/revolver_cylinder.ogg"]:
+        if not ResourceLoader.exists(clip_path):
+            _fail("missing original user audio: " + clip_path)
+            return
+    if (gun.get("cock_audio") as AudioStreamPlayer).stream != load("res://audio/revolver_cock.ogg") or (gun.get("report") as AudioStreamPlayer).stream != load("res://audio/revolver_shot.ogg") or (gun.get("cylinder_audio") as AudioStreamPlayer).stream != load("res://audio/revolver_cylinder.ogg"):
+        _fail("revolver still uses placeholder effects")
+        return
     for index in range(6):
         gun.set("cooldown", 0.0)
         gun.call("request_shot")
