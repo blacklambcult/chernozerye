@@ -12,6 +12,11 @@ var player: CharacterBody3D
 var flash := OmniLight3D.new()
 var report := AudioStreamPlayer.new()
 var marks: Array[MeshInstance3D] = []
+var impact_sounds := {
+    &"soil": preload("res://impacts/soil.wav"),
+    &"wood": preload("res://impacts/wood.wav"),
+    &"metal": preload("res://impacts/metal.wav")
+}
 var cylinder: MeshInstance3D
 
 func _part(mesh: PrimitiveMesh, at: Vector3, tint: Color) -> MeshInstance3D:
@@ -131,6 +136,11 @@ func _shoot() -> void:
     if hit.collider.is_in_group("breakable_pottery"):
         hit.collider.queue_free()
         return
+    _surface_feedback(hit)
+
+func _surface_feedback(hit: Dictionary) -> void:
+    var body := hit.collider as Node3D
+    var surface: StringName = body.get_meta("impact_surface", &"solid")
     var mark := MeshInstance3D.new()
     var mesh := CylinderMesh.new()
     mesh.radial_segments = 7
@@ -139,6 +149,17 @@ func _shoot() -> void:
     mesh.height = 0.006
     var material := StandardMaterial3D.new()
     material.albedo_color = Color("#211913")
+    match surface:
+        &"wood":
+            material.albedo_color = Color("#ac8055")
+            mesh.top_radius = 0.045
+        &"metal":
+            material.albedo_color = Color("#b4bfbd")
+            mesh.top_radius = 0.032
+        &"soil":
+            material.albedo_color = Color("#503727")
+            mesh.top_radius = 0.082
+            mesh.bottom_radius = 0.09
     mesh.material = material
     mark.mesh = mesh
     mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -146,6 +167,21 @@ func _shoot() -> void:
     var normal: Vector3 = hit.normal
     mark.global_position = hit.position + normal * 0.005
     mark.global_basis = Basis(Quaternion(Vector3.UP, normal))
+    if surface == &"wood":
+        mark.scale = Vector3(0.62, 1.0, 1.9)
+        # Raised log relief projects just past the building collision hull.
+        if body.name == &"CollisionTimberBuildings":
+            mark.global_position += normal * 0.023
+    if impact_sounds.has(surface):
+        var sound := AudioStreamPlayer3D.new()
+        sound.bus = &"Effects"
+        sound.stream = impact_sounds[surface]
+        sound.unit_size = 9.0
+        sound.volume_db = -4.0
+        sound.pitch_scale = randf_range(0.92, 1.07)
+        mark.add_child(sound)
+        sound.finished.connect(sound.queue_free)
+        sound.play()
     marks.append(mark)
     if marks.size() > 32:
         var oldest := marks.pop_front() as MeshInstance3D

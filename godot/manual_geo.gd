@@ -15,6 +15,7 @@ const COLORS := {
     "sauna": Color("#bd7f6b"),
     "car": Color("#5585b0")
 }
+var _soil_faces := PackedVector3Array()
 var object_count: int = 0
 var forest_positions: Array[Transform3D] = []
 var broad_canopies: Array[Transform3D] = []
@@ -111,6 +112,19 @@ func _build_manual() -> void:
     # Surveyed centre lines remain untouched. No visible round junction caps:
     # crossings are handled by small elevation separation + track clearance.
     _build_road_intersections()
+    if not _soil_faces.is_empty():
+        var road_body := StaticBody3D.new()
+        road_body.collision_layer = 2
+        road_body.collision_mask = 0
+        road_body.set_meta("impact_surface", &"soil")
+        var road_shape := ConcavePolygonShape3D.new()
+        road_shape.backface_collision = true
+        road_shape.set_faces(_soil_faces)
+        var road_collider := CollisionShape3D.new()
+        road_collider.shape = road_shape
+        road_body.add_child(road_collider)
+        add_child(road_body)
+        _soil_faces.clear()
     _build_forest_instances()
     # Separate, reversible decorative layer; manual survey coordinates remain untouched.
     var art := Node3D.new()
@@ -157,6 +171,7 @@ func _mesh_from_triangles(vertices: PackedVector3Array, color: Color, label: Str
     arrays[Mesh.ARRAY_VERTEX] = vertices
     var material := _mat(color)
     if soil:
+        _soil_faces.append_array(vertices)
         var uvs := PackedVector2Array()
         uvs.resize(vertices.size())
         for i in vertices.size():
@@ -555,6 +570,7 @@ func _add_car(point: Array, _feature: Dictionary) -> void:
     var box := BoxMesh.new()
     box.size = Vector3(2.0, 1.35, 4.0)
     var body := StaticBody3D.new()
+    body.set_meta("impact_surface", &"metal")
     body.name = "Машина"
     body.position = _pos(p, 0.78)
     var visual := MeshInstance3D.new()
@@ -667,6 +683,7 @@ func _build_trunk_collision() -> void:
             _put_triangle(faces, p0, Vector3(p1.x, top_y, p1.z), Vector3(p0.x, top_y, p0.z))
     if not faces.is_empty():
         var trunk_body := StaticBody3D.new()
+        trunk_body.set_meta("impact_surface", &"wood")
         trunk_body.name = "CollisionForestTrunks"
         var collision := CollisionShape3D.new()
         var shape := ConcavePolygonShape3D.new()

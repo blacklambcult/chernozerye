@@ -133,6 +133,7 @@ func _solid_box(label: String, location: Vector3, dimensions: Vector3,
     mesh_node.mesh = mesh
     mesh_node.material_override = _make_material(color)
     if label in ["Старые половицы", "Бревенчатая стена", "Старая стена", "Старый стол", "Потолок"]:
+        node.set_meta("impact_surface", &"wood")
         mesh_node.material_override = wood
     node.add_child(mesh_node)
     interior.add_child(node)
