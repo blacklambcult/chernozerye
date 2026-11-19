@@ -38,26 +38,51 @@ func _first_person_part(label: String) -> bool:
 
 
 func _make_material(label: String) -> StandardMaterial3D:
-    var mat := StandardMaterial3D.new()
+    # All full-model materials are explicit. The source GLB now has PBR too,
+    # but this Godot-side fallback guarantees a coloured F4 inspector even
+    # when the platform ignores vertex-color attributes.
+    var color := Color("#676657")
     if label.begins_with("FPSCoat"):
         if "LowerLeft" in label or "CenterSeam" in label:
-            mat.albedo_color = Color("#45493c")
+            color = Color("#484c40")
         elif "Button" in label:
-            mat.albedo_color = Color("#b9ad87")
+            color = Color("#bbae8b")
         elif "Pocket" in label:
-            mat.albedo_color = Color("#81755e")
+            color = Color("#887964")
         else:
-            mat.albedo_color = Color("#626556")
-        mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+            color = Color("#676759")
+    elif "Hair" in label or "Eyebrow" in label:
+        color = Color("#393630")
+    elif "Head" in label or "Neck" in label or "Nose" in label or "Hand" in label or "Thumb" in label or "EyeShadow" in label:
+        color = Color("#a18b7c")
+    elif "BootSole" in label:
+        color = Color("#2d2a27")
     elif "Boot" in label:
-        mat.albedo_color = Color("#534b41")
+        color = Color("#50483d")
+    elif "Thigh" in label:
+        color = Color("#5a6158")
     elif "LowerLeg" in label:
-        mat.albedo_color = Color("#424945")
-    else:
-        mat.albedo_color = Color("#596157")
+        color = Color("#4a524e")
+    elif "Sidor" in label or "Canvas" in label:
+        color = Color("#8c7f62")
+    elif "Belt" in label or "ShoulderStrap" in label:
+        color = Color("#755b43")
+    elif "Button" in label or "Buckle" in label or "Lace" in label:
+        color = Color("#b9ae90")
+    elif "Sleeve" in label or "WinterCoat" in label:
+        color = Color("#757361")
+    elif "Pocket" in label or "Seam" in label or "Epaulette" in label or "Cuff" in label:
+        color = Color("#525347")
+    elif "Shirt" in label:
+        color = Color("#646b55")
+    var mat := StandardMaterial3D.new()
+    mat.albedo_color = color
     mat.roughness = 1.0
+    mat.metallic = 0.0
+    mat.vertex_color_use_as_albedo = false
+    if label.begins_with("FPSCoat"):
+        mat.cull_mode = BaseMaterial3D.CULL_DISABLED
     return mat
-
 
 func _apply_mode(inspect: bool) -> void:
     inspection_mode = inspect
@@ -69,12 +94,15 @@ func _apply_mode(inspect: bool) -> void:
         var label := String(mesh.name)
         var first_person := _first_person_part(label)
         mesh.visible = (not label.begins_with(FIRST_PERSON_COAT_PREFIX)) if inspect else first_person
-        if not inspect and mesh.visible:
+        if mesh.visible:
+            # Never discard colours in inspection mode: in 0.6.2 the
+            # full-body model became a completely white silhouette.
             mesh.material_override = _make_material(label)
-            if label.begins_with(FIRST_PERSON_COAT_PREFIX):
-                visible_cutaway_meshes += 1
-            else:
-                visible_leg_meshes += 1
+            if not inspect:
+                if label.begins_with(FIRST_PERSON_COAT_PREFIX):
+                    visible_cutaway_meshes += 1
+                else:
+                    visible_leg_meshes += 1
         else:
             mesh.material_override = null
             if not inspect and not first_person:
@@ -127,7 +155,7 @@ func _ready() -> void:
             legacy.visible = true
         return
     model_loaded = true
-    print("MODELED_CHARACTER_READY: glb=true first_person_cutaway=true legs=true procedural_coat_hidden=true inspection_f4=true")
+    print("MODELED_CHARACTER_READY: glb=true first_person_cutaway=true legs=true procedural_coat_hidden=true inspection_f4=true colored_materials=true compact_cutaway=true")
 
 
 func _process(delta: float) -> void:

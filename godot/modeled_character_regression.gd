@@ -46,6 +46,14 @@ func _run() -> void:
     if cutaway < 8 or legs < 8:
         _fail("imported cutaway or boots are missing")
         return
+    var left_front := root.find_child("FPSCoatUpperLeft",true,false) as MeshInstance3D
+    var crop_box := left_front.mesh.get_aabb()
+    var crop_min := left_front.to_global(crop_box.position)
+    var crop_max := left_front.to_global(crop_box.position + crop_box.size)
+    var crop_top := maxf(crop_min.y, crop_max.y) - actor.global_position.y
+    if crop_top > 1.11:
+        _fail("first-person chest reaches too close to the camera and becomes a giant triangle")
+        return
     var eye := actor.get_node("Camera3D") as Camera3D
     for pitch in [0.0, -0.5, -1.0, -1.45]:
         eye.rotation.x = pitch
@@ -63,12 +71,20 @@ func _run() -> void:
     if not (actor.get_node("CharacterInspectionCamera") as Camera3D).current:
         _fail("F4 does not activate inspection camera")
         return
-    if not (root.find_child("WinterCoat",true,false) as MeshInstance3D).visible:
-        _fail("full original coat not shown in model inspector")
+    var coat := root.find_child("WinterCoat",true,false) as MeshInstance3D
+    var face := root.find_child("Head",true,false) as MeshInstance3D
+    var boot := root.find_child("LeftBootToe",true,false) as MeshInstance3D
+    if coat == null or not coat.visible or face == null or boot == null:
+        _fail("complete protagonist is not visible in inspector")
         return
+    for piece in [coat, face, boot]:
+        var material := piece.material_override as StandardMaterial3D
+        if material == null or material.albedo_color.r > 0.98 and material.albedo_color.g > 0.98 and material.albedo_color.b > 0.98:
+            _fail("the model inspector has white/unassigned materials")
+            return
     actor.call("_toggle_model_inspection")
     if bool(actor.get("_inspect_enabled")) or head.visible or old_body.visible:
         _fail("F4 exit did not restore clean first-person mesh")
         return
-    print("MODELED_CHARACTER_REGRESSION_OK: glb=true coat_cutaway=true full_coat_hidden=true stable_legs=true inspect_f4=true legacy_hidden=true")
+    print("MODELED_CHARACTER_REGRESSION_OK: glb=true coat_cutaway=true full_coat_hidden=true stable_legs=true inspect_f4=true legacy_hidden=true colored_materials=true compact_cutaway=true")
     quit(0)

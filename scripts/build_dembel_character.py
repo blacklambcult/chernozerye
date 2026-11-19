@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 import numpy as np
 import trimesh
+from trimesh.visual.material import PBRMaterial
+from trimesh.visual import TextureVisuals
 
 P = {
  "coat":(105,103,88,255),"dark":(71,75,66,255),"edge":(131,125,103,255),
@@ -25,14 +27,23 @@ def pivot(name,parent,at=(0,0,0)):
     scene.graph.update(frame_from=parent,frame_to=name,matrix=m)
 
 def geo(name,parent,mesh,shade):
-    mesh.visual.vertex_colors=np.tile(np.array(P[shade],dtype=np.uint8),(len(mesh.vertices),1))
+    # Explicit glTF PBR base-color material. Vertex colours alone imported
+    # as white in the Godot Web Compatibility renderer (see 0.6.2 screenshots).
+    rgba = [channel / 255.0 for channel in P[shade]]
+    mesh.visual = TextureVisuals(material=PBRMaterial(
+        name="cloth_" + shade,
+        baseColorFactor=rgba,
+        metallicFactor=0.0,
+        roughnessFactor=1.0,
+        doubleSided=name.startswith("FPSCoat")
+    ))
     scene.add_geometry(mesh,node_name=name,geom_name=name,parent_node_name=parent)
 
 def cube(name,parent,pos,size,shade):
     mesh=trimesh.creation.box(extents=size);mesh.apply_translation(pos)
     geo(name,parent,mesh,shade)
 
-def tube(name,parent,a,b,r0,r1,shade,steps=7):
+def tube(name,parent,a,b,r0,r1,shade,steps=7,cap_start=True):
     a=np.array(a,dtype=float);b=np.array(b,dtype=float)
     d=b-a;d/=np.linalg.norm(d)
     ref=np.array((1,0,0)) if abs(d[0])<.9 else np.array((0,0,1))
@@ -47,7 +58,9 @@ def tube(name,parent,a,b,r0,r1,shade,steps=7):
         j=(k+1)%steps
         f += [(k,j,steps+j),(k,steps+j,steps+k)]
     for k in range(1,steps-1):
-        f += [(0,k+1,k),(steps,steps+k,steps+k+1)]
+        if cap_start:
+            f.append((0,k+1,k))
+        f.append((steps,steps+k,steps+k+1))
     geo(name,parent,trimesh.Trimesh(vertices=v,faces=f,process=False),shade)
 
 def coat():
@@ -89,9 +102,9 @@ for s,name in ((-1,"L"),(1,"R")):
 
 for s,label in ((-1,"Left"),(1,"Right")):
     hip=label+"LegPivot";pivot(hip,"CharacterRoot",(s*.163,.866,.026))
-    tube(label+"Thigh",hip,(0,0,0),(0,-.380,-.008),.132,.110,"pants",8)
+    tube(label+"Thigh",hip,(0,0,0),(0,-.380,-.008),.132,.110,"pants",8,cap_start=False)
     knee=label+"KneePivot";pivot(knee,hip,(0,-.380,-.008))
-    tube(label+"LowerLeg",knee,(0,0,0),(0,-.355,.022),.112,.088,"pants_dark")
+    tube(label+"LowerLeg",knee,(0,0,0),(0,-.355,.022),.112,.088,"pants_dark",cap_start=False)
     ankle=label+"AnklePivot";pivot(ankle,knee,(0,-.355,.022))
     cube(label+"BootShaft",ankle,(0,-.04,-.035),(.189,.162,.208),"boots")
     cube(label+"BootToe",ankle,(0,-.072,-.176),(.194,.092,.275),"boots")
@@ -121,30 +134,33 @@ for s,name in ((-1,"Left"),(1,"Right")):
 # player's eye. The full winter coat remains intact for F4 model inspection.
 def fp_panel(name, points, shade):
     v=np.array(points,dtype=float)
-    f=np.array([(0,1,2),(0,2,3),(2,1,0),(3,2,0)])
+    # A single winding and double-sided PBR. Duplicated opposite triangles
+    # cancelled normals and made spiky, unpredictable lighting in WebGL.
+    f=np.array([(0,1,2),(0,2,3)])
     geo(name,"CharacterRoot",trimesh.Trimesh(vertices=v,faces=f,process=False),shade)
 
+# The front is a short waist/chest crop WELL BELOW the player's eye.
+# Previous panels reached y=1.30 (eye=1.55), exploding to ~2/3 screen
+# width during steep lookdown. The upper limit is now 1.055 m.
 fp_panel("FPSCoatUpperLeft", [
-    (-.286,1.295,-.100),(-.012,1.300,-.116),
-    (-.012,.963,-.196),(-.310,.955,-.195)],"coat")
+    (-.226,1.055,-.126),(-.012,1.055,-.138),
+    (-.012,.920,-.191),(-.252,.920,-.185)],"coat")
 fp_panel("FPSCoatUpperRight", [
-    (.012,1.300,-.116),(.286,1.295,-.100),
-    (.310,.955,-.195),(.012,.963,-.196)],"edge")
+    (.012,1.055,-.138),(.226,1.055,-.126),
+    (.252,.920,-.185),(.012,.920,-.191)],"edge")
 fp_panel("FPSCoatLowerLeft", [
-    (-.310,.962,-.194),(-.012,.964,-.196),
-    (-.016,.785,-.206),(-.320,.800,-.185)],"dark")
+    (-.252,.920,-.185),(-.012,.920,-.191),
+    (-.012,.775,-.199),(-.266,.785,-.177)],"dark")
 fp_panel("FPSCoatLowerRight", [
-    (.012,.964,-.196),(.310,.962,-.194),
-    (.320,.800,-.185),(.016,.785,-.206)],"coat")
-# Deliberate overlap: narrow stitching stays near the cloth surface and
-# doesn't close the opening in front of the player's camera.
-cube("FPSCoatCenterSeam","CharacterRoot",(0,1.115,-.207),(.017,.36,.014),"dark")
+    (.012,.920,-.191),(.252,.920,-.185),
+    (.266,.785,-.177),(.012,.775,-.199)],"coat")
+cube("FPSCoatCenterSeam","CharacterRoot",(0,.917,-.202),(.015,.255,.012),"dark")
 for i in range(3):
-    cube("FPSCoatButton"+str(i),"CharacterRoot",(.027,1.240-i*.095,-.216),(.016,.016,.012),"metal")
-cube("FPSCoatLowerHem","CharacterRoot",(0,.798,-.206),(.617,.024,.020),"edge")
+    cube("FPSCoatButton"+str(i),"CharacterRoot",(.023,1.012-i*.070,-.211),(.014,.014,.012),"metal")
+cube("FPSCoatLowerHem","CharacterRoot",(0,.773,-.202),(.528,.022,.018),"edge")
 for s,name in ((-1,"L"),(1,"R")):
-    cube("FPSCoatPocket"+name,"CharacterRoot",(s*.208,.916,-.209),(.134,.08,.014),"canvas_dark")
-    cube("FPSCoatPocketFlap"+name,"CharacterRoot",(s*.208,.968,-.218),(.145,.023,.014),"canvas")
+    cube("FPSCoatPocket"+name,"CharacterRoot",(s*.180,.833,-.206),(.114,.066,.014),"canvas_dark")
+    cube("FPSCoatPocketFlap"+name,"CharacterRoot",(s*.180,.870,-.214),(.125,.023,.014),"canvas")
 
 dest=Path(sys.argv[1] if len(sys.argv)>1 else "dembel_2005.glb")
 dest.parent.mkdir(parents=True,exist_ok=True)
