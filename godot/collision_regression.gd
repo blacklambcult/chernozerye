@@ -158,8 +158,12 @@ func _run() -> void:
     if imported_legs == null or not bool(imported_legs.get("model_loaded")):
         _fail("imported feet unavailable while looking down")
         return
-    if not bool(imported_legs.get("visible")) or int(imported_legs.get("visible_cutaway_meshes")) < 8:
-        _fail("the imported first-person coat/legs were not activated")
+    var fps_asset := imported_legs.get("first_person_body") as Node3D
+    if not imported_legs.visible or fps_asset == null or not fps_asset.visible:
+        _fail("standalone FPS body not active")
+        return
+    if fps_asset.find_child("FPTorsoShell",true,false) == null or fps_asset.find_child("FPPelvis",true,false) == null:
+        _fail("standalone FPS chest or pelvis missing")
         return
     if not (pelvis.get_node("LeftArm") as Node3D).visible:
         _fail("side-hanging arms are hidden at downward pitch")

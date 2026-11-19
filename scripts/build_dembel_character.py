@@ -1,6 +1,6 @@
 """Chernozerye: original low-poly adult protagonist. Blender-editable GLB.
 Independent leg joints: looking down rotates the CAMERA, not the leg mesh.
-Run: python scripts/build_dembel_character.py godot/assets/dembel_2005.glb
+Run: python scripts/build_dembel_character.py godot/assets/dembel_full.glb
 """
 import math
 import sys
@@ -129,40 +129,7 @@ for s,name in ((-1,"Left"),(1,"Right")):
     cube(name+"Eyebrow","HeadPivot",(s*.066,.237,-.131),(.055,.018,.02),"hair")
     cube(name+"EyeShadow","HeadPivot",(s*.066,.206,-.139),(.044,.019,.014),"skin_dark")
 
-# An original first-person CUTAWAY sewn from the SAME garment palette.
-# This face-only variant has no cap/back: it cannot surround or swallow the
-# player's eye. The full winter coat remains intact for F4 model inspection.
-def fp_panel(name, points, shade):
-    v=np.array(points,dtype=float)
-    # A single winding and double-sided PBR. Duplicated opposite triangles
-    # cancelled normals and made spiky, unpredictable lighting in WebGL.
-    f=np.array([(0,1,2),(0,2,3)])
-    geo(name,"CharacterRoot",trimesh.Trimesh(vertices=v,faces=f,process=False),shade)
-
-# The front is a short waist/chest crop WELL BELOW the player's eye.
-# Previous panels reached y=1.30 (eye=1.55), exploding to ~2/3 screen
-# width during steep lookdown. The upper limit is now 1.055 m.
-fp_panel("FPSCoatUpperLeft", [
-    (-.226,1.055,-.126),(-.012,1.055,-.138),
-    (-.012,.920,-.191),(-.252,.920,-.185)],"coat")
-fp_panel("FPSCoatUpperRight", [
-    (.012,1.055,-.138),(.226,1.055,-.126),
-    (.252,.920,-.185),(.012,.920,-.191)],"edge")
-fp_panel("FPSCoatLowerLeft", [
-    (-.252,.920,-.185),(-.012,.920,-.191),
-    (-.012,.775,-.199),(-.266,.785,-.177)],"dark")
-fp_panel("FPSCoatLowerRight", [
-    (.012,.920,-.191),(.252,.920,-.185),
-    (.266,.785,-.177),(.012,.775,-.199)],"coat")
-cube("FPSCoatCenterSeam","CharacterRoot",(0,.917,-.202),(.015,.255,.012),"dark")
-for i in range(3):
-    cube("FPSCoatButton"+str(i),"CharacterRoot",(.023,1.012-i*.070,-.211),(.014,.014,.012),"metal")
-cube("FPSCoatLowerHem","CharacterRoot",(0,.773,-.202),(.528,.022,.018),"edge")
-for s,name in ((-1,"L"),(1,"R")):
-    cube("FPSCoatPocket"+name,"CharacterRoot",(s*.180,.833,-.206),(.114,.066,.014),"canvas_dark")
-    cube("FPSCoatPocketFlap"+name,"CharacterRoot",(s*.180,.870,-.214),(.125,.023,.014),"canvas")
-
-dest=Path(sys.argv[1] if len(sys.argv)>1 else "dembel_2005.glb")
+dest=Path(sys.argv[1] if len(sys.argv)>1 else "dembel_full.glb")
 dest.parent.mkdir(parents=True,exist_ok=True)
 dest.write_bytes(scene.export(file_type="glb"))
 print("CHARACTER_ASSET_READY: file=",dest," bytes=",dest.stat().st_size,

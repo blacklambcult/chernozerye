@@ -41,14 +41,16 @@ jobs:
           print('MANUAL_SOURCE_VERIFIED:', len(d['features']))
           PY
 
-      - name: Build original low-poly protagonist GLB
+      - name: Build separate full and FPS low-poly GLBs
         shell: bash
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check 'numpy>=1.26,<3' 'trimesh>=4.4,<5'
-          python scripts/build_dembel_character.py godot/assets/dembel_2005.glb
-          test -s godot/assets/dembel_2005.glb
-          python scripts/check_dembel_character.py godot/assets/dembel_2005.glb
+          python scripts/build_dembel_character.py godot/assets/dembel_full.glb
+          python scripts/build_dembel_fps.py godot/assets/dembel_fp.glb
+          test -s godot/assets/dembel_full.glb
+          test -s godot/assets/dembel_fp.glb
+          python scripts/check_dembel_character.py godot/assets/dembel_full.glb godot/assets/dembel_fp.glb
 
       - name: Download Godot 4.7.2 and export templates
         shell: bash
@@ -118,7 +120,7 @@ jobs:
         run: |
           set -euo pipefail
           godot --headless --path godot --script res://modeled_character_regression.gd 2>&1 | tee /tmp/model-regression.log
-          grep -q "MODELED_CHARACTER_REGRESSION_OK: glb=true coat_cutaway=true full_coat_hidden=true stable_legs=true inspect_f4=true legacy_hidden=true colored_materials=true compact_cutaway=true" /tmp/model-regression.log
+          grep -q "MODELED_CHARACTER_REGRESSION_OK: two_glbs=true solid_torso=true closed_pelvis=true separate_f4=true stable_legs=true legacy_hidden=true" /tmp/model-regression.log
 
       - name: Regression-test first-person viewmodel arms
         shell: bash
@@ -149,7 +151,7 @@ jobs:
           grep -q "STORY_PROLOGUE_READY:" /tmp/world-smoke.log
           grep -q "FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2" /tmp/world-smoke.log
           grep -q "FPS_VIEWMODEL_READY: camera_local=true arms=2 unarmed=true" /tmp/world-smoke.log
-          grep -q "MODELED_CHARACTER_READY: glb=true first_person_cutaway=true legs=true procedural_coat_hidden=true inspection_f4=true colored_materials=true compact_cutaway=true" /tmp/world-smoke.log
+          grep -q "MODELED_CHARACTER_READY: separate_glb=true solid_fps_torso=true opaque_pelvis=true full_f4=true legacy_hidden=true" /tmp/world-smoke.log
           grep -q "CHARACTER_SEQUENCE_READY: cosmetic=true selected_slot_required=true duration=120 states=8" /tmp/world-smoke.log
           grep -q "SURVIVAL_HUD_READY: compass=center hp=100 hotbar=4 cigarette_pack=slot1" /tmp/world-smoke.log
           grep -q "manual_mode=true" /tmp/world-smoke.log

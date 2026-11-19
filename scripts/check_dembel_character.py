@@ -1,31 +1,33 @@
-"""Guard GLB material colour and first-person cutaway geometry before Godot import."""
+"""Fail CI for missing, white, flat or mixed character assets."""
 import sys
-from pathlib import Path
 import trimesh
 from trimesh.visual.material import PBRMaterial
 
-p=Path(sys.argv[1])
-scene=trimesh.load(p,force="scene",process=False)
-assert isinstance(scene,trimesh.Scene), "not a GLB scene"
-all_shapes=scene.geometry
-assert len(all_shapes)>=55, f"Unexpected number of GLB mesh parts: {len(all_shapes)}"
-for name,mesh in all_shapes.items():
-    if not isinstance(mesh.visual.material,PBRMaterial):
-        raise AssertionError(f"{name}: no PBR material")
-    c=mesh.visual.material.baseColorFactor
-    # Trimesh returns uint8 0..255 when it re-reads GLB PBR factors,
-    # while other versions return 0..1 floats. Normalize both formats.
-    if c is None:
-        raise AssertionError(f"{name}: missing PBR colour")
-    scale=255.0 if max(float(x) for x in c[:3]) > 1.0 else 1.0
-    rgb=[float(x)/scale for x in c[:3]]
-    if all(x >= 0.98 for x in rgb):
-        raise AssertionError(f"{name}: white PBR colour {c}")
-for piece in ["WinterCoat","LeftThigh","RightThigh","LeftBootToe","RightBootToe","FPSCoatUpperLeft","FPSCoatUpperRight"]:
-    assert piece in all_shapes,f"Missing mesh {piece}"
-for piece in ["FPSCoatUpperLeft","FPSCoatUpperRight","FPSCoatLowerLeft","FPSCoatLowerRight"]:
-    mesh=all_shapes[piece]
-    assert mesh.bounds[1,1] <= 1.11, f"{piece}: too close to eyes (y={mesh.bounds[1,1]:.2f})"
-    assert max(abs(mesh.bounds[0,0]),abs(mesh.bounds[1,0])) <= 0.28, f"{piece}: too wide for downlook"
-    assert len(mesh.faces)==2, f"{piece}: reversed duplicate triangles"
-print(f"CHARACTER_ASSET_VALIDATED: colored_pbr=true cutaway_bounds=true coat_mesh=true parts={len(all_shapes)}")
+full_path,fp_path=sys.argv[1:3]
+full=trimesh.load(full_path,force="scene",process=False)
+fp=trimesh.load(fp_path,force="scene",process=False)
+assert isinstance(full,trimesh.Scene) and isinstance(fp,trimesh.Scene)
+assert full_path!=fp_path and len(full.geometry)>=45 and len(fp.geometry)>=22
+for name,scene in (("full",full),("fps",fp)):
+    for part,mesh in scene.geometry.items():
+        material=mesh.visual.material
+        assert isinstance(material,PBRMaterial),f"{name}/{part}: PBR missing"
+        color=material.baseColorFactor
+        assert color is not None,f"{name}/{part}: colour missing"
+        divisor=255 if max(float(x) for x in color[:3])>1.0 else 1.0
+        assert not all(float(x)/divisor>.97 for x in color[:3]),f"{name}/{part}: white geometry"
+for part in ("WinterCoat","Head","LeftThigh","RightThigh","SidorCanvasSack","LeftBootToe"):
+    assert part in full.geometry,f"full missing {part}"
+assert not any(n.startswith("FP") for n in full.geometry),"full contains FPS cuts"
+for part in ("FPTorsoShell","FPShirtLining","FPWaistInner","FPPelvis","FPCrotch",
+             "LeftThigh","RightThigh","LeftCalf","RightCalf","LeftBootToe","RightBootToe"):
+    assert part in fp.geometry,f"FPS missing {part}"
+assert not any(n in fp.geometry for n in ("Head","WinterCoat","SidorCanvasSack"))
+torso=fp.geometry["FPTorsoShell"]
+assert len(torso.faces)>=40 and len(torso.vertices)>=24,"FPS torso still a sheet"
+assert torso.bounds[1,1]<=1.20,"FPS chest occupies player's eye"
+for part in ("FPShirtLining","FPWaistInner","FPPelvis","FPCrotch"):
+    mesh=fp.geometry[part]
+    assert mesh.is_watertight and mesh.volume>0,f"{part}: not a closed opaque volume"
+assert "FPSCoatUpperLeft" not in fp.geometry
+print("TWO_CHARACTER_ASSETS_OK: separate_glb=true colored_pbr=true volumetric_torso=true closed_waist=true stable_leg_pivots=true")
