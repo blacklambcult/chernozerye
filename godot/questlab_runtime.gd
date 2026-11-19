@@ -108,9 +108,9 @@ func get_target_world() -> Vector3:
 func activate_preview() -> bool:
     if preview_active or player == null or selected_quest.is_empty():
         return false
-    if story != null and (bool(story.get("inside_home")) or bool(story.get("journal_open"))):
+    if story != null and (story.get("inside_home") == true or story.get("journal_open") == true):
         return false
-    if bool(player.get("controls_locked")):
+    if player.get("controls_locked") == true:
         return false
     saved_transform = player.global_transform
     var camera := player.get_node_or_null("Camera3D") as Camera3D
