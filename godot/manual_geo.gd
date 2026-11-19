@@ -1,6 +1,6 @@
 extends Node3D
 # CHERNOZERYE / manually surveyed 3D preview
-# Source: user Geo Lab 2.0 survey (130 WGS84 objects), converted to UTM local metres.
+# Source: user Geo Lab 2.0 survey (710 WGS84 objects, 2026-11-19), converted to UTM local metres.
 # Visuals are blockout placeholders; outline shapes and positions are preserved.
 const SOURCE := "res://manual_layout.json"
 const COLORS := {
@@ -224,7 +224,7 @@ func _append_joined_ribbon(vertices: PackedVector3Array, points: PackedVector2Ar
 
 
 func _road_elevation(road_id: int) -> float:
-    # Up to 18 surveyed roads, max height difference ≈ 6 cm.
+    # Up to 20 surveyed roads, max height difference ≈ 7 cm.
     # Separates overlapping Godot WebGL polygons with no circular junction discs.
     return 0.11 + float(road_id) * 0.0036
 

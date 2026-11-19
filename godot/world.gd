@@ -5,11 +5,11 @@ const LOGO_DATA = preload("res://logo_data.gd")
 const MAP_FILE := "res://world_data.json"
 const MANUAL_FILE := "res://manual_layout.json"
 const GAME_TITLE := "Fearless Knights of the Cordon"
-const GAME_STAGE := "Pre-Alpha 0.6.8"
+const GAME_STAGE := "Pre-Alpha 0.6.9"
 const MANUAL_CAMERA_NEAR := 0.16
 const MANUAL_CAMERA_FAR := 250.0
 const SEASON := "NOVEMBER"
-const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.6.8 · ЧЕРНОЗЁРЬЕ · 314 ОБЪЕКТОВ"
+const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.6.9 · ЧЕРНОЗЁРЬЕ · 710 ОБЪЕКТОВ"
 var manual_mode := false
 var manual_button: Button
 var _status_label: Label
@@ -68,7 +68,7 @@ func _ready() -> void:
     _create_brand_watermark()
     _create_overview_map()
     _create_gameplay_hud()
-    # Load the manual 314-object village from the first playable frame.
+    # Load the manual 710-object village from the first playable frame.
     # The original sector/preview buttons are no longer part of the player HUD.
     _activate_default_village()
     _create_november_snow()
@@ -651,7 +651,7 @@ func _create_manual_navigation() -> void:
     layer.layer = 8
     add_child(layer)
     manual_button = Button.new()
-    manual_button.text = "РУЧНАЯ РАЗМЕТКА · 314 ОБЪЕКТОВ"
+    manual_button.text = "РУЧНАЯ РАЗМЕТКА · 710 ОБЪЕКТОВ"
     manual_button.position = Vector2(16.0, 121.0)
     manual_button.size = Vector2(276.0, 42.0)
     manual_button.tooltip_text = "Показать отдельно дороги, дома, участки и лес из загруженного GeoJSON"
@@ -673,7 +673,7 @@ func _toggle_manual_preview() -> void:
     if osm_roads != null:
         osm_roads.visible = not manual_mode
     if manual_button != null:
-        manual_button.text = "ВЕРНУТЬ СТАРУЮ МЕСТНОСТЬ" if manual_mode else "РУЧНАЯ РАЗМЕТКА · 314 ОБЪЕКТОВ"
+        manual_button.text = "ВЕРНУТЬ СТАРУЮ МЕСТНОСТЬ" if manual_mode else "РУЧНАЯ РАЗМЕТКА · 710 ОБЪЕКТОВ"
     var terrain := get_node_or_null("BaseGround") as MeshInstance3D
     if terrain != null:
         if manual_mode and _manual_ground_material == null:

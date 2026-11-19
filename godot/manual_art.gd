@@ -962,7 +962,7 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
     _building_count += 1
     var index := _building_count
     # Exactly two anomalous houses and ~7 sparsely occupied houses in the
-    # 92-home manual survey; all others have no interior illumination.
+    # 232-home Geo Lab survey; all others have no interior illumination.
     _current_house_light_kind = ""
     _house_light_claimed = false
     if category == "house":

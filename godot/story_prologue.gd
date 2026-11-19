@@ -1,7 +1,7 @@
 extends Node
 # Fearless Knights of the Cordon / Pre-Alpha 0.4.0
 # Playable Chapter 1 slice: return home, investigate, face an unexplained sound.
-# The house is anchored to one immutable feature ID in the user's 314-object
+# The house is anchored to one immutable feature ID preserved in the 710-object
 # survey. The furnished interior is instanced separately to avoid changing
 # surveyed buildings, fences, roads or procedural roof geometry.
 

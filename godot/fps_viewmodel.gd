@@ -1,8 +1,6 @@
 extends Node3D
-# Camera-attached hands, sleeves, and a compact shoulder fold. There is
-# deliberately NO body/leg GLB in gameplay; full body renders only for F4.
-# Keep shoulder meshes entirely past the near plane so clipped cylinders
-# cannot produce giant rectangular blocks in the screen corners.
+# Camera-attached hands and sleeves only. No full-body geometry, fake
+# shoulder yokes or rectangular coat patches in the first-person camera.
 # The art is unarmed and deliberately low-poly; it never affects collisions.
 
 const COAT := Color("#676655")
@@ -73,28 +71,18 @@ func _build_arm(side: float, label: String) -> Node3D:
     var root := Node3D.new()
     root.name = label
     add_child(root)
-    # Start sleeves beyond the near clip (z <= -0.32). Previously the
-    # first segment started at -0.12 and was cut by the near plane,
-    # producing the huge flat shoulder polygons in the 0.6.7 screenshot.
-    # Mirror both sides with only a slight hand-height asymmetry.
-    var lift := 0.025 if side > 0.0 else -0.025
-    var shoulder := Vector3(side * 0.455, -0.730 + lift, -0.340)
-    var elbow := Vector3(side * 0.365, -0.640 + lift, -0.450)
-    var wrist := Vector3(side * 0.280, -0.535 + lift, -0.720)
-    # This is a short fabric fold fused into the upper sleeve, not a
-    # separate oversized cylinder projecting towards the camera.
-    _limb(root, "ShoulderYoke",
-        Vector3(side * 0.490, -0.635 + lift, -0.435),
-        Vector3(side * 0.440, -0.685 + lift, -0.505),
-        0.064, 0.059, COAT_SHADOW)
+    var shoulder := Vector3(side * 0.330, -0.700, -0.470)
+    var elbow := Vector3(side * 0.300, -0.620, -0.570)
+    var wrist := Vector3(side * 0.255, -0.535, -0.760)
+    # Narrow connected sleeves; the heavy shoulder blocks are gone.
     _limb(root, "UpperCoatSleeve", shoulder, elbow,
-        0.087, 0.083, COAT)
+        0.062, 0.056, COAT)
     _limb(root, "ForearmSleeve", elbow, wrist,
-        0.097, 0.074, COAT_SHADOW)
+        0.068, 0.052, COAT_SHADOW)
     _limb(root, "WristCuff",
         wrist + Vector3(0.0, -0.005, 0.042),
         wrist + Vector3(0.0, 0.003, -0.028),
-        0.081, 0.072, CUFF)
+        0.064, 0.055, CUFF)
 
     # Palm is a narrow tapered silhouette. Individual fingers angle downward
     # instead of forming the hard rectangular fist seen in 0.5.8.
@@ -118,8 +106,6 @@ func _build_arm(side: float, label: String) -> Node3D:
             knuckle + Vector3(0.0, -0.038, -finger_length),
             0.014, 0.010, SKIN)
     # Restrained low-poly coat detailing, readable in the night palette.
-    _block(root, "CoatPatch", Vector3(0.048, 0.012, 0.072),
-        elbow + Vector3(0.0, 0.075, 0.015), COAT)
     _block(root, "CuffStitch", Vector3(0.035, 0.009, 0.012),
         wrist + Vector3(0, 0.075, 0.005), THREAD)
     return root
@@ -134,7 +120,7 @@ func _ready() -> void:
     player = eye.get_parent() as CharacterBody3D
     left_arm = _build_arm(-1.0, "LeftArm")
     right_arm = _build_arm(1.0, "RightArm")
-    print("FPS_VIEWMODEL_READY: camera_local=true arms=2 unarmed=true lowpoly=true persistent_downlook=true compact_shoulders=true near_plane_safe=true")
+    print("FPS_VIEWMODEL_READY: camera_local=true arms=2 unarmed=true lowpoly=true persistent_downlook=true shoulder_blocks=absent hands_visible=true")
 
 
 func push_look_motion(relative_pixels: Vector2) -> void:
@@ -181,7 +167,6 @@ func _process(delta: float) -> void:
         -step * 0.011 * stride_weight,
         step * 0.012 * stride_weight,
         -0.010 * cos(stride_phase) * stride_weight)
-    # Reveal a NARROW fabric shoulder fold along each lower screen edge.
-    # The near-plane-safe geometry must never widen into a solid rectangle.
-    right_arm.position += Vector3(0.050, 0.215, -0.075) * downlook_weight
-    left_arm.position += Vector3(-0.050, 0.215, -0.075) * downlook_weight
+    # Only a small lift while looking down. Never inflate the outer edges.
+    right_arm.position += Vector3(0.020, 0.110, -0.030) * downlook_weight
+    left_arm.position += Vector3(-0.020, 0.110, -0.030) * downlook_weight

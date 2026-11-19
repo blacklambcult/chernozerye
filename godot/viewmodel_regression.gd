@@ -64,37 +64,28 @@ func _run() -> void:
             _fail("FPS arms vanish or old body appears at pitch %s" % pitch)
             return
     if float(rig.get("downlook_weight")) < 0.99:
-        _fail("shoulders did not appear at maximum downward pitch")
+        _fail("maximum downlook pose not active")
         return
     for arm in [left,right]:
-        var shoulder := arm.get_node("ShoulderYoke") as MeshInstance3D
+        if arm.get_node_or_null("ShoulderYoke") != null or arm.get_node_or_null("CoatPatch") != null:
+            _fail("camera still contains oversized shoulder blocks")
+            return
         var sleeve := arm.get_node("UpperCoatSleeve") as MeshInstance3D
         var palm := arm.get_node("Palm") as MeshInstance3D
-        if shoulder == null or sleeve == null:
-            _fail("shoulder fold / upper sleeve is missing")
-            return
-        if shoulder.global_position.distance_to(sleeve.global_position) > 0.17:
-            _fail("shoulder fold is detached from its sleeve")
-            return
-        for part in [shoulder,sleeve,palm]:
+        for part in [sleeve,palm]:
             var local := eye.to_local(part.global_position)
             if local.z >= -eye.near or absf(local.y / -local.z) > 1.17 or absf(local.x / -local.z) > 1.40:
-                _fail("FPS sleeve or hand projects outside the downlook frame")
+                _fail("sleeve/hand outside downward screen")
                 return
-        var shoulder_radius := maxf((shoulder.mesh as CylinderMesh).bottom_radius, (shoulder.mesh as CylinderMesh).top_radius)
-        var cam_shoulder := eye.to_local(shoulder.global_position)
-        if (shoulder_radius * 2.0) / -cam_shoulder.z > 0.28:
-            _fail("oversized shoulder fold fills a corner of the viewport")
+        var upper_mesh := sleeve.mesh as CylinderMesh
+        if upper_mesh == null or maxf(upper_mesh.bottom_radius,upper_mesh.top_radius) > 0.07:
+            _fail("oversized upper sleeve remains")
             return
-        # Inspect the actual nearest sleeve cap rather than just mesh origin.
-        # A cylinder intersecting the 0.22 m near plane becomes a massive
-        # truncated polygon even though its center looks correctly placed.
-        var cap_mesh := sleeve.mesh as CylinderMesh
-        var bottom_cap := sleeve.to_global(Vector3(0.0, -cap_mesh.height * 0.5, 0.0))
-        var top_cap := sleeve.to_global(Vector3(0.0, cap_mesh.height * 0.5, 0.0))
-        if eye.to_local(bottom_cap).z > -eye.near - 0.085 or eye.to_local(top_cap).z > -eye.near - 0.085:
-            _fail("upper sleeve intersects the view camera near plane")
-            return
+        for cap in [-upper_mesh.height * 0.5, upper_mesh.height * 0.5]:
+            var camera_cap := eye.to_local(sleeve.to_global(Vector3(0,cap,0)))
+            if camera_cap.z > -eye.near - 0.085:
+                _fail("sleeve intersects the camera clipping plane")
+                return
     eye.rotation.x = 0.0
     rig.call("_process",0.016)
     body.call("_process",0.016)
@@ -112,5 +103,5 @@ func _run() -> void:
     if not rig.visible:
         _fail("viewmodel does not recover in ambient phase")
         return
-    print("VIEWMODEL_REGRESSION_OK: hands=2 coat_sleeves=true lowpoly=true camera_space=true persistent_downlook=true compact_shoulders=true near_plane_safe=true cinematic_safe=true mouse_sway=true")
+    print("VIEWMODEL_REGRESSION_OK: hands=2 coat_sleeves=true lowpoly=true camera_space=true persistent_downlook=true shoulder_blocks_absent=true cinematic_safe=true mouse_sway=true")
     quit(0)
