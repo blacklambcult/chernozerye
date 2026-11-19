@@ -245,6 +245,7 @@ func _build_interior() -> void:
     door_handle.get_child(0).position.x = 0.07
     porch_sound.name = "Шаги за дверью"
     porch_sound.position = Vector3(0.3, 0.65, 4.7)
+    porch_sound.bus = &"Effects"
     porch_sound.stream = preload("res://porch_steps.wav")
     porch_sound.unit_size = 5.0
     interior.add_child(porch_sound)

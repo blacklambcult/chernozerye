@@ -12,6 +12,8 @@ var transition: Tween
 func _ready() -> void:
     street.stream = preload("res://music/well_fog.ogg")
     cabin.stream = preload("res://music/dym_iz_truby.ogg")
+    street.bus = &"Music"
+    cabin.bus = &"Music"
     add_child(street)
     add_child(cabin)
     street.volume_linear = 0.0

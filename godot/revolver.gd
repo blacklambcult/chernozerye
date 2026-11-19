@@ -65,6 +65,7 @@ func _ready() -> void:
     flash.omni_range = 5.0
     flash.visible = false
     add_child(flash)
+    report.bus = &"Effects"
     report.stream = preload("res://revolver_report.wav")
     report.volume_db = -9.0
     add_child(report)

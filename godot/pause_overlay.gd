@@ -11,6 +11,8 @@ var player: CharacterBody3D
 var backdrop: ColorRect
 var sensitivity_readout: Label
 var sensitivity_slider: HSlider
+const AUDIO_CONFIG := "user://audio.cfg"
+var audio_settings := ConfigFile.new()
 var is_open := false
 var was_captured := false
 
@@ -28,6 +30,7 @@ func _ready() -> void:
     layer = 90
     process_mode = Node.PROCESS_MODE_ALWAYS
     player = get_parent() as CharacterBody3D
+    audio_settings.load(AUDIO_CONFIG)
     _build_ui()
     print("PAUSE_OVERLAY_READY: esc=toggle world_pauses=true sensitivity=true")
 
@@ -95,10 +98,43 @@ func _build_ui() -> void:
     sensitivity_row.add_child(sensitivity_readout)
     sensitivity_slider.value_changed.connect(_on_sensitivity_changed)
 
+    _add_volume_row(items, &"Effects", "ГРОМКОСТЬ ЗВУКОВ")
+    _add_volume_row(items, &"Music", "ГРОМКОСТЬ МУЗЫКИ")
+
     items.add_child(_make_label("WASD — идти    SHIFT — бег    C — тихий шаг    МЫШЬ — осмотр", 13, MUTED))
     items.add_child(_make_label("E — взаимодействие    J — журнал    M — карта", 13, MUTED))
     items.add_child(_make_label("ESC — вернуться к игре", 13, ACCENT))
     backdrop.visible = false
+
+
+func _add_volume_row(items: VBoxContainer, bus: StringName, title: String) -> void:
+    var row := HBoxContainer.new()
+    items.add_child(row)
+    var label := _make_label(title, 13, INK)
+    label.custom_minimum_size.x = 155
+    row.add_child(label)
+    var slider := HSlider.new()
+    slider.name = str(bus) + "Volume"
+    slider.tooltip_text = title
+    slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+    row.add_child(slider)
+    var readout := _make_label("", 14, ACCENT)
+    readout.custom_minimum_size.x = 45
+    readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+    row.add_child(readout)
+    slider.value = clampf(float(audio_settings.get_value("volume", bus, 100)), 0, 100)
+    var index := AudioServer.get_bus_index(bus)
+    var apply := func(value: float) -> void:
+        AudioServer.set_bus_mute(index, value == 0)
+        AudioServer.set_bus_volume_db(index, linear_to_db(maxf(value, 1.0) / 100.0))
+        readout.text = "%d%%" % int(value)
+    apply.call(slider.value)
+    slider.value_changed.connect(func(value: float) -> void:
+        apply.call(value)
+        audio_settings.set_value("volume", bus, int(value))
+        audio_settings.save(AUDIO_CONFIG)
+    )
 
 
 func _on_sensitivity_changed(multiplier: float) -> void:

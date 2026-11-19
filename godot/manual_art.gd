@@ -361,6 +361,9 @@ func _pixel_texture(tone: Color, seed: int, rooftop: bool, wall_style: int = 0) 
                     4: # Wavy old asbestos sheets.
                         if x % 16 < 4: offset -= 0.058
                         if y % 24 < 3: offset -= 0.038
+                # Staggered damp bands beneath the lower edges of the sheets.
+                var course := (y + 4 * int(x / 32)) % 32
+                offset -= 0.055 * (1.0 - smoothstep(0.0, 7.0, float(course)))
                 offset += 0.010 * sin(float(x) * 0.17 + float(y) * 0.08)
             else:
                 match wall_style:
@@ -393,6 +396,11 @@ func _pixel_texture(tone: Color, seed: int, rooftop: bool, wall_style: int = 0) 
                             offset += 0.018
                         if y % 19 == 0:
                             offset -= 0.08
+                if wall_style == 0 or wall_style == 1:
+                    var across := y if wall_style == 1 else x
+                    var along := x if wall_style == 1 else y
+                    var bow := sin(TAU * along / 64.0 + float(int(across / 8)))
+                    offset += 0.036 * sin((across + bow) * PI * 0.5)
                 if (x * 17 + y * 7 + seed) % 67 <= 2:
                     offset -= 0.16
             var shade := clampf(0.90 + offset, 0.52, 0.98)
