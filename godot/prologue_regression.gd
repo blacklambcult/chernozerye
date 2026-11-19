@@ -31,6 +31,10 @@ func _run_tests() -> void:
     if story.get("waypoint") == null:
         _fail("home waypoint missing")
         return
+    var waypoint := story.get("waypoint") as Label3D
+    if waypoint.visible or waypoint.text != "":
+        _fail("floating surveyed-home text must never be drawn")
+        return
     # Layout: quest, distance and journal top-left; subtitles bottom-center.
     var distance := story.get("distance_label") as Label
     var journal_hint := story.get("journal_hint_label") as Label
@@ -113,6 +117,9 @@ func _run_tests() -> void:
         return
     if porch.playing or first_motion.is_valid():
         _fail("porch cue continued after leaving")
+        return
+    if waypoint.visible or waypoint.text != "":
+        _fail("floating surveyed-home label reappeared after exit")
         return
     var home_point: Vector2 = story.get("home_point")
     if not home_point.is_finite():

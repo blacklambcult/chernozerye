@@ -48,9 +48,11 @@ func _ready() -> void:
     wind.bus = &"Effects"
     add_child(step_sound)
     wind.stream = preload("res://village_wind.wav")
-    wind.volume_db = -19.0
+    wind.volume_db = -80.0
     add_child(wind)
-    wind.play()
+    # The existing seamless wind WAV reads like a continuous waterfall on
+    # headphones. Leave the player available for compatibility, but disabled.
+    wind.stop()
     camera = Camera3D.new()
     camera.name = "Camera3D"
     camera.position.y = 1.55
@@ -262,7 +264,7 @@ func _physics_process(delta: float) -> void:
 func set_indoors(value: bool) -> void:
     music.set_indoors(value)
     revolver.indoors = value
-    wind.volume_db = -34.0 if value else -19.0
+    wind.volume_db = -80.0  # Wind ambient stays off indoors and outdoors
     step_sound.stream = BOARD_STEP if value else EARTH_STEP
     step_distance = 0.0
 

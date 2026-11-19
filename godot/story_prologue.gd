@@ -301,9 +301,12 @@ func _play_porch_steps() -> void:
     latch_motion.tween_property(door_handle, "rotation:z", 0.0, 0.18)
 
 func _build_waypoint() -> void:
-    waypoint = _story_marker("РОДНОЙ ДОМ", _gate_location() + Vector3.UP * 2.9,
+    # Retain the logical waypoint node for the existing story flow,
+    # but never display a floating house label in the 3D village.
+    waypoint = _story_marker("", _gate_location() + Vector3.UP * 2.9,
         Color("#c3ad8a"), 32)
     waypoint.name = "SurveyedHomeWaypoint"
+    waypoint.visible = false
     get_parent().add_child(waypoint)
 
 func _build_hud() -> void:
@@ -557,7 +560,7 @@ func _leave_home() -> void:
         print("STORY_CHAPTER_ONE_COMPLETE: clues=2 mysterious_presence=true")
     elif not chapter_completed:
         _say("Дом всё ещё хранит ответы. Нужно вернуться и осмотреть его внимательнее.")
-    waypoint.visible = not chapter_completed
+    waypoint.visible = false  # No floating label after leaving the house
     _update_journal()
     _update_focus()
 

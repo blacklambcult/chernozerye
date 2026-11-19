@@ -46,6 +46,9 @@ func _run() -> void:
         _fail("unarmed view, spread or recoil did not recover")
         return
     var wind := player.get("wind") as AudioStreamPlayer
+    if wind.playing:
+        _fail("ambient wind loop must be silent in the village")
+        return
     if (wind.stream as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_FORWARD:
         _fail("wind must loop")
         return
@@ -57,8 +60,8 @@ func _run() -> void:
         _fail("indoor wind remained exposed")
         return
     player.call("set_indoors", false)
-    if boards == footsteps.stream or wind.volume_db != outdoors_db:
-        _fail("outdoor mix was not restored")
+    if boards == footsteps.stream or wind.volume_db != outdoors_db or wind.playing:
+        _fail("outdoor mix was not restored or disabled wind restarted")
         return
     var previous := 0.0
     for speed: float in [player.call("_movement_speed", true, true), 3.35, 5.15]:
