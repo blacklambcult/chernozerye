@@ -518,6 +518,8 @@ func _enter_home() -> void:
     if player == null:
         return
     outside_rotation = player.rotation.y
+    if player.has_method("set_indoors"):
+        player.call("set_indoors", true)
     inside_home = true
     interior.visible = true
     waypoint.visible = false
@@ -539,6 +541,8 @@ func _leave_home() -> void:
     if latch_motion != null:
         latch_motion.kill()
     door_handle.rotation.z = 0.0
+    if player.has_method("set_indoors"):
+        player.call("set_indoors", false)
     inside_home = false
     interior.visible = false
     player.global_position = _gate_location() + Vector3.UP * 0.12

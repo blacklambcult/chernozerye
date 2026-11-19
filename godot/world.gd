@@ -682,7 +682,18 @@ func _toggle_manual_preview() -> void:
     # The procedural WorldEnvironment/Light nodes had no explicit names in older builds.
     # Hold direct references so toggling scenes always changes the actual light and sky.
     if _night_environment != null:
-        _night_environment.background_mode = Environment.BG_COLOR
+        if manual_mode and _night_environment.sky == null:
+            var dusk := ProceduralSkyMaterial.new()
+            dusk.sky_top_color = Color("#182437")
+            dusk.sky_horizon_color = Color("#68717b")
+            dusk.ground_horizon_color = dusk.sky_horizon_color
+            dusk.ground_bottom_color = Color("#303039")
+            dusk.sky_curve = 0.20
+            dusk.sun_angle_max = 0.0
+            var sky := Sky.new()
+            sky.sky_material = dusk
+            _night_environment.sky = sky
+        _night_environment.background_mode = Environment.BG_SKY if manual_mode else Environment.BG_COLOR
         # Godot Compatibility Web: artistic depth fog, not unsupported volumetric fog.
         _night_environment.background_color = Color("#303441") if manual_mode else Color("#575b69")
         _night_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
@@ -693,13 +704,14 @@ func _toggle_manual_preview() -> void:
         _night_environment.tonemap_exposure = 1.01 if manual_mode else 1.0
         _night_environment.fog_enabled = true
         _night_environment.fog_mode = Environment.FOG_MODE_DEPTH if manual_mode else Environment.FOG_MODE_EXPONENTIAL
-        _night_environment.fog_light_color = Color("#444951") if manual_mode else Color("#676976")
+        _night_environment.fog_light_color = Color("#576270") if manual_mode else Color("#676976")
         _night_environment.fog_light_energy = 0.50 if manual_mode else 1.0
+        _night_environment.fog_sky_affect = 0.33 if manual_mode else 1.0
         _night_environment.fog_sun_scatter = 0.0
         _night_environment.fog_aerial_perspective = 0.0
         _night_environment.fog_density = 0.88 if manual_mode else 0.0018
         _night_environment.fog_depth_begin = 28.0 if manual_mode else 24.0
-        _night_environment.fog_depth_end = 148.0 if manual_mode else 118.0
+        _night_environment.fog_depth_end = 165.0 if manual_mode else 118.0
         _night_environment.fog_depth_curve = 1.3
         _night_environment.fog_height = 0.8 if manual_mode else 0.0
         _night_environment.fog_height_density = 0.017 if manual_mode else 0.0

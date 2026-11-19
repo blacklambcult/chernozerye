@@ -1,5 +1,10 @@
 extends CharacterBody3D
 
+signal noise_emitted(at: Vector3, strength: float)
+
+const QUIET_SPEED := 1.45
+const EARTH_STEP := preload("res://step_earth.wav")
+const BOARD_STEP := preload("res://step_boards.wav")
 const SPEED := 3.35
 const SPRINT_SPEED := 5.15
 const WALK_ACCELERATION := 9.0
@@ -8,6 +13,10 @@ const JUMP := 4.5
 const MOUSE_SENS := 0.002
 
 var revolver := preload("res://revolver.gd").new()
+var step_sound := AudioStreamPlayer.new()
+var wind := AudioStreamPlayer.new()
+var step_distance := 0.0
+var noise_level := 0.0
 var camera: Camera3D
 var status_label: Label
 var last_event := "none"
@@ -33,6 +42,11 @@ func set_controls_locked(value: bool) -> void:
         velocity.z = 0.0
 
 func _ready() -> void:
+    add_child(step_sound)
+    wind.stream = preload("res://village_wind.wav")
+    wind.volume_db = -19.0
+    add_child(wind)
+    wind.play()
     camera = Camera3D.new()
     camera.name = "Camera3D"
     camera.position.y = 1.55
@@ -199,11 +213,14 @@ func kick_view() -> void:
     camera.rotation.x += kick
     recoil_pitch += kick
 
-func _movement_speed(sprinting: bool) -> float:
+func _movement_speed(sprinting: bool, quiet: bool = false) -> float:
+    if quiet:
+        return QUIET_SPEED
     return SPRINT_SPEED if sprinting else SPEED
 
 
 func _physics_process(delta: float) -> void:
+    noise_level = move_toward(noise_level, 0.0, delta * 0.85)
     var recovery := minf(recoil_pitch, delta * deg_to_rad(7.0))
     camera.rotation.x = maxf(-1.45, camera.rotation.x - recovery)
     recoil_pitch -= recovery
@@ -222,11 +239,41 @@ func _physics_process(delta: float) -> void:
     if pressed["a"] or Input.is_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_A): axis.x -= 1.0
     if pressed["d"] or Input.is_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_D): axis.x += 1.0
     var direction := (transform.basis * Vector3(axis.x, 0.0, axis.y)).normalized()
-    var speed := _movement_speed(Input.is_key_pressed(KEY_SHIFT))
+    var speed := _movement_speed(Input.is_key_pressed(KEY_SHIFT), Input.is_physical_key_pressed(KEY_C))
     var desired := direction * speed
     var acceleration := WALK_FRICTION if direction.length_squared() < 0.01 else WALK_ACCELERATION
     velocity.x = move_toward(velocity.x, desired.x, acceleration * delta)
     velocity.z = move_toward(velocity.z, desired.z, acceleration * delta)
     move_and_slide()
+    var travel := get_position_delta()
+    if is_on_floor():
+        _track_steps(Vector2(travel.x, travel.z).length(), delta)
+    else:
+        step_distance = 0.0
     if is_instance_valid(status_label):
         status_label.text = "INPUT DIAGNOSTICS 0.6\nLast: %s\nAxis: %s | Pos: (%.1f, %.1f)\nMouse: %s\nClick on game, then press W / M" % [last_event, str(axis), position.x, position.z, str(Input.mouse_mode)]
+
+func set_indoors(value: bool) -> void:
+    wind.volume_db = -34.0 if value else -19.0
+    step_sound.stream = BOARD_STEP if value else EARTH_STEP
+    step_distance = 0.0
+
+func emit_noise(strength: float) -> void:
+    noise_level = maxf(noise_level, strength)
+    noise_emitted.emit(global_position, strength)
+
+func _track_steps(distance: float, delta: float) -> void:
+    if distance < 0.001 or delta <= 0.0:
+        return
+    var actual_speed := distance / delta
+    step_distance += distance
+    if step_distance < clampf(0.75 + actual_speed * 0.17, 0.8, 1.7):
+        return
+    step_distance = 0.0
+    var strength := clampf(actual_speed / SPRINT_SPEED, 0.1, 1.0) * 0.72
+    if step_sound.stream == null:
+        step_sound.stream = EARTH_STEP
+    step_sound.volume_db = lerpf(-27.0, -6.0, strength / 0.72)
+    step_sound.pitch_scale = randf_range(0.91, 1.09)
+    step_sound.play()
+    emit_noise(strength)

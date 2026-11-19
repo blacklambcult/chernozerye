@@ -45,5 +45,30 @@ func _run() -> void:
     if gun.visible or absf(eye.rotation.x) > 0.001 or not is_equal_approx(gun.call("spread_angle"), idle):
         _fail("unarmed view, spread or recoil did not recover")
         return
+    var wind := player.get("wind") as AudioStreamPlayer
+    if (wind.stream as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_FORWARD:
+        _fail("wind must loop")
+        return
+    var outdoors_db := wind.volume_db
+    player.call("set_indoors", true)
+    var footsteps := player.get("step_sound") as AudioStreamPlayer
+    var boards := footsteps.stream
+    if wind.volume_db >= outdoors_db:
+        _fail("indoor wind remained exposed")
+        return
+    player.call("set_indoors", false)
+    if boards == footsteps.stream or wind.volume_db != outdoors_db:
+        _fail("outdoor mix was not restored")
+        return
+    var previous := 0.0
+    for speed: float in [player.call("_movement_speed", true, true), 3.35, 5.15]:
+        player.set("noise_level", 0)
+        for tick in range(100):
+            player.call("_track_steps", speed / 60.0, 1.0 / 60.0)
+        var strength := float(player.get("noise_level"))
+        if strength <= previous or strength >= 1.0:
+            _fail("step noise must increase with movement speed")
+            return
+        previous = strength
     print("VIEWMODEL_REGRESSION_OK: item_only=true spread=true recoil=true")
     quit(0)

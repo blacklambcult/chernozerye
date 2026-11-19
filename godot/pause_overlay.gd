@@ -95,7 +95,7 @@ func _build_ui() -> void:
     sensitivity_row.add_child(sensitivity_readout)
     sensitivity_slider.value_changed.connect(_on_sensitivity_changed)
 
-    items.add_child(_make_label("WASD — идти    SHIFT — ускориться    МЫШЬ — осмотр", 13, MUTED))
+    items.add_child(_make_label("WASD — идти    SHIFT — бег    C — тихий шаг    МЫШЬ — осмотр", 13, MUTED))
     items.add_child(_make_label("E — взаимодействие    J — журнал    M — карта", 13, MUTED))
     items.add_child(_make_label("ESC — вернуться к игре", 13, ACCENT))
     backdrop.visible = false

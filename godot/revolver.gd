@@ -118,6 +118,7 @@ func _shoot() -> void:
     cylinder.rotate_object_local(Vector3.UP, PI / 3)
     flash.light_energy = 3.6
     report.play()
+    player.call("emit_noise", 1.0)
     var start := eye.global_position
     var direction := _shot_direction()
     bloom = minf(2.5, bloom + 1.05)

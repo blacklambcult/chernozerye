@@ -183,5 +183,9 @@ func _draw() -> void:
     draw_count += 1
     _draw_compass(size.x)
     _draw_health(size.y)
+    if player != null:
+        _write(18, size.y - 32, "ШУМ", 10, MUTED)
+        draw_rect(Rect2(55, size.y - 39, 165, 4), FRAME_STROKE)
+        draw_rect(Rect2(55, size.y - 39, 165 * float(player.get("noise_level")), 4), GOLD)
     _draw_slots(size.x, size.y)
     _draw_reticle()
