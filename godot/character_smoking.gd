@@ -7,6 +7,7 @@ enum Phase { IDLE, PACK, RETRIEVE, LIGHT_CUT, MOVE_TO_FACE, BURN, LOWER, DISCARD
 
 const BURN_SECONDS := 120.0
 const MAX_STUBS := 6
+const MOUTH_REST := Vector3(0.035, -0.155, -0.205)
 var phase: Phase = Phase.IDLE
 var phase_elapsed := 0.0
 var burn_elapsed := 0.0
@@ -23,6 +24,7 @@ var mouth_prop: Node3D
 var mouth_paper: Node3D
 var embers: MeshInstance3D
 var smoke: CPUParticles3D
+var ember_light: OmniLight3D
 var active_visual := false
 
 func _material(tint: Color, unlit: bool = false) -> StandardMaterial3D:
@@ -131,32 +133,58 @@ func _ready() -> void:
     # Most of the prop is naturally clipped by the camera, with only a small
     # forward tip briefly visible along the lower edge. The previous position
     # projected a large detached prop into the middle of the screen.
-    mouth_prop.position = Vector3(0.035,-0.155,-0.14)
+    mouth_prop.position = MOUTH_REST
     mouth_prop.rotation_degrees = Vector3(-68.0,0.0,-14.0)
     mouth_prop.scale = Vector3(0.80,0.80,0.80)
     add_child(mouth_prop)
     mouth_paper = _prop(mouth_prop,"FadingProp")
     embers = mouth_paper.get_node("DimEmber") as MeshInstance3D
+    # The tiny lip-edge attachment stays in front of the carried weapon.
+    # Its meshes do not compete with world geometry for the depth buffer.
+    for part in mouth_paper.get_children():
+        if part is MeshInstance3D:
+            var surface_mat := part.material_override as StandardMaterial3D
+            surface_mat.no_depth_test = true
+            surface_mat.render_priority = 2
+    var ember_mat := embers.material_override as StandardMaterial3D
+    ember_mat.emission_enabled = true
+    ember_mat.emission = Color("#ff6c2e")
+    ember_mat.emission_energy_multiplier = 1.8
+    ember_light = OmniLight3D.new()
+    ember_light.name = "SubtleEmberGlow"
+    ember_light.position = Vector3(0, 0.09, 0)
+    ember_light.light_color = Color("#ff7a3b")
+    ember_light.light_energy = 0.14
+    ember_light.omni_range = 0.70
+    ember_light.shadow_enabled = false
+    mouth_prop.add_child(ember_light)
     mouth_prop.visible = false
     smoke = CPUParticles3D.new()
     smoke.name = "SparseAmbientSmoke"
     smoke.position = Vector3(0.0,0.10,0.0)
-    smoke.amount = 3
-    smoke.lifetime = 1.6
+    smoke.amount = 12
+    smoke.lifetime = 2.2
     smoke.direction = Vector3(0,1,0)
-    smoke.spread = 15.0
-    smoke.initial_velocity_min = 0.05
-    smoke.initial_velocity_max = 0.13
-    smoke.gravity = Vector3(0,0.045,0)
+    smoke.spread = 22.0
+    smoke.initial_velocity_min = 0.035
+    smoke.initial_velocity_max = 0.11
+    smoke.gravity = Vector3(0,0.025,0)
     smoke.local_coords = false
     var quad := QuadMesh.new()
-    quad.size = Vector2(0.012,0.012)
-    var sm := _material(Color(0.68,0.70,0.71,0.10),true)
+    quad.size = Vector2(0.020,0.020)
+    var sm := _material(Color(0.68,0.70,0.71,0.16),true)
     sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
     sm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
     sm.cull_mode = BaseMaterial3D.CULL_DISABLED
     quad.material = sm
     smoke.mesh = quad
+    var fade := Gradient.new()
+    fade.set_offsets(PackedFloat32Array([0.0, 0.25, 1.0]))
+    fade.set_colors(PackedColorArray([
+        Color(0.69, 0.68, 0.65, 0.0),
+        Color(0.70, 0.71, 0.72, 0.45),
+        Color(0.70, 0.71, 0.72, 0.0)]))
+    smoke.color_ramp = fade
     mouth_prop.add_child(smoke)
     smoke.emitting = false
     _render_phase()
@@ -169,8 +197,8 @@ func _phase_length() -> float:
         Phase.LIGHT_CUT: return 0.82
         Phase.MOVE_TO_FACE: return 0.75
         Phase.BURN: return BURN_SECONDS
-        Phase.LOWER: return 0.70
-        Phase.DISCARD: return 0.75
+        Phase.LOWER: return 0.55
+        Phase.DISCARD: return 0.30
     return 0.0
 
 func _set_phase(next_phase: Phase) -> void:
@@ -234,18 +262,27 @@ func _process(delta: float) -> void:
     _advance(delta)
 
 func _render_phase() -> void:
+    var gun: Node3D = player.get("revolver") if player != null else null
+    var weapon_drawn := gun != null and gun.visible
     gesture.visible = phase in [Phase.PACK,Phase.RETRIEVE,
-        Phase.LIGHT_CUT,Phase.MOVE_TO_FACE,Phase.LOWER,Phase.DISCARD]
-    pack.visible = phase in [Phase.PACK,Phase.RETRIEVE]
-    lighter.visible = phase == Phase.LIGHT_CUT
+        Phase.LIGHT_CUT,Phase.MOVE_TO_FACE] and not weapon_drawn
+    pack.visible = phase in [Phase.PACK,Phase.RETRIEVE] and not weapon_drawn
+    lighter.visible = phase == Phase.LIGHT_CUT and not weapon_drawn
     var view_camera := get_parent() as Camera3D
     var gaze_down := view_camera != null and view_camera.rotation.x < -0.75
     # Looking down moves the actual mouth outside the visible field; the
     # camera-anchored visual must follow that occlusion instead of floating
     # across the player's torso.
-    mouth_prop.visible = phase == Phase.BURN and not gaze_down
+    mouth_prop.visible = phase in [Phase.BURN, Phase.LOWER] and not gaze_down
     hand_prop.visible = phase in [Phase.RETRIEVE,Phase.LIGHT_CUT,
-        Phase.MOVE_TO_FACE,Phase.LOWER,Phase.DISCARD]
+        Phase.MOVE_TO_FACE] and not weapon_drawn
+    mouth_prop.position = MOUTH_REST
+    mouth_prop.rotation_degrees = Vector3(-68.0, 0.0, -14.0)
+    if phase == Phase.LOWER:
+        # Automatic spit-out: the protagonist does not take it in his hand.
+        var spit_t := clampf(phase_elapsed / _phase_length(), 0.0, 1.0)
+        mouth_prop.position += Vector3(0.23, -0.30, -0.38) * spit_t
+        mouth_prop.rotation_degrees += Vector3(-55.0, 0.0, -90.0) * spit_t
     if gesture.visible:
         # One cinematic silhouette; never keep the arm up during the
         # two-minute ambient state.
@@ -254,17 +291,13 @@ func _render_phase() -> void:
         if phase == Phase.MOVE_TO_FACE:
             hand.position = hand.position.lerp(Vector3(0.14,-0.20,-0.36),
                 smoothstep(0.0,1.0,t))
-        elif phase == Phase.LOWER:
-            hand.position = Vector3(0.14,-0.20,-0.36).lerp(
-                Vector3(0.35,-0.58,-0.65),smoothstep(0.0,1.0,t))
-        elif phase == Phase.DISCARD:
-            hand.position = Vector3(0.34,-0.55,-0.63).lerp(
-                Vector3(0.55,-0.77,-0.73),smoothstep(0.0,1.0,t))
-        hand.rotation = Vector3(-0.12,-0.25,-0.24)
+         hand.rotation = Vector3(-0.12,-0.25,-0.24)
         if phase == Phase.MOVE_TO_FACE:
             hand.rotation.y = -0.35
     smoke.emitting = phase == Phase.BURN and mouth_prop.visible
+    ember_light.visible = mouth_prop.visible
     if phase == Phase.BURN:
+        ember_light.light_energy = 0.13 + 0.035 * sin(burn_elapsed * 5.5)
         var portion := clampf(burn_elapsed/BURN_SECONDS,0,1)
         mouth_paper.scale.y = lerpf(1.0,0.28,portion)
         var ember_color := Color("#ac4834").lerp(Color("#ce6940"),

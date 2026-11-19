@@ -2,18 +2,24 @@ extends Node3D
 # Camera-space prop and arcade interaction with the first solid world surface.
 const REST := Vector3(0.23, -0.19, -0.53)
 const CAPACITY := 6
-const OUTDOOR_REPORT := preload("res://revolver_report.wav")
-const INDOOR_REPORT := preload("res://revolver_report_room.wav")
+const SHOT_STREAM := preload("res://audio/revolver_shot.ogg")
+const COCK_STREAM := preload("res://audio/revolver_cock.ogg")
+const CYLINDER_STREAM := preload("res://audio/revolver_cylinder.ogg")
+const RELOAD_SECONDS := 1.55
 var indoors := false
 var rounds := CAPACITY
 var cooldown := 0.0
 var reload_left := 0.0
 var bloom := 0.0
 var pending := false
+var cocked := false
+var last_action := "idle"
 var eye: Camera3D
 var player: CharacterBody3D
 var flash := OmniLight3D.new()
 var report := AudioStreamPlayer.new()
+var cock_audio := AudioStreamPlayer.new()
+var cylinder_audio := AudioStreamPlayer.new()
 var marks: Array[MeshInstance3D] = []
 var impact_sounds := {
     &"soil": preload("res://impacts/soil.wav"),
@@ -74,26 +80,50 @@ func _ready() -> void:
     flash.visible = false
     add_child(flash)
     report.bus = &"Effects"
-    report.stream = OUTDOOR_REPORT
+    report.stream = SHOT_STREAM
     report.max_polyphony = 3
     report.volume_db = -3.0
     add_child(report)
+    cock_audio.stream = COCK_STREAM
+    cock_audio.bus = &"Effects"
+    cock_audio.volume_db = -5.0
+    add_child(cock_audio)
+    cylinder_audio.stream = CYLINDER_STREAM
+    cylinder_audio.bus = &"Effects"
+    cylinder_audio.volume_db = -8.0
+    add_child(cylinder_audio)
 
 func equip(value: bool) -> void:
     visible = value
     if not value:
         pending = false
+        cocked = false
         reload_left = 0.0
         flash.visible = false
+        last_action = "holstered"
 
 func request_shot() -> void:
-    if visible and rounds > 0 and cooldown <= 0 and reload_left <= 0:
+    if not visible or rounds <= 0 or cooldown > 0.0 or reload_left > 0.0:
+        return
+    if not cocked:
+        # Alternating game inputs: first click raises the hammer, second fires.
+        cocked = true
+        last_action = "cock"
+        cock_audio.pitch_scale = randf_range(0.98, 1.02)
+        cock_audio.play()
+    else:
+        cocked = false
+        last_action = "fire"
         pending = true
 
 func reload() -> void:
     if visible and rounds < CAPACITY and reload_left <= 0:
         pending = false
-        reload_left = 0.95
+        cocked = false
+        last_action = "reload"
+        reload_left = RELOAD_SECONDS
+        cylinder_audio.pitch_scale = 1.0
+        cylinder_audio.play()
 
 func _physics_process(delta: float) -> void:
     bloom = move_toward(bloom, 0.0, delta * 1.9)
@@ -109,8 +139,9 @@ func _physics_process(delta: float) -> void:
         if not player.get("controls_locked") and eye.current and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
             _shoot()
     var kick := maxf(0, cooldown - 0.12) / 0.12
-    position = REST + Vector3(0, -0.13 * sin(PI * reload_left / 0.95), kick * 0.045)
-    rotation = Vector3(kick * 0.28,0.19,-0.46 * sin(PI * reload_left / 0.95))
+    var reload_t := sin(PI * reload_left / RELOAD_SECONDS)
+    position = REST + Vector3(0, -0.13 * reload_t + (0.012 if cocked else 0.0), kick * 0.045)
+    rotation = Vector3(kick * 0.28 + (0.045 if cocked else 0.0), 0.19, -0.46 * reload_t)
     flash.visible = cooldown > 0.19
 
 func spread_angle() -> float:
@@ -123,13 +154,16 @@ func _shot_direction() -> Vector3:
     return (eye.global_basis * Vector3(cos(angle)*radius, sin(angle)*radius, -1)).normalized()
 
 func _shoot() -> void:
+    if rounds <= 0:
+        return
+    pending = false
+    cocked = false
+    last_action = "fire"
     rounds -= 1
     cooldown = 0.24
     cylinder.rotate_object_local(Vector3.UP, PI / 3)
     flash.light_energy = 3.6
-    var shot_stream := INDOOR_REPORT if indoors else OUTDOOR_REPORT
-    if report.stream != shot_stream:
-        report.stream = shot_stream
+    report.volume_db = -8.0 if indoors else -3.0
     report.pitch_scale = randf_range(0.97, 1.03)
     report.play()
     player.call("emit_noise", 1.0)

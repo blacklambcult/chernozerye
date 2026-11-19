@@ -1,29 +1,38 @@
 shader_type canvas_item;
 render_mode unshaded;
 
+// Preserve fine silhouettes; pixel structure is a texture, not the entire image.
 uniform sampler2D scene_color : hint_screen_texture, repeat_disable, filter_nearest;
+uniform float virtual_height : hint_range(360.0, 1080.0) = 640.0;
+uniform float pixel_mix : hint_range(0.0, 1.0) = 0.48;
+uniform float cel_strength : hint_range(0.0, 1.0) = 0.36;
 
-float luminance(vec3 color) {
-    return dot(color, vec3(0.299, 0.587, 0.114));
+float luminance(vec3 c) {
+    return dot(c, vec3(0.299, 0.587, 0.114));
 }
 
 void fragment() {
-    vec2 grid = vec2(360.0 * SCREEN_PIXEL_SIZE.y / SCREEN_PIXEL_SIZE.x, 360.0);
-    vec2 pixel = floor(SCREEN_UV * grid);
-    vec2 uv = (pixel + 0.5) / grid;
-    vec3 scene = texture(scene_color, uv).rgb;
+    float h = min(virtual_height, 1.0 / SCREEN_PIXEL_SIZE.y);
+    vec2 grid = vec2(h * SCREEN_PIXEL_SIZE.y / SCREEN_PIXEL_SIZE.x, h);
+    vec2 px = floor(SCREEN_UV * grid);
+    vec2 snapped = (px + 0.5) / grid;
+    vec3 original = texture(scene_color, SCREEN_UV).rgb;
+    vec3 coarse = texture(scene_color, snapped).rgb;
+    vec3 scene = mix(original, coarse, pixel_mix);
 
-    // A short dark rim on the lit side of a strong edge.
-    float lightness = luminance(scene);
-    float neighbor = min(luminance(texture(scene_color, uv - vec2(1.0 / grid.x, 0.0)).rgb),
-                         luminance(texture(scene_color, uv + vec2(0.0, 1.0 / grid.y)).rgb));
-    scene *= 1.0 - 0.23 * smoothstep(0.065, 0.19, lightness - neighbor);
+    // Soft posterization without destroying distant roof lines or tree branches.
+    vec3 stepped = floor(scene * 42.0 + 0.5) / 42.0;
+    scene = mix(scene, stepped, cel_strength);
 
-    // Ordered dithering anchors the color steps to the virtual pixels.
-    vec2 phase = mod(pixel, 2.0);
-    float threshold = (2.0 * mod(phase.x + phase.y, 2.0) + phase.y) / 4.0;
-    scene = floor(scene * 35.0 + 0.55 * threshold + 0.24) / 35.0;
+    // Stylized dark contour only where the original image has strong contrast.
+    vec2 step_uv = SCREEN_PIXEL_SIZE * 1.35;
+    float lum = luminance(original);
+    float neighbor = min(luminance(texture(scene_color, SCREEN_UV + vec2(step_uv.x, 0.0)).rgb),
+                         luminance(texture(scene_color, SCREEN_UV + vec2(0.0, step_uv.y)).rgb));
+    float contour = smoothstep(0.075, 0.23, lum - neighbor);
+    scene *= 1.0 - 0.17 * cel_strength * contour;
+
     vec2 corners = SCREEN_UV * 2.0 - 1.0;
-    float vignette = 1.0 - 0.2 * smoothstep(0.25, 1.85, dot(corners, corners));
+    float vignette = 1.0 - 0.13 * smoothstep(0.36, 1.88, dot(corners, corners));
     COLOR = vec4(scene * vignette, 1.0);
 }

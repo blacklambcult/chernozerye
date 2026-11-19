@@ -216,7 +216,7 @@ func _run() -> void:
     if not face_prop.visible:
         _fail("mouth-edge visual absent during ambient state")
         return
-    if absf(face_prop.position.x) > 0.05 or face_prop.position.z < -0.19:
+    if absf(face_prop.position.x) > 0.05 or face_prop.position.z < -0.23:
         _fail("ambient prop drifts into center screen instead of lip edge")
         return
     if face_prop.rotation_degrees.x > -55.0:
@@ -234,6 +234,18 @@ func _run() -> void:
         return
     if (sequence.get("gesture") as Node3D).visible:
         _fail("gesture remains on screen during two-minute ambient state")
+        return
+    # Reproduce the original bug through real Player input, not direct equip().
+    var equip_key := InputEventKey.new()
+    equip_key.physical_keycode = KEY_2
+    equip_key.pressed = true
+    actor.call("_input", equip_key)
+    if int(hud.get("selected_slot")) != 1 or not actor.revolver.visible:
+        _fail("weapon slot blocked by ongoing cigarette visual")
+        return
+    sequence.call("_render_phase")
+    if not face_prop.visible or not (sequence.get("smoke") as CPUParticles3D).emitting:
+        _fail("mouth prop disappears when revolver is equipped")
         return
     sequence.call("_advance",60.0)
     if absf(float(sequence.get("burn_elapsed")) - 60.0) > 0.2:

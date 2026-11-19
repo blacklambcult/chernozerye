@@ -201,8 +201,8 @@ func _input(event: InputEvent) -> void:
         if key.pressed and not key.echo and key.physical_keycode in [KEY_1, KEY_2, KEY_3, KEY_4]:
             var survival_hud := get_parent().get_node_or_null("GameplayHUD/SurvivalHUD")
             if survival_hud != null:
-                if int(_character_sequence.get("phase")) != 0:
-                    return
+                # Inventory selection stays responsive during the ambient visual.
+                # The cigarette is a separate camera attachment, not a hand item.
                 survival_hud.call("choose_slot", int(key.physical_keycode) - KEY_1)
                 revolver.equip(_armed_slot())
         if key.pressed and not key.echo and _matches(key, KEY_R, "к"):

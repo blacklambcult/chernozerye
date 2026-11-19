@@ -78,7 +78,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for script in world.gd player.gd geography_v07.gd live_map_v08.gd overture_3d_a.gd manual_geo.gd manual_art.gd izba_variants.gd logo_data.gd story_prologue.gd collision_regression.gd first_person_body.gd modeled_character.gd modeled_character_regression.gd fps_viewmodel.gd viewmodel_regression.gd gameplay_hud.gd character_smoking.gd pause_overlay.gd pause_regression.gd body_gait_regression.gd body_view_regression.gd; do
+          for script in world.gd player.gd geography_v07.gd live_map_v08.gd overture_3d_a.gd manual_geo.gd manual_art.gd izba_variants.gd logo_data.gd story_prologue.gd collision_regression.gd first_person_body.gd modeled_character.gd modeled_character_regression.gd fps_viewmodel.gd viewmodel_regression.gd gameplay_hud.gd character_smoking.gd revolver.gd revolver_cycle_regression.gd pause_overlay.gd pause_regression.gd body_gait_regression.gd body_view_regression.gd; do
             echo "Checking ${script}"
             godot --headless --path godot --check-only --script "res://${script}"
           done
@@ -131,6 +131,13 @@ jobs:
           set -euo pipefail
           godot --headless --path godot --script res://viewmodel_regression.gd 2>&1 | tee /tmp/viewmodel-regression.log
           grep -q "VIEWMODEL_REGRESSION_OK: item_only=true spread=true recoil=true" /tmp/viewmodel-regression.log
+
+      - name: Regression-test two-click revolver cycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path godot --script res://revolver_cycle_regression.gd 2>&1 | tee /tmp/revolver-cycle-regression.log
+          grep -q "REVOLVER_CYCLE_REGRESSION_OK: clicks=12 shots=6 reload=true sfx=true" /tmp/revolver-cycle-regression.log
 
       - name: Regression-test pause and mouse sensitivity
         shell: bash

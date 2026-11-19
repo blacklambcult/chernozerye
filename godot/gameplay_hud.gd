@@ -155,7 +155,8 @@ func _draw_slots(view_width: float, view_height: float) -> void:
     if selected_slot == 1 and player != null:
         var gun: Node3D = player.get("revolver")
         var status := "ПЕРЕЗАРЯДКА" if float(gun.get("reload_left")) > 0 else "%d / 6" % int(gun.get("rounds"))
-        _write(x0, y + 72, status + "    ЛКМ — ОГОНЬ    R — ЗАРЯДИТЬ", 11, GOLD)
+        var action := "ЛКМ — ВЫСТРЕЛ" if bool(gun.get("cocked")) else "ЛКМ — ВЗВЕСТИ"
+        _write(x0, y + 72, status + "    " + action + "    R — ЗАРЯДИТЬ", 11, GOLD)
     else:
         _write(x0, y + 72, "1 ПАЧКА · V ДЕЙСТВИЕ     2 РЕВОЛЬВЕР", 11, MUTED)
 
