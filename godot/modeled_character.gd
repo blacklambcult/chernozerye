@@ -4,6 +4,10 @@ extends Node3D
 
 const FULL_ASSET_PATH := "res://assets/dembel_full.glb"
 const FPS_ASSET_PATH := "res://assets/dembel_fp.glb"
+# The camera sits at the FRONT of the hero's head; the torso sits behind
+# the eyes. Offset ONLY the first-person visual asset, not the camera,
+# collider, interaction ray or external F4 inspection model.
+const FPS_BODY_BACK_OFFSET := 0.24
 
 var actor: CharacterBody3D
 var full_body: Node3D
@@ -95,6 +99,11 @@ func _ready() -> void:
     full_body.name = "FullCharacter"
     add_child(first_person_body)
     add_child(full_body)
+    # At zero offset the viewer looks vertically into the coat's open
+    # collar, turning its 8-sided rim into an enormous central polygon.
+    # With the visual body behind the eyes, jacket stays along the lower
+    # edge and both boots remain farther ahead in downward projection.
+    first_person_body.position.z = FPS_BODY_BACK_OFFSET
     left_hip = _part(first_person_body,"LeftLegPivot")
     right_hip = _part(first_person_body,"RightLegPivot")
     left_knee = _part(first_person_body,"LeftKneePivot")
@@ -125,7 +134,7 @@ func _ready() -> void:
     if legacy != null:
         legacy.visible = false
     model_loaded = true
-    print("MODELED_CHARACTER_READY: separate_glb=true solid_fps_torso=true opaque_pelvis=true full_f4=true legacy_hidden=true")
+    print("MODELED_CHARACTER_READY: separate_glb=true solid_fps_torso=true opaque_pelvis=true full_f4=true legacy_hidden=true camera_forward_of_torso=true")
 
 
 func set_inspection_mode(enabled: bool) -> void:

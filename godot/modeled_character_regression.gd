@@ -51,6 +51,37 @@ func _run() -> void:
     var left_rest := left.position
     var right_rest := right.position
     var camera := player.get_node("Camera3D") as Camera3D
+    var body_offset := float(rig.get("FPS_BODY_BACK_OFFSET"))
+    if absf(fp.position.z - body_offset) > 0.001 or body_offset < 0.20:
+        _fail("the camera is still directly above the open coat collar")
+        return
+    if absf(camera.position.z) > 0.001:
+        _fail("gameplay camera was moved instead of the FPS visual body")
+        return
+    # Test what actually projects into the screen when looking down.
+    # The old checks only tested material/mesh existence and completely
+    # missed a giant eight-sided collar covering the viewport center.
+    camera.rotation.x = -1.45
+    var bounds := chest.mesh.get_aabb()
+    var top := bounds.position.y + bounds.size.y
+    var most_central_rim := -100.0
+    for z in [bounds.position.z, bounds.position.z + bounds.size.z]:
+        var camera_point := camera.to_local(chest.to_global(Vector3(0.0, top, z)))
+        if camera_point.z >= -camera.near:
+            _fail("coat collar is inside the camera near plane")
+            return
+        most_central_rim = maxf(most_central_rim, camera_point.y / -camera_point.z)
+    if most_central_rim > -0.25:
+        _fail("open coat collar covers the center of downward FPS view")
+        return
+    var toe := fp.find_child("LeftBootToe",true,false) as MeshInstance3D
+    if toe == null:
+        _fail("real imported FPS boot is missing")
+        return
+    var camera_toe := camera.to_local(toe.global_position)
+    if camera_toe.z >= -camera.near or camera_toe.y / -camera_toe.z < most_central_rim + 0.09:
+        _fail("boot projects behind the coat instead of ahead of it")
+        return
     for pitch in [0.0,-0.5,-1.0,-1.45]:
         camera.rotation.x = pitch
         for step in range(24):
@@ -69,5 +100,5 @@ func _run() -> void:
     if not fp.visible or full.visible or legacy.visible:
         _fail("F4 return failed")
         return
-    print("MODELED_CHARACTER_REGRESSION_OK: two_glbs=true solid_torso=true closed_pelvis=true separate_f4=true stable_legs=true legacy_hidden=true")
+    print("MODELED_CHARACTER_REGRESSION_OK: two_glbs=true solid_torso=true closed_pelvis=true separate_f4=true stable_legs=true legacy_hidden=true coat_below_center=true boots_ahead=true")
     quit(0)
