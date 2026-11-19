@@ -87,7 +87,7 @@ jobs:
           encoded = Path("data/forge_pistol.glb.xz.b64").read_text().strip()
           payload = lzma.decompress(base64.b64decode(encoded, validate=True))
           digest = hashlib.sha256(payload).hexdigest()
-          assert digest == "401c46ea34218d7ccf9247f32989ffff1819a3302752ac81c582afdaa55adb16", digest
+          assert digest == "0eea0b0e3e61f41033df60b8e1b50933b743e87a07ce798e7c963bad1f256a6e", digest
           magic, version, size = struct.unpack_from("<III", payload, 0)
           assert magic == 0x46546C67 and version == 2 and size == len(payload)
           json_size, chunk = struct.unpack_from("<II", payload, 12)
@@ -484,8 +484,13 @@ jobs:
           const profile = JSON.parse(fs.readFileSync("godot/assets/forge_pistol.viewmodel.json", "utf8"));
           assert.equal(profile.format, "chernozerye.forge.viewmodel");
           assert.equal(profile.version, 1);
-          assert.deepEqual(profile.viewmodel, forge.normalizeViewmodel());
-          console.log("FORGE_VIEWMODEL_PROFILE_OK: default=shared scale=0.26 hand=true");
+          assert.deepEqual(profile.viewmodel, forge.normalizeViewmodel(profile.viewmodel));
+          assert.equal(profile.viewmodel.scale, 0.32);
+          assert.deepEqual(profile.viewmodel.position, [0.285,-0.225,-0.47]);
+          assert.deepEqual(profile.viewmodel.rotation, [0,9,0]);
+          assert.deepEqual(profile.viewmodel.hand_position, [-0.01,0.06,-0.01]);
+          assert.deepEqual(profile.viewmodel.hand_rotation, [0,0,0]);
+          console.log("FORGE_VIEWMODEL_PROFILE_OK: user_pose=true scale=0.32 hand=true");
           NODE
           mkdir -p build/web/forge
           cp -a site/forge/. build/web/forge/

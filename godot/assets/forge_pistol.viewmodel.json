@@ -2,10 +2,26 @@
   "format": "chernozerye.forge.viewmodel",
   "version": 1,
   "viewmodel": {
-    "position": [0.285, -0.225, -0.47],
-    "rotation": [0, 9, 0],
-    "scale": 0.26,
-    "hand_position": [0.025, -0.015, 0.035],
-    "hand_rotation": [0, 0, 0]
+    "position": [
+      0.285,
+      -0.225,
+      -0.47
+    ],
+    "rotation": [
+      0,
+      9,
+      0
+    ],
+    "scale": 0.32,
+    "hand_position": [
+      -0.01,
+      0.06,
+      -0.01
+    ],
+    "hand_rotation": [
+      0,
+      0,
+      0
+    ]
   }
 }

@@ -32,11 +32,17 @@ func _run() -> void:
     if revolver_hand.find_children("*", "MeshInstance3D", true, false).size() < 8:
         _fail("revolver wrist and fingers do not have visible geometry")
         return
-    if not is_equal_approx(float(pistol.get("model_scale")), 0.26):
+    if not is_equal_approx(float(pistol.get("model_scale")), 0.32):
         _fail("pistol remains at its old undersized viewmodel scale")
         return
     if (pistol.position - Vector3(0.285, -0.225, -0.47)).length() > 0.001:
         _fail("Forge camera-relative pose was not loaded")
+        return
+    if (pistol_hand.position - Vector3(-0.01, 0.06, -0.01)).length() > 0.001:
+        _fail("new author-positioned viewmodel hand was not applied")
+        return
+    if (pistol.rotation - Vector3(0.0, deg_to_rad(9.0), 0.0)).length() > 0.001:
+        _fail("new author-selected rotation did not load")
         return
     var model := pistol.get("imported_model") as Node3D
     if model.find_children("*", "MeshInstance3D", true, false).size() < 10:
