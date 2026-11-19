@@ -527,11 +527,17 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault(); deleteSelected();
   } else if (event.code === "Escape") select(null);
 });
+let lastCanvasWidth = -1;
+let lastCanvasHeight = -1;
 function resize() {
   const bounds = canvas.getBoundingClientRect();
   const w = Math.max(1, Math.floor(bounds.width));
   const h = Math.max(1, Math.floor(bounds.height));
-  if (w === renderer.domElement.width && h === renderer.domElement.height) return;
+  // setSize works in CSS pixels; canvas.width is in *device* pixels.
+  // Comparing those values would resize the WebGL renderer every frame on HiDPI screens.
+  if (w === lastCanvasWidth && h === lastCanvasHeight) return;
+  lastCanvasWidth = w;
+  lastCanvasHeight = h;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
