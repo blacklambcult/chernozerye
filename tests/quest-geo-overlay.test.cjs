@@ -4,13 +4,13 @@ const layers = require("../site/quest/geo-overlay-core.js");
 const geo = require("../site/map/editor-core.js");
 
 test("Quest Lab reads exactly the same saved Geo Lab feature collection without modifying it", () => {
-  const building = geo.makeFeature("house", { type:"Polygon", coordinates:[[
+  const building = geo.makeFeature("house-01", "house", { type:"Polygon", coordinates:[[
     [55.852,54.672],[55.8522,54.672],[55.8522,54.6722],[55.852,54.6722],[55.852,54.672]
   ]]});
-  const forest = geo.makeFeature("forest", { type:"Polygon", coordinates:[[
+  const forest = geo.makeFeature("forest-01", "forest", { type:"Polygon", coordinates:[[
     [55.853,54.672],[55.8532,54.672],[55.8532,54.6722],[55.853,54.6722],[55.853,54.672]
   ]]});
-  const water = geo.makeFeature("water", { type:"Polygon", coordinates:[[
+  const water = geo.makeFeature("water-01", "water", { type:"Polygon", coordinates:[[
     [55.854,54.672],[55.8542,54.672],[55.8542,54.6722],[55.854,54.6722],[55.854,54.672]
   ]]});
   const doc = geo.collectionFromFeatures([building,forest,water]);

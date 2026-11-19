@@ -24,6 +24,7 @@
   let manualRaw = undefined;
   let geoReadyCount = 0;
   let geoSourceFailures = 0;
+  let manualCount = 0;
   const geoPublished = [];
 
 
@@ -253,7 +254,7 @@
     renderMapPins();
     setMode(mode === "step" && (!step() || step().type === "message") ? "spawn" : mode);
   }
-  function updateGeoStatus(manualCount = 0) {
+  function updateGeoStatus() {
     if (!Geo || !GeoEditor) {
       $("geo-layer-status").textContent = "GEO LAB / МОДУЛЬ НЕДОСТУПЕН";
       $("geo-layer-status").classList.add("warning");
@@ -297,7 +298,8 @@
       manualLayer = next;
       manualRaw = raw;
       if (geoEnabled && manualLayer) manualLayer.addTo(map);
-      updateGeoStatus(features.length);
+      manualCount = features.length;
+      updateGeoStatus();
     } catch (error) {
       console.warn("QUEST_GEO_MANUAL_INVALID", error);
       $("geo-layer-status").textContent = "GEO LAB / ПРОВЕРЬ ЧЕРНОВИК";
@@ -321,9 +323,9 @@
         geoSourceFailures++;
         console.warn("QUEST_GEO_LAYER_FAILED", spec.file, error);
       }
-      refreshGeoManual(true);
+      updateGeoStatus();
     }));
-    refreshGeoManual(true);
+    refreshGeoManual();
   }
   function toggleGeoLayers() {
     geoEnabled = !geoEnabled;

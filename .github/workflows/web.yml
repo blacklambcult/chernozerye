@@ -404,13 +404,18 @@ jobs:
           node --check site/quest/quest-core.js
           node --check site/quest/quest.js
           node --test tests/quest-core.test.cjs
-          grep -q 'quest.js?v=1' site/quest/index.html
+          node --check site/quest/geo-overlay-core.js
+          node --test tests/quest-geo-overlay.test.cjs
+          grep -q 'quest.js?v=2' site/quest/index.html
+          grep -q 'geo-overlay-core.js?v=1' site/quest/index.html
+          grep -q '../map/editor-core.js?v=20' site/quest/index.html
           grep -q 'href="../quest/"' site/map/index.html
           mkdir -p build/web/quest
           cp -a site/quest/. build/web/quest/
           test -s build/web/quest/index.html
           test -s build/web/quest/quest.js
           test -s build/web/quest/quest-core.js
+          test -s build/web/quest/geo-overlay-core.js
           # Model Lab: model format and control logic must pass before deployment.
           node --check site/model/model-core.js
           node --check site/model/model.mjs
@@ -428,6 +433,8 @@ jobs:
           node --check site/studio/studio.js
           node --test tests/studio-state.test.cjs
           grep -q 'studio-state.js?v=1' site/studio/index.html
+          grep -q 'studio.js?v=2' site/studio/index.html
+          grep -q 'id="rail-toggle"' site/studio/index.html
           grep -q 'href="../studio/"' site/map/index.html
           grep -q 'href="../studio/"' site/quest/index.html
           grep -q 'href="../studio/"' site/model/index.html
@@ -436,6 +443,7 @@ jobs:
           test -s build/web/studio/index.html
           test -s build/web/studio/studio-state.js
           test -s build/web/studio/studio.js
+          grep -q 'QuestGeoOverlayRefresh' build/web/studio/studio.js
           grep -q 'editor.js?v=20' site/map/index.html
           grep -q 'editor-core.js?v=20' site/map/index.html
           mkdir -p build/web/map

@@ -29,7 +29,7 @@
     button.setAttribute("aria-expanded", String(!railCollapsed));
     button.title = railCollapsed ? "Развернуть боковую панель (Ctrl+B)" : "Свернуть боковую панель (Ctrl+B)";
     $("rail-chevron").textContent = railCollapsed ? "»" : "«";
-    $(".rail-toggle-text").textContent = railCollapsed ? "РАЗВЕРНУТЬ" : "СВЕРНУТЬ МЕНЮ";
+    document.querySelector(".rail-toggle-text").textContent = railCollapsed ? "РАЗВЕРНУТЬ" : "СВЕРНУТЬ МЕНЮ";
     try { localStorage.setItem(COLLAPSE_KEY, String(railCollapsed)); }
     catch { /* shell navigation still functions without storage */ }
     notifyEditorResize();
@@ -129,6 +129,9 @@
     $("section-kicker").textContent = config.kicker;
     $("section-title").textContent = config.name;
     $("rail-toggle").addEventListener("click", () => setRailCollapsed(!railCollapsed));
+  document.querySelector(".rail").addEventListener("transitionend", (event) => {
+    if (event.propertyName === "width") notifyEditorResize();
+  });
   for (const b of document.querySelectorAll("[data-target]")) {
       const selected = b.dataset.target === id;
       b.classList.toggle("active", selected);
