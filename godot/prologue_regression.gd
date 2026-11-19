@@ -17,6 +17,10 @@ func _run_tests() -> void:
     player.name = "Player"
     player.position = Vector3(-789.7, 0.22, -268.6)
     root.add_child(player)
+    var camera := Camera3D.new()
+    camera.name = "Camera3D"
+    camera.position.y = 1.55
+    player.add_child(camera)
     var story := Node.new()
     story.name = "StoryPrologue"
     story.set_script(load("res://story_prologue.gd"))
@@ -75,17 +79,25 @@ func _run_tests() -> void:
         _fail("interact E cannot enter home")
         return
     var room := Vector3(3200.0, 0.0, 3200.0)
-    player.global_position = room + Vector3(-2.1, 0.25, -0.55)
+    player.global_position = room + Vector3(-2.1, 0.25, 0.65)
+    camera.look_at(camera.global_position + Vector3.BACK)
+    story.call("_interact")
+    if bool(story.get("note_found")):
+        _fail("note can be read while facing away")
+        return
+    camera.look_at(story.call("_target_position", "note"))
     story.call("_interact")
     if not bool(story.get("note_found")):
         _fail("note not interactable")
         return
-    player.global_position = room + Vector3(0, 0.25, -3.35)
+    player.global_position = room + Vector3(0, 0.25, -2.35)
+    camera.look_at(story.call("_target_position", "mask"))
     story.call("_interact")
     if not bool(story.get("mask_found")):
         _fail("mask not interactable")
         return
-    player.global_position = room + Vector3(0, 0.25, 3.65)
+    player.global_position = room + Vector3(0, 0.25, 2.1)
+    camera.look_at(story.call("_target_position", "exit"))
     story.call("_interact")
     if bool(story.get("inside_home")) or not bool(story.get("chapter_completed")):
         _fail("prologue does not complete when leaving after both clues")

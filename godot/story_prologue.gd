@@ -12,6 +12,7 @@ const INTERACT_RANGE := 2.8
 const GATE_RANGE := 5.0
 
 var player: CharacterBody3D
+var view_camera: Camera3D
 var home_point := Vector2.ZERO
 var gate_point := Vector2.ZERO
 var inside_home := false
@@ -40,6 +41,7 @@ func _ready() -> void:
     if player == null:
         push_error("STORY_PROLOGUE_ERROR: player missing")
         return
+    view_camera = player.get_node("Camera3D") as Camera3D
     if not _locate_home():
         push_error("STORY_PROLOGUE_ERROR: surveyed home missing")
         return
@@ -184,9 +186,30 @@ func _build_interior() -> void:
             Vector3(0.18, 0.16, 0.035), Color("#211d1c"), false)
     _solid_box("Дверная рама", Vector3(0, 1.16, 3.85),
         Vector3(1.35, 2.3, 0.13), Color("#2b2824"), false)
-    interior.add_child(_story_marker("ЗАПИСКА", Vector3(-2.1, 1.12, -0.55), Color("#baa98d"), 22))
-    interior.add_child(_story_marker("МАСКА", Vector3(0, 2.55, -3.70), Color("#8ca9b2"), 22))
-    interior.add_child(_story_marker("ВЫХОД", Vector3(0, 2.65, 3.72), Color("#a8a29a"), 23))
+    # A recessed-looking frosted sash on the west wall lights the writing surface.
+    var glass := _solid_box("Матовое окно", Vector3(-4.34, 1.85, -0.55),
+        Vector3(0.08, 1.24, 1.60), Color("#82969c"), false)
+    var pane := glass.get_child(0) as MeshInstance3D
+    var pane_material := pane.material_override as StandardMaterial3D
+    pane_material.emission_enabled = true
+    pane_material.emission = Color("#597382")
+    for height in [1.19, 1.85, 2.51]:
+        _solid_box("Оконный переплёт", Vector3(-4.27, height, -0.55),
+            Vector3(0.14, 0.075, 1.78), Color("#403a31"), false)
+    for depth in [-1.39, -0.55, 0.29]:
+        _solid_box("Оконная стойка", Vector3(-4.27, 1.85, depth),
+            Vector3(0.14, 1.38, 0.08), Color("#403a31"), false)
+    var daylight := OmniLight3D.new()
+    daylight.position = Vector3(-3.85, 1.88, -0.55)
+    daylight.light_color = Color("#bdced9")
+    daylight.light_energy = 1.25
+    daylight.omni_range = 4.6
+    interior.add_child(daylight)
+    for i in range(3):
+        _solid_box("Выцветшие строки", Vector3(-2.16, 0.766, -0.64 + i * 0.068),
+            Vector3(0.29 - i * 0.035, 0.004, 0.018), Color("#574f45"), false)
+    _solid_box("Дверная ручка", Vector3(0.46, 1.02, 3.73),
+        Vector3(0.17, 0.065, 0.12), Color("#827760"), false)
     var light := OmniLight3D.new()
     light.name = "Остывшая комната"
     light.position = Vector3(0, 3.1, 0.3)
@@ -318,11 +341,11 @@ func _update_journal() -> void:
 func _target_position(id: String) -> Vector3:
     match id:
         "note":
-            return ROOM_ORIGIN + Vector3(-2.1, 0.85, -0.55)
+            return ROOM_ORIGIN + Vector3(-2.1, 0.765, -0.55)
         "mask":
-            return ROOM_ORIGIN + Vector3(0, 1.65, -3.65)
+            return ROOM_ORIGIN + Vector3(0, 1.86, -3.72)
         "exit":
-            return ROOM_ORIGIN + Vector3(0, 0.85, 3.65)
+            return ROOM_ORIGIN + Vector3(0, 1.16, 3.76)
     return _gate_location()
 
 func _home_bearing() -> String:
@@ -381,13 +404,15 @@ func _update_focus() -> void:
         if not mask_found:
             candidates.append("mask")
         candidates.append("exit")
-        var closest := INF
+        var best_alignment := cos(deg_to_rad(28.0))
         for key in candidates:
-            var target: Vector3 = _target_position(key)
-            var d: float = player.global_position.distance_to(target)
-            if d < closest and d <= INTERACT_RANGE:
+            var to_target := _target_position(key) - view_camera.global_position
+            if to_target.length_squared() > INTERACT_RANGE * INTERACT_RANGE:
+                continue
+            var alignment := -view_camera.global_basis.z.dot(to_target.normalized())
+            if alignment > best_alignment and view_camera.current:
                 focus = str(key)
-                closest = d
+                best_alignment = alignment
         match focus:
             "note":
                 hint = "[E / У] Осмотреть записку"
