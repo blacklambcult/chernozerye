@@ -449,18 +449,35 @@ func _batch_quad(key: String, a: Vector3, b: Vector3, c: Vector3, d: Vector3) ->
     _batch_tri(key, a, b, c)
     _batch_tri(key, a, c, d)
 
-func _create_solid_mesh(verts: PackedVector3Array, color: Color, label: String) -> void:
+func _create_solid_mesh(verts: PackedVector3Array, color: Color, label: String,
+        timber: bool = false) -> void:
     if verts.is_empty():
         return
     var arrays := []
     arrays.resize(Mesh.ARRAY_MAX)
     arrays[Mesh.ARRAY_VERTEX] = verts
+    var material := _material(color)
+    if timber:
+        # Follow the course of each log, including diagonally oriented houses.
+        var uvs := PackedVector2Array()
+        uvs.resize(verts.size())
+        for i in range(0, verts.size(), 3):
+            var normal := (verts[i + 1] - verts[i]).cross(verts[i + 2] - verts[i])
+            var tangent := Vector3.UP.cross(normal).normalized()
+            if tangent.x < 0 or (is_zero_approx(tangent.x) and tangent.z < 0):
+                tangent = -tangent
+            for j in range(i, i + 3):
+                uvs[j] = Vector2(verts[j].dot(tangent) / 3.4, verts[j].y / 1.6)
+        arrays[Mesh.ARRAY_TEX_UV] = uvs
+        material.albedo_texture = preload("res://textures/weathered_timber.png")
+        material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS_ANISOTROPIC
+        material.albedo_color = Color(color.r * 1.98, color.g * 2.12, color.b * 2.30)
     var mesh := ArrayMesh.new()
     mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
     var node := MeshInstance3D.new()
     node.name = label
     node.mesh = mesh
-    node.material_override = _material(color)
+    node.material_override = material
     node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     add_child(node)
 
@@ -499,9 +516,9 @@ func _flush_details() -> void:
         "lean_to": Color("#46443e"),
         "lean_to_roof": Color("#292f30"),
         "log_course": Color("#35352f"),
-        "log_upper": Color("#574b40"),
+        "log_upper": Color("#554a40"),
         "log_front": Color("#493d35"),
-        "log_lower": Color("#302c29"),
+        "log_lower": Color("#423931"),
         "fascia": Color("#2e3332"),
         "muntin": Color("#383b35"),
         "trim_blue": Color("#5c7775"),
@@ -552,7 +569,8 @@ func _flush_details() -> void:
             lit_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
             add_child(lit_node)
         else:
-            _create_solid_mesh(verts, colors.get(key, Color.WHITE), "Детали фасада / " + str(key))
+            _create_solid_mesh(verts, colors.get(key, Color.WHITE), "Детали фасада / " + str(key),
+                str(key).begins_with("log_"))
 
 func _signed_area(points: PackedVector2Array) -> float:
     var area := 0.0
