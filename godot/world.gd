@@ -223,6 +223,11 @@ func _create_retro_grade() -> void:
     screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
     var grade := ShaderMaterial.new()
     grade.shader = preload("res://retro_grade.gdshader")
+    grade.set_shader_parameter("virtual_height", 420.0)
+    grade.set_shader_parameter("pixel_mix", 0.88)
+    grade.set_shader_parameter("cel_strength", 0.58)
+    grade.set_shader_parameter("poster_levels", 16.0)
+    grade.set_shader_parameter("edge_strength", 0.26)
     screen.material = grade
     layer.add_child(screen)
 
