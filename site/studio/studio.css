@@ -83,3 +83,11 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--hot);outline-offset
  .context{min-height:50px;padding:6px 10px}
  .navitem{min-height:55px}
 }
+
+/* The four editor cards use two balanced columns at desktop widths. */
+.module-grid{grid-template-columns:repeat(2,minmax(0,1fr));max-width:1200px}
+.forge-card{background:#251c20b8;border-color:#704d4c}
+.forge-card .card-icon{color:#ef8f70}
+.forge-card:hover{background:#362629;border-color:#f58c70}
+.forge-nav-icon{color:#e98a70}
+@media(max-width:760px){.module-grid{grid-template-columns:1fr}.forge-card{min-height:170px}}

@@ -7,7 +7,8 @@
     home: {kicker:"SYSTEM / OVERVIEW", name:"ЦЕНТР УПРАВЛЕНИЯ"},
     geo: {kicker:"GEOGRAPHIC WORKSPACE / 01", name:"GEO LAB · РЕДАКТОР МЕСТНОСТИ", url:"../map/", file:"../map/?studio=1"},
     quest: {kicker:"MISSION WORKSPACE / 02", name:"QUEST LAB · РЕДАКТОР КВЕСТОВ", url:"../quest/", file:"../quest/?studio=1"},
-    model: {kicker:"ASSET WORKSPACE / 03", name:"MODEL LAB · 3D-КОНСТРУКТОР", url:"../model/", file:"../model/?studio=1"}
+    model: {kicker:"ASSET WORKSPACE / 03", name:"MODEL LAB · 3D-КОНСТРУКТОР", url:"../model/", file:"../model/?studio=1"},
+    forge: {kicker:"ARMORY ASSET WORKSPACE / 04", name:"HELLISH FORGE · ИГРОВЫЕ МОДЕЛИ", url:"../forge/", file:"../forge/?studio=1"}
   });
   const COLLAPSE_KEY = "chernozerye.studio.rail-collapsed.v1";
   const cached = new Map();
@@ -40,7 +41,7 @@
   let active = null;
   const refreshStats = () => {
     const stats = State.snapshot(localStorage);
-    for (const name of ["geo", "quest", "model"]) {
+    for (const name of ["geo", "quest", "model", "forge"]) {
       $(name + "-count").textContent = stats[name] === null ? "!" : String(stats[name]);
       $(name + "-count").title = stats[name] === null ?
         "Локальный файл не удалось прочитать; скачайте резервную копию из редактора." : "Локальные записи";
@@ -68,14 +69,14 @@
         let url;
         try { url = new URL(link.href, frame.contentWindow.location.href); } catch { return; }
         if (url.origin !== window.location.origin) return;
-        const match = url.pathname.match(/\/chernozerye\/(map|quest|model|studio)\/?$/);
+        const match = url.pathname.match(/\/chernozerye\/(map|quest|model|forge|studio)\/?$/);
         if (!match) return;
         event.preventDefault();
         show(match[1] === "map" ? "geo" : match[1] === "studio" ? "home" : match[1]);
       }, {capture: true});
       doc.addEventListener("keydown", (event) => {
         if (!event.altKey || event.ctrlKey || event.metaKey) return;
-        const next = { Digit0:"home", Digit1:"geo", Digit2:"quest", Digit3:"model" }[event.code];
+        const next = { Digit0:"home", Digit1:"geo", Digit2:"quest", Digit3:"model", Digit4:"forge" }[event.code];
         if (next) { event.preventDefault(); event.stopImmediatePropagation(); show(next); }
       }, {capture: true});
     } catch (error) {
@@ -185,11 +186,11 @@
       return;
     }
     if (!evt.altKey || evt.ctrlKey || evt.metaKey) return;
-    const id = {Digit0:"home",Digit1:"geo",Digit2:"quest",Digit3:"model"}[evt.code];
+    const id = {Digit0:"home",Digit1:"geo",Digit2:"quest",Digit3:"model",Digit4:"forge"}[evt.code];
     if (id) { evt.preventDefault(); show(id); }
   });
   setRailCollapsed(railCollapsed);
   refreshStats();
   show(State.toolId(location.hash), false);
-  console.info("CHERNOZERYE_STUDIO_READY: geo=true quest=true model=true workspace=local");
+  console.info("CHERNOZERYE_STUDIO_READY: geo=true quest=true model=true forge=true workspace=local");
 })();

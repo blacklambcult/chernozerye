@@ -8,9 +8,10 @@
   const KEYS = Object.freeze({
     geo: "chernozerye_manual_geojson_v2",
     quest: "chernozerye.questlab.v1",
-    model: "chernozerye.modellab.v1"
+    model: "chernozerye.modellab.v1",
+    forge: "chernozerye.hellish-forge.v1"
   });
-  const TOOLS = Object.freeze(["home", "geo", "quest", "model"]);
+  const TOOLS = Object.freeze(["home", "geo", "quest", "model", "forge"]);
   function toolId(hash) {
     const id = typeof hash === "string" ? hash.replace(/^#/, "").toLowerCase() : "";
     return TOOLS.includes(id) ? id : "home";
@@ -25,6 +26,8 @@
     if (key === "quest") return data.format === "chernozerye.questlab" && data.version === 1 &&
       Array.isArray(data.quests) ? data.quests.length : null;
     if (key === "model") return data.format === "chernozerye.modellab" && data.version === 1 &&
+      Array.isArray(data.parts) ? data.parts.length : null;
+    if (key === "forge") return data.format === "chernozerye.hellish-forge" && data.version === 1 &&
       Array.isArray(data.parts) ? data.parts.length : null;
     return null;
   }

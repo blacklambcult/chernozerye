@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0c1114">
+  <meta name="description" content="CHERNOZERYE HELLISH FORGE — редактор low-poly моделей для игры.">
+  <title>Чернозёрье / HELLISH FORGE 0.1</title>
+  <link rel="stylesheet" href="./forge.css?v=1">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+    }
+  }
+  </script>
+  <script>if(new URLSearchParams(location.search).has("studio"))document.documentElement.classList.add("studio-embedded");</script>
+  <style>
+    html.studio-embedded .topbar, html.studio-embedded .footer { display:none!important; }
+    html.studio-embedded .app { height:100vh!important; min-height:0!important; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="identity">
+      <div class="mark">Ч</div>
+      <div>
+        <div class="micro amber">CHERNOZERYE / DEVELOPMENT TOOLS</div>
+        <h1>HELLISH FORGE <em>/ 0.1</em></h1>
+      </div>
+    </div>
+    <nav class="navigation" aria-label="Смежные инструменты">
+      <a href="../map/">01 / GEO LAB</a>
+      <a href="../quest/">02 / QUEST LAB</a>
+      <a href="../model/">03 / MODEL LAB</a>
+      <a href="./" aria-current="page">04 / HELLISH FORGE</a>
+      <a href="../studio/">◈ STUDIO</a>
+      <a href="../" class="game-link">↗ ИГРА</a>
+    </nav>
+  </header>
+  <div class="workspace">
+    <aside class="left sidebar" aria-label="Список деталей и готовые шаблоны">
+      <section class="section">
+        <div class="micro amber">01 / ОБЪЕКТ</div>
+        <h2>Адская кузница</h2>
+        <p class="muted-copy">Создавай визуальные модели вымышленных игровых предметов. Назначай роли деталям и цифровые маркеры для Godot.</p>
+        <label for="model-name">Название игрового предмета</label>
+        <input id="model-name" maxlength="90" type="text" value="Новый игровой предмет" autocomplete="off">
+        <label for="forge-group">Категория</label>
+        <select id="forge-group" aria-label="Категория"></select>
+        <label for="forge-subtype">Тип</label>
+        <select id="forge-subtype" aria-label="Тип"></select>
+        <p class="forge-note">Рабочая область — только визуальные игровые ассеты и метки, без реальных механизмов.</p>
+      </section>
+      <section class="section">
+        <div class="section-header"><h3>Заготовки</h3><span class="tag">ПРОТОТИПЫ</span></div>
+        <div class="forge-presets">
+          <button data-preset="forge_demo" type="button" class="preset"><span class="preset-symbol">◇</span><strong>Фантазийный образец</strong><small>4 объёма + метки</small></button>
+          <button data-preset="empty" type="button" class="preset"><span class="preset-symbol">＋</span><strong>Пустой проект</strong><small>Своя геометрия</small></button>
+        </div>
+        <p class="hint">Заготовка заменяет текущий силуэт после подтверждения.</p>
+      </section>
+      <section class="section">
+        <div class="section-header"><h3>Добавить примитив</h3><span class="tag">LOW POLY</span></div>
+        <div class="shape-grid" role="group" aria-label="Примитивы">
+          <button class="shape" data-primitive="box" type="button"><span>▣</span>Куб</button>
+          <button class="shape" data-primitive="cylinder" type="button"><span>▥</span>Цилиндр</button>
+          <button class="shape" data-primitive="sphere" type="button"><span>◉</span>Сфера</button>
+          <button class="shape" data-primitive="cone" type="button"><span>△</span>Конус</button>
+          <button class="shape" data-primitive="plane" type="button"><span>▱</span>Плоскость</button>
+        </div>
+      </section>
+      <section class="section hierarchy-section">
+        <div class="section-header"><h3>Детали и роли</h3><span id="part-count" class="count">0</span></div>
+        <div id="object-list" class="object-list" aria-label="Иерархия деталей"></div>
+        <div class="pair">
+          <button id="duplicate" type="button" class="button secondary" disabled>⧉ Дублировать</button>
+          <button id="delete" type="button" class="button danger" disabled>× Удалить</button>
+        </div>
+      </section>
+      <section class="section bottom">
+        <div class="section-header"><h3>Проект</h3><span class="tag">FORGE / JSON</span></div>
+        <button id="new-project" type="button" class="button secondary full">+ Новая модель</button>
+        <button id="save-json" type="button" class="button secondary full">↓ Скачать проект JSON</button>
+        <label class="button secondary full import" for="load-json">↑ Импортировать JSON
+          <input id="load-json" type="file" accept=".json,application/json" hidden>
+        </label>
+        <p class="hint">JSON позволяет продолжить работу позже. GLB содержит геометрию и именованные опорные узлы для Godot.</p>
+      </section>
+    </aside>
+
+    <main class="center" aria-label="Трёхмерный редактор">
+      <div class="toolbar">
+        <div class="toolbar-heading">
+          <div class="micro amber">02 / РАБОЧАЯ ОБЛАСТЬ</div>
+          <div class="toolbar-title" id="viewport-title">Новая модель</div>
+        </div>
+        <div class="toolbar-actions" role="group" aria-label="Операции над деталями">
+          <button data-mode="translate" class="tool active" aria-pressed="true" type="button" title="Перемещение (W)">↔ <span>Двигать</span></button>
+          <button data-mode="rotate" class="tool" aria-pressed="false" type="button" title="Вращение (E)">⟳ <span>Вращать</span></button>
+          <button data-mode="scale" class="tool" aria-pressed="false" type="button" title="Размер (R)">⌗ <span>Масштаб</span></button>
+          <span class="toolbar-separator"></span>
+          <button id="toggle-grid" class="tool active" type="button" aria-pressed="true" title="Показать или скрыть сетку">▦ <span>Сетка</span></button>
+          <button id="frame-model" class="tool" type="button" title="Показать всю модель (F)">◎ <span>В кадр</span></button>
+        </div>
+      </div>
+      <div class="stage">
+        <canvas id="viewport" tabindex="0" aria-label="3D-просмотр модели; выберите деталь, чтобы редактировать"></canvas>
+        <div class="stage-corner top-left"><span class="live"></span> HELLISH FORGE / GAME ASSET <span class="dim">/ PERSPECTIVE</span></div>
+        <div class="stage-corner top-right">Y ↑ / X → / −Z вперёд<span class="dim"> · METERS</span></div>
+        <div id="webgl-error" class="webgl-error" role="alert" hidden>3D-редактор не загрузился. Нужен браузер с WebGL2 и доступ к библиотеке Three.js.</div>
+        <div id="viewport-hint" class="viewport-hint">ЛКМ — выбрать деталь · ПКМ — перемещать обзор · Колёсико — приблизить · W/E/R — инструменты</div>
+        <div class="stage-corner bottom-right" id="selection-caption">НЕТ ВЫДЕЛЕННОЙ ДЕТАЛИ</div>
+      </div>
+      <div class="view-footer">
+        <span><i class="dot orange"></i> ГЕОМЕТРИЯ / LOW POLY</span>
+        <span><i class="dot teal"></i> GLTF 2.0 / GLB</span>
+        <span id="model-size">ГАБАРИТЫ / —</span>
+      </div>
+    </main>
+
+    <aside class="right sidebar" aria-label="Инспектор выбранной детали">
+      <section class="section inspector-header">
+        <div class="micro amber">03 / ИНСПЕКТОР</div>
+        <h2>Свойства детали</h2>
+        <p class="muted-copy">Выбери деталь в списке или нажми на неё в 3D-окне.</p>
+      </section>
+      <div id="empty-inspector" class="empty-inspector">
+        <div class="empty-icon">⌗</div>
+        <h3>Ничего не выбрано</h3>
+        <p>Добавь примитив слева, чтобы увидеть его размеры, материалы и положение.</p>
+      </div>
+      <div id="part-inspector" hidden>
+        <section class="section">
+          <div class="section-header"><h3>Идентификация</h3><span id="part-kind" class="tag">CUBE</span></div>
+          <label for="part-name">Название</label>
+          <input id="part-name" type="text" maxlength="90" autocomplete="off">
+          <label for="part-role">Роль детали</label>
+          <select id="part-role"></select>
+          <p id="part-id" class="id-caption">part-id</p>
+        </section>
+        <section class="section">
+          <div class="section-header"><h3>Трансформация</h3><span class="tag">XYZ</span></div>
+          <div class="field-group">
+            <label>Позиция / м</label>
+            <div class="triplet" id="position-fields">
+              <label class="axis x"><span>X</span><input aria-label="Положение X" type="number" step=".05" data-field="position" data-index="0"></label>
+              <label class="axis y"><span>Y</span><input aria-label="Положение Y" type="number" step=".05" data-field="position" data-index="1"></label>
+              <label class="axis z"><span>Z</span><input aria-label="Положение Z" type="number" step=".05" data-field="position" data-index="2"></label>
+            </div>
+          </div>
+          <div class="field-group">
+            <label>Вращение / °</label>
+            <div class="triplet" id="rotation-fields">
+              <label class="axis x"><span>X</span><input aria-label="Поворот X" type="number" step="5" data-field="rotation" data-index="0"></label>
+              <label class="axis y"><span>Y</span><input aria-label="Поворот Y" type="number" step="5" data-field="rotation" data-index="1"></label>
+              <label class="axis z"><span>Z</span><input aria-label="Поворот Z" type="number" step="5" data-field="rotation" data-index="2"></label>
+            </div>
+          </div>
+          <div class="field-group">
+            <label>Масштаб</label>
+            <div class="triplet" id="scale-fields">
+              <label class="axis x"><span>X</span><input aria-label="Масштаб X" type="number" min=".02" step=".1" data-field="scale" data-index="0"></label>
+              <label class="axis y"><span>Y</span><input aria-label="Масштаб Y" type="number" min=".02" step=".1" data-field="scale" data-index="1"></label>
+              <label class="axis z"><span>Z</span><input aria-label="Масштаб Z" type="number" min=".02" step=".1" data-field="scale" data-index="2"></label>
+            </div>
+          </div>
+          <button id="reset-transform" type="button" class="button secondary full">Сбросить трансформацию</button>
+        </section>
+        <section class="section">
+          <div class="section-header"><h3>Материал</h3><span class="tag">PBR</span></div>
+          <label for="part-color">Цвет поверхности</label>
+          <div class="color-box"><input id="part-color" aria-label="Выбор цвета" type="color"><span id="color-hex">#977256</span></div>
+          <div id="swatches" class="swatches" aria-label="Палитра материалов"></div>
+          <div class="range-row"><label for="metalness">Металличность</label><output id="metalness-output">0%</output></div>
+          <input id="metalness" type="range" min="0" max="1" step=".05">
+          <div class="range-row"><label for="roughness">Шероховатость</label><output id="roughness-output">85%</output></div>
+          <input id="roughness" type="range" min="0" max="1" step=".05">
+        </section>
+      </div>
+      <section class="section forge-anchor-panel">
+        <div class="section-header"><h3>Опорные маркеры</h3><span class="tag">GODOT / −Z</span></div>
+        <p class="hint">Метки положения и направления в игровых координатах. Ось −Z считается направлением вперёд.</p>
+        <label for="anchor-key">Маркер</label><select id="anchor-key"></select>
+        <label class="anchor-check"><input id="anchor-enabled" type="checkbox"> Активный маркер GLB</label>
+        <div class="field-group"><label>Позиция / метры</label><div class="triplet">
+          <label class="axis x"><span>X</span><input data-anchor-field="position" data-anchor-index="0" type="number" step=".05"></label>
+          <label class="axis y"><span>Y</span><input data-anchor-field="position" data-anchor-index="1" type="number" step=".05"></label>
+          <label class="axis z"><span>Z</span><input data-anchor-field="position" data-anchor-index="2" type="number" step=".05"></label>
+        </div></div>
+        <div class="field-group"><label>Ориентация / градусы</label><div class="triplet">
+          <label class="axis x"><span>X</span><input data-anchor-field="rotation" data-anchor-index="0" type="number" step="5"></label>
+          <label class="axis y"><span>Y</span><input data-anchor-field="rotation" data-anchor-index="1" type="number" step="5"></label>
+          <label class="axis z"><span>Z</span><input data-anchor-field="rotation" data-anchor-index="2" type="number" step="5"></label>
+        </div></div>
+        <div class="pair">
+          <button id="anchor-edit" type="button" class="button secondary">⌖ Настроить в 3D</button>
+          <button id="anchor-snap" type="button" class="button secondary">→ К детали</button>
+        </div>
+        <p class="hint" id="anchor-caption">Метки сохраняются в Forge JSON и GLB.</p>
+      </section>
+      <section class="section export-panel">
+        <div class="section-header"><h3>Экспорт модели</h3><span class="tag">GODOT READY</span></div>
+        <button id="export-glb" class="button primary full" type="button">↓ Экспортировать GLB</button>
+        <p id="save-status" class="save-status" role="status">Локальный проект готов.</p>
+        <p class="hint">GLB содержит меши и материалы; GLB содержит детали и опорные узлы HF_*. Поведение в игре настраивается отдельно.</p>
+      </section>
+    </aside>
+  </div>
+  <footer class="footer"><span>CHERNOZERYE <b>HELLISH FORGE 0.1</b></span><span id="global-status">3D / РЕДАКТОР ПРОПСОВ</span><span>ЛОКАЛЬНОЕ СОХРАНЕНИЕ · JSON + GLB</span></footer>
+</div>
+<script src="../model/model-core.js?v=1"></script>
+<script src="./forge-core.js?v=1"></script>
+<script type="module" src="./forge.mjs?v=1"></script>
+</body>
+</html>

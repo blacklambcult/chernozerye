@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1114">
   <meta name="description" content="Чернозёрье Studio — единое рабочее пространство Geo Lab, Quest Lab и Model Lab.">
-  <title>Чернозёрье / STUDIO 0.1</title>
-  <link rel="stylesheet" href="./studio.css?v=2">
+  <title>Чернозёрье / STUDIO 0.3</title>
+  <link rel="stylesheet" href="./studio.css?v=3">
 </head>
 <body>
 <div class="studio">
@@ -17,7 +17,7 @@
         <span class="eyebrow">FEARLESS KNIGHTS OF THE CORDON / DEV TOOLS</span>
         <h1>CHERNOZERYE <span>STUDIO</span></h1>
       </div>
-      <span class="version">BUILD 0.1</span>
+      <span class="version">BUILD 0.3</span>
     </div>
     <div class="topright">
       <span class="connection"><span class="light"></span> LOCAL WORKSPACE</span>
@@ -53,12 +53,18 @@
         <span class="navcopy"><strong>MODEL LAB</strong><small>3D-модели и пропсы</small></span>
         <span class="nav-arrow">↗</span>
       </button>
+      <button class="navitem" data-target="forge" type="button" aria-label="Hellish Forge" title="Hellish Forge">
+        <span class="navindex">04</span><span class="nav-icon forge-nav-icon">♜</span>
+        <span class="navcopy"><strong>HELLISH FORGE</strong><small>Игровые модели и маркеры</small></span>
+        <span class="nav-arrow">↗</span>
+      </button>
       <div class="rail-spacer"></div>
       <div class="library">
         <div class="rail-label">ЛОКАЛЬНАЯ БИБЛИОТЕКА</div>
         <div class="library-line"><span>Геообъекты</span><b id="geo-count">—</b></div>
         <div class="library-line"><span>Квесты</span><b id="quest-count">—</b></div>
         <div class="library-line"><span>Детали модели</span><b id="model-count">—</b></div>
+        <div class="library-line"><span>Детали Forge</span><b id="forge-count">—</b></div>
         <p>Счётчики отражают данные браузера. Перед сменой устройства скачивай проекты в файлы.</p>
       </div>
       <div class="rail-footer">◈ DATA IS LOCAL <span>/</span> CHERNOZERYE</div>
@@ -80,9 +86,9 @@
 
       <section class="overview" id="overview">
         <div class="intro">
-          <div class="intro-index">3 МОДУЛЯ · 1 РАБОЧЕЕ ПРОСТРАНСТВО</div>
-          <h3>ТРИ ЛАБОРАТОРИИ.<br><em>ОДИН МИР.</em></h3>
-          <p>Создавай географию, сценарии и трёхмерные объекты в одной студии. Переключайся между редакторами — они сохраняют открытые сцены и черновики в браузере.</p>
+          <div class="intro-index">4 МОДУЛЯ · 1 РАБОЧЕЕ ПРОСТРАНСТВО</div>
+          <h3>ЧЕТЫРЕ МАСТЕРСКИЕ.<br><em>ОДИН МИР.</em></h3>
+          <p>Создавай географию, сценарии, пропсы и игровые модели в одной студии. Переключайся между редакторами — они сохраняют открытые сцены и черновики в браузере.</p>
           <span class="intro-footnote">PRE-ALPHA / EDITOR SUITE 0.1</span>
         </div>
         <div class="module-grid">
@@ -101,10 +107,15 @@
             <span class="card-content"><strong>MODEL LAB</strong><small>Геометрия / Материалы / GLB</small><span class="card-desc">Low-poly объекты из примитивов, 3D-просмотр, материалы и экспорт моделей в Godot.</span></span>
             <span class="card-bottom">ОТКРЫТЬ РЕДАКТОР <span>↗</span></span>
           </button>
+          <button type="button" data-open="forge" class="module-card forge-card">
+            <span class="card-top"><span class="card-number">/ 04</span><span class="card-icon">♜</span></span>
+            <span class="card-content"><strong>HELLISH FORGE</strong><small>Игровые предметы / Роли / Маркеры</small><span class="card-desc">Отдельная кузница игровых моделей: категории, габариты, отметки деталей и точки для интеграции в Godot.</span></span>
+            <span class="card-bottom">ОТКРЫТЬ КУЗНИЦУ <span>↗</span></span>
+          </button>
         </div>
         <div class="bottom-notes">
           <div><span class="little">01 / СОХРАНЕНИЕ</span><p>Редакторы хранят данные раздельно в одном браузере. Существующие черновики остаются на месте.</p></div>
-          <div><span class="little">02 / ФОРМАТЫ</span><p>GEO LAB — GeoJSON · QUEST LAB — JSON · MODEL LAB — JSON / GLB.</p></div>
+          <div><span class="little">02 / ФОРМАТЫ</span><p>GEO LAB — GeoJSON · QUEST LAB — JSON · MODEL LAB — JSON/GLB · FORGE — FORGE.JSON/GLB.</p></div>
           <div><span class="little">03 / СЛЕДУЮЩИЙ ШАГ</span><p>Общая библиотека ID и объектов, размещение моделей в Geo Lab и события в Quest Lab.</p></div>
         </div>
       </section>
@@ -114,10 +125,10 @@
   <footer class="statusbar">
     <span><i class="pulse"></i> CHERNOZERYE STUDIO / READY</span>
     <span id="last-status">СЕССИЯ / ВАШ БРАУЗЕР</span>
-    <span>ALT+1 / GEO · ALT+2 / QUEST · ALT+3 / MODEL</span>
+    <span>ALT+1 / GEO · ALT+2 / QUEST · ALT+3 / MODEL · ALT+4 / FORGE</span>
   </footer>
 </div>
 <script src="./studio-state.js?v=1"></script>
-<script src="./studio.js?v=2"></script>
+<script src="./studio.js?v=3"></script>
 </body>
 </html>
