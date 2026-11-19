@@ -21,6 +21,23 @@ func _run() -> void:
             or pistol.get("magazine_marker") == null:
         _fail("GLB anchor nodes were not imported")
         return
+    var pistol_hand := pistol.get_node_or_null("WeaponRightHand") as Node3D
+    var revolver_hand := revolver.get_node_or_null("WeaponRightHand") as Node3D
+    if pistol_hand == null or revolver_hand == null:
+        _fail("camera-space holding hand missing from either weapon")
+        return
+    if pistol_hand.find_children("*", "MeshInstance3D", true, false).size() < 8:
+        _fail("pistol wrist and fingers do not have visible geometry")
+        return
+    if revolver_hand.find_children("*", "MeshInstance3D", true, false).size() < 8:
+        _fail("revolver wrist and fingers do not have visible geometry")
+        return
+    if not is_equal_approx(float(pistol.get("model_scale")), 0.26):
+        _fail("pistol remains at its old undersized viewmodel scale")
+        return
+    if (pistol.position - Vector3(0.285, -0.225, -0.47)).length() > 0.001:
+        _fail("Forge camera-relative pose was not loaded")
+        return
     var model := pistol.get("imported_model") as Node3D
     if model.find_children("*", "MeshInstance3D", true, false).size() < 10:
         _fail("uploaded GLB has lost its author-designed visual parts")
@@ -29,8 +46,8 @@ func _run() -> void:
         _fail("pistol did not start holstered with 7 rounds")
         return
     pistol.call("equip", true)
-    if revolver.visible:
-        _fail("legacy revolver unexpectedly visible")
+    if revolver.visible or not pistol_hand.is_visible_in_tree():
+        _fail("pistol holding hand hidden or legacy revolver unexpectedly visible")
         return
     for count in range(7):
         pistol.set("cooldown", 0.0)
@@ -57,8 +74,8 @@ func _run() -> void:
         return
     pistol.call("equip", false)
     revolver.call("equip", true)
-    if int(revolver.get("rounds")) != 6:
-        _fail("original six-round revolver was changed")
+    if int(revolver.get("rounds")) != 6 or not revolver_hand.is_visible_in_tree():
+        _fail("original six-round revolver or its holding hand was changed")
         return
-    print("FORGE_PISTOL_REGRESSION_OK: uploaded_glb=true anchors=3 parts>=10 capacity=7 one_click=true reload=true original_revolver=true")
+    print("FORGE_PISTOL_REGRESSION_OK: uploaded_glb=true anchors=3 parts>=10 capacity=7 one_click=true reload=true original_revolver=true hands=2 fp_profile=true")
     quit(0)

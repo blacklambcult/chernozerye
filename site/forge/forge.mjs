@@ -40,7 +40,8 @@ let startupWarning = "";
 function readForgeDocument(input) {
   const data=Forge.normalizeProject(input);
   forgeMeta={category:data.category,subtype:data.subtype,partRoles:{...data.partRoles},
-    anchors:JSON.parse(JSON.stringify(data.anchors))};
+    anchors:JSON.parse(JSON.stringify(data.anchors)),
+    viewmodel:JSON.parse(JSON.stringify(data.viewmodel))};
   project=C.makeProject(data.name,data.parts);
 }
 function forgeDocument() {
@@ -49,7 +50,8 @@ function forgeDocument() {
   return Forge.normalizeProject({
     format:Forge.FORMAT,version:Forge.VERSION,units:"meters",axis_forward:"-Z",
     name:project.name,parts:project.parts,category:forgeMeta.category,
-    subtype:forgeMeta.subtype,partRoles,anchors:forgeMeta.anchors
+    subtype:forgeMeta.subtype,partRoles,anchors:forgeMeta.anchors,
+    viewmodel:forgeMeta.viewmodel
   });
 }
 try {
@@ -62,6 +64,8 @@ try {
 let selectedId = null;
 let selectedAnchorKey = null;
 let anchorChoice = "grip_primary";
+let fpPreviewActive = false;
+let savedEditorView = null;
 let mode = "translate";
 let gridVisible = true;
 const undoHistory = [];
@@ -218,7 +222,9 @@ function rebuild() {
   renderList();
   renderForgeMetadata();
   renderAnchorInspector();
+  renderFpInspector();
   updateDimensions();
+  if(fpPreviewActive) updateFpPreview();
   $("part-count").textContent = project.parts.length;
   $("viewport-title").textContent = project.name;
   $("model-name").value = project.name;
@@ -241,6 +247,7 @@ function select(id) {
   }
   renderList();
   renderInspector();
+  if(fpPreviewActive) transform.detach();
   $("selection-caption").textContent = part() ? part().name.toUpperCase() : "ВЫБЕРИ ДЕТАЛЬ ИЛИ МАРКЕР";
 }
 function persist() {
@@ -248,9 +255,11 @@ function persist() {
     const checked=forgeDocument();
     project=C.makeProject(checked.name,checked.parts);
     forgeMeta={category:checked.category,subtype:checked.subtype,partRoles:{...checked.partRoles},
-      anchors:JSON.parse(JSON.stringify(checked.anchors))};
+      anchors:JSON.parse(JSON.stringify(checked.anchors)),
+      viewmodel:JSON.parse(JSON.stringify(checked.viewmodel))};
     localStorage.setItem(KEY,JSON.stringify(checked));
     updateDimensions();
+    if(fpPreviewActive) updateFpPreview();
     status("HELLISH FORGE · "+project.parts.length+" деталей, "+Object.values(forgeMeta.anchors).filter(a=>a.enabled).length+" маркеров");
     return true;
   } catch (error) {
@@ -373,6 +382,7 @@ function useProject(next) {
   persist();
 }
 function frameModel() {
+  if(fpPreviewActive) return;
   const bounds = new THREE.Box3().setFromObject(sceneModel);
   const center = bounds.isEmpty() ? new THREE.Vector3(0, 0.8, 0) : bounds.getCenter(new THREE.Vector3());
   const size = bounds.isEmpty() ? 2 : bounds.getSize(new THREE.Vector3()).length();
@@ -385,6 +395,7 @@ function frameModel() {
   orbit.update();
 }
 function changeMode(next) {
+  if(fpPreviewActive) return;
   mode = next;
   transform.setMode(selectedAnchorKey && next==="scale" ? "translate" : next);
   for (const b of document.querySelectorAll("[data-mode]")) {
@@ -403,9 +414,11 @@ let pointerStart = null;
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 canvas.addEventListener("pointerdown", (event) => {
+  if(fpPreviewActive) return;
   pointerStart = { x:event.clientX, y:event.clientY, button:event.button };
 });
 canvas.addEventListener("pointerup", (event) => {
+  if(fpPreviewActive) return;
   if (!pointerStart || pointerStart.button !== 0 ||
       Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y) > 4 ||
       transform.dragging || transform.axis) {
@@ -543,7 +556,8 @@ $("export-glb").addEventListener("click", async () => {
     const exportGroup=new THREE.Group();
     exportGroup.name="HF_ASSET_"+data.name;
     exportGroup.userData={forgeSchema:Forge.FORMAT,forgeVersion:Forge.VERSION,
-      category:data.category,subtype:data.subtype,units:"meters",forwardAxis:"-Z"};
+      category:data.category,subtype:data.subtype,units:"meters",forwardAxis:"-Z",
+      viewmodel:data.viewmodel};
     for(const p of data.parts){
       const mesh=meshFor(p);
       mesh.userData={forgePartId:p.id,role:data.partRoles[p.id],primitive:p.primitive};
@@ -619,7 +633,7 @@ function resize() {
 new ResizeObserver(resize).observe(canvas);
 function frame() {
   resize();
-  orbit.update();
+  if(!fpPreviewActive) orbit.update();
   if (selectionBox) selectionBox.update();
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
@@ -786,6 +800,197 @@ $("anchor-snap").addEventListener("click",()=>{
   }
   pushUndo();
   updateAnchorData(anchorChoice,"position",mesh.position.toArray());
+});
+
+
+/* A real camera-space preview of the same transform hierarchy used by
+ * godot/forge_pistol.gd. Separate from the editable world-space scene. */
+const fpRoot = new THREE.Group();
+fpRoot.name = "EditorOnlyFirstPersonPreview";
+fpRoot.visible = false;
+scene.add(fpRoot);
+
+function fpSegment(parent, name, start, end, radius, endRadius, color) {
+  const a=new THREE.Vector3(...start), b=new THREE.Vector3(...end);
+  const d=b.clone().sub(a);
+  const material=new THREE.MeshStandardMaterial({color,roughness:0.95,metalness:0,flatShading:true});
+  const geometry=new THREE.CylinderGeometry(endRadius,radius,d.length(),6,1);
+  const mesh=new THREE.Mesh(geometry,material);
+  mesh.name=name;
+  mesh.position.copy(a.clone().add(b).multiplyScalar(.5));
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());
+  mesh.castShadow=false;
+  parent.add(mesh);
+}
+function fpHandGeometry(parent) {
+  const wrist=[.052,-.062,.071];
+  const cuff=[.087,-.130,.136];
+  const elbow=[.215,-.385,.285];
+  const upper=[.275,-.555,.410];
+  fpSegment(parent,"Sleeve",upper,elbow,.095,.076,"#545849");
+  fpSegment(parent,"Forearm",elbow,cuff,.082,.060,"#3c4239");
+  fpSegment(parent,"Cuff",[.100,-.150,.162],[.072,-.108,.118],.072,.068,"#393d36");
+  fpSegment(parent,"Palm",wrist,[.005,-.023,.013],.058,.045,"#a18a7c");
+  fpSegment(parent,"Thumb",[.009,-.054,.054],[-.045,-.012,-.063],.025,.018,"#a18a7c");
+  for(let i=0;i<4;i++){
+    const x=(i-1.5)*.023;
+    fpSegment(parent,"Finger"+i,[x,-.018,.028],[x-.008,-.084,-.028],.016,.012,"#847065");
+  }
+}
+function clearFpPreview() {
+  for (const child of [...fpRoot.children]) {
+    fpRoot.remove(child);
+    child.traverse((node)=>{
+      if(node.isMesh) {
+        node.geometry.dispose();
+        if(Array.isArray(node.material)) node.material.forEach(m=>m.dispose());
+        else node.material.dispose();
+      }
+    });
+  }
+}
+function updateFpPreview() {
+  if(!fpPreviewActive) return;
+  clearFpPreview();
+  const vm=forgeMeta.viewmodel;
+  fpRoot.position.fromArray(vm.position);
+  fpRoot.rotation.set(...vm.rotation.map(THREE.MathUtils.degToRad),"XYZ");
+  const importedModel = new THREE.Group();
+  importedModel.name = "ForgePreviewImportedAsset";
+  importedModel.scale.setScalar(vm.scale);
+  // The imported GLB is centred at HF_GRIP_PRIMARY by the Godot viewmodel.
+  const grip = forgeMeta.anchors.grip_primary.enabled ?
+    forgeMeta.anchors.grip_primary.position : [0,0,0];
+  importedModel.position.set(-grip[0]*vm.scale,-grip[1]*vm.scale,-grip[2]*vm.scale);
+  for(const p of project.parts) {
+    const mesh=meshFor(p);
+    mesh.castShadow=false;
+    importedModel.add(mesh);
+  }
+  fpRoot.add(importedModel);
+  const hand=new THREE.Group();
+  hand.name="WeaponRightHand";
+  hand.position.fromArray(vm.hand_position);
+  hand.rotation.set(...vm.hand_rotation.map(THREE.MathUtils.degToRad),"XYZ");
+  fpHandGeometry(hand);
+  fpRoot.add(hand);
+}
+function renderFpInspector() {
+  if(!forgeMeta?.viewmodel) return;
+  const vm=forgeMeta.viewmodel;
+  for(const input of document.querySelectorAll("[data-fp-field]")) {
+    const field=input.dataset.fpField;
+    const index=Number(input.dataset.fpIndex);
+    input.value=String(vm[field][index]);
+  }
+  $("fp-scale").value=String(vm.scale);
+  $("fp-scale-slider").value=String(Math.min(1.2,vm.scale));
+  $("fp-scale-output").value=vm.scale.toFixed(3)+"×";
+  $("fp-preview-toggle").classList.toggle("active",fpPreviewActive);
+  $("fp-preview-toggle").setAttribute("aria-pressed",String(fpPreviewActive));
+  $("fp-preview-panel").classList.toggle("active",fpPreviewActive);
+  $("fp-preview-panel").textContent=fpPreviewActive ?
+    "▤ Вернуться в редактор модели" : "◉ Включить предпросмотр в руке";
+  $("fp-preview-overlay").hidden=!fpPreviewActive;
+}
+function toggleFpPreview() {
+  fpPreviewActive=!fpPreviewActive;
+  if(fpPreviewActive){
+    savedEditorView={
+      position:camera.position.clone(),quaternion:camera.quaternion.clone(),
+      target:orbit.target.clone(),fov:camera.fov
+    };
+    orbit.enabled=false;
+    camera.position.set(0,0,0);
+    camera.quaternion.identity();
+    camera.fov=75;
+    camera.updateProjectionMatrix();
+    sceneModel.visible=false;
+    anchorGroup.visible=false;
+    floor.visible=false;
+    grid.visible=false;
+    axes.visible=false;
+    transform.visible=false;
+    if(selectionBox) selectionBox.visible=false;
+    fpRoot.visible=true;
+    updateFpPreview();
+  }else{
+    clearFpPreview();
+    fpRoot.visible=false;
+    sceneModel.visible=true;
+    anchorGroup.visible=true;
+    floor.visible=true;
+    grid.visible=gridVisible;
+    transform.visible=true;
+    if(selectionBox) selectionBox.visible=true;
+    if(savedEditorView){
+      camera.position.copy(savedEditorView.position);
+      camera.quaternion.copy(savedEditorView.quaternion);
+      camera.fov=savedEditorView.fov;
+      orbit.target.copy(savedEditorView.target);
+      camera.updateProjectionMatrix();
+    }
+    orbit.enabled=true;
+    // Clear selection gizmo state after returning to editing mode.
+    selectedAnchorKey=null;
+    select(selectedId);
+  }
+  $("frame-model").disabled=fpPreviewActive;
+  for(const button of document.querySelectorAll("[data-mode]"))button.disabled=fpPreviewActive;
+  $("toggle-grid").disabled=fpPreviewActive;
+  $("viewport-hint").textContent=fpPreviewActive ?
+    "ПРЕДПРОСМОТР ИГРЫ · FOV 75° · Положение и масштаб редактируются в панели справа" :
+    "ЛКМ — выбрать деталь · ПКМ — обзор · Колёсико — приблизить · W/E/R — инструменты";
+  renderFpInspector();
+}
+function changeViewmodel(field, value) {
+  try {
+    const checked=Forge.normalizeViewmodel({...forgeMeta.viewmodel,[field]:value});
+    pushUndo();
+    forgeMeta.viewmodel=checked;
+    persist();
+    renderFpInspector();
+  }catch(error){
+    status("Поза от первого лица: "+error.message,true);
+    renderFpInspector();
+  }
+}
+for(const input of document.querySelectorAll("[data-fp-field]")){
+  input.addEventListener("change",()=>{
+    const field=input.dataset.fpField;
+    const values=[...forgeMeta.viewmodel[field]];
+    if(input.value.trim()==="") {renderFpInspector();return;}
+    values[Number(input.dataset.fpIndex)]=Number(input.value);
+    changeViewmodel(field,values);
+  });
+}
+$("fp-scale").addEventListener("change",()=>{
+  const input=$("fp-scale");
+  if(input.value.trim()==="") {renderFpInspector();return;}
+  changeViewmodel("scale",Number(input.value));
+});
+$("fp-scale-slider").addEventListener("input",event=>{
+  const v=Number(event.target.value);
+  $("fp-scale-output").value=v.toFixed(3)+"×";
+  // Slider changes preview continuously, including hand position.
+  changeViewmodel("scale",v);
+});
+$("fp-preview-toggle").addEventListener("click",toggleFpPreview);
+$("fp-preview-panel").addEventListener("click",toggleFpPreview);
+$("fp-reset").addEventListener("click",()=>{
+  pushUndo();
+  forgeMeta.viewmodel=Forge.normalizeViewmodel();
+  persist();
+  renderFpInspector();
+});
+$("export-fp-profile").addEventListener("click",()=>{
+  try {
+    const viewmodel=forgeDocument().viewmodel;
+    const profile={format:"chernozerye.forge.viewmodel",version:1,viewmodel};
+    download(new Blob([JSON.stringify(profile,null,2)+"\n"],{type:"application/json"}),
+      filename()+".viewmodel.json");
+    status("Профиль положения в руках сохранён. Его можно подключить в Godot.");
+  }catch(err){status("Ошибка экспорта FP-профиля: "+err.message,true);}
 });
 
 rebuild();

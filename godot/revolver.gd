@@ -29,6 +29,7 @@ var impact_sounds := {
     &"metal": preload("res://impacts/metal.wav")
 }
 var cylinder: MeshInstance3D
+var weapon_hand: Node3D
 
 func _part(mesh: PrimitiveMesh, at: Vector3, tint: Color) -> MeshInstance3D:
     var part := MeshInstance3D.new()
@@ -74,6 +75,11 @@ func _ready() -> void:
     _tube(Vector3(0,0.02,0.012),Vector3(0,0.064,0.047),0.015,0.009,iron)
     _tube(Vector3(0.12,-0.24,0.18),Vector3(0.025,-0.09,0.065),0.071,0.05,Color("#525447"))
     _tube(Vector3(0.026,-0.09,0.065),Vector3(0.016,-0.047,0.009),0.048,0.04,Color("#967866"))
+    weapon_hand = Node3D.new()
+    weapon_hand.set_script(preload("res://weapon_hand_viewmodel.gd"))
+    weapon_hand.name = "WeaponRightHand"
+    weapon_hand.set("grip_local", Vector3(0.075, -0.14, 0.12))
+    add_child(weapon_hand)
     for i in range(3):
         _tube(Vector3(-0.02,-0.038-i*0.015,0.01),Vector3(0.031,-0.038-i*0.015,-0.004),0.009,0.012,Color("#846555"))
     flash.position = Vector3(0,0.05,-0.4)

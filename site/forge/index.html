@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0c1114">
   <meta name="description" content="CHERNOZERYE HELLISH FORGE — редактор low-poly моделей для игры.">
   <title>Чернозёрье / HELLISH FORGE 0.1</title>
-  <link rel="stylesheet" href="./forge.css?v=1">
+  <link rel="stylesheet" href="./forge.css?v=2">
   <script type="importmap">
   {
     "imports": {
@@ -104,12 +104,18 @@
           <span class="toolbar-separator"></span>
           <button id="toggle-grid" class="tool active" type="button" aria-pressed="true" title="Показать или скрыть сетку">▦ <span>Сетка</span></button>
           <button id="frame-model" class="tool" type="button" title="Показать всю модель (F)">◎ <span>В кадр</span></button>
+          <button id="fp-preview-toggle" class="tool fp-toggle" type="button" aria-pressed="false" title="Предпросмотр в руке игрового персонажа">◉ <span>Вид от первого лица</span></button>
         </div>
       </div>
       <div class="stage">
         <canvas id="viewport" tabindex="0" aria-label="3D-просмотр модели; выберите деталь, чтобы редактировать"></canvas>
         <div class="stage-corner top-left"><span class="live"></span> HELLISH FORGE / GAME ASSET <span class="dim">/ PERSPECTIVE</span></div>
         <div class="stage-corner top-right">Y ↑ / X → / −Z вперёд<span class="dim"> · METERS</span></div>
+        <div id="fp-preview-overlay" class="fp-preview-overlay" hidden>
+          <div class="fp-crosshair" aria-hidden="true"><span></span></div>
+          <div class="fp-preview-caption">FIRST PERSON / GODOT CAMERA · 75° FOV</div>
+          <div class="fp-preview-help">Настраивай параметры справа — положение, размер и руку увидишь сразу.</div>
+        </div>
         <div id="webgl-error" class="webgl-error" role="alert" hidden>3D-редактор не загрузился. Нужен браузер с WebGL2 и доступ к библиотеке Three.js.</div>
         <div id="viewport-hint" class="viewport-hint">ЛКМ — выбрать деталь · ПКМ — перемещать обзор · Колёсико — приблизить · W/E/R — инструменты</div>
         <div class="stage-corner bottom-right" id="selection-caption">НЕТ ВЫДЕЛЕННОЙ ДЕТАЛИ</div>
@@ -180,6 +186,38 @@
           <input id="roughness" type="range" min="0" max="1" step=".05">
         </section>
       </div>
+      <section class="section forge-fp-panel" id="fp-inspector">
+        <div class="section-header"><h3>Вид от первого лица</h3><span class="tag">FPS / CAMERA</span></div>
+        <p class="hint">Посмотри, как игровой предмет выглядит в правой руке персонажа. Движок использует <b>75° FOV</b>; единицы позиций — игровые метры.</p>
+        <button id="fp-preview-panel" type="button" class="button fp-preview-button full">◉ Включить предпросмотр в руке</button>
+        <div class="field-group"><label>Положение на экране / XYZ, м</label><div class="triplet">
+          <label class="axis x"><span>X</span><input type="number" step=".01" data-fp-field="position" data-fp-index="0" aria-label="Положение предмета X"></label>
+          <label class="axis y"><span>Y</span><input type="number" step=".01" data-fp-field="position" data-fp-index="1" aria-label="Положение предмета Y"></label>
+          <label class="axis z"><span>Z</span><input type="number" step=".01" data-fp-field="position" data-fp-index="2" aria-label="Положение предмета Z"></label>
+        </div></div>
+        <div class="field-group"><label>Поворот предмета / XYZ, °</label><div class="triplet">
+          <label class="axis x"><span>X</span><input type="number" step="1" data-fp-field="rotation" data-fp-index="0" aria-label="Поворот предмета X"></label>
+          <label class="axis y"><span>Y</span><input type="number" step="1" data-fp-field="rotation" data-fp-index="1" aria-label="Поворот предмета Y"></label>
+          <label class="axis z"><span>Z</span><input type="number" step="1" data-fp-field="rotation" data-fp-index="2" aria-label="Поворот предмета Z"></label>
+        </div></div>
+        <div class="field-group"><div class="fp-scale-heading"><label for="fp-scale">Масштаб в руках</label><output id="fp-scale-output">0.260×</output></div>
+          <input id="fp-scale-slider" type="range" min=".05" max="1.2" step=".01" aria-label="Масштаб оружия в первом лице">
+          <input id="fp-scale" type="number" step=".01" min=".05" max="3" aria-label="Точный масштаб оружия">
+        </div>
+        <div class="field-group"><label>Положение кисти / XYZ, м</label><div class="triplet">
+          <label class="axis x"><span>X</span><input type="number" step=".01" data-fp-field="hand_position" data-fp-index="0" aria-label="Положение кисти X"></label>
+          <label class="axis y"><span>Y</span><input type="number" step=".01" data-fp-field="hand_position" data-fp-index="1" aria-label="Положение кисти Y"></label>
+          <label class="axis z"><span>Z</span><input type="number" step=".01" data-fp-field="hand_position" data-fp-index="2" aria-label="Положение кисти Z"></label>
+        </div></div>
+        <div class="field-group"><label>Поворот кисти / XYZ, °</label><div class="triplet">
+          <label class="axis x"><span>X</span><input type="number" step="1" data-fp-field="hand_rotation" data-fp-index="0" aria-label="Поворот кисти X"></label>
+          <label class="axis y"><span>Y</span><input type="number" step="1" data-fp-field="hand_rotation" data-fp-index="1" aria-label="Поворот кисти Y"></label>
+          <label class="axis z"><span>Z</span><input type="number" step="1" data-fp-field="hand_rotation" data-fp-index="2" aria-label="Поворот кисти Z"></label>
+        </div></div>
+        <button id="fp-reset" type="button" class="button secondary full">↶ Сбросить вид от первого лица</button>
+        <button id="export-fp-profile" type="button" class="button secondary full">↓ Скачать FP-профиль для Godot</button>
+        <p class="hint">Описания позы сохраняются в <code>.forge.json</code> и метаданных GLB. Чтобы применить их в самой игре, профиль нужно добавить в её сборку.</p>
+      </section>
       <section class="section forge-anchor-panel">
         <div class="section-header"><h3>Опорные маркеры</h3><span class="tag">GODOT / −Z</span></div>
         <p class="hint">Метки положения и направления в игровых координатах. Ось −Z считается направлением вперёд.</p>
@@ -212,7 +250,7 @@
   <footer class="footer"><span>CHERNOZERYE <b>HELLISH FORGE 0.1</b></span><span id="global-status">3D / РЕДАКТОР ПРОПСОВ</span><span>ЛОКАЛЬНОЕ СОХРАНЕНИЕ · JSON + GLB</span></footer>
 </div>
 <script src="../model/model-core.js?v=1"></script>
-<script src="./forge-core.js?v=1"></script>
-<script type="module" src="./forge.mjs?v=1"></script>
+<script src="./forge-core.js?v=2"></script>
+<script type="module" src="./forge.mjs?v=2"></script>
 </body>
 </html>

@@ -78,3 +78,24 @@ select:focus-visible{outline:2px solid var(--accent)}
 .anchor-check{display:flex;align-items:center;gap:9px;cursor:pointer;font-size:11px}
 .anchor-check input{accent-color:#f38b6f;width:16px;height:16px}
 .view-footer .dot.orange{background:#e88d71}
+
+/* Live camera-space preview of the selected virtual prop and its right hand. */
+.fp-toggle{border-color:#bd7260!important;color:#eeb39f!important;background:#302324!important;white-space:nowrap}
+.fp-toggle.active{background:#af6650!important;border-color:#ef9974!important;color:#161719!important}
+.forge-fp-panel{background:#181f24;border-top:2px solid #ac6b58}
+.forge-fp-panel .field-group{margin:15px 0}
+.fp-preview-button{border-color:#b87559!important;background:#352824!important;color:#f4c2aa!important}
+.fp-preview-button.active{background:#bf7659!important;color:#1d1717!important}
+.fp-scale-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.fp-scale-heading label{margin:0}
+.fp-scale-heading output{color:#f0b18d;font-family:ui-monospace,monospace;font-size:11px}
+#fp-scale{width:100%;margin-top:6px}
+.fp-preview-overlay{position:absolute;inset:0;z-index:3;pointer-events:none}
+.fp-preview-overlay[hidden]{display:none}
+.fp-crosshair{position:absolute;top:50%;left:50%;width:20px;height:20px;transform:translate(-50%,-50%);opacity:.75}
+.fp-crosshair::before,.fp-crosshair::after{content:"";position:absolute;background:#f4ecda}
+.fp-crosshair::before{left:9px;top:0;width:2px;height:20px}
+.fp-crosshair::after{top:9px;left:0;height:2px;width:20px}
+.fp-crosshair span{position:absolute;z-index:1;left:7px;top:7px;width:6px;height:6px;background:#141d22;border:1px solid #f4ecda}
+.fp-preview-caption{position:absolute;top:55px;left:18px;border:1px solid #7a5042;background:#121c22e3;color:#f0b48d;font-size:10px;font-weight:800;letter-spacing:.8px;padding:9px 11px}
+.fp-preview-help{position:absolute;bottom:49px;left:18px;right:20px;max-width:420px;background:#101b22de;color:#bfcfc9;font-size:10px;line-height:1.5;padding:10px;border-left:2px solid #cc7e5f}

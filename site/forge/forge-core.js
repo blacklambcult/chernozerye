@@ -49,6 +49,26 @@
     return value.map((v)=>finite(v,low,high,context));
   };
   const clone = (v) => JSON.parse(JSON.stringify(v));
+  // All first-person values are *virtual* Godot camera-space values in metres
+  // and degrees. Keep schema v1 compatible with existing user projects.
+  const DEFAULT_VIEWMODEL = Object.freeze({
+    position:Object.freeze([0.285,-0.225,-0.47]),
+    rotation:Object.freeze([0,9,0]),
+    scale:0.26,
+    hand_position:Object.freeze([0.025,-0.015,0.035]),
+    hand_rotation:Object.freeze([0,0,0])
+  });
+  function normalizeViewmodel(value = DEFAULT_VIEWMODEL) {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      throw new Error("Параметры первого лица должны быть объектом.");
+    return {
+      position:vec(value.position,-2,2,"FP позиция"),
+      rotation:vec(value.rotation,-180,180,"FP поворот"),
+      scale:finite(value.scale,0.05,3,"FP масштаб"),
+      hand_position:vec(value.hand_position,-1,1,"FP положение кисти"),
+      hand_rotation:vec(value.hand_rotation,-180,180,"FP поворот кисти")
+    };
+  }
   function normalAnchor(value,key) {
     if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.enabled !== "boolean")
       throw new Error("Отсутствует точка крепления: "+key);
@@ -69,7 +89,8 @@
   function makeProject(name="Новый игровой предмет",category="sidearm",subtype="revolver",parts=[]) {
     return normalizeProject({
       format:FORMAT,version:VERSION,units:"meters",name,category,subtype,
-      axis_forward:"-Z",parts,partRoles:{},anchors:makeAnchors()
+      axis_forward:"-Z",parts,partRoles:{},anchors:makeAnchors(),
+      viewmodel:normalizeViewmodel()
     });
   }
   function normalizeProject(value) {
@@ -98,7 +119,7 @@
       format:FORMAT,version:VERSION,units:"meters",axis_forward:"-Z",
       name:model.name,category:value.category,subtype:value.subtype,
       parts:model.parts,partRoles:Object.fromEntries(model.parts.map((p)=>[p.id,oldRoles[p.id]||"body"])),
-      anchors
+      anchors,viewmodel:normalizeViewmodel(value.viewmodel === undefined ? DEFAULT_VIEWMODEL : value.viewmodel)
     };
   }
   function toModel(data) {
@@ -128,5 +149,6 @@
     return normalizeProject(p);
   }
   return Object.freeze({FORMAT,VERSION,STORAGE_KEY,GROUPS,ROLES,ANCHORS,ANCHOR_COLORS,
+    DEFAULT_VIEWMODEL,normalizeViewmodel,
     makeAnchors,makeProject,normalizeProject,toModel,setCategory,previewAsset});
 });

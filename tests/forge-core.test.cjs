@@ -51,3 +51,26 @@ test("invalid marker positions, IDs, roles, unsafe schema are rejected",()=>{
   invalid4.partRoles["missing-id"]="body";
   assert.throws(()=>Forge.normalizeProject(invalid4),/отсутствующую/);
 });
+
+test("FP viewmodel stays compatible with old saved Forge projects", () => {
+  const original=Forge.previewAsset();
+  assert.deepEqual(original.viewmodel,Forge.normalizeViewmodel());
+  assert.deepEqual(original.viewmodel.position,[0.285,-0.225,-0.47]);
+  assert.equal(original.viewmodel.scale,0.26);
+  const old=JSON.parse(JSON.stringify(original));
+  delete old.viewmodel;
+  assert.deepEqual(Forge.normalizeProject(old).viewmodel,Forge.normalizeViewmodel());
+  const updated=Forge.normalizeProject({
+    ...original,viewmodel:{...original.viewmodel,scale:0.4,position:[0.2,-0.3,-0.5],
+      hand_position:[0.1,0,0.05],hand_rotation:[4,0,0]}
+  });
+  assert.equal(updated.viewmodel.scale,0.4);
+  assert.deepEqual(Forge.normalizeProject(JSON.parse(JSON.stringify(updated))),updated);
+  assert.notStrictEqual(updated.viewmodel.hand_position,original.viewmodel.hand_position);
+});
+test("FP transforms reject invalid scales, NaNs and out-of-scene positions",()=>{
+  assert.throws(()=>Forge.normalizeViewmodel({...Forge.DEFAULT_VIEWMODEL,scale:0}),/масштаб/);
+  assert.throws(()=>Forge.normalizeViewmodel({...Forge.DEFAULT_VIEWMODEL,scale:Infinity}),/масштаб/);
+  assert.throws(()=>Forge.normalizeViewmodel({...Forge.DEFAULT_VIEWMODEL,position:[0,0,99]}),/позиция/);
+  assert.throws(()=>Forge.normalizeViewmodel({...Forge.DEFAULT_VIEWMODEL,hand_position:[0,2,0]}),/кисти/);
+});

@@ -3,7 +3,8 @@ extends Node3D
 # This module keeps the old six-round two-click revolver untouched.
 const CAPACITY := 7
 const RELOAD_SECONDS := 1.20
-const REST := Vector3(0.245, -0.245, -0.58)
+const VIEWMODEL_PROFILE := "res://assets/forge_pistol.viewmodel.json"
+const DEFAULT_REST := Vector3(0.285, -0.225, -0.47)
 const ASSET_SCENE: PackedScene = preload("res://assets/forge_pistol.glb")
 const SHOT_STREAM: AudioStream = preload("res://revolver_report.wav")
 var indoors := false
@@ -20,6 +21,40 @@ var imported_model: Node3D
 var grip_marker: Node3D
 var forward_marker: Node3D
 var magazine_marker: Node3D
+var weapon_hand: Node3D
+var rest_pose := DEFAULT_REST
+var rest_angles := Vector3(0.0, deg_to_rad(9.0), 0.0)
+var model_scale := 0.26
+var hand_position := Vector3(0.025, -0.015, 0.035)
+var hand_angles := Vector3.ZERO
+
+func _read_vector(values: Variant, fallback: Vector3) -> Vector3:
+    if not values is Array or values.size() != 3:
+        return fallback
+    for value in values:
+        if not (value is int or value is float) or not is_finite(float(value)):
+            return fallback
+    return Vector3(float(values[0]), float(values[1]), float(values[2]))
+
+func _read_profile() -> void:
+    if not FileAccess.file_exists(VIEWMODEL_PROFILE):
+        return
+    var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(VIEWMODEL_PROFILE))
+    if not parsed is Dictionary or not parsed.get("viewmodel") is Dictionary:
+        push_warning("FORGE_VIEWMODEL_PROFILE_INVALID")
+        return
+    var settings: Dictionary = parsed.get("viewmodel")
+    rest_pose = _read_vector(settings.get("position"), DEFAULT_REST)
+    var rot := _read_vector(settings.get("rotation"), Vector3(0.0, 9.0, 0.0))
+    rest_angles = Vector3(deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z))
+    var scale_value: float = float(settings.get("scale", 0.26))
+    model_scale = clampf(scale_value if is_finite(scale_value) else 0.26, 0.05, 3.0)
+    hand_position = _read_vector(settings.get("hand_position"),
+        Vector3(0.025, -0.015, 0.035))
+    var hand_rot := _read_vector(settings.get("hand_rotation"), Vector3.ZERO)
+    hand_angles = Vector3(deg_to_rad(hand_rot.x),
+        deg_to_rad(hand_rot.y), deg_to_rad(hand_rot.z))
+
 var report := AudioStreamPlayer.new()
 var flash := OmniLight3D.new()
 
@@ -30,12 +65,14 @@ func _ready() -> void:
         push_error("FORGE_PISTOL_CAMERA_MISSING")
         return
     player = eye.get_parent() as CharacterBody3D
-    position = REST
+    _read_profile()
+    position = rest_pose
+    rotation = rest_angles
     visual_holder = Node3D.new()
     visual_holder.name = "ForgePistolVisual"
     # Forge exports a metric scene. This is a viewmodel-only scale adjustment,
     # leaving the uploaded GLB's mesh and marker coordinates untouched.
-    visual_holder.scale = Vector3.ONE * 0.165
+    visual_holder.scale = Vector3.ONE * model_scale
     add_child(visual_holder)
     imported_model = ASSET_SCENE.instantiate() as Node3D
     visual_holder.add_child(imported_model)
@@ -47,7 +84,18 @@ func _ready() -> void:
     if grip_marker != null:
         grip = imported_model.to_local(grip_marker.global_position)
     imported_model.position = -grip
+    # Hand is attached at the exact same camera-local origin as the author
+    # supplied grip marker, instead of floating behind the visual prop.
+    weapon_hand = Node3D.new()
+    weapon_hand.set_script(preload("res://weapon_hand_viewmodel.gd"))
+    weapon_hand.name = "WeaponRightHand"
+    weapon_hand.set("grip_local", Vector3.ZERO)
+    weapon_hand.position = hand_position
+    weapon_hand.rotation = hand_angles
+    add_child(weapon_hand)
     flash.position = Vector3(0.0, 0.11, -0.51)
+    if forward_marker != null:
+        flash.position = visual_holder.to_local(forward_marker.global_position)
     flash.light_color = Color("#ffba75")
     flash.omni_range = 4.0
     flash.light_energy = 3.0
@@ -61,7 +109,8 @@ func _ready() -> void:
     visible = false
     print("FORGE_PISTOL_READY: model=uploaded_glb capacity=7 one_click=true grip_marker=",
         grip_marker != null, " forward_marker=", forward_marker != null,
-        " magazine_marker=", magazine_marker != null)
+        " magazine_marker=", magazine_marker != null,
+        " model_scale=", model_scale, " hand_visible=", weapon_hand != null)
 
 func equip(value: bool) -> void:
     visible = value
@@ -144,6 +193,6 @@ func _physics_process(delta: float) -> void:
             _shoot()
     var kick := maxf(0.0, cooldown - 0.12) / 0.11
     var reload_t := sin(PI * reload_left / RELOAD_SECONDS)
-    position = REST + Vector3(0.0, -0.11 * reload_t, 0.045 * kick)
-    rotation = Vector3(0.24 * kick, 0.12, -0.20 * reload_t)
+    position = rest_pose + Vector3(0.0, -0.11 * reload_t, 0.045 * kick)
+    rotation = rest_angles + Vector3(0.24 * kick, 0.0, -0.20 * reload_t)
     flash.visible = cooldown > 0.18
