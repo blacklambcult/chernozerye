@@ -339,7 +339,8 @@ jobs:
             <script>
               // Redirect *only* retired HTML release links. Missing engine
               // resources keep a real 404 so broken builds are not hidden.
-              if (/^\\/chernozerye\\/(?:pre-alpha-[^\\/]+|v[0-9]+)\\/?$/.test(location.pathname)) {
+              var p = location.pathname.replace("/chernozerye/", "").split("/");
+              if (p.length <= 2 && (p[0].startsWith("pre-alpha-") || /^v[0-9]+$/.test(p[0]))) {
                 location.replace("/chernozerye/");
               }
             </script>
