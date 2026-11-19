@@ -2,9 +2,11 @@ extends Node3D
 # Camera-space prop and arcade interaction with the first solid world surface.
 const REST := Vector3(0.23, -0.19, -0.53)
 const CAPACITY := 6
-const SHOT_STREAM := preload("res://audio/revolver_shot.ogg")
-const COCK_STREAM := preload("res://audio/revolver_cock.ogg")
-const CYLINDER_STREAM := preload("res://audio/revolver_cylinder.ogg")
+# Compatibility sounds keep the current online build functional until the
+# project's supplied OGG assets are imported to res://audio/.
+const SHOT_STREAM := preload("res://revolver_report.wav")
+const COCK_STREAM := preload("res://impacts/metal.wav")
+const CYLINDER_STREAM := preload("res://impacts/wood.wav")
 const RELOAD_SECONDS := 1.55
 var indoors := false
 var rounds := CAPACITY
@@ -80,15 +82,15 @@ func _ready() -> void:
     flash.visible = false
     add_child(flash)
     report.bus = &"Effects"
-    report.stream = SHOT_STREAM
+    report.stream = load("res://audio/revolver_shot.ogg") if ResourceLoader.exists("res://audio/revolver_shot.ogg") else SHOT_STREAM
     report.max_polyphony = 3
     report.volume_db = -3.0
     add_child(report)
-    cock_audio.stream = COCK_STREAM
+    cock_audio.stream = load("res://audio/revolver_cock.ogg") if ResourceLoader.exists("res://audio/revolver_cock.ogg") else COCK_STREAM
     cock_audio.bus = &"Effects"
     cock_audio.volume_db = -5.0
     add_child(cock_audio)
-    cylinder_audio.stream = CYLINDER_STREAM
+    cylinder_audio.stream = load("res://audio/revolver_cylinder.ogg") if ResourceLoader.exists("res://audio/revolver_cylinder.ogg") else CYLINDER_STREAM
     cylinder_audio.bus = &"Effects"
     cylinder_audio.volume_db = -8.0
     add_child(cylinder_audio)
