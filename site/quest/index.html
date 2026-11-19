@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a1013">
+  <meta name="description" content="QUEST LAB — редактор сюжетных и побочных квестов Чернозёрья.">
+  <title>ЧЕРНОЗЁРЬЕ / QUEST LAB 0.1</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="./quest.css?v=1">
+</head>
+<body>
+<div class="studio">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">Ч</div>
+      <div class="brand-copy">
+        <div class="overline">CHERNOZERYE / DEVELOPMENT TOOLS</div>
+        <h1>QUEST LAB <span class="muted">/ 0.1</span></h1>
+      </div>
+    </div>
+    <nav class="topnav" aria-label="Инструменты проекта">
+      <a href="../map/">01 / GEO LAB</a>
+      <a href="./" class="current" aria-current="page">02 / QUEST LAB</a>
+      <span class="planned" title="Следующий инструмент">03 / MODEL LAB · СКОРО</span>
+      <a href="../" class="play-link">↗ ИГРА</a>
+    </nav>
+  </header>
+
+  <div class="workspace">
+    <aside class="sidebar panel-left" aria-label="Библиотека и параметры квестов">
+      <div class="panel-section heading-section">
+        <div class="eyebrow">01 / БИБЛИОТЕКА</div>
+        <h2>Конструктор квестов</h2>
+        <p class="subtle">Создавай задания и настраивай последовательность игровых событий. Все изменения сохраняются локально.</p>
+      </div>
+      <section class="panel-section">
+        <div class="section-heading"><h3>Квесты</h3><span id="quest-count" class="mini-count">0</span></div>
+        <div class="two-buttons">
+          <button type="button" id="add-main" class="button primary">+ Главный</button>
+          <button type="button" id="add-side" class="button">+ Побочный</button>
+        </div>
+        <div id="quest-list" class="quest-list" aria-live="polite"></div>
+      </section>
+      <section class="panel-section" id="quest-fields" hidden>
+        <div class="section-heading"><h3>Параметры квеста</h3><span class="mini-tag">QUEST DATA</span></div>
+        <label for="quest-title">Название квеста</label>
+        <input id="quest-title" type="text" maxlength="140" placeholder="Название" autocomplete="off">
+        <label for="quest-type">Категория</label>
+        <select id="quest-type"><option value="main">Главный</option><option value="side">Побочный</option></select>
+        <label for="quest-description">Описание</label>
+        <textarea id="quest-description" rows="3" maxlength="1200" placeholder="Короткое описание истории"></textarea>
+        <div class="section-heading split"><h3>Точка спавна игрока</h3><span class="mini-tag">WGS84</span></div>
+        <p class="hint">Выбери «Спавн» над картой и нажми на нужное место либо введи координаты ниже.</p>
+        <div class="coordinate-fields">
+          <div><label for="spawn-lat">Широта (N)</label><input id="spawn-lat" type="number" step="0.0000001" min="-90" max="90"></div>
+          <div><label for="spawn-lon">Долгота (E)</label><input id="spawn-lon" type="number" step="0.0000001" min="-180" max="180"></div>
+        </div>
+        <label for="spawn-bearing">Направление взгляда (0–359°)</label>
+        <input id="spawn-bearing" type="number" min="0" max="359.99" step="1" value="0">
+        <button type="button" id="show-spawn" class="button full">◎ Показать спавн на карте</button>
+        <button type="button" id="duplicate-quest" class="button full quiet">Дублировать квест</button>
+        <button type="button" id="delete-quest" class="button full danger">Удалить квест</button>
+      </section>
+      <section class="panel-section bottom-section">
+        <div class="section-heading"><h3>Проект</h3><span class="mini-tag">JSON / V1</span></div>
+        <button type="button" id="export-json" class="button primary full">↓ Скачать проект JSON</button>
+        <label class="button full import-button" for="import-json">↑ Импортировать проект JSON
+          <input id="import-json" type="file" accept=".json,application/json" hidden>
+        </label>
+        <div id="save-state" class="save-state" role="status">Сохранение в браузере.</div>
+        <p class="tiny-note">Файл содержит все квесты, шаги и координаты. Экспортируй JSON для резервной копии. Подключение к игровому исполнителю — следующий этап.</p>
+      </section>
+    </aside>
+
+    <main class="map-main" aria-label="Карта квеста">
+      <div class="map-toolbar">
+        <div>
+          <div class="eyebrow">02 / ПРОСТРАНСТВО КВЕСТА</div>
+          <h2 id="map-quest-title">Выбери квест</h2>
+        </div>
+        <div class="map-actions" role="group" aria-label="Режим карты">
+          <button id="tool-spawn" type="button" class="map-tool active" data-mode="spawn" aria-pressed="true">⌖ Спавн</button>
+          <button id="tool-step" type="button" class="map-tool" data-mode="step" aria-pressed="false">◆ Точка шага</button>
+          <button id="basemap-toggle" type="button" class="map-tool basemap">◫ Спутник</button>
+        </div>
+      </div>
+      <div class="map-frame">
+        <div id="quest-map" aria-label="Интерактивная карта стартовой точки и задач"></div>
+        <div class="map-head"><span class="live-dot"></span> CHERNOZERYE / MISSION PLANNER</div>
+        <div id="map-hint" class="map-hint" role="status">Создай или выбери квест, затем нажми на карту для размещения точки спавна.</div>
+        <div class="map-coords">УКАЗАТЕЛЬ <span id="pointer-coords">54.672897, 55.852815</span></div>
+        <div id="map-error" class="map-error" role="alert" hidden>Картографический модуль не загрузился. Проверь соединение с интернетом.</div>
+        <noscript>Для редактора квестов нужен JavaScript.</noscript>
+      </div>
+      <div class="map-footer"><span><b class="legend-dot spawn"></b> Спавн игрока</span><span><b class="legend-dot step"></b> Точка задачи</span><span>Координаты: WGS84 / Geo Lab</span></div>
+    </main>
+
+    <aside class="sidebar panel-right" aria-label="Редактор событий квеста">
+      <div class="panel-section heading-section">
+        <div class="eyebrow">03 / СЦЕНАРИЙ</div>
+        <h2>Логика квеста</h2>
+        <p class="subtle">Шаги выполняются по порядку. Сообщение — отдельное сюжетное событие, остальные шаги могут иметь цель на карте.</p>
+      </div>
+      <section class="panel-section">
+        <div class="section-heading"><h3>Последовательность</h3><span id="step-count" class="mini-count">0</span></div>
+        <div id="step-list" class="step-list"></div>
+        <div class="add-step">
+          <label for="new-step-type">Новый шаг</label>
+          <div class="add-step-actions">
+            <select id="new-step-type">
+              <option value="reach">Дойти до точки</option>
+              <option value="interact">Взаимодействовать</option>
+              <option value="collect">Найти предмет</option>
+              <option value="message">Сообщение</option>
+            </select>
+            <button id="add-step" type="button" class="button primary">+</button>
+          </div>
+        </div>
+      </section>
+      <section class="panel-section" id="step-fields" hidden>
+        <div class="section-heading"><h3>Инспектор шага</h3><span id="step-index" class="mini-tag">STEP 01</span></div>
+        <label for="step-type">Тип действия</label>
+        <select id="step-type">
+          <option value="reach">Дойти до точки</option>
+          <option value="interact">Взаимодействовать</option>
+          <option value="collect">Найти предмет</option>
+          <option value="message">Показать сообщение</option>
+        </select>
+        <label for="step-title">Название</label>
+        <input id="step-title" type="text" maxlength="140" placeholder="Например: Найти дом" autocomplete="off">
+        <label for="step-text">Текст задачи / сообщение</label>
+        <textarea id="step-text" rows="4" maxlength="1400" placeholder="Текст для игрока или реплика повествования"></textarea>
+        <div id="target-controls">
+          <label for="step-object">ID объекта Geo Lab (необязательно)</label>
+          <input id="step-object" type="text" maxlength="120" placeholder="Например: house-01" autocomplete="off">
+          <div class="step-target-line">
+            <span id="target-coords">Точка не выбрана</span>
+            <button id="clear-target" type="button" class="text-button">Очистить</button>
+          </div>
+          <button id="place-step" type="button" class="button full">◆ Поставить точку на карте</button>
+        </div>
+        <p class="hint">Редактор сохраняет описание и координаты. Исполнение триггеров в Godot будет добавлено отдельно.</p>
+      </section>
+    </aside>
+  </div>
+  <footer class="statusbar"><span><span class="live-dot"></span> QUEST LAB / LOCAL EDITOR</span><span id="status-detail">Готов к работе</span><span>СОХРАНЕНИЕ В БРАУЗЕРЕ · WGS84</span></footer>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="./quest-core.js?v=1"></script>
+<script src="./quest.js?v=1"></script>
+</body>
+</html>

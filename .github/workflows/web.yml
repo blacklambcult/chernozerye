@@ -378,6 +378,17 @@ jobs:
           node --check site/map/editor-core.js
           node --check site/map/editor.js
           node --test tests/editor-core.test.cjs
+          # Quest Lab is deployed separately and must remain a working editor.
+          node --check site/quest/quest-core.js
+          node --check site/quest/quest.js
+          node --test tests/quest-core.test.cjs
+          grep -q 'quest.js?v=1' site/quest/index.html
+          grep -q 'href="../quest/"' site/map/index.html
+          mkdir -p build/web/quest
+          cp -a site/quest/. build/web/quest/
+          test -s build/web/quest/index.html
+          test -s build/web/quest/quest.js
+          test -s build/web/quest/quest-core.js
           grep -q 'editor.js?v=20' site/map/index.html
           grep -q 'editor-core.js?v=20' site/map/index.html
           mkdir -p build/web/map
@@ -438,8 +449,10 @@ jobs:
             if curl -fsSL --max-time 20 --retry 2 --retry-delay 2 "${SITE_URL}?build=${GITHUB_SHA:0:8}" -o /tmp/pages-root.html \
               && grep -q 'window.location.replace' /tmp/pages-root.html \
               && curl -fsSL --max-time 20 "${SITE_URL}${RELEASE_DIR}/index.html" -o /tmp/pages-game.html \
-              && test -s /tmp/pages-game.html; then
-              echo "LIVE_PAGES_OK: ${SITE_URL} and ${SITE_URL}${RELEASE_DIR}/"
+              && test -s /tmp/pages-game.html \
+              && curl -fsSL --max-time 20 "${SITE_URL}quest/index.html" -o /tmp/pages-quest.html \
+              && grep -q 'QUEST LAB' /tmp/pages-quest.html; then
+              echo "LIVE_PAGES_OK: ${SITE_URL}, ${SITE_URL}${RELEASE_DIR}/, ${SITE_URL}quest/"
               exit 0
             fi
             echo "Public Pages check ${attempt}/12 not ready"
