@@ -9,7 +9,12 @@ const CUFF := Color("#44463c")
 const THREAD := Color("#8b8170")
 const SKIN := Color("#988579")
 const SKIN_SHADOW := Color("#76665e")
-const HANDOFF_PITCH := -1.04
+# Look-down hands must leave the screen BEFORE the jacket fills it.
+# The full-body arms take over at -1.04. The short gap between them is
+# intentional: in an unarmed relaxed stance hands hang below the view.
+const LOWER_START := 0.42
+const LOWER_END := 0.76
+const HIDE_PITCH := -0.85
 
 var right_arm: Node3D
 var left_arm: Node3D
@@ -70,39 +75,49 @@ func _build_arm(side: float, label: String) -> Node3D:
     var root := Node3D.new()
     root.name = label
     add_child(root)
-    # All points are camera-local. Back ends of the sleeves are intentionally
-    # clipped below the frame, like a classic 2000s horror-FPS viewmodel.
-    # Left hand sits lower, right hand slightly closer and more dominant.
-    var lift := 0.035 if side > 0.0 else -0.040
-    var shoulder := Vector3(side * 0.43, -0.72 + lift, -0.12)
-    var elbow := Vector3(side * 0.335, -0.48 + lift, -0.47)
-    var wrist := Vector3(side * 0.245, -0.39 + lift, -0.70)
+    # Relaxed unarmed stance. Sleeves originate below/behind the near plane
+    # and follow a bent elbow towards the lower corners, not straight ahead
+    # as if the player were permanently aiming invisible pistols.
+    var lift := 0.030 if side > 0.0 else -0.080
+    var shoulder := Vector3(side * 0.470, -0.820 + lift, -0.120)
+    var elbow := Vector3(side * 0.365, -0.640 + lift, -0.425)
+    var wrist := Vector3(side * 0.280, -0.535 + lift, -0.720)
+    # Unequal radial widths create a tailored, angular canvas coat sleeve.
     _limb(root, "UpperCoatSleeve", shoulder, elbow,
-        0.126, 0.113, COAT)
+        0.105, 0.093, COAT)
     _limb(root, "ForearmSleeve", elbow, wrist,
-        0.116, 0.087, COAT_SHADOW)
-    _limb(root, "WristCuff", wrist + Vector3(0, -0.005, 0.038),
-        wrist + Vector3(0, 0.003, -0.018),
-        0.097, 0.085, CUFF)
-    # Separate palm / thumb / knuckles, not an anonymous single box.
-    var palm := wrist + Vector3(0.0, 0.011, -0.079)
-    _block(root, "Palm", Vector3(0.120, 0.067, 0.144), palm, SKIN)
-    _block(root, "Knuckles", Vector3(0.115, 0.045, 0.055),
-        palm + Vector3(0, 0.014, -0.087), SKIN_SHADOW)
-    _limb(root, "Thumb", palm + Vector3(-side * 0.059, -0.005, 0.027),
-        palm + Vector3(-side * 0.079, -0.011, -0.044),
-        0.026, 0.018, SKIN)
+        0.097, 0.074, COAT_SHADOW)
+    _limb(root, "WristCuff",
+        wrist + Vector3(0.0, -0.005, 0.042),
+        wrist + Vector3(0.0, 0.003, -0.028),
+        0.081, 0.072, CUFF)
+
+    # Palm is a narrow tapered silhouette. Individual fingers angle downward
+    # instead of forming the hard rectangular fist seen in 0.5.8.
+    var palm_start := wrist + Vector3(0.0, 0.006, -0.015)
+    var palm_end := wrist + Vector3(-side * 0.004, -0.014, -0.145)
+    _limb(root, "Palm", palm_start, palm_end,
+        0.057, 0.049, SKIN)
+    _limb(root, "Knuckles",
+        palm_end + Vector3(0.0, 0.005, 0.018),
+        palm_end + Vector3(0.0, -0.005, -0.032),
+        0.050, 0.043, SKIN_SHADOW)
+    _limb(root, "Thumb",
+        wrist + Vector3(-side * 0.052, -0.004, -0.064),
+        wrist + Vector3(-side * 0.073, -0.032, -0.148),
+        0.024, 0.017, SKIN)
     for finger in range(4):
-        var finger_x := (float(finger) - 1.5) * 0.029
-        var knuckle := palm + Vector3(finger_x, 0.0, -0.085)
+        var finger_x := (float(finger) - 1.5) * 0.026
+        var knuckle := palm_end + Vector3(finger_x, -0.006, -0.025)
+        var finger_length := 0.055 if finger == 0 or finger == 3 else 0.069
         _limb(root, "Finger%d" % finger, knuckle,
-            knuckle + Vector3(0, -0.006, -0.052),
-            0.014, 0.012, SKIN)
-    # High-contrast patch and two low-resolution stitched cuff markers.
-    _block(root, "CoatPatch", Vector3(0.064, 0.011, 0.080),
-        elbow + Vector3(0, 0.082, 0.020), COAT)
-    _block(root, "CuffStitch", Vector3(0.040, 0.008, 0.013),
-        wrist + Vector3(0, 0.087, 0.007), THREAD)
+            knuckle + Vector3(0.0, -0.038, -finger_length),
+            0.014, 0.010, SKIN)
+    # Restrained low-poly coat detailing, readable in the night palette.
+    _block(root, "CoatPatch", Vector3(0.048, 0.012, 0.072),
+        elbow + Vector3(0.0, 0.075, 0.015), COAT)
+    _block(root, "CuffStitch", Vector3(0.035, 0.009, 0.012),
+        wrist + Vector3(0, 0.075, 0.005), THREAD)
     return root
 
 
@@ -115,7 +130,7 @@ func _ready() -> void:
     player = eye.get_parent() as CharacterBody3D
     left_arm = _build_arm(-1.0, "LeftArm")
     right_arm = _build_arm(1.0, "RightArm")
-    print("FPS_VIEWMODEL_READY: camera_local=true arms=2 unarmed=true lowpoly=true body_handoff=true")
+    print("FPS_VIEWMODEL_READY: camera_local=true arms=2 unarmed=true lowpoly=true body_handoff=true relaxed_pose=true early_lowering=true")
 
 
 func push_look_motion(relative_pixels: Vector2) -> void:
@@ -136,7 +151,7 @@ func _process(delta: float) -> void:
     # The cinematic has its own hands during short gestures; avoid overlap.
     # The long ambient phase (5) leaves the regular idle arms visible.
     is_gesture_hidden = phase in [1, 2, 3, 4, 6, 7]
-    is_downlook_hidden = eye.rotation.x <= HANDOFF_PITCH
+    is_downlook_hidden = eye.rotation.x <= HIDE_PITCH
     visible = not is_gesture_hidden and not is_downlook_hidden
 
     var grounded := player.is_on_floor()
@@ -162,7 +177,10 @@ func _process(delta: float) -> void:
         -step * 0.011 * stride_weight,
         step * 0.012 * stride_weight,
         -0.010 * cos(stride_phase) * stride_weight)
-    # Move the hands down before switching to the world-space down-look arms.
-    var lower := smoothstep(-0.72, -1.04, eye.rotation.x)
-    right_arm.position.y -= 0.16 * lower
-    left_arm.position.y -= 0.16 * lower
+    # On modest downward pitch the torso enters the frame. Lower both hands
+    # OUT of frame early; do not leave detached fists on top of the jacket.
+    var lower := smoothstep(LOWER_START, LOWER_END, -eye.rotation.x)
+    right_arm.position.y -= 0.66 * lower
+    left_arm.position.y -= 0.66 * lower
+    right_arm.position.z += 0.10 * lower
+    left_arm.position.z += 0.10 * lower

@@ -109,7 +109,7 @@ jobs:
         run: |
           set -euo pipefail
           godot --headless --path godot --script res://viewmodel_regression.gd 2>&1 | tee /tmp/viewmodel-regression.log
-          grep -q "VIEWMODEL_REGRESSION_OK: hands=2 coat_sleeves=true lowpoly=true camera_space=true downlook_handoff=true cinematic_safe=true mouse_sway=true" /tmp/viewmodel-regression.log
+          grep -q "VIEWMODEL_REGRESSION_OK: hands=2 coat_sleeves=true lowpoly=true camera_space=true downlook_handoff=true cinematic_safe=true mouse_sway=true early_lowering=true" /tmp/viewmodel-regression.log
 
       - name: Regression-test pause and mouse sensitivity
         shell: bash

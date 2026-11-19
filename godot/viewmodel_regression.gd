@@ -56,6 +56,24 @@ func _run() -> void:
     if rig.position.length() <= 0.002:
         _fail("mouse look motion did not reach viewmodel sway")
         return
+    # The handoff must begin well before the coat takes up the center
+    # of the screen. Check at an intermediate downward pitch as well as
+    # the maximum camera angle.
+    eye.rotation.x = -0.70
+    rig.call("_process",0.016)
+    body.call("_process",0.016)
+    if not rig.visible:
+        _fail("relaxed hands disappear abruptly at moderate downward pitch")
+        return
+    if right.position.y > -0.38 or left.position.y > -0.38:
+        _fail("hands still sit on top of the jacket during downward view")
+        return
+    eye.rotation.x = -0.90
+    rig.call("_process",0.016)
+    body.call("_process",0.016)
+    if rig.visible:
+        _fail("viewmodel hands remain over jacket at downward pitch")
+        return
     eye.rotation.x = -1.45
     rig.call("_process",0.016)
     body.call("_process",0.016)
@@ -79,5 +97,5 @@ func _run() -> void:
     if not rig.visible:
         _fail("viewmodel does not recover in ambient phase")
         return
-    print("VIEWMODEL_REGRESSION_OK: hands=2 coat_sleeves=true lowpoly=true camera_space=true downlook_handoff=true cinematic_safe=true mouse_sway=true")
+    print("VIEWMODEL_REGRESSION_OK: hands=2 coat_sleeves=true lowpoly=true camera_space=true downlook_handoff=true cinematic_safe=true mouse_sway=true early_lowering=true")
     quit(0)
