@@ -155,6 +155,7 @@ func _create_ground() -> void:
     _day_ground_material = instance.material_override
     add_child(instance)
     var ground := StaticBody3D.new()
+    ground.set_meta("impact_surface", &"soil")
     ground.position.y = -0.2
     var collider := CollisionShape3D.new()
     var shape := BoxShape3D.new()

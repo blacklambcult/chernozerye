@@ -91,6 +91,7 @@ var _roof_counts := [0, 0, 0, 0, 0]
 var _body_counts := [0, 0, 0, 0, 0]
 var _window_counts := [0, 0, 0, 0, 0]
 var _entrance_counts := [0, 0, 0, 0, 0]
+var _timber_faces := PackedVector3Array()
 var _log_courses_count := 0
 var _eaves_count := 0
 var _carved_count := 0
@@ -267,12 +268,12 @@ func _collision_wall(faces: PackedVector3Array,
     _push_tri(faces, pb, qf, pf)
 
 
-func _register_building_collider(points: PackedVector2Array, height: float) -> void:
+func _register_building_collider(points: PackedVector2Array, height: float, timber: bool = false) -> void:
     # Match the same footprint used to render actual walls, not invisible blockout.
     for i in range(points.size()):
         var a: Vector2 = points[i]
         var b: Vector2 = points[(i + 1) % points.size()]
-        _collision_wall(_building_collision_faces, _pt(a, 0.0),
+        _collision_wall(_timber_faces if timber else _building_collision_faces, _pt(a, 0.0),
             _pt(b, 0.0), 0.02, height, 0.30)
     _collision_building_count += 1
 
@@ -288,6 +289,8 @@ func _build_collision_body(faces: PackedVector3Array, label: String) -> void:
         return
     var body := StaticBody3D.new()
     body.name = label
+    if label == "CollisionTimberBuildings":
+        body.set_meta("impact_surface", &"wood")
     body.collision_layer = 1
     body.collision_mask = 1
     var shape := ConcavePolygonShape3D.new()
@@ -300,6 +303,7 @@ func _build_collision_body(faces: PackedVector3Array, label: String) -> void:
 
 
 func _build_collision_bodies() -> void:
+    _build_collision_body(_timber_faces, "CollisionTimberBuildings")
     _build_collision_body(_building_collision_faces, "CollisionBuildings")
     _build_collision_body(_fence_collision_faces, "CollisionFences")
     _build_collision_body(_yard_collision_faces, "CollisionYardProps")
@@ -1016,7 +1020,7 @@ func _decorate_building(points: PackedVector2Array, category: String) -> void:
         _window_counts[window_style] += 1
         _entrance_counts[entrance_style] += 1
     var walls_height := (6.52 if floors == 2 else 3.78) if category == "house" else (2.7 if category == "sauna" else 2.35)
-    _register_building_collider(points, walls_height)
+    _register_building_collider(points, walls_height, body_style in [0, 1, 4])
     var wall_style := body_style if category == "house" else (1 if category == "sauna" else 0)
     # From the supplied Russian village photographs: dark logs, faded paint,
     # mint-green fences, dull blue gables, rusty metal and pale limewash.
