@@ -44,6 +44,8 @@ func set_controls_locked(value: bool) -> void:
 
 func _ready() -> void:
     add_child(music)
+    step_sound.bus = &"Effects"
+    wind.bus = &"Effects"
     add_child(step_sound)
     wind.stream = preload("res://village_wind.wav")
     wind.volume_db = -19.0

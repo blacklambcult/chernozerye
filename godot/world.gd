@@ -195,11 +195,20 @@ func _create_manual_ground_material() -> StandardMaterial3D:
             var noise := rng.randf_range(-0.032, 0.032)
             var value := clampf(0.39 + broad * 0.7 + swirls * 0.65 + noise * 0.6, 0.31, 0.48)
             img.set_pixel(x, y, Color(value * 0.96, value * 0.87, value * 0.74))
+    # Small clusters of shale and broken straw repeat seamlessly across the soil.
+    for fleck in range(180):
+        var origin := Vector2i(rng.randi_range(0, 127), rng.randi_range(0, 127))
+        var straw := fleck % 4 == 0
+        var pigment := Color("#77644c") if straw else Color("#5c544c")
+        for dx in range(rng.randi_range(2, 5)):
+            var x := (origin.x + dx) % 128
+            var y := (origin.y + (dx / 2 if straw else 0)) % 128
+            img.set_pixel(x, y, img.get_pixel(x, y).lerp(pigment, 0.65))
     img.generate_mipmaps()
     var mat := _material(Color("#98968c"))
     mat.albedo_texture = ImageTexture.create_from_image(img)
-    mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-    mat.uv1_scale = Vector3(21.0, 21.0, 1.0)
+    mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS_ANISOTROPIC
+    mat.uv1_scale = Vector3(520.0, 520.0, 1.0)
     return mat
 
 func _create_lighting() -> void:
