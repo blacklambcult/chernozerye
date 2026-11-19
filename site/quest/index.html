@@ -88,7 +88,8 @@
         <div class="map-actions" role="group" aria-label="Режим карты">
           <button id="tool-spawn" type="button" class="map-tool active" data-mode="spawn" aria-pressed="true">⌖ Спавн</button>
           <button id="tool-step" type="button" class="map-tool" data-mode="step" aria-pressed="false">◆ Точка шага</button>
-          <button id="basemap-toggle" type="button" class="map-tool basemap">◫ Спутник</button>
+          <button id="geo-layer-toggle" type="button" class="map-tool active" aria-pressed="true" title="Геообъекты Geo Lab: здания, лес, вода, дороги, ручная разметка">▥ Геообъекты</button>
+          <button id="basemap-toggle" type="button" class="map-tool basemap">◫ Схема</button>
         </div>
       </div>
       <div class="map-frame">
@@ -99,7 +100,7 @@
         <div id="map-error" class="map-error" role="alert" hidden>Картографический модуль не загрузился. Проверь соединение с интернетом.</div>
         <noscript>Для редактора квестов нужен JavaScript.</noscript>
       </div>
-      <div class="map-footer"><span><b class="legend-dot spawn"></b> Спавн игрока</span><span><b class="legend-dot step"></b> Точка задачи</span><span>Координаты: WGS84 / Geo Lab</span></div>
+      <div class="map-footer"><span><b class="legend-dot spawn"></b> Спавн игрока</span><span><b class="legend-dot step"></b> Точка задачи</span><span><b class="legend-dot houses"></b> Дома</span><span><b class="legend-dot nature"></b> Лес / вода</span><span id="geo-layer-status" role="status">GEO LAB / ЗАГРУЗКА СЛОЁВ…</span></div>
     </main>
 
     <aside class="sidebar panel-right" aria-label="Редактор событий квеста">
@@ -154,6 +155,8 @@
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="./quest-core.js?v=1"></script>
-<script src="./quest.js?v=1"></script>
+<script src="../map/editor-core.js?v=20"></script>
+<script src="./geo-overlay-core.js?v=1"></script>
+<script src="./quest.js?v=2"></script>
 </body>
 </html>

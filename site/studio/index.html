@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1114">
   <meta name="description" content="Чернозёрье Studio — единое рабочее пространство Geo Lab, Quest Lab и Model Lab.">
   <title>Чернозёрье / STUDIO 0.1</title>
-  <link rel="stylesheet" href="./studio.css?v=1">
+  <link rel="stylesheet" href="./studio.css?v=2">
 </head>
 <body>
 <div class="studio">
@@ -27,23 +27,28 @@
 
   <div class="main">
     <nav class="rail" aria-label="Разделы студии">
+      <button id="rail-toggle" class="rail-toggle" type="button" aria-expanded="true" aria-controls="rail-menu" title="Свернуть боковую панель (Ctrl+B)">
+        <span id="rail-chevron" class="rail-chevron" aria-hidden="true">«</span>
+        <span class="rail-toggle-text">СВЕРНУТЬ МЕНЮ</span>
+      </button>
+      <div id="rail-menu" class="rail-menu">
       <div class="rail-label">WORKSPACE / 01</div>
-      <button class="navitem" data-target="home" type="button">
+      <button class="navitem" data-target="home" type="button" aria-label="Центр управления" title="Центр управления">
         <span class="navindex">00</span><span class="nav-icon">▤</span>
         <span class="navcopy"><strong>Центр управления</strong><small>Обзор инструментов</small></span>
       </button>
       <div class="rail-separator">ПРОГРАММЫ</div>
-      <button class="navitem" data-target="geo" type="button">
+      <button class="navitem" data-target="geo" type="button" aria-label="Geo Lab" title="Geo Lab">
         <span class="navindex">01</span><span class="nav-icon">⌗</span>
         <span class="navcopy"><strong>GEO LAB</strong><small>География и мир</small></span>
         <span class="nav-arrow">↗</span>
       </button>
-      <button class="navitem" data-target="quest" type="button">
+      <button class="navitem" data-target="quest" type="button" aria-label="Quest Lab" title="Quest Lab">
         <span class="navindex">02</span><span class="nav-icon">◇</span>
         <span class="navcopy"><strong>QUEST LAB</strong><small>Квесты и события</small></span>
         <span class="nav-arrow">↗</span>
       </button>
-      <button class="navitem" data-target="model" type="button">
+      <button class="navitem" data-target="model" type="button" aria-label="Model Lab" title="Model Lab">
         <span class="navindex">03</span><span class="nav-icon">⬡</span>
         <span class="navcopy"><strong>MODEL LAB</strong><small>3D-модели и пропсы</small></span>
         <span class="nav-arrow">↗</span>
@@ -57,6 +62,7 @@
         <p>Счётчики отражают данные браузера. Перед сменой устройства скачивай проекты в файлы.</p>
       </div>
       <div class="rail-footer">◈ DATA IS LOCAL <span>/</span> CHERNOZERYE</div>
+      </div>
     </nav>
 
     <main class="content" aria-label="Рабочая область студии">
@@ -112,6 +118,6 @@
   </footer>
 </div>
 <script src="./studio-state.js?v=1"></script>
-<script src="./studio.js?v=1"></script>
+<script src="./studio.js?v=2"></script>
 </body>
 </html>

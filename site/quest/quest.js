@@ -2,6 +2,8 @@
 (() => {
   "use strict";
   const C = window.ChernoQuestCore;
+  const Geo = window.ChernoQuestGeo;
+  const GeoEditor = window.GeoLabEditorCore;
   const KEY = "chernozerye.questlab.v1";
   const $ = (id) => document.getElementById(id);
   const TYPE_NAMES = { main: "ОСНОВНОЙ", side: "ПОБОЧНЫЙ" };
@@ -15,8 +17,15 @@
   let markers = null;
   let streetTiles = null;
   let satelliteTiles = null;
-  let satellite = false;
+  let satellite = true;
   let storageWarning = "";
+  let geoEnabled = true;
+  let manualLayer = null;
+  let manualRaw = undefined;
+  let geoReadyCount = 0;
+  let geoSourceFailures = 0;
+  const geoPublished = [];
+
 
   if (!C) {
     $("save-state").textContent = "Ошибка: не загружен модуль данных Quest Lab.";
@@ -244,6 +253,100 @@
     renderMapPins();
     setMode(mode === "step" && (!step() || step().type === "message") ? "spawn" : mode);
   }
+  function updateGeoStatus(manualCount = 0) {
+    if (!Geo || !GeoEditor) {
+      $("geo-layer-status").textContent = "GEO LAB / МОДУЛЬ НЕДОСТУПЕН";
+      $("geo-layer-status").classList.add("warning");
+      return;
+    }
+    const suffix = geoSourceFailures ? " · часть слоёв недоступна" : "";
+    $("geo-layer-status").textContent = "GEO LAB / " + manualCount +
+      " МОИХ · " + geoReadyCount + "/" + Geo.SOURCES.length + " БАЗОВЫХ" + suffix;
+    $("geo-layer-status").classList.toggle("warning", geoSourceFailures > 0);
+  }
+
+  function makeGeoLayer(features, styleFn) {
+    if (!map || !window.L) return null;
+    // Noninteractive Canvas geometry lets clicks pass through to mission markers.
+    // High-vertex surveys remain a backdrop rather than stealing quest-map events.
+    return window.L.geoJSON(features, {
+      interactive: false,
+      renderer: window.L.canvas({ padding:0.4 }),
+      style: styleFn,
+      pointToLayer: (_feature, latlng) => window.L.circleMarker(latlng, {
+        radius:4, color:"#aecfd6", weight:1, fillOpacity:0.65, interactive:false
+      })
+    });
+  }
+  function refreshGeoManual(force = false) {
+    if (!map || !Geo || !GeoEditor) return;
+    let raw;
+    try { raw = window.localStorage.getItem(Geo.STORAGE_KEY); }
+    catch {
+      $("geo-layer-status").textContent = "GEO LAB / НЕТ ДОСТУПА К ХРАНИЛИЩУ";
+      $("geo-layer-status").classList.add("warning");
+      return;
+    }
+    if (!force && raw === manualRaw) return;
+    // Preserve previously drawn overlay if storage unexpectedly becomes corrupted.
+    try {
+      const features = Geo.readManual(raw, GeoEditor);
+      const next = makeGeoLayer({ type:"FeatureCollection", features }, feature =>
+        Geo.manualStyle(feature.properties?.category));
+      if (manualLayer && map.hasLayer(manualLayer)) map.removeLayer(manualLayer);
+      manualLayer = next;
+      manualRaw = raw;
+      if (geoEnabled && manualLayer) manualLayer.addTo(map);
+      updateGeoStatus(features.length);
+    } catch (error) {
+      console.warn("QUEST_GEO_MANUAL_INVALID", error);
+      $("geo-layer-status").textContent = "GEO LAB / ПРОВЕРЬ ЧЕРНОВИК";
+      $("geo-layer-status").classList.add("warning");
+    }
+  }
+  async function loadGeoPublished() {
+    if (!map || !Geo) return;
+    await Promise.all(Geo.SOURCES.map(async spec => {
+      try {
+        const response = await fetch("../map/data/" + spec.file, { cache:"default" });
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        const documentData = await response.json();
+        const size = Geo.sourceCounts(documentData);
+        const layer = makeGeoLayer(documentData, () => Geo.sourceStyle(spec.id));
+        geoPublished.push(layer);
+        geoReadyCount++;
+        if (geoEnabled && layer) layer.addTo(map);
+        console.info("QUEST_GEO_LAYER_READY: " + spec.id + " features=" + size);
+      } catch (error) {
+        geoSourceFailures++;
+        console.warn("QUEST_GEO_LAYER_FAILED", spec.file, error);
+      }
+      refreshGeoManual(true);
+    }));
+    refreshGeoManual(true);
+  }
+  function toggleGeoLayers() {
+    geoEnabled = !geoEnabled;
+    for (const layer of [...geoPublished,manualLayer]) {
+      if (!layer) continue;
+      if (geoEnabled) { if (!map.hasLayer(layer)) layer.addTo(map); }
+      else if (map.hasLayer(layer)) map.removeLayer(layer);
+    }
+    $("geo-layer-toggle").classList.toggle("active", geoEnabled);
+    $("geo-layer-toggle").setAttribute("aria-pressed", String(geoEnabled));
+    $("geo-layer-toggle").textContent = geoEnabled ? "▥ Геообъекты" : "▤ Показать слои";
+  }
+  // The Studio keeps Quest Lab alive in an iframe while editing Geo Lab in
+  // another. Refresh the same Geo Lab localStorage data every time it opens.
+  window.QuestGeoOverlayRefresh = () => {
+    refreshGeoManual();
+    if (map) window.requestAnimationFrame(() => map.invalidateSize());
+  };
+  window.addEventListener("storage", evt => {
+    if (Geo && evt.key === Geo.STORAGE_KEY) refreshGeoManual();
+  });
+  window.addEventListener("focus", () => refreshGeoManual());
+
   function initializeMap() {
     if (!window.L) {
       $("map-error").hidden = false;
@@ -255,18 +358,15 @@
     L.control.zoom({ position: "bottomright" }).addTo(map);
     streetTiles = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
       maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> / CARTO'
-    }).addTo(map);
+    });
     satelliteTiles = L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
         maxZoom: 19, attribution: "Esri World Imagery"
-      });
+      }).addTo(map);
     markers = L.layerGroup().addTo(map);
-    // The shared Geo Lab data is a visual reference, not a duplicate database.
-    fetch("../map/data/roads.geojson").then((res) => {
-      if (!res.ok) throw new Error("missing terrain layer");
-      return res.json();
-    }).then((data) => L.geoJSON(data, { style: { color: "#b49060", weight: 1.6, opacity: 0.45 },
-      interactive: false }).addTo(map)).catch(() => {});
+    refreshGeoManual(true);
+    void loadGeoPublished();
+    $("geo-layer-toggle").addEventListener("click", toggleGeoLayers);
     map.on("click", (evt) => updatePoint(evt.latlng));
     map.on("mousemove", (evt) => {
       $("pointer-coords").textContent = evt.latlng.lat.toFixed(6) + ", " + evt.latlng.lng.toFixed(6);

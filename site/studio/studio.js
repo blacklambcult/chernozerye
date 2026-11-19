@@ -9,7 +9,34 @@
     quest: {kicker:"MISSION WORKSPACE / 02", name:"QUEST LAB · РЕДАКТОР КВЕСТОВ", url:"../quest/", file:"../quest/?studio=1"},
     model: {kicker:"ASSET WORKSPACE / 03", name:"MODEL LAB · 3D-КОНСТРУКТОР", url:"../model/", file:"../model/?studio=1"}
   });
+  const COLLAPSE_KEY = "chernozerye.studio.rail-collapsed.v1";
   const cached = new Map();
+  let railCollapsed = false;
+  function notifyEditorResize() {
+    const current = cached.get(active);
+    if (!current) return;
+    requestAnimationFrame(() => {
+      try {
+        current.frame.contentWindow.dispatchEvent(new Event("resize"));
+        current.frame.contentWindow.QuestGeoOverlayRefresh?.();
+      } catch (err) { console.warn("STUDIO_RESIZE_FAILED",err); }
+    });
+  }
+  function setRailCollapsed(collapsed) {
+    railCollapsed = Boolean(collapsed);
+    document.querySelector(".studio").classList.toggle("nav-collapsed", railCollapsed);
+    const button = $("rail-toggle");
+    button.setAttribute("aria-expanded", String(!railCollapsed));
+    button.title = railCollapsed ? "Развернуть боковую панель (Ctrl+B)" : "Свернуть боковую панель (Ctrl+B)";
+    $("rail-chevron").textContent = railCollapsed ? "»" : "«";
+    $(".rail-toggle-text").textContent = railCollapsed ? "РАЗВЕРНУТЬ" : "СВЕРНУТЬ МЕНЮ";
+    try { localStorage.setItem(COLLAPSE_KEY, String(railCollapsed)); }
+    catch { /* shell navigation still functions without storage */ }
+    notifyEditorResize();
+  }
+  try { railCollapsed = localStorage.getItem(COLLAPSE_KEY) === "true"; }
+  catch { /* storage not available: start expanded */ }
+
   let active = null;
   const refreshStats = () => {
     const stats = State.snapshot(localStorage);
@@ -61,7 +88,10 @@
     entry.frame.hidden = false;
     // Leaflet and WebGL observers can need a fresh resize after being hidden.
     window.requestAnimationFrame(() => {
-      try { entry.frame.contentWindow.dispatchEvent(new Event("resize")); }
+      try {
+        entry.frame.contentWindow.dispatchEvent(new Event("resize"));
+        if (id === "quest") entry.frame.contentWindow.QuestGeoOverlayRefresh?.();
+      }
       catch { /* the standalone editors still work */ }
     });
   }
@@ -98,7 +128,8 @@
     const config = MODES[id];
     $("section-kicker").textContent = config.kicker;
     $("section-title").textContent = config.name;
-    for (const b of document.querySelectorAll("[data-target]")) {
+    $("rail-toggle").addEventListener("click", () => setRailCollapsed(!railCollapsed));
+  for (const b of document.querySelectorAll("[data-target]")) {
       const selected = b.dataset.target === id;
       b.classList.toggle("active", selected);
       b.setAttribute("aria-current", selected ? "page" : "false");
@@ -145,10 +176,16 @@
   });
   window.addEventListener("focus", refreshStats);
   window.addEventListener("keydown", (evt) => {
+    if ((evt.ctrlKey || evt.metaKey) && !evt.altKey && evt.code === "KeyB") {
+      evt.preventDefault();
+      setRailCollapsed(!railCollapsed);
+      return;
+    }
     if (!evt.altKey || evt.ctrlKey || evt.metaKey) return;
     const id = {Digit0:"home",Digit1:"geo",Digit2:"quest",Digit3:"model"}[evt.code];
     if (id) { evt.preventDefault(); show(id); }
   });
+  setRailCollapsed(railCollapsed);
   refreshStats();
   show(State.toolId(location.hash), false);
   console.info("CHERNOZERYE_STUDIO_READY: geo=true quest=true model=true workspace=local");
