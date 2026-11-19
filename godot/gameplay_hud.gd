@@ -156,6 +156,13 @@ func _draw_slots(view_width: float, view_height: float) -> void:
             draw_line(Vector2(x+10,y+25),Vector2(x+41,y+25),INK,4)
             draw_circle(Vector2(x+31,y+29),6,GOLD)
             draw_line(Vector2(x+39,y+28),Vector2(x+44,y+40),Color("#a37c57"),6)
+        elif index == 2:
+            # New Forge asset: simple compact silhouette independent of revolver art.
+            draw_rect(Rect2(x + 10, y + 24, 34, 7), Color("#b7a38c"))
+            draw_rect(Rect2(x + 11, y + 20, 26, 6), Color("#86705d"))
+            draw_line(Vector2(x + 23, y + 31),Vector2(x + 29, y + 43),
+                Color("#b98b6b"), 6.0)
+            draw_rect(Rect2(x + 39, y + 24, 8, 5), Color("#d4b886"))
         else:
             draw_line(Vector2(x + 20, y + 31),
                 Vector2(x + 37, y + 31), Color("#565850"), 1.0)
@@ -164,8 +171,12 @@ func _draw_slots(view_width: float, view_height: float) -> void:
         var status := "ПЕРЕЗАРЯДКА" if float(gun.get("reload_left")) > 0 else "%d / 6" % int(gun.get("rounds"))
         var action := "ЛКМ — ВЫСТРЕЛ" if bool(gun.get("cocked")) else "ЛКМ — ВЗВЕСТИ"
         _write(x0, y + 72, status + "    " + action + "    R — ЗАРЯДИТЬ", 11, GOLD)
+    elif selected_slot == 2 and player != null:
+        var pistol: Node3D = player.get("forge_pistol")
+        var status := "ПЕРЕЗАРЯДКА" if float(pistol.get("reload_left")) > 0.0 else "%d / 7" % int(pistol.get("rounds"))
+        _write(x0, y + 72, "FORGE · " + status + "   ЛКМ — ВЫСТРЕЛ   R — ПЕРЕЗАРЯДКА", 11, GOLD)
     else:
-        _write(x0, y + 72, "1 ПАЧКА · V ДЕЙСТВИЕ     2 РЕВОЛЬВЕР", 11, MUTED)
+        _write(x0, y + 72, "1 ПАЧКА · V     2 РЕВОЛЬВЕР     3 ПИСТОЛЕТ", 11, MUTED)
 
 func _draw_reticle() -> void:
     if player == null or bool(player.get("controls_locked")):
@@ -178,6 +189,8 @@ func _draw_reticle() -> void:
     draw_circle(center, 1.35, INK)
     var gun: Node3D = player.get("revolver")
     if not gun.visible:
+        gun = player.get("forge_pistol") as Node3D
+    if gun == null or not gun.visible:
         return
     var eye := gun.get_parent() as Camera3D
     var gap := maxf(3.0, size.y * 0.5 * tan(float(gun.call("spread_angle"))) / tan(deg_to_rad(eye.fov * 0.5)))

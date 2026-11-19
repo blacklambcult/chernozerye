@@ -264,7 +264,8 @@ func _process(delta: float) -> void:
 
 func _render_phase() -> void:
     var gun: Node3D = player.get("revolver") if player != null else null
-    var weapon_drawn := gun != null and gun.visible
+    var forge: Node3D = player.get("forge_pistol") if player != null else null
+    var weapon_drawn := (gun != null and gun.visible) or (forge != null and forge.visible)
     gesture.visible = phase in [Phase.PACK,Phase.RETRIEVE,
         Phase.LIGHT_CUT,Phase.MOVE_TO_FACE] and not weapon_drawn
     pack.visible = phase in [Phase.PACK,Phase.RETRIEVE] and not weapon_drawn

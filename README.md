@@ -1,5 +1,13 @@
 # Fearless Knights of the Cordon
 
+### Forge pistol: user-authored weapon skin, seven-shot arcade controls
+
+- The GLB supplied by the user in Hellish Forge is restored during CI at `godot/assets/forge_pistol.glb` (SHA-256 checked).
+- Inventory: 1 cigarette pack, 2 existing two-click revolver (6 rounds), **3 Forge pistol (7 rounds)**, 4 empty.
+- The Forge pistol shoots once for each valid left click (no separate cocking), `R` reloads seven virtual rounds; the original revolver controls, ammunition and visual mesh are preserved.
+- Godot imports the original GLB meshes and `HF_GRIP_PRIMARY`, `HF_FORWARD`, `HF_MAGAZINE` markers. The viewmodel scales/positions the mesh without editing the source asset.
+- Includes a headless regression for the uploaded GLB, three anchors, seven-shot ammo cycle, independent reload, and preserved revolver.
+
 ### Hellish Forge 0.1 — цифровая кузница игровых предметов
 
 - Самостоятельный браузерный модуль: https://blacklambcult.github.io/chernozerye/forge/ и вкладка `/studio/#forge`. Не заменяет Model Lab и использует отдельный ключ локального хранилища.

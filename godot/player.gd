@@ -13,6 +13,7 @@ const JUMP := 4.5
 const MOUSE_SENS := 0.002
 
 var revolver := preload("res://revolver.gd").new()
+var forge_pistol := preload("res://forge_pistol.gd").new()
 var step_sound := AudioStreamPlayer.new()
 var music := preload("res://location_music.gd").new()
 var wind := AudioStreamPlayer.new()
@@ -97,6 +98,7 @@ func _ready() -> void:
     _modeled_character.set_script(preload("res://modeled_character.gd"))
     add_child(_modeled_character)
     camera.add_child(revolver)
+    camera.add_child(forge_pistol)
     _character_sequence = Node3D.new()
     _character_sequence.name = "CharacterSmoking"
     _character_sequence.set_script(preload("res://character_smoking.gd"))
@@ -142,7 +144,7 @@ func _toggle_model_inspection() -> void:
     camera.current = not _inspect_enabled
     _inspection_light.visible = _inspect_enabled
     _inspection_hint.visible = _inspect_enabled
-    revolver.equip(not _inspect_enabled and _armed_slot())
+    _sync_equipped_weapons()
     _character_sequence.visible = not _inspect_enabled
     set_controls_locked(_inspect_enabled)
     if _inspect_enabled:
@@ -163,6 +165,14 @@ func _start_character_sequence() -> bool:
 func _armed_slot() -> bool:
     var hud := get_parent().get_node_or_null("GameplayHUD/SurvivalHUD")
     return hud != null and int(hud.get("selected_slot")) == 1
+
+func _pistol_slot() -> bool:
+    var hud := get_parent().get_node_or_null("GameplayHUD/SurvivalHUD")
+    return hud != null and int(hud.get("selected_slot")) == 2
+
+func _sync_equipped_weapons() -> void:
+    revolver.equip(not _inspect_enabled and _armed_slot())
+    forge_pistol.equip(not _inspect_enabled and _pistol_slot())
 
 func _matches(event: InputEventKey, latin: int, cyrillic: String) -> bool:
     return event.physical_keycode == latin or event.keycode == latin or (event.unicode != 0 and char(event.unicode).to_lower() == cyrillic)
@@ -189,6 +199,8 @@ func _input(event: InputEvent) -> void:
         # Otherwise the six-round cycle would silently require 13 clicks.
         if revolver.visible:
             revolver.request_shot()
+        elif forge_pistol.visible:
+            forge_pistol.request_shot()
     elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
         rotate_y(-event.relative.x * mouse_sensitivity)
         camera.rotate_x(-event.relative.y * mouse_sensitivity)
@@ -208,9 +220,12 @@ func _input(event: InputEvent) -> void:
                 # Inventory selection stays responsive during the ambient visual.
                 # The cigarette is a separate camera attachment, not a hand item.
                 survival_hud.call("choose_slot", int(key.physical_keycode) - KEY_1)
-                revolver.equip(_armed_slot())
+                _sync_equipped_weapons()
         if key.pressed and not key.echo and _matches(key, KEY_R, "к"):
-            revolver.reload()
+            if revolver.visible:
+                revolver.reload()
+            elif forge_pistol.visible:
+                forge_pistol.reload()
         if key.pressed and not key.echo and (key.keycode == KEY_V or key.physical_keycode == KEY_V):
             _start_character_sequence()
         if key.pressed and not key.echo and (key.keycode == KEY_F3 or key.physical_keycode == KEY_F3):
@@ -264,6 +279,7 @@ func _physics_process(delta: float) -> void:
 func set_indoors(value: bool) -> void:
     music.set_indoors(value)
     revolver.indoors = value
+    forge_pistol.indoors = value
     wind.volume_db = -80.0 if value else -75.0  # Remain silent; preserve the old interior mix relationship
     step_sound.stream = BOARD_STEP if value else EARTH_STEP
     step_distance = 0.0

@@ -69,6 +69,40 @@ jobs:
           test -s godot/assets/dembel_fp.glb
           python scripts/check_dembel_character.py godot/assets/dembel_full.glb godot/assets/dembel_fp.glb
 
+      - name: Restore user-exported Hellish Forge pistol GLB
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import lzma
+          import struct
+          from pathlib import Path
+
+          # Preserve the exact GLB from Hellish Forge, not a procedurally
+          # recreated placeholder. The repository stores XZ/base64 to
+          # transport uploaded binary data through the GitHub connector.
+          encoded = Path("data/forge_pistol.glb.xz.b64").read_text().strip()
+          payload = lzma.decompress(base64.b64decode(encoded, validate=True))
+          digest = hashlib.sha256(payload).hexdigest()
+          assert digest == "401c46ea34218d7ccf9247f32989ffff1819a3302752ac81c582afdaa55adb16", digest
+          magic, version, size = struct.unpack_from("<III", payload, 0)
+          assert magic == 0x46546C67 and version == 2 and size == len(payload)
+          json_size, chunk = struct.unpack_from("<II", payload, 12)
+          assert chunk == 0x4E4F534A
+          data = json.loads(payload[20:20+json_size])
+          assert len(data["meshes"]) == 11, "Uploaded mesh count changed"
+          anchors = {n["name"] for n in data["nodes"] if n.get("name", "").startswith("HF_")}
+          assert {"HF_GRIP_PRIMARY", "HF_FORWARD", "HF_MAGAZINE"} <= anchors
+          destination = Path("godot/assets/forge_pistol.glb")
+          destination.parent.mkdir(parents=True, exist_ok=True)
+          destination.write_bytes(payload)
+          print("FORGE_UPLOAD_GLB_OK: bytes=", len(payload), "meshes=11 anchors=3 sha256=", digest)
+          PY
+          test -s godot/assets/forge_pistol.glb
+
       - name: Download Godot 4.7.2 and export templates
         shell: bash
         run: |
