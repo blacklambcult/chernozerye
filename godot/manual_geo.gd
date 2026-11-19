@@ -148,18 +148,29 @@ func _mat(color: Color) -> StandardMaterial3D:
     m.cull_mode = BaseMaterial3D.CULL_DISABLED
     return m
 
-func _mesh_from_triangles(vertices: PackedVector3Array, color: Color, label: String) -> void:
+func _mesh_from_triangles(vertices: PackedVector3Array, color: Color, label: String,
+        soil: bool = false) -> void:
     if vertices.is_empty():
         return
     var arrays := []
     arrays.resize(Mesh.ARRAY_MAX)
     arrays[Mesh.ARRAY_VERTEX] = vertices
+    var material := _mat(color)
+    if soil:
+        var uvs := PackedVector2Array()
+        uvs.resize(vertices.size())
+        for i in vertices.size():
+            uvs[i] = Vector2(vertices[i].x, vertices[i].z) / 3.6
+        arrays[Mesh.ARRAY_TEX_UV] = uvs
+        material.albedo_texture = preload("res://textures/lane_soil.png")
+        material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS_ANISOTROPIC
+        material.albedo_color = Color(color.r * 2.15, color.g * 2.25, color.b * 2.40)
     var mesh := ArrayMesh.new()
     mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
     var instance := MeshInstance3D.new()
     instance.name = label
     instance.mesh = mesh
-    instance.material_override = _mat(color)
+    instance.material_override = material
     instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     if label.ends_with("_walls") or label.ends_with("_roof"):
         _base_buildings.add_child(instance)
@@ -235,7 +246,7 @@ func _add_strip(raw: Array, width: float, height: float, tint: Color, label: Str
         return
     var surface := PackedVector3Array()
     _append_joined_ribbon(surface, points, width, 0.0, height)
-    _mesh_from_triangles(surface, tint, label)
+    _mesh_from_triangles(surface, tint, label, true)
     if label == "road":
         _add_november_mud(points, height)
         _add_road_wear(points, height + 0.035)
@@ -304,8 +315,8 @@ func _add_november_mud(points: PackedVector2Array, height: float) -> void:
                     _append_mud_patch(mud, center, tangent, wide, half_long,
                         half_wide, height + 0.018, i * 61 + j)
                 _mud_patches += 1
-    _mesh_from_triangles(mud, Color("#40352e"), "Ноябрь / влажный грунт")
-    _mesh_from_triangles(dark_mud, Color("#332c28"), "Ноябрь / грязевые пятна")
+    _mesh_from_triangles(mud, Color("#40352e"), "Ноябрь / влажный грунт", true)
+    _mesh_from_triangles(dark_mud, Color("#332c28"), "Ноябрь / грязевые пятна", true)
     _mesh_from_triangles(puddles, Color("#3e4445"), "Ноябрь / неглубокие лужи")
 
 
@@ -353,7 +364,7 @@ func _add_road_wear(points: PackedVector2Array, height: float) -> void:
             if (j + i) % 4 == 1 and not _near_junction(mid, 4.0):
                 var center := PackedVector2Array([p0, p1])
                 _append_joined_ribbon(grass, center, 0.13, 0.0, height + 0.010)
-    _mesh_from_triangles(tracks, Color("#3b342e"), "Дорога / мягкие прерывистые колеи")
+    _mesh_from_triangles(tracks, Color("#3b342e"), "Дорога / мягкие прерывистые колеи", true)
     _mesh_from_triangles(grass, Color("#49473c"), "Дорога / редкая центральная трава")
 
 
@@ -425,8 +436,8 @@ func _add_village_roadside(points: PackedVector2Array, width: float, height: flo
                     var plane_y := height + 0.052
                     _put_triangle(stones, _pos(t - dx, plane_y),
                         _pos(t + dy, plane_y), _pos(t + dx, plane_y))
-    _mesh_from_triangles(shoulders, Color("#3e3830"), "Дорога / сырые земляные обочины")
-    _mesh_from_triangles(stones, Color("#544d43"), "Дорога / мокрый гравий и выбоины")
+    _mesh_from_triangles(shoulders, Color("#3e3830"), "Дорога / сырые земляные обочины", true)
+    _mesh_from_triangles(stones, Color("#544d43"), "Дорога / мокрый гравий и выбоины", true)
     _mesh_from_triangles(weeds, Color("#3f4439"), "Обочина / пожухлая ноябрьская трава")
     _mesh_from_triangles(dried, Color("#605444"), "Обочина / сухие стебли")
 
