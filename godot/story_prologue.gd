@@ -230,11 +230,12 @@ func _build_interior() -> void:
     glow.position = Vector3(-2.74,1.13,-0.89)
     glow.omni_range = 4.0
     glow.light_color = Color("#ffa653")
-    glow.light_energy = 2.5
+    glow.light_energy = 3.1
+    glow.shadow_enabled = true
     interior.add_child(glow)
     var daylight := OmniLight3D.new()
     daylight.position = Vector3(-3.85, 1.88, -0.55)
-    daylight.light_color = Color("#bdced9")
+    daylight.light_color = Color("#96b2db")
     daylight.light_energy = 1.25
     daylight.omni_range = 4.6
     interior.add_child(daylight)
@@ -254,7 +255,7 @@ func _build_interior() -> void:
     light.name = "Остывшая комната"
     light.position = Vector3(0, 3.1, 0.3)
     light.light_color = Color("#a3a9af")
-    light.light_energy = 0.58
+    light.light_energy = 0.45
     light.omni_range = 10.0
     light.shadow_enabled = false
     interior.add_child(light)

@@ -259,6 +259,7 @@ func _physics_process(delta: float) -> void:
 
 func set_indoors(value: bool) -> void:
     music.set_indoors(value)
+    revolver.indoors = value
     wind.volume_db = -34.0 if value else -19.0
     step_sound.stream = BOARD_STEP if value else EARTH_STEP
     step_distance = 0.0
