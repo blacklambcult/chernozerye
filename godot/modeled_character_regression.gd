@@ -62,15 +62,28 @@ func _run() -> void:
     # The old checks only tested material/mesh existence and completely
     # missed a giant eight-sided collar covering the viewport center.
     camera.rotation.x = -1.45
-    var bounds := chest.mesh.get_aabb()
-    var top := bounds.position.y + bounds.size.y
+    # AABB corner (maximum y, minimum z) is not necessarily an actual
+    # vertex: our garment tapers at the collar, with a broader lower hem.
+    # Project the genuine collar vertices rather than a phantom box corner.
+    var arrays := chest.mesh.surface_get_arrays(0)
+    var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+    var top := -100.0
+    for vertex in vertices:
+        top = maxf(top, vertex.y)
     var most_central_rim := -100.0
-    for z in [bounds.position.z, bounds.position.z + bounds.size.z]:
-        var camera_point := camera.to_local(chest.to_global(Vector3(0.0, top, z)))
+    var collar_vertices := 0
+    for vertex in vertices:
+        if vertex.y < top - 0.012:
+            continue
+        collar_vertices += 1
+        var camera_point := camera.to_local(chest.to_global(vertex))
         if camera_point.z >= -camera.near:
-            _fail("coat collar is inside the camera near plane")
+            _fail("actual coat collar crosses the camera near plane")
             return
         most_central_rim = maxf(most_central_rim, camera_point.y / -camera_point.z)
+    if collar_vertices < 6:
+        _fail("imported glTF has an incomplete upper collar ring")
+        return
     if most_central_rim > -0.25:
         _fail("open coat collar covers the center of downward FPS view")
         return
