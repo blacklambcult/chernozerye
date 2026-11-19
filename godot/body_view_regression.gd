@@ -48,12 +48,30 @@ func _run() -> void:
     if left_toe_height < seam_height + 0.13 or right_toe_height < seam_height + 0.13:
         _fail("both boot toes must project visibly above the coat waist")
         return
-    if _projected_height(eye, left_knee.global_position) < seam_height + 0.035:
+    var knee_height := _projected_height(eye, left_knee.global_position)
+    var hip_height := _projected_height(eye, left.global_position)
+    if knee_height < seam_height + 0.14:
         _fail("knees remain obscured by the coat in the look-down pose")
+        return
+    if left_toe_height < 0.25 or right_toe_height < 0.25:
+        _fail("toes remain glued to the coat seam rather than visible ahead")
+        return
+    if left_toe_height - knee_height < 0.14:
+        _fail("shins are foreshortened into tiny stumps")
+        return
+    if knee_height - hip_height < 0.17:
+        _fail("thighs are compressed behind the coat")
+        return
+    if left_knee.position.z > -0.26 or right_knee.position.z > -0.26:
+        _fail("knees do not project forward in the downward view")
+        return
+    var left_ankle := left_knee.get_node("AnkleJoint") as Node3D
+    if left_ankle.position.z > -0.24:
+        _fail("ankles remain behind the coat and knees")
         return
     var a := eye.to_local(left_toe.global_position)
     var b := eye.to_local(right_toe.global_position)
-    if absf(a.x / -a.z - b.x / -b.z) < 0.14:
+    if absf(a.x / -a.z - b.x / -b.z) < 0.22:
         _fail("the two boots overlap into a single silhouette")
         return
 
@@ -63,7 +81,10 @@ func _run() -> void:
     if absf(left_knee.position.z - 0.014) > 0.01 or absf(right_knee.position.z - 0.014) > 0.01:
         _fail("knees remain pushed forward in normal forward view")
         return
-    print("BODY_VIEW_REGRESSION_OK: soles_above_ground=true knees_visible=true two_boots_distinct=true coat_clearance=true upright_restored=true")
+    if absf(left_ankle.position.z - 0.020) > 0.01:
+        _fail("boots do not return to standing position when looking forward")
+        return
+    print("BODY_VIEW_REGRESSION_OK: soles_above_ground=true knees_visible=true two_boots_distinct=true coat_clearance=true upright_restored=true leg_chain_visible=true")
     quit(0)
 
 

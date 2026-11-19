@@ -7,8 +7,8 @@ extends Node3D
 const COAT := Color("#465148")
 const COAT_SHADOW := Color("#303932")
 const SHIRT := Color("#686255")
-const PANTS := Color("#4b5048")
-const BOOTS := Color("#343a34")
+const PANTS := Color("#62685c")
+const BOOTS := Color("#514c43")
 const GLOVES := Color("#60594e")
 const BELT := Color("#252722")
 
@@ -234,7 +234,7 @@ func _ready() -> void:
     right_calf_mesh = right_knee_joint.get_node("TrouserCalf") as MeshInstance3D
     left_arm = _arm(-1.0, "LeftArm", pelvis_root)
     right_arm = _arm(1.0, "RightArm", pelvis_root)
-    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true pelvis_aligned=true torso_visible=true front_panels=true upright_joints=true grounded_gait=true soles_above_ground=true")
+    print("FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2 helmet=false prototype=true camera_clearance=true pelvis_aligned=true torso_visible=true front_panels=true upright_joints=true grounded_gait=true soles_above_ground=true downlook_fulllegs=true")
 
 
 func set_right_hand_occupied(value: bool) -> void:
@@ -252,18 +252,22 @@ func _fit_bone_mesh(mesh: MeshInstance3D, a: Vector3, b: Vector3) -> void:
 
 
 func _align_leg_to_downward_view(delta: float, pitch: float) -> void:
-    # A camera looking nearly vertically down compresses upright legs into
-    # the coat silhouette. Slightly reposition the knees/ankles in the
-    # first-person VISUAL pose, while leaving hip positions and the
-    # CharacterBody/collision capsule fixed.
-    var target := smoothstep(0.68, 1.38, -pitch)
-    look_down_weight = lerpf(look_down_weight, target, clampf(delta * 12.0, 0.0, 1.0))
-    var knee_offset := 0.115 * look_down_weight
-    var ankle_offset := 0.072 * look_down_weight
-    left_knee_joint.position.z = 0.014 - knee_offset
-    right_knee_joint.position.z = 0.014 - knee_offset
-    left_ankle_joint.position.z = 0.020 - ankle_offset
-    right_ankle_joint.position.z = 0.020 - ankle_offset
+    # The earlier ~10 cm adjustment left the knees and boots overlapping
+    # the coat seam in actual browser screenshots. A larger, smoothed,
+    # perspective-only correction exposes the entire leg chain.
+    # Only visual joints move; the player capsule and physics stay intact.
+    var target := smoothstep(0.52, 1.30, -pitch)
+    look_down_weight = move_toward(look_down_weight, target, delta * 3.8)
+    var knee_forward := 0.315 * look_down_weight
+    var ankle_forward := 0.285 * look_down_weight
+    var knee_spread := 0.022 * look_down_weight
+    var ankle_spread := 0.026 * look_down_weight
+    left_knee_joint.position = Vector3(-0.008 - knee_spread, -0.330, 0.014 - knee_forward)
+    right_knee_joint.position = Vector3(0.008 + knee_spread, -0.330, 0.014 - knee_forward)
+    left_ankle_joint.position = Vector3(-0.004 - ankle_spread, -0.294, 0.020 - ankle_forward)
+    right_ankle_joint.position = Vector3(0.004 + ankle_spread, -0.294, 0.020 - ankle_forward)
+    # The tapered geometry is continuously stretched between the joints,
+    # so kneecaps, shins and footwear stay connected while looking around.
     _fit_bone_mesh(left_thigh_mesh, Vector3.ZERO, left_knee_joint.position)
     _fit_bone_mesh(right_thigh_mesh, Vector3.ZERO, right_knee_joint.position)
     _fit_bone_mesh(left_calf_mesh, Vector3(0.0, -0.012, 0.0), left_ankle_joint.position)
