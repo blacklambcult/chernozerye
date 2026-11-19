@@ -240,7 +240,8 @@ func _ready() -> void:
 func set_right_hand_occupied(value: bool) -> void:
     hide_right_hand = value
     if right_arm != null:
-        right_arm.visible = not value and not view_down_cutaway
+        var eye := get_parent().get_node_or_null("Camera3D") as Camera3D
+        right_arm.visible = not value and eye != null and eye.rotation.x <= -1.04
 
 func _fit_bone_mesh(mesh: MeshInstance3D, a: Vector3, b: Vector3) -> void:
     # Adjust only the render segment; this never moves the player collider.
@@ -317,10 +318,13 @@ func _process(delta: float) -> void:
     view_down_cutaway = false
     upper_coat.visible = true
     lower_jacket.visible = true
-    left_arm.visible = true
-    right_arm.visible = not hide_right_hand
+    # The camera-mounted viewmodel owns hands at level gaze; do not render
+    # duplicate side arms across the same view. Keep them for extreme down-look.
+    var eye_camera := actor.get_node_or_null("Camera3D") as Camera3D
+    var downlook_arms := eye_camera != null and eye_camera.rotation.x <= -1.04
+    left_arm.visible = downlook_arms
+    right_arm.visible = downlook_arms and not hide_right_hand
     var planar_speed := Vector2(actor.velocity.x, actor.velocity.z).length()
     _update_gait(delta, planar_speed if actor.is_on_floor() else 0.0)
-    var eye_camera := actor.get_node_or_null("Camera3D") as Camera3D
     if eye_camera != null:
         _align_leg_to_downward_view(delta, eye_camera.rotation.x)

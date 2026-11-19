@@ -16,6 +16,7 @@ var controls_locked := false
 var mouse_sensitivity := MOUSE_SENS
 # Narrative character animation is isolated from player movement and stats.
 var _avatar: Node3D
+var _viewmodel: Node3D
 var _character_sequence: Node3D
 
 func set_controls_locked(value: bool) -> void:
@@ -61,6 +62,10 @@ func _ready() -> void:
     _avatar.name = "FirstPersonFullBody"
     _avatar.set_script(preload("res://first_person_body.gd"))
     add_child(_avatar)
+    _viewmodel = Node3D.new()
+    _viewmodel.name = "FPSViewmodel"
+    _viewmodel.set_script(preload("res://fps_viewmodel.gd"))
+    camera.add_child(_viewmodel)
     _character_sequence = Node3D.new()
     _character_sequence.name = "CharacterSmoking"
     _character_sequence.set_script(preload("res://character_smoking.gd"))
@@ -98,6 +103,8 @@ func _input(event: InputEvent) -> void:
         rotate_y(-event.relative.x * mouse_sensitivity)
         camera.rotate_x(-event.relative.y * mouse_sensitivity)
         camera.rotation.x = clampf(camera.rotation.x, -1.45, 1.45)
+        if _viewmodel != null:
+            _viewmodel.call("push_look_motion", event.relative)
         last_event = "mouse movement"
     elif event is InputEventKey:
         var key := event as InputEventKey

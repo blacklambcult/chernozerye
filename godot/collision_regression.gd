@@ -256,8 +256,17 @@ func _run() -> void:
     if int(sequence.get("phase")) != 0 or int(sequence.get("completed_cycles")) != 1:
         _fail("automatic end state did not complete")
         return
-    if not (pelvis.get_node("RightArm") as Node3D).visible:
-        _fail("full-body arm failed to restore")
+    avatar.call("_process",0.016)
+    if (pelvis.get_node("RightArm") as Node3D).visible:
+        _fail("world-space right arm overlaps with the camera viewmodel at level gaze")
+        return
+    var fps_rig := actor.get_node_or_null("Camera3D/FPSViewmodel") as Node3D
+    if fps_rig == null:
+        _fail("camera-space arms missing after cinematic")
+        return
+    fps_rig.call("_process",0.016)
+    if not fps_rig.visible:
+        _fail("viewmodel arms failed to restore after cinematic")
         return
     if get_nodes_in_group("DiscardedScenicProps").is_empty():
         _fail("automatic final ground prop missing")
