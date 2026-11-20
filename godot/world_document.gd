@@ -112,7 +112,7 @@ func _can_read_now() -> bool:
 func _process(_delta: float) -> void:
     if not has_document_data or note_root == null or archive == null:
         return
-    var in_quest := quest_runtime != null and quest_runtime.get("preview_active") == true
+    var in_quest: bool = quest_runtime != null and quest_runtime.get("preview_active") == true
     note_root.visible = not archive.call("has_document", document_id) and not in_quest
     hint.visible = note_root.visible and _can_read_now()
 
