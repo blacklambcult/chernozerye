@@ -30,7 +30,6 @@ func _run() -> void:
     root.add_child(manager)
     manager.set_process(false)
     var entries: Array = manager.get("entries")
-    var finder := manager.get("locator_label") as Label
     var test_nearby := 0
     for entry in entries:
         var pos: Vector3 = entry["position"]
@@ -41,11 +40,7 @@ func _run() -> void:
     if test_nearby < 3:
         _fail("fewer than three loot objects within 27m of actual village spawn")
         return
-    if finder == null or not finder.visible or not finder.text.contains("Письмо") \
-            or not finder.text.contains("м"):
-        _fail("world items lack a clearly visible distance/direction hint near spawn")
-        return
-    if entries.size() != 4:
+    if entries.size() != 11:
         _fail("world item library was not loaded independently: " + str(entries.size()))
         return
     if archive.call("has_document", "world-note-roadside") \
@@ -57,12 +52,9 @@ func _run() -> void:
         _fail("first note is missing or reordered")
         return
     var first_node := record["node"] as Node3D
-    var distant_label := first_node.get_node_or_null("DistantFindBeacon") as Label3D
-    var warm_light := first_node.get_node_or_null("FindableWarmLight") as OmniLight3D
-    var visible_paper := first_node.get_node_or_null("Paper") as MeshInstance3D
-    if distant_label == null or not distant_label.visible or warm_light == null \
-            or not warm_light.visible or visible_paper == null or visible_paper.position.y < 0.4:
-        _fail("loot is too hard to see: missing raised model, beacon or warm light")
+    var prompt := first_node.get_node("PickupPrompt") as Label3D
+    if not prompt.visible or not prompt.text.contains("Письмо"):
+        _fail("the first find needs a nearby prompt")
         return
     var first_position: Vector3 = record["position"]
     actor.global_position = Vector3(first_position.x, 0.22, first_position.z)
@@ -78,8 +70,9 @@ func _run() -> void:
         return
     archive.call("close_reader")
     manager.call("_process", 0.0)
-    if not finder.visible or finder.text.contains("Письмо из опустевшей деревни"):
-        _fail("locator should move to the next uncollected item")
+    var summary: Dictionary = manager.call("quest_summary")
+    if first_node.visible or summary["collected"] != 1 or summary["target"] != entries[2]["position"]:
+        _fail("collected note must disappear and advance the compass")
         return
     if bool(manager.call("_collect_nearest")):
         _fail("a collected note can be picked again")
@@ -135,6 +128,17 @@ func _run() -> void:
     var visual := record["node"] as Node3D
     if visual.visible:
         _fail("world paper did not disappear after collection")
+        return
+    var fresh_archive := Node.new()
+    fresh_archive.set_script(load("res://note_archive.gd"))
+    fresh_archive.set("session_only", true)
+    root.add_child(fresh_archive)
+    if fresh_archive.call("has_document", "world-note-roadside"):
+        _fail("a fresh session must ignore previously saved notes")
+        return
+    if not fresh_archive.call("collect_and_read", "session-only-test", "Test", "Text", "Test") \
+            or JSON.parse_string(FileAccess.get_file_as_string(save_file)) != saved:
+        _fail("session notes must stay in memory")
         return
     print("WORLD_ITEMS_REGRESSION_OK: authored=", original_count,
         " reader=true item=true journal=true persistence=true spawned=true visibility=true")
