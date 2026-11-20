@@ -49,6 +49,24 @@ static func convert_quest(data: Dictionary, projector: Node) -> Dictionary:
     return {"id": str(chosen.get("id", "")), "title": str(chosen.get("title", "")),
         "spawn_world": spawn, "spawn_bearing": float(chosen["spawn"].get("bearing", 0)), "steps": compiled}
 
+static func convert_world_items(data: Dictionary, projector: Node) -> Array:
+    var editor: Variant = data.get("editors", {}).get("quest")
+    if not editor is Dictionary or not editor.get("worldItems") is Array:
+        return []
+    var metadata: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://world_data.json"))["metadata"]
+    var origin: Array = projector.call("_project", metadata["center_lat"], metadata["center_lon"])
+    var result := []
+    for item in editor["worldItems"]:
+        if not item is Dictionary or not ["note", "item"].has(item.get("type")):
+            continue
+        var at := _point(item.get("target"), projector, origin)
+        if at.is_empty():
+            continue
+        result.append({"id": str(item.get("id", "")), "type": item["type"],
+            "title": str(item.get("title", "")), "body": str(item.get("body", "")),
+            "position_world": at})
+    return result
+
 static func _point(value: Variant, projector: Node, origin: Array) -> Array:
     if not value is Dictionary:
         return []

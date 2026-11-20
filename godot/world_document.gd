@@ -6,26 +6,30 @@ const PICKUP_RADIUS := 2.8
 var player: CharacterBody3D
 var archive: Node
 var quest_runtime: Node
+var snapshot_items: Variant = null
 var entries: Array[Dictionary] = []
 func _ready() -> void:
     name = "WorldDocument"
     player = get_parent().get_node_or_null("Player") as CharacterBody3D
     archive = get_parent().get_node_or_null("NoteArchive")
     quest_runtime = get_parent().get_node_or_null("QuestLabRuntime")
-    if not FileAccess.file_exists(DATA_FILE):
-        push_warning("WORLD_ITEMS_NOT_COMPILED")
-        return
-    var source: Variant = JSON.parse_string(FileAccess.get_file_as_string(DATA_FILE))
-    if not source is Dictionary or str(source.get("schema", "")) != "chernozerye.questlab.runtime-1":
-        push_warning("WORLD_ITEMS_BAD_FORMAT")
-        return
-    var authored: Variant = source.get("world_items", [])
-    if not authored is Array:
-        return
+    var authored: Variant = snapshot_items
+    if authored == null:
+        if not FileAccess.file_exists(DATA_FILE):
+            push_warning("WORLD_ITEMS_NOT_COMPILED")
+            return
+        var source: Variant = JSON.parse_string(FileAccess.get_file_as_string(DATA_FILE))
+        if not source is Dictionary or str(source.get("schema", "")) != "chernozerye.questlab.runtime-1":
+            push_warning("WORLD_ITEMS_BAD_FORMAT")
+            return
+        authored = source.get("world_items", [])
+        if not authored is Array:
+            return
     for item in authored:
         if item is Dictionary:
             _register_item(item)
-    _validate_live_spawn()
+    if snapshot_items == null:
+        _validate_live_spawn()
     _process(0.0)
     print("WORLD_ITEMS_READY: authored=", entries.size(), " independent_of_f7=true")
 
@@ -180,7 +184,7 @@ func _can_pickup() -> bool:
     return player != null and archive != null \
         and archive.call("is_open") == false \
         and player.get("controls_locked") != true \
-        and (quest_runtime == null or quest_runtime.get("preview_active") != true)
+        and (snapshot_items != null or quest_runtime == null or quest_runtime.get("preview_active") != true)
 
 func _nearest_collectible(max_distance: float = PICKUP_RADIUS) -> Dictionary:
     if not _can_pickup():

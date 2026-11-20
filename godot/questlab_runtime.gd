@@ -223,7 +223,7 @@ func _spawn_marker(step: Dictionary) -> void:
     _clear_marker()
     if not step.get("target_world") is Array:
         return
-    if not ["interact", "collect"].has(str(step.get("type", ""))):
+    if not ["reach", "interact", "collect"].has(str(step.get("type", ""))):
         return
     marker_root = Node3D.new()
     marker_root.set_script(MARKER_SCRIPT)
