@@ -319,6 +319,7 @@
     pendingPlacement = null;
     draftMarker?.remove();
     draftMarker = null;
+    window.updatePlacementContext?.(null);
     void window.showPlacementPreview?.(null);
     $("local-placement-edit").hidden = true;
     $("local-model-status").textContent = "";
@@ -344,6 +345,7 @@
       $(id + "-value").textContent = $(id).value + suffix;
     }
     window.updatePlacementPreview?.(draft.heading, draft.scale);
+    window.updatePlacementContext?.(draft, pendingPlacement);
     const hasPoint = Number.isFinite(draft.lat) && Number.isFinite(draft.lon);
     $("save-local-heading").disabled = !hasPoint;
     if (hasPoint && map) {
