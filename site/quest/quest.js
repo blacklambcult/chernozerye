@@ -15,6 +15,8 @@
   const objects = window.ChernoObjectLibrary;
   let localMarkers;
   let pendingPlacement = null;
+  let draftMarker = null;
+  let localModels = [];
   let selectedCharacterId = null;
   let selectedStepId = null;
   let selectedWorldItemId = null;
@@ -261,6 +263,7 @@
   async function refreshLocalObjects() {
     try {
       const [models, placements] = await Promise.all([objects.models(), objects.placements()]);
+      localModels = models;
       const picker = $("local-model");
       const selected = picker.value;
       picker.replaceChildren(...models.map(model => new Option(model.name, model.id)));
@@ -314,40 +317,97 @@
   }
   function cancelPlacement() {
     pendingPlacement = null;
+    draftMarker?.remove();
+    draftMarker = null;
+    void window.showPlacementPreview?.(null);
     $("local-placement-edit").hidden = true;
     $("local-model-status").textContent = "";
   }
+
+  function placementDraft() {
+    if (!pendingPlacement) return null;
+    const { lat, lon } = pendingPlacement;
+    const east = Number($("local-east").value);
+    const north = Number($("local-north").value);
+    const heading = Number($("local-heading").value);
+    const scale = Number($("local-scale").value);
+    return { ...pendingPlacement, heading, scale,
+      lat: lat + north / 111320,
+      lon: lon + east / (111320 * Math.cos(lat * Math.PI / 180)) };
+  }
+
+  function updatePlacementDraft() {
+    const draft = placementDraft();
+    if (!draft) return;
+    for (const [id, suffix] of [["local-heading", "°"], ["local-scale", "×"],
+      ["local-east", " м"], ["local-north", " м"]]) {
+      $(id + "-value").textContent = $(id).value + suffix;
+    }
+    window.updatePlacementPreview?.(draft.heading, draft.scale);
+    const hasPoint = Number.isFinite(draft.lat) && Number.isFinite(draft.lon);
+    $("save-local-heading").disabled = !hasPoint;
+    if (hasPoint && map) {
+      draftMarker ??= window.L.circleMarker([draft.lat, draft.lon], {
+        radius: 10, color: "#ffb863", fillOpacity: 0.8, interactive: false
+      }).addTo(map);
+      draftMarker.setLatLng([draft.lat, draft.lon]);
+    }
+  }
+
   function beginPlacement(item) {
+    cancelPlacement();
     setMode("browse");
-    pendingPlacement = item;
+    pendingPlacement = { ...item };
     $("local-placement-edit").hidden = false;
     $("local-heading").value = item.heading ?? 0;
-    $("save-local-heading").disabled = !item.id;
-    $("local-model-status").textContent = "Укажи точку на карте или сохрани поворот на текущем месте.";
+    $("local-scale").value = item.scale ?? 1;
+    $("local-east").value = 0;
+    $("local-north").value = 0;
+    $("local-model-status").textContent = "Клик по карте задаёт опорную точку. Оранжевая метка показывает новую позицию.";
+    updatePlacementDraft();
+    const model = localModels.find(entry => entry.id === item.modelId);
+    window.showPlacementPreview?.(model?.blob)?.catch(() => {
+      $("local-model-status").textContent = "Не удалось показать модель в 3D.";
+    });
   }
-  async function savePlacement(lat, lon) {
-    if (!pendingPlacement) return;
-    const input = $("local-heading");
-    const heading = input.valueAsNumber;
-    if (!Number.isFinite(heading) || heading < 0 || heading >= 360) {
-      $("local-model-status").textContent = "Укажи угол от 0 до 360° (без 360).";
-      return;
-    }
-    const item = pendingPlacement;
-    cancelPlacement();
-    try {
-      await objects.savePlacement({ ...item, id: item.id || crypto.randomUUID(), lat, lon, heading });
-      await refreshLocalObjects();
-    } catch (error) { $("local-model-status").textContent = error.message; }
-  }
+
   $("place-local-model").addEventListener("click", () => {
     const modelId = $("local-model").value;
     if (modelId) beginPlacement({ modelId });
   });
-  $("save-local-heading").addEventListener("click", () => {
-    if (pendingPlacement?.id) void savePlacement(pendingPlacement.lat, pendingPlacement.lon);
+  for (const id of ["local-heading", "local-scale", "local-east", "local-north"])
+    $(id).addEventListener("input", updatePlacementDraft);
+  $("save-local-heading").addEventListener("click", async () => {
+    const draft = placementDraft();
+    if (!draft || !Number.isFinite(draft.lat) || !Number.isFinite(draft.lon)) return;
+    const editing = pendingPlacement;
+    $("save-local-heading").disabled = true;
+    try {
+      await objects.savePlacement({ ...draft, id: draft.id || crypto.randomUUID() });
+      if (editing === pendingPlacement) cancelPlacement();
+      await refreshLocalObjects();
+    } catch (error) {
+      $("local-model-status").textContent = error.message;
+      if (editing === pendingPlacement) $("save-local-heading").disabled = false;
+    }
   });
   $("cancel-local-edit").addEventListener("click", cancelPlacement);
+
+  $("share-local-world").addEventListener("click", async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    $("local-share-result").hidden = true;
+    try {
+      const hash = await objects.makeSnapshot();
+      const link = new URL("../", location.href);
+      link.hash = "world=" + hash;
+      $("local-world-link").value = link.href;
+      $("local-share-result").hidden = false;
+      $("local-world-link").select();
+    } catch (error) {
+      $("local-model-status").textContent = error.message;
+    } finally { button.disabled = false; }
+  });
 
   function catalogNote(item) {
     return project.worldItems.find(note => note.id === item?.noteId);
@@ -791,9 +851,13 @@
     refreshGeoManual(true);
     void loadGeoPublished();
     $("geo-layer-toggle").addEventListener("click", toggleGeoLayers);
-    map.on("click", async evt => {
+    map.on("click", evt => {
       if (pendingPlacement) {
-        await savePlacement(evt.latlng.lat, evt.latlng.lng);
+        pendingPlacement.lat = evt.latlng.lat;
+        pendingPlacement.lon = evt.latlng.lng;
+        $("local-east").value = 0;
+        $("local-north").value = 0;
+        updatePlacementDraft();
         return;
       }
       if(mode==="object"){

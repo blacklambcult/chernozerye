@@ -19,7 +19,8 @@
     return { placements, models };
   }
   window.chernozeryeLoadLocalObjects = () => {
-    load().then(data => {
+    const source = location.hash.startsWith("#world=") ? library.openSnapshot(location.hash.slice(7)) : load();
+    source.then(data => {
       window.chernozeryeLocalObjects = JSON.stringify(data);
     }).catch(error => {
       console.warn("В игре не удалось открыть локальную библиотеку", error);
