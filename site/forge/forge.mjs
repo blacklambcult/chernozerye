@@ -41,7 +41,7 @@ function readForgeDocument(input) {
   const data=Forge.normalizeProject(input);
   forgeMeta={category:data.category,subtype:data.subtype,partRoles:{...data.partRoles},
     anchors:JSON.parse(JSON.stringify(data.anchors)),
-    viewmodel:JSON.parse(JSON.stringify(data.viewmodel))};
+    gameplay:data.gameplay, viewmodel:JSON.parse(JSON.stringify(data.viewmodel))};
   project=C.makeProject(data.name,data.parts);
 }
 function forgeDocument() {
@@ -51,7 +51,7 @@ function forgeDocument() {
     format:Forge.FORMAT,version:Forge.VERSION,units:"meters",axis_forward:"-Z",
     name:project.name,parts:project.parts,category:forgeMeta.category,
     subtype:forgeMeta.subtype,partRoles,anchors:forgeMeta.anchors,
-    viewmodel:forgeMeta.viewmodel
+    gameplay:forgeMeta.gameplay, viewmodel:forgeMeta.viewmodel
   });
 }
 try {
@@ -256,7 +256,7 @@ function persist() {
     project=C.makeProject(checked.name,checked.parts);
     forgeMeta={category:checked.category,subtype:checked.subtype,partRoles:{...checked.partRoles},
       anchors:JSON.parse(JSON.stringify(checked.anchors)),
-      viewmodel:JSON.parse(JSON.stringify(checked.viewmodel))};
+      gameplay:checked.gameplay, viewmodel:JSON.parse(JSON.stringify(checked.viewmodel))};
     localStorage.setItem(KEY,JSON.stringify(checked));
     updateDimensions();
     if(fpPreviewActive) updateFpPreview();
@@ -545,13 +545,8 @@ $("load-json").addEventListener("change", async (event) => {
     status("Импортировано: " + project.parts.length + " деталей");
   } catch (error) { status("Не удалось открыть файл: " + error.message, true); }
 });
-$("export-glb").addEventListener("click", async () => {
-  if (!project.parts.length) { status("Добавь хотя бы одну деталь перед экспортом.", true); return; }
-  const button = $("export-glb");
-  button.disabled = true;
-  button.textContent = "Экспорт GLB…";
-  try {
-    const data=forgeDocument();
+const GAME_MODEL_KEY = "chernozerye.forge.game-model.v1";
+async function exportForgeGlb(data) {
     // Export only the digital prop: no floor, visible debug arrows, or gizmos.
     const exportGroup=new THREE.Group();
     exportGroup.name="HF_ASSET_"+data.name;
@@ -573,22 +568,56 @@ $("export-glb").addEventListener("click", async () => {
       node.userData={forgeAnchor:key,forwardAxis:"-Z",purpose:Forge.ANCHORS[key]};
       exportGroup.add(node);
     }
-    const exporter = new GLTFExporter();
-    const buffer = await exporter.parseAsync(exportGroup, {
-      binary:true, onlyVisible:true, trs:true, includeCustomExtensions:false
+    try {
+      const buffer = await new GLTFExporter().parseAsync(exportGroup, { binary:true, trs:true });
+      return new Blob([buffer], { type:"model/gltf-binary" });
+    } finally {
+      exportGroup.traverse(obj => {
+        if (obj.isMesh) { obj.geometry.dispose(); obj.material.dispose(); }
+      });
+    }
+}
+
+for (const key of ["damage","recoil","capacity","reload","sound"]) {
+  $("game-" + key).addEventListener("change", () => {
+    try {
+      const specs = Forge.normalizeGameplay(forgeMeta.gameplay, forgeMeta.category);
+      const input = $("game-" + key);
+      specs[key] = key === "sound" ? input.value : input.valueAsNumber;
+      forgeMeta.gameplay = Forge.normalizeGameplay(specs, forgeMeta.category);
+      persist();
+    } catch (error) { renderFpInspector(); status(error.message, true); }
+  });
+}
+
+async function deliverModel(button, inGame) {
+  if (!project.parts.length) { status("Добавь хотя бы одну деталь.", true); return; }
+  button.disabled = true;
+  try {
+    const data = forgeDocument();
+    if (inGame && !["sidearm", "longarm"].includes(data.category)) return;
+    const blob = await exportForgeGlb(data);
+    if (!inGame) { download(blob, filename() + ".glb"); status("GLB экспортирован."); return; }
+    if (blob.size > 2 * 1024 * 1024) throw new Error("Для локальной отправки GLB должен быть до 2 МБ.");
+    const url = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
     });
-    download(new Blob([buffer], {type:"model/gltf-binary"}), filename() + ".glb");
-    exportGroup.traverse((obj) => {
-      if (obj.isMesh) { obj.geometry.dispose(); obj.material.dispose(); }
-    });
-    status("GLB готов · "+data.parts.length+" деталей · "+Object.values(data.anchors).filter(a=>a.enabled).length+" узлов HF_*");
-  } catch (error) {
-    console.error("HELLISH_FORGE_GLTF_EXPORT_FAILED", error);
-    status("Не удалось экспортировать GLB: " + error.message, true);
-  } finally {
-    button.disabled = false;
-    button.textContent = "↓ Экспортировать GLB";
-  }
+    localStorage.setItem(GAME_MODEL_KEY, JSON.stringify({ version:1, name:data.name,
+      category:data.category, viewmodel:data.viewmodel, glb:url.split(",")[1],
+      gameplay:Forge.normalizeGameplay(data.gameplay, data.category) }));
+    status("Образец отправлен. Перезапусти игру в этом браузере и выбери слот 3.");
+  } catch (error) { status("Не удалось подготовить GLB: " + error.message, true); }
+  finally { button.disabled = inGame && !["sidearm", "longarm"].includes(forgeMeta.category); }
+}
+
+$("export-glb").addEventListener("click", event => deliverModel(event.currentTarget, false));
+$("send-game-model").addEventListener("click", event => deliverModel(event.currentTarget, true));
+$("reset-game-model").addEventListener("click", () => {
+  try { localStorage.removeItem(GAME_MODEL_KEY); status("Штатная модель вернётся при следующем запуске игры."); }
+  catch (error) { status(error.message, true); }
 });
 window.addEventListener("keydown", (event) => {
   const target = event.target;
@@ -746,6 +775,7 @@ groupSelect.addEventListener("change",(evt)=>{
   pushUndo();
   forgeMeta.category=evt.target.value;
   forgeMeta.subtype=Object.keys(Forge.GROUPS[forgeMeta.category].types)[0];
+  renderFpInspector();
   renderForgeMetadata();
   persist();
 });
@@ -876,6 +906,9 @@ function updateFpPreview() {
   fpRoot.add(hand);
 }
 function renderFpInspector() {
+  const specs = Forge.normalizeGameplay(forgeMeta.gameplay, forgeMeta.category);
+  for (const [key, value] of Object.entries(specs)) $("game-" + key).value = value;
+  $("send-game-model").disabled = !["sidearm", "longarm"].includes(forgeMeta.category);
   if(!forgeMeta?.viewmodel) return;
   const vm=forgeMeta.viewmodel;
   for(const input of document.querySelectorAll("[data-fp-field]")) {

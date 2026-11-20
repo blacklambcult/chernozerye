@@ -93,6 +93,18 @@
       viewmodel:normalizeViewmodel()
     });
   }
+  function normalizeGameplay(value, category) {
+    if (value == null) return category === "longarm"
+      ? {damage:35, recoil:1.4, capacity:5, reload:1.8, sound:"heavy"}
+      : {damage:20, recoil:1, capacity:7, reload:1.2, sound:"standard"};
+    if (!["standard", "heavy", "muted"].includes(value.sound) || !Number.isInteger(value.capacity))
+      throw new Error("Проверь звуковой профиль и ёмкость.");
+    return {damage:finite(value.damage, 1, 100, "игровой урон"),
+      recoil:finite(value.recoil, 0, 3, "визуальная отдача"),
+      capacity:finite(value.capacity, 1, 30, "ёмкость"),
+      reload:finite(value.reload, 0.3, 5, "перезарядка"), sound:value.sound};
+  }
+
   function normalizeProject(value) {
     if (!value || typeof value !== "object" || Array.isArray(value) ||
         value.format !== FORMAT || value.version !== VERSION ||
@@ -119,6 +131,7 @@
       format:FORMAT,version:VERSION,units:"meters",axis_forward:"-Z",
       name:model.name,category:value.category,subtype:value.subtype,
       parts:model.parts,partRoles:Object.fromEntries(model.parts.map((p)=>[p.id,oldRoles[p.id]||"body"])),
+      ...(value.gameplay == null ? {} : {gameplay:normalizeGameplay(value.gameplay, value.category)}),
       anchors,viewmodel:normalizeViewmodel(value.viewmodel === undefined ? DEFAULT_VIEWMODEL : value.viewmodel)
     };
   }
@@ -149,6 +162,6 @@
     return normalizeProject(p);
   }
   return Object.freeze({FORMAT,VERSION,STORAGE_KEY,GROUPS,ROLES,ANCHORS,ANCHOR_COLORS,
-    DEFAULT_VIEWMODEL,normalizeViewmodel,
+    DEFAULT_VIEWMODEL,normalizeViewmodel,normalizeGameplay,
     makeAnchors,makeProject,normalizeProject,toModel,setCategory,previewAsset});
 });
