@@ -14,7 +14,7 @@
   let library = "quest";
   const objects = window.ChernoObjectLibrary;
   let localMarkers;
-  let placementModelId = null;
+  let pendingPlacement = null;
   let selectedCharacterId = null;
   let selectedStepId = null;
   let selectedWorldItemId = null;
@@ -292,10 +292,19 @@
         remove.className = "button";
         remove.textContent = "Удалить";
         remove.onclick = async () => {
+          if (pendingPlacement?.id === item.id) cancelPlacement();
           try { await objects.removePlacement(item.id); await refreshLocalObjects(); }
           catch (error) { $("local-model-status").textContent = error.message; }
         };
-        row.append(locate, remove);
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "button";
+        edit.textContent = "Изменить";
+        edit.onclick = () => {
+          locate.onclick();
+          beginPlacement(item);
+        };
+        row.append(locate, edit, remove);
         $("local-placements").append(row);
       }
     } catch (error) {
@@ -303,12 +312,42 @@
       $("local-model-status").textContent = "Библиотека недоступна: " + error.message;
     }
   }
-  $("place-local-model").addEventListener("click", () => {
-    placementModelId = $("local-model").value || null;
-    if (!placementModelId) return;
+  function cancelPlacement() {
+    pendingPlacement = null;
+    $("local-placement-edit").hidden = true;
+    $("local-model-status").textContent = "";
+  }
+  function beginPlacement(item) {
     setMode("browse");
-    $("local-model-status").textContent = "Выбери точку на карте.";
+    pendingPlacement = item;
+    $("local-placement-edit").hidden = false;
+    $("local-heading").value = item.heading ?? 0;
+    $("save-local-heading").disabled = !item.id;
+    $("local-model-status").textContent = "Укажи точку на карте или сохрани поворот на текущем месте.";
+  }
+  async function savePlacement(lat, lon) {
+    if (!pendingPlacement) return;
+    const input = $("local-heading");
+    const heading = input.valueAsNumber;
+    if (!Number.isFinite(heading) || heading < 0 || heading >= 360) {
+      $("local-model-status").textContent = "Укажи угол от 0 до 360° (без 360).";
+      return;
+    }
+    const item = pendingPlacement;
+    cancelPlacement();
+    try {
+      await objects.savePlacement({ ...item, id: item.id || crypto.randomUUID(), lat, lon, heading });
+      await refreshLocalObjects();
+    } catch (error) { $("local-model-status").textContent = error.message; }
+  }
+  $("place-local-model").addEventListener("click", () => {
+    const modelId = $("local-model").value;
+    if (modelId) beginPlacement({ modelId });
   });
+  $("save-local-heading").addEventListener("click", () => {
+    if (pendingPlacement?.id) void savePlacement(pendingPlacement.lat, pendingPlacement.lon);
+  });
+  $("cancel-local-edit").addEventListener("click", cancelPlacement);
 
   function catalogNote(item) {
     return project.worldItems.find(note => note.id === item?.noteId);
@@ -407,7 +446,7 @@
     renderMap();
   }
   function setMode(next) {
-    if (next !== "browse") placementModelId = null;
+    if (next !== "browse" && pendingPlacement) cancelPlacement();
     if (["step","object"].includes(next) && !worldItem() && (!step() || step().type === "message")) {
       displayStatus("Выбери задачу с географической целью, а не сообщение.", true);
       return;
@@ -753,14 +792,8 @@
     void loadGeoPublished();
     $("geo-layer-toggle").addEventListener("click", toggleGeoLayers);
     map.on("click", async evt => {
-      if (placementModelId) {
-        const modelId = placementModelId;
-        placementModelId = null;
-        try {
-          await objects.savePlacement({ id: crypto.randomUUID(), modelId,
-            lat: evt.latlng.lat, lon: evt.latlng.lng });
-          await refreshLocalObjects();
-        } catch (error) { $("local-model-status").textContent = error.message; }
+      if (pendingPlacement) {
+        await savePlacement(evt.latlng.lat, evt.latlng.lng);
         return;
       }
       if(mode==="object"){
@@ -784,7 +817,7 @@
 
   for (const tab of document.querySelectorAll("[data-library]")) {
     tab.addEventListener("click", () => {
-      placementModelId = null;
+      if (pendingPlacement) cancelPlacement();
       library = tab.dataset.library;
       if (library === "item") void refreshLocalObjects();
       selectedWorldItemId = null;
