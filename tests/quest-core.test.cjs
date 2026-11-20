@@ -100,3 +100,17 @@ test("world item drafts are valid, duplicate IDs and malformed content are rejec
   assert.throws(()=>core.normalizeWorldItem({...incomplete,body:"x".repeat(4001)}),/длиннее/);
   assert.throws(()=>core.normalizeProject({...duplicate,worldItems:Array.from({length:151},()=>incomplete)}),/Слишком много/);
 });
+
+test("catalog note links and character records survive project roundtrip", () => {
+  const quest = core.createQuest("main", "quest-link");
+  const step = core.createStep("collect", "find-letter");
+  const note = core.createWorldItem("note", "letter");
+  step.noteId = note.id;
+  quest.steps.push(step);
+  const input = { ...core.makeProject(), quests: [quest], worldItems: [note],
+    characters: [{ id: "character-1", name: "Сторож", description: "Живёт у станции." }] };
+  const result = core.normalizeProject(input);
+  assert.equal(result.quests[0].steps[0].noteId, note.id);
+  assert.deepEqual(result.characters, input.characters);
+  assert.throws(() => core.normalizeProject({ ...input, worldItems: [] }), /отсутствует/);
+});

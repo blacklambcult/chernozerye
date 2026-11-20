@@ -74,6 +74,10 @@
         body: text(value.document.body ?? "", 4000)
       };
     }
+    if (value.noteId) {
+      if (result.type !== "collect") throw new Error("Записка привязывается только к шагу сбора.");
+      result.noteId = id(value.noteId);
+    }
     if (!result.title) throw new Error("У задачи должно быть название.");
     return result;
   }
@@ -146,10 +150,28 @@
       if (worldIds.has(item.id)) throw new Error("Повторяющийся ID находки: " + item.id);
       worldIds.add(item.id);
     }
+    const noteIds = new Set(worldItems.filter(item => item.type === "note").map(item => item.id));
+    for (const quest of quests) {
+      for (const step of quest.steps) {
+        if (step.noteId && !noteIds.has(step.noteId))
+          throw new Error("Записка шага отсутствует в каталоге: " + step.noteId);
+      }
+    }
+    const rawCharacters = value.characters ?? [];
+    if (!Array.isArray(rawCharacters) || rawCharacters.length > 150)
+      throw new Error("Допускается до 150 персонажей.");
+    const characterIds = new Set();
+    const characters = rawCharacters.map(character => {
+      const entry = { id: id(character?.id), name: text(character?.name ?? "", 140),
+        description: text(character?.description ?? "", 1200) };
+      if (!entry.name || characterIds.has(entry.id)) throw new Error("Проверь имена и ID персонажей.");
+      characterIds.add(entry.id);
+      return entry;
+    });
     const selectedId = typeof value.selectedId === "string" && seen.has(value.selectedId) ?
       value.selectedId : (quests[0]?.id || null);
     return { format: FORMAT, version: VERSION, coordinates: "WGS84",
-      selectedId, quests, worldItems };
+      selectedId, quests, worldItems, ...(characters.length ? { characters } : {}) };
   }
   function makeProject(quests = [], selectedId = null) {
     return normalizeProject({ format: FORMAT, version: VERSION, selectedId, quests });

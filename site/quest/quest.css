@@ -184,3 +184,8 @@ select option{background:#142126}
 .world-item-dot{background:#f0b67c!important}
 .pin-shape.world{width:17px;height:17px;background:#f3b56d;border-radius:20%;box-shadow:0 0 0 2px #f3b56d}
 .pin-shape.world-active{width:22px;height:22px;background:#fbe6ad;border-color:#32241d;box-shadow:0 0 0 3px #fbe6ad}
+
+[data-library][aria-pressed="true"] {
+  border-color: var(--accent, #ffc27b);
+  color: var(--accent, #ffc27b);
+}
