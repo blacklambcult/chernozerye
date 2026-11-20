@@ -14,6 +14,24 @@
   let library = "quest";
   const objects = window.ChernoObjectLibrary;
   let localMarkers;
+  const placementMarkers = new Map();
+
+  function syncPlacementSelection() {
+    for (const [id, marker] of placementMarkers) {
+      const selected = id === pendingPlacement?.id;
+      marker.setStyle({ color: selected ? "#ffb863" : "#6bd3d6", fillOpacity: selected ? 0.9 : 0.35 });
+      marker.setRadius(selected ? 9 : 7);
+      if (selected) marker.bringToFront();
+    }
+  }
+
+  function selectPlacement(item) {
+    if (pendingPlacement?.id === item.id) return;
+    if (!document.querySelector('[data-library="item"]').matches('[aria-pressed="true"]'))
+      document.querySelector('[data-library="item"]').click();
+    beginPlacement(item);
+    $("local-placement-edit").scrollIntoView({ block: "nearest" });
+  }
   let pendingPlacement = null;
   let draftMarker = null;
   let localModels = [];
@@ -275,13 +293,17 @@
       const names = new Map(models.map(model => [model.id, model.name]));
       $("local-placements").replaceChildren();
       localMarkers?.clearLayers();
+      placementMarkers.clear();
       for (const item of placements) {
-        const name = names.get(item.modelId) || "Модель недоступна";
+        const name = item.name || names.get(item.modelId) || "Модель недоступна";
         if (localMarkers) {
           const label = document.createElement("span");
           label.textContent = name;
-          window.L.circleMarker([item.lat, item.lon], { radius: 7, color: "#6bd3d6" })
-            .bindTooltip(label).addTo(localMarkers);
+          const marker = window.L.circleMarker([item.lat, item.lon], {
+            radius: 7, bubblingMouseEvents: false
+          }).bindTooltip(label).addTo(localMarkers);
+          marker.on("click", () => selectPlacement(item));
+          placementMarkers.set(item.id, marker);
         }
         const row = document.createElement("div");
         row.className = "two-buttons";
@@ -305,11 +327,12 @@
         edit.textContent = "Изменить";
         edit.onclick = () => {
           locate.onclick();
-          beginPlacement(item);
+          selectPlacement(item);
         };
         row.append(locate, edit, remove);
         $("local-placements").append(row);
       }
+      syncPlacementSelection();
     } catch (error) {
       $("place-local-model").disabled = true;
       $("local-model-status").textContent = "Библиотека недоступна: " + error.message;
@@ -317,6 +340,7 @@
   }
   function cancelPlacement() {
     pendingPlacement = null;
+    syncPlacementSelection();
     draftMarker?.remove();
     draftMarker = null;
     window.updatePlacementContext?.(null);
@@ -332,7 +356,7 @@
     const north = Number($("local-north").value);
     const heading = Number($("local-heading").value);
     const scale = Number($("local-scale").value);
-    return { ...pendingPlacement, heading, scale,
+    return { ...pendingPlacement, name: $("local-placement-name").value.trim(), heading, scale,
       lat: lat + north / 111320,
       lon: lon + east / (111320 * Math.cos(lat * Math.PI / 180)) };
   }
@@ -347,7 +371,7 @@
     window.updatePlacementPreview?.(draft.heading, draft.scale);
     window.updatePlacementContext?.(draft, pendingPlacement);
     const hasPoint = Number.isFinite(draft.lat) && Number.isFinite(draft.lon);
-    $("save-local-heading").disabled = !hasPoint;
+    $("save-local-heading").disabled = !hasPoint || !draft.name;
     if (hasPoint && map) {
       draftMarker ??= window.L.circleMarker([draft.lat, draft.lon], {
         radius: 10, color: "#ffb863", fillOpacity: 0.8, interactive: false
@@ -360,7 +384,9 @@
     cancelPlacement();
     setMode("browse");
     pendingPlacement = { ...item };
+    syncPlacementSelection();
     $("local-placement-edit").hidden = false;
+    $("local-placement-name").value = item.name || (item.id ? localModels.find(model => model.id === item.modelId)?.name || "" : "");
     $("local-heading").value = item.heading ?? 0;
     $("local-scale").value = item.scale ?? 1;
     $("local-east").value = 0;
@@ -379,13 +405,15 @@
   });
   for (const id of ["local-heading", "local-scale", "local-east", "local-north"])
     $(id).addEventListener("input", updatePlacementDraft);
+  $("local-placement-name").addEventListener("input", updatePlacementDraft);
   $("save-local-heading").addEventListener("click", async () => {
     const draft = placementDraft();
-    if (!draft || !Number.isFinite(draft.lat) || !Number.isFinite(draft.lon)) return;
+    if (!draft?.name || !Number.isFinite(draft.lat) || !Number.isFinite(draft.lon)) return;
     const editing = pendingPlacement;
     $("save-local-heading").disabled = true;
     try {
-      await objects.savePlacement({ ...draft, id: draft.id || crypto.randomUUID() });
+      const nameKey = draft.name.normalize("NFC").toLocaleLowerCase("ru");
+      await objects.savePlacement({ ...draft, id: draft.id || crypto.randomUUID() }, nameKey);
       if (editing === pendingPlacement) cancelPlacement();
       await refreshLocalObjects();
     } catch (error) {

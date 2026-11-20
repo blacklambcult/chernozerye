@@ -93,6 +93,8 @@
         <select id="local-model"></select>
         <button id="place-local-model" type="button" class="button full">Поставить на карту</button>
         <div id="local-placement-edit" hidden>
+          <label for="local-placement-name">Название экземпляра</label>
+          <input id="local-placement-name" maxlength="80" type="text" required autocomplete="off">
           <canvas id="placement-preview" width="280" height="170" aria-label="Предпросмотр модели"></canvas>
           <p id="placement-context-status" class="hint" role="status"></p>
           <label for="placement-context-zoom">Обзор окружения</label>
@@ -270,8 +272,8 @@
 <script src="./quest-core.js?v=3"></script>
 <script src="../map/editor-core.js?v=20"></script>
 <script src="./geo-overlay-core.js?v=2"></script>
-<script src="../object-library/library.js"></script>
-<script src="./quest.js?v=9"></script>
+<script src="../object-library/library.js?v=2"></script>
+<script src="./quest.js?v=10"></script>
 <script type="module" src="./placement-preview.mjs?v=2"></script>
 </body>
 </html>

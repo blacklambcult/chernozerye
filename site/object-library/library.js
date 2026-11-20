@@ -78,7 +78,23 @@
     models: () => access("models", "readonly", store => store.getAll()),
     placements: () => access("placements", "readonly", store => store.getAll()),
     saveModel: record => access("models", "readwrite", store => store.put(record)),
-    savePlacement: record => access("placements", "readwrite", store => store.put(record)),
+    savePlacement: (record, nameKey) => {
+      let duplicate = false;
+      return access("placements", "readwrite", store => {
+        if (!nameKey) return store.put(record);
+        const read = store.getAll();
+        read.onsuccess = () => {
+          duplicate = read.result.some(item => item.id !== record.id &&
+            (item.name || "").trim().normalize("NFC").toLocaleLowerCase("ru") === nameKey);
+          if (duplicate) store.transaction.abort();
+          else store.put(record);
+        };
+        return read;
+      }).catch(error => {
+        if (duplicate) throw new Error("Такое название уже есть. Введи другое.");
+        throw error;
+      });
+    },
     removePlacement: id => access("placements", "readwrite", store => store.delete(id)),
     requestPersistence: async () => Boolean(await navigator.storage?.persist?.())
   });
