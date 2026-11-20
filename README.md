@@ -1,5 +1,14 @@
 # Fearless Knights of the Cordon
 
+### CHERNOZERYE STUDIO 0.4 — release desk, changelog, backlog and roadmap
+
+- The **Центр управления** screen now starts with a large Release Desk showing the active Studio version, the current game release, the **actual Git SHA** of the published Web build, versioned changes and an interactive roadmap/backlog.
+- Release history can be filtered (all / Studio / game / Labs + Forge); entries expand into their change lists and links to real, verified GitHub commits. All release content is kept in the reviewed, versioned source file `site/studio/releases.json`. No invented completion statuses or release dates.
+- The roadmap is grouped by `NEXT`, `PLANNED`, `IDEAS` and includes module, priority and a concrete expected outcome; these are future tasks, not implemented features. The user can still open the four editors from cards below the Release Desk.
+- `site/studio/release-core.js` validates the data format, dates, SHA references, unique release IDs, roadmap items and priorities. Regression tests cover schema correctness, filtering and roadmap grouping.
+- CI generates `build/web/studio/build-meta.json` from the **current** `GITHUB_SHA` and current Studio release number on every deployment, avoiding a stale hardcoded "last build" label. GitHub Pages publication verification checks both the changelog JSON and real build SHA.
+- **Release notes are curated manually in Git** when functionality changes; only the build SHA is generated automatically. No prior browser-saved drafts are modified.
+
 ### Forge pistol — пользовательский ассет и FP-поза (2026-11-20)
 
 - Обновлены бинарный GLB и отдельный FPS-профиль именно из предоставленных файлов `новый-игровой-предмет (1).glb` и `новый-игровой-предмет.viewmodel.json`.

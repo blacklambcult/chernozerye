@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1114">
-  <meta name="description" content="Чернозёрье Studio — единое рабочее пространство Geo Lab, Quest Lab и Model Lab.">
-  <title>Чернозёрье / STUDIO 0.3</title>
-  <link rel="stylesheet" href="./studio.css?v=3">
+  <meta name="description" content="Чернозёрье Studio — рабочее пространство, журнал обновлений и роадмап Geo Lab, Quest Lab, Model Lab и Hellish Forge.">
+  <title>Чернозёрье / STUDIO 0.4 — журнал и роадмап</title>
+  <link rel="stylesheet" href="./studio.css?v=4">
 </head>
 <body>
 <div class="studio">
@@ -17,7 +17,7 @@
         <span class="eyebrow">FEARLESS KNIGHTS OF THE CORDON / DEV TOOLS</span>
         <h1>CHERNOZERYE <span>STUDIO</span></h1>
       </div>
-      <span class="version">BUILD 0.3</span>
+      <span class="version" id="studio-version-top">STUDIO 0.4.0</span>
     </div>
     <div class="topright">
       <span class="connection"><span class="light"></span> LOCAL WORKSPACE</span>
@@ -89,8 +89,81 @@
           <div class="intro-index">4 МОДУЛЯ · 1 РАБОЧЕЕ ПРОСТРАНСТВО</div>
           <h3>ЧЕТЫРЕ МАСТЕРСКИЕ.<br><em>ОДИН МИР.</em></h3>
           <p>Создавай географию, сценарии, пропсы и игровые модели в одной студии. Переключайся между редакторами — они сохраняют открытые сцены и черновики в браузере.</p>
-          <span class="intro-footnote">PRE-ALPHA / EDITOR SUITE 0.1</span>
+          <span class="intro-footnote">PRE-ALPHA / EDITOR SUITE 0.4.0 · РАЗРАБОТКА ВЕДЁТСЯ ОТКРЫТО</span>
         </div>
+        <section class="release-hub" aria-label="Беклог, актуальная версия и история изменений">
+          <div class="release-headline">
+            <div>
+              <span class="section-kicker">DEVELOPMENT DESK / 00</span>
+              <h4>ЖУРНАЛ РАЗРАБОТКИ <span>/ BACKLOG</span></h4>
+            </div>
+            <div class="release-headline-tools">
+              <span class="release-headline-caption">ВЕРСИИ · ИЗМЕНЕНИЯ · РОАДМАП</span>
+              <a href="https://github.com/blacklambcult/chernozerye/commits/main/" target="_blank" rel="noopener noreferrer">ИСТОРИЯ GIT ↗</a>
+            </div>
+          </div>
+          <div class="current-build" aria-label="Текущая версия Studio">
+            <div class="current-main">
+              <div class="current-label"><span class="current-dot"></span> АКТУАЛЬНАЯ ВЕРСИЯ / ПРЕДВАРИТЕЛЬНАЯ</div>
+              <div class="current-version-line">
+                <span class="current-version" id="release-current-version">STUDIO 0.4.0</span>
+                <span class="current-state">PRE-ALPHA / ACTIVE</span>
+              </div>
+              <h5 id="release-current-title">Единый центр разработки Чернозёрья</h5>
+              <p id="release-current-description">История обновлений и план развития всех инструментов в одном месте.</p>
+            </div>
+            <div class="current-side">
+              <div class="current-metric">
+                <span>ИГРА / GODOT WEB</span>
+                <strong id="release-game-version">PRE-ALPHA 0.5.4</strong>
+              </div>
+              <div class="current-metric">
+                <span>ТЕКУЩИЙ КОММИТ СБОРКИ</span>
+                <a href="https://github.com/blacklambcult/chernozerye/commits/main/" id="release-build-sha" target="_blank" rel="noopener noreferrer">ЗАГРУЗКА… ↗</a>
+              </div>
+              <div class="current-metric">
+                <span>ОБНОВЛЕНО</span>
+                <strong id="release-current-date">20.11.2026</strong>
+              </div>
+            </div>
+          </div>
+          <div class="release-columns">
+            <section class="changelog-panel" aria-labelledby="changelog-title">
+              <div class="panel-topline">
+                <div>
+                  <span class="panel-index">01 / VERSION HISTORY</span>
+                  <h5 id="changelog-title">ИСТОРИЯ ИЗМЕНЕНИЙ</h5>
+                </div>
+                <span class="panel-counter" id="release-count">— ВЕРСИЙ</span>
+              </div>
+              <div class="changelog-filters" aria-label="Фильтр журнала по модулю">
+                <button type="button" data-changelog-filter="all" class="filter-tab active" aria-pressed="true">ВСЁ</button>
+                <button type="button" data-changelog-filter="studio" class="filter-tab" aria-pressed="false">STUDIO</button>
+                <button type="button" data-changelog-filter="game" class="filter-tab" aria-pressed="false">ИГРА</button>
+                <button type="button" data-changelog-filter="tools" class="filter-tab" aria-pressed="false">LABS / FORGE</button>
+              </div>
+              <div id="release-list" class="release-list" aria-live="polite">
+                <p class="release-loading">Чтение истории проекта…</p>
+              </div>
+              <div class="panel-foot">Данные основаны на коммитах GitHub. Подробнее — раскрывай записи.</div>
+            </section>
+            <aside class="roadmap-panel" aria-labelledby="roadmap-title">
+              <div class="panel-topline">
+                <div>
+                  <span class="panel-index">02 / DEVELOPMENT ROADMAP</span>
+                  <h5 id="roadmap-title">РОАДМАП И БЕКЛОГ</h5>
+                </div>
+                <span class="panel-counter" id="roadmap-count">— ЗАДАЧ</span>
+              </div>
+              <div class="roadmap-explain">Что будем делать дальше. Пункты — <b>планы</b>, а не завершённые функции. Очерёдность можно менять.</div>
+              <div id="roadmap-list" class="roadmap-list" aria-live="polite">
+                <p class="release-loading">Подготовка роадмапа…</p>
+              </div>
+              <div class="panel-foot">NEXT → PLANNED → IDEAS / БЕЗ ОБЕЩАННЫХ СРОКОВ</div>
+            </aside>
+          </div>
+        </section>
+        <div class="module-section-title"><span class="section-kicker">EDITOR SUITE / 04</span><h4>РАБОЧИЕ ИНСТРУМЕНТЫ</h4></div>
         <div class="module-grid">
           <button type="button" data-open="geo" class="module-card">
             <span class="card-top"><span class="card-number">/ 01</span><span class="card-icon">⌗</span></span>
@@ -129,6 +202,8 @@
   </footer>
 </div>
 <script src="./studio-state.js?v=1"></script>
+<script src="./release-core.js?v=1"></script>
+<script src="./studio-releases.js?v=1"></script>
 <script src="./studio.js?v=3"></script>
 </body>
 </html>
