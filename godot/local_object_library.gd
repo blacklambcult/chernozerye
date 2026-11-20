@@ -1,11 +1,16 @@
 extends Node3D
 ## Loads decorative placements from the current browser profile.
 
+var snapshot: Dictionary = {}
+
 func _ready() -> void:
     if not OS.has_feature("web"):
         return
     # Let the first playable frame render before reading IndexedDB.
     await RenderingServer.frame_post_draw
+    if not snapshot.is_empty():
+        await _load_objects(snapshot, true)
+        return
     if not JavaScriptBridge.eval("typeof window.chernozeryeLoadLocalObjects === 'function'", true):
         return
     JavaScriptBridge.eval("window.chernozeryeLoadLocalObjects()", true)

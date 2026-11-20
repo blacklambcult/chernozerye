@@ -77,8 +77,19 @@ func _ready() -> void:
     _activate_default_village()
     _create_november_snow()
     _create_note_archive()
-    _create_world_document()
-    add_child(preload("res://local_object_library.gd").new())
+    var library := preload("res://local_object_library.gd").new()
+    var snapshot := preload("res://studio_snapshot.gd").read()
+    if snapshot.is_empty():
+        _create_world_document()
+    library.snapshot = snapshot
+    add_child(library)
+    if not snapshot.is_empty():
+        var quest := preload("res://studio_snapshot.gd").convert_quest(snapshot, library)
+        var runtime := preload("res://questlab_runtime.gd").new()
+        runtime.name = "QuestLabRuntime"
+        runtime.snapshot_mode = true
+        runtime.authored_quest = quest
+        add_child(runtime)
 
 func _create_note_archive() -> void:
     var notes := Node.new()

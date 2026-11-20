@@ -63,4 +63,20 @@
       button.disabled = false;
     }
   });
+  const play = document.querySelector("#play-studio-project");
+  document.querySelector("#load-studio-project").addEventListener("click", () => play.click());
+  play.addEventListener("change", async () => {
+    const file = play.files?.[0];
+    play.value = "";
+    if (!file) return;
+    try {
+      if (file.size > 2500000) throw new Error("Снимок больше 2,5 МБ.");
+      const raw = await file.text();
+      const snapshot = JSON.parse(raw);
+      if (snapshot?.format !== "chernozerye.studio-project" || snapshot.version !== 1)
+        throw new Error("Выбери снимок проекта из Studio.");
+      sessionStorage.setItem("chernozerye.studio-playtest.v1", raw);
+      location.href = "../#studio-playtest";
+    } catch (error) { status.textContent = error.message; }
+  });
 })();
