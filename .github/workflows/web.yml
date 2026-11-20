@@ -498,7 +498,7 @@ jobs:
           node --check site/quest/geo-overlay-core.js
           node --test tests/quest-geo-overlay.test.cjs
           node --test tests/quest-geo-link.test.cjs
-          grep -q 'quest.js?v=5' site/quest/index.html
+          grep -q 'quest.js?v=6' site/quest/index.html
           grep -q 'geo-overlay-core.js?v=2' site/quest/index.html
           grep -q 'quest-core.js?v=3' site/quest/index.html
           grep -q 'id="step-document-fields"' site/quest/index.html
@@ -518,7 +518,7 @@ jobs:
           node --check site/model/model-core.js
           node --check site/model/model.mjs
           node --test tests/model-core.test.cjs
-          grep -q 'model.mjs?v=1' site/model/index.html
+          grep -q 'model.mjs?v=2' site/model/index.html
           grep -q 'href="../model/"' site/quest/index.html
           grep -q 'href="../model/"' site/map/index.html
           mkdir -p build/web/model
