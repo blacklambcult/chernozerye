@@ -471,38 +471,47 @@ $("load-json").addEventListener("change", async (event) => {
     status("Импортировано: " + project.parts.length + " деталей");
   } catch (error) { status("Не удалось открыть файл: " + error.message, true); }
 });
-$("export-glb").addEventListener("click", async () => {
-  if (!project.parts.length) { status("Добавь хотя бы одну деталь перед экспортом.", true); return; }
-  const button = $("export-glb");
-  button.disabled = true;
-  button.textContent = "Экспорт GLB…";
+async function makeGlb(data) {
+  const group = new THREE.Group();
+  group.name = data.name;
   try {
-    const data = C.normalizeProject(project);
-    // Standalone mesh group, without grid, lighting, helpers or editor camera.
-    const exportGroup = new THREE.Group();
-    exportGroup.name = data.name;
-    for (const p of data.parts) {
-      const mesh = meshFor(p);
-      mesh.userData = { modelLabId:p.id, primitive:p.primitive };
-      exportGroup.add(mesh);
+    for (const part of data.parts) {
+      const mesh = meshFor(part);
+      mesh.userData = { modelLabId: part.id, primitive: part.primitive };
+      group.add(mesh);
     }
-    const exporter = new GLTFExporter();
-    const buffer = await exporter.parseAsync(exportGroup, {
-      binary:true, onlyVisible:true, trs:true, includeCustomExtensions:false
-    });
-    download(new Blob([buffer], {type:"model/gltf-binary"}), filename() + ".glb");
-    exportGroup.traverse((obj) => {
+    const buffer = await new GLTFExporter().parseAsync(group, { binary: true, trs: true });
+    return new Blob([buffer], { type: "model/gltf-binary" });
+  } finally {
+    group.traverse(obj => {
       if (obj.isMesh) { obj.geometry.dispose(); obj.material.dispose(); }
     });
-    status("GLB экспортирован · " + data.parts.length + " деталей / Godot");
+  }
+}
+async function publishModel(button, saveLocally) {
+  if (!project.parts.length) { status("Добавь хотя бы одну деталь.", true); return; }
+  button.disabled = true;
+  try {
+    const data = C.normalizeProject(project);
+    const exportName = filename();
+    const blob = await makeGlb(data);
+    if (saveLocally) {
+      const library = window.ChernoObjectLibrary;
+      await library.saveModel({ id: crypto.randomUUID(), name: data.name, blob });
+      void library.requestPersistence().catch(() => {});
+      status("Модель в локальной библиотеке · открой «Предметы» в Quest Lab");
+    } else {
+      download(blob, exportName + ".glb");
+      status("GLB экспортирован · " + data.parts.length + " деталей / Godot");
+    }
   } catch (error) {
-    console.error("MODEL_LAB_GLTF_EXPORT_FAILED", error);
-    status("Не удалось экспортировать GLB: " + error.message, true);
+    status("Не удалось сохранить модель: " + error.message, true);
   } finally {
     button.disabled = false;
-    button.textContent = "↓ Экспортировать GLB";
   }
-});
+}
+$("export-glb").addEventListener("click", event => publishModel(event.currentTarget, false));
+$("save-library-model").addEventListener("click", event => publishModel(event.currentTarget, true));
 window.addEventListener("keydown", (event) => {
   const target = event.target;
   if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;

@@ -12,6 +12,9 @@
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
   let project;
   let library = "quest";
+  const objects = window.ChernoObjectLibrary;
+  let localMarkers;
+  let placementModelId = null;
   let selectedCharacterId = null;
   let selectedStepId = null;
   let selectedWorldItemId = null;
@@ -255,6 +258,58 @@
       item.target.lat.toFixed(6) + ", " + item.target.lon.toFixed(6) : "Точка не выбрана";
     renderObjectState();
   }
+  async function refreshLocalObjects() {
+    try {
+      const [models, placements] = await Promise.all([objects.models(), objects.placements()]);
+      const picker = $("local-model");
+      const selected = picker.value;
+      picker.replaceChildren(...models.map(model => new Option(model.name, model.id)));
+      if (models.some(model => model.id === selected)) picker.value = selected;
+      $("place-local-model").disabled = !models.length;
+      $("local-model-status").textContent = models.length ?
+        "Размещения доступны в игре в этом профиле браузера." :
+        "Сохрани модель в библиотеку из Model Lab.";
+      const names = new Map(models.map(model => [model.id, model.name]));
+      $("local-placements").replaceChildren();
+      localMarkers?.clearLayers();
+      for (const item of placements) {
+        const name = names.get(item.modelId) || "Модель недоступна";
+        if (localMarkers) {
+          const label = document.createElement("span");
+          label.textContent = name;
+          window.L.circleMarker([item.lat, item.lon], { radius: 7, color: "#6bd3d6" })
+            .bindTooltip(label).addTo(localMarkers);
+        }
+        const row = document.createElement("div");
+        row.className = "two-buttons";
+        const locate = document.createElement("button");
+        locate.type = "button";
+        locate.className = "button";
+        locate.textContent = name;
+        locate.onclick = () => map?.setView([item.lat, item.lon], 18);
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "button";
+        remove.textContent = "Удалить";
+        remove.onclick = async () => {
+          try { await objects.removePlacement(item.id); await refreshLocalObjects(); }
+          catch (error) { $("local-model-status").textContent = error.message; }
+        };
+        row.append(locate, remove);
+        $("local-placements").append(row);
+      }
+    } catch (error) {
+      $("place-local-model").disabled = true;
+      $("local-model-status").textContent = "Библиотека недоступна: " + error.message;
+    }
+  }
+  $("place-local-model").addEventListener("click", () => {
+    placementModelId = $("local-model").value || null;
+    if (!placementModelId) return;
+    setMode("browse");
+    $("local-model-status").textContent = "Выбери точку на карте.";
+  });
+
   function catalogNote(item) {
     return project.worldItems.find(note => note.id === item?.noteId);
   }
@@ -267,6 +322,7 @@
     $("quest-scenario").hidden = !isQuest;
     if (!isQuest) $("quest-fields").hidden = true;
     $("world-library").hidden = !isFind;
+    $("local-object-library").hidden = library !== "item";
     $("character-library").hidden = library !== "character";
     $("world-library-title").textContent = library === "note" ? "Записки" : "Предметы";
     $("add-world-note").hidden = library !== "note";
@@ -351,6 +407,7 @@
     renderMap();
   }
   function setMode(next) {
+    if (next !== "browse") placementModelId = null;
     if (["step","object"].includes(next) && !worldItem() && (!step() || step().type === "message")) {
       displayStatus("Выбери задачу с географической целью, а не сообщение.", true);
       return;
@@ -664,6 +721,7 @@
   // The Studio keeps Quest Lab alive in an iframe while editing Geo Lab in
   // another. Refresh the same Geo Lab localStorage data every time it opens.
   window.QuestGeoOverlayRefresh = () => {
+    void refreshLocalObjects();
     refreshGeoManual();
     if (map) window.requestAnimationFrame(() => map.invalidateSize());
   };
@@ -689,10 +747,22 @@
         maxZoom: 19, attribution: "Esri World Imagery"
       }).addTo(map);
     markers = L.layerGroup().addTo(map);
+    localMarkers = L.layerGroup().addTo(map);
+    void refreshLocalObjects();
     refreshGeoManual(true);
     void loadGeoPublished();
     $("geo-layer-toggle").addEventListener("click", toggleGeoLayers);
-    map.on("click", evt => {
+    map.on("click", async evt => {
+      if (placementModelId) {
+        const modelId = placementModelId;
+        placementModelId = null;
+        try {
+          await objects.savePlacement({ id: crypto.randomUUID(), modelId,
+            lat: evt.latlng.lat, lon: evt.latlng.lng });
+          await refreshLocalObjects();
+        } catch (error) { $("local-model-status").textContent = error.message; }
+        return;
+      }
       if(mode==="object"){
         displayStatus("Выбери окрашенный контур из разметки Geo Lab, а не пустую точку карты.",true);
         return;
@@ -714,7 +784,9 @@
 
   for (const tab of document.querySelectorAll("[data-library]")) {
     tab.addEventListener("click", () => {
+      placementModelId = null;
       library = tab.dataset.library;
+      if (library === "item") void refreshLocalObjects();
       selectedWorldItemId = null;
       renderAll();
       setMode(library === "quest" ? "spawn" : "browse");

@@ -78,6 +78,7 @@ func _ready() -> void:
     _create_november_snow()
     _create_note_archive()
     _create_world_document()
+    add_child(preload("res://local_object_library.gd").new())
 
 func _create_note_archive() -> void:
     var notes := Node.new()

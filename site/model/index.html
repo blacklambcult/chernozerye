@@ -176,6 +176,7 @@
       </div>
       <section class="section export-panel">
         <div class="section-header"><h3>Экспорт модели</h3><span class="tag">GODOT READY</span></div>
+        <button id="save-library-model" class="button full" type="button">Сохранить в библиотеку</button>
         <button id="export-glb" class="button primary full" type="button">↓ Экспортировать GLB</button>
         <p id="save-status" class="save-status" role="status">Локальный проект готов.</p>
         <p class="hint">GLB содержит меши и материалы; игровые коллизии, анимации и точки крепления добавим позже.</p>
@@ -185,6 +186,7 @@
   <footer class="footer"><span>CHERNOZERYE <b>MODEL LAB 0.1</b></span><span id="global-status">3D / РЕДАКТОР ПРОПСОВ</span><span>ЛОКАЛЬНОЕ СОХРАНЕНИЕ · JSON + GLB</span></footer>
 </div>
 <script src="./model-core.js?v=1"></script>
-<script type="module" src="./model.mjs?v=1"></script>
+<script src="../object-library/library.js"></script>
+<script type="module" src="./model.mjs?v=2"></script>
 </body>
 </html>
