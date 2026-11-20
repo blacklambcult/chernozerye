@@ -18,8 +18,12 @@
       .map(async item => ({ id: item.id, glb: await base64(item.blob) })));
     return { placements, models };
   }
-  load().then(data => { window.chernozeryeLocalObjects = JSON.stringify(data); }).catch(error => {
-    console.warn("В игре не удалось открыть локальную библиотеку", error);
-    window.chernozeryeLocalObjects = "{}";
-  });
+  window.chernozeryeLoadLocalObjects = () => {
+    load().then(data => {
+      window.chernozeryeLocalObjects = JSON.stringify(data);
+    }).catch(error => {
+      console.warn("В игре не удалось открыть локальную библиотеку", error);
+      window.chernozeryeLocalObjects = "{}";
+    });
+  };
 })();

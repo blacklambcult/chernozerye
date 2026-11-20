@@ -4,10 +4,16 @@ extends Node3D
 func _ready() -> void:
     if not OS.has_feature("web"):
         return
+    # Let the first playable frame render before reading IndexedDB.
+    await RenderingServer.frame_post_draw
+    if not JavaScriptBridge.eval("typeof window.chernozeryeLoadLocalObjects === 'function'", true):
+        return
+    JavaScriptBridge.eval("window.chernozeryeLoadLocalObjects()", true)
     for attempt in range(150):
         var payload = JavaScriptBridge.eval("window.chernozeryeLocalObjects || ''", true)
         if payload is String and not payload.is_empty():
-            _load_objects(JSON.parse_string(payload))
+            JavaScriptBridge.eval("delete window.chernozeryeLocalObjects", true)
+            await _load_objects(JSON.parse_string(payload), true)
             return
         await get_tree().create_timer(0.2).timeout
 
@@ -39,7 +45,7 @@ func _project(lat: float, lon: float) -> Array[float]:
     return [east, north]
 
 
-func _load_objects(data: Variant) -> void:
+func _load_objects(data: Variant, spread_over_frames := false) -> void:
     if not data is Dictionary or not data.get("placements") is Array \
             or not data.get("models") is Array or data["placements"].is_empty():
         return
@@ -48,6 +54,8 @@ func _load_objects(data: Variant) -> void:
     var origin := _project(float(metadata["center_lat"]), float(metadata["center_lon"]))
     var scenes := {}
     for model in data["models"]:
+        if spread_over_frames:
+            await RenderingServer.frame_post_draw
         var document := GLTFDocument.new()
         var state := GLTFState.new()
         if document.append_from_buffer(Marshalls.base64_to_raw(model["glb"]), "", state) != OK:
@@ -62,6 +70,8 @@ func _load_objects(data: Variant) -> void:
         if template == null:
             continue
         var point := _project(float(placement["lat"]), float(placement["lon"]))
+        if spread_over_frames and count > 0 and count % 16 == 0:
+            await RenderingServer.frame_post_draw
         var instance := template.duplicate() as Node3D
         instance.position = Vector3(point[0] - origin[0], 0.04, origin[1] - point[1])
         add_child(instance)
