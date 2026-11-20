@@ -49,8 +49,9 @@ jobs:
         run: |
           set -euo pipefail
           python -m unittest discover -s tests -p test_convert_questlab.py
-          python scripts/convert_questlab.py data/questlab_return_cordon.json --output godot/questlab_runtime.json
-          python scripts/convert_questlab.py data/questlab_interactions_demo.json --output godot/questlab_interactions_demo.json
+          python -m unittest discover -s tests -p test_geo_quest_binding.py
+          python scripts/convert_questlab.py data/questlab_return_cordon.json --geo-layout godot/manual_layout.json --output godot/questlab_runtime.json
+          python scripts/convert_questlab.py data/questlab_interactions_demo.json --geo-layout godot/manual_layout.json --output godot/questlab_interactions_demo.json
           python - <<'PY'
           import json
           doc = json.load(open('godot/questlab_runtime.json', encoding='utf-8'))
@@ -61,7 +62,11 @@ jobs:
           assert len(demo['quests'])==1
           assert [s['type'] for s in demo['quests'][0]['steps']] == ['interact','collect','message']
           assert all(s['target_world'] is not None for s in demo['quests'][0]['steps'][:2])
-          print('QUESTLAB_DATA_READY: authored=2 demo=3 interact=true collect=true')
+          house=demo['quests'][0]['steps'][0]
+          assert house['object_id'] == '4499fe7a-c031-469c-aac4-96636c23eea8'
+          assert house['object_type'] == 'house' and house['target_source'] == 'geo_lab_id'
+          assert demo['quests'][0]['steps'][1]['target_source'] == 'free_point'
+          print('QUESTLAB_DATA_READY: authored=2 demo=3 real_house=true interact=true collect=true')
           PY
 
       - name: Build separate full and FPS low-poly GLBs
@@ -163,7 +168,7 @@ jobs:
         run: |
           set -euo pipefail
           godot --headless --path godot --script res://questlab_interaction_regression.gd 2>&1 | tee /tmp/questlab-interactions.log
-          grep -q "QUESTLAB_INTERACTION_REGRESSION_OK: f7=true marker=true interact=true collect=true distance_guard=true message=true original_f6=true restored=true" /tmp/questlab-interactions.log
+          grep -q "QUESTLAB_INTERACTION_REGRESSION_OK: f7=true marker=true interact=true collect=true distance_guard=true message=true original_f6=true restored=true geo_link=true" /tmp/questlab-interactions.log
 
       - name: Regression-test building and fence physics
         shell: bash

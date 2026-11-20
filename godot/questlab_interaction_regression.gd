@@ -39,6 +39,11 @@ func _run() -> void:
             or str(demo_steps[1].get("type", "")) != "collect":
         _fail("F7 demo has wrong step types")
         return
+    if str(demo_steps[0].get("object_id", "")) != "4499fe7a-c031-469c-aac4-96636c23eea8" \
+            or str(demo_steps[0].get("target_source", "")) != "geo_lab_id" \
+            or str(demo_steps[0].get("object_type", "")) != "house":
+        _fail("interact target was not resolved against a surveyed Geo Lab house")
+        return
     if not bool(runtime.call("activate_preview", true)):
         _fail("F7 did not activate test mission")
         return
@@ -47,8 +52,9 @@ func _run() -> void:
         return
     var info := runtime.get("detail_label") as Label
     var marker := runtime.get("marker_root") as Node3D
-    if marker == null or marker.get_node_or_null("PreviewOnlyVisual") == null:
-        _fail("interactive note marker missing")
+    if marker == null or marker.get_node_or_null("PreviewOnlyVisual") == null \
+            or marker.get("linked_object") != true:
+        _fail("real Geo Lab house locator missing")
         return
     if bool(runtime.call("interact_selected")) or int(runtime.get("step_index")) != 0:
         _fail("interaction works from outside allowed range")
@@ -58,7 +64,7 @@ func _run() -> void:
     if not bool(runtime.call("interact_selected")) or int(runtime.get("step_index")) != 1:
         _fail("E does not advance interact step")
         return
-    if not info.text.contains("Подобрать старую записку"):
+    if not info.text.contains("Подобрать записку возле дома"):
         _fail("collect step title not visible")
         return
     if (runtime.get("collected_items") as Array).size() != 0:
@@ -102,5 +108,5 @@ func _run() -> void:
         _fail("original user-authored mission was replaced")
         return
     runtime.call("deactivate_preview")
-    print("QUESTLAB_INTERACTION_REGRESSION_OK: f7=true marker=true interact=true collect=true distance_guard=true message=true original_f6=true restored=true")
+    print("QUESTLAB_INTERACTION_REGRESSION_OK: f7=true marker=true interact=true collect=true distance_guard=true message=true original_f6=true restored=true geo_link=true")
     quit(0)

@@ -20,6 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 WORLD = ROOT / "godot" / "world_data.json"
 FORMATS = {"reach", "interact", "collect", "message"}
 QUEST_TYPES = {"main", "side"}
+INTERACTION_CLEARANCE_M = 1.8
+GEO_KINDS = {"house", "sauna", "shed", "car", "road", "path", "plot", "forest", "water", "object"}
 
 
 def _string(value: object, length: int, field: str) -> str:
@@ -39,7 +41,96 @@ def _coordinates(point: object, field: str) -> tuple[float, float]:
     return float(lon), float(lat)
 
 
-def compile_questlab(document: dict, origin: dict) -> dict:
+
+
+def _nearest_on_segment(px: float, py: float, ax: float, ay: float,
+                        bx: float, by: float) -> tuple[float, float]:
+    dx, dy = bx - ax, by - ay
+    length2 = dx * dx + dy * dy
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / length2)) if length2 > 1e-10 else 0.0
+    return ax + t * dx, ay + t * dy
+
+
+def _geo_object_anchor(feature: dict, spawn_world: list[float]) -> list[float]:
+    """Reachable interaction point in the *existing* Geo Lab survey, x=east / y=north.
+    For polygons prefer a nearby perimeter point outside the footprint instead
+    of the unreachable building centre. Do not modify the imported 3D geometry.
+    """
+    points = feature.get("points", [])
+    if not isinstance(points, list) or not points:
+        raise ValueError(f"Empty Geo Lab object: {feature.get('id', '')}")
+    coords = []
+    for raw in points:
+        if (not isinstance(raw, list) or len(raw) != 2 or
+                any(isinstance(v, bool) or not isinstance(v, (int, float))
+                    or not math.isfinite(v) for v in raw)):
+            raise ValueError(f"Invalid Geo Lab point for {feature.get('id', '')}")
+        coords.append((float(raw[0]), float(raw[1])))
+    shape = feature.get("geometry_type")
+    if shape == "Point":
+        return [round(coords[0][0], 3), 0.22, round(-coords[0][1], 3)]
+    if shape == "LineString":
+        if len(coords) < 2:
+            raise ValueError("Geo Lab line has less than 2 points")
+        lengths = [math.dist(coords[i], coords[i+1]) for i in range(len(coords)-1)]
+        total = sum(lengths)
+        remaining = total / 2
+        for i, length in enumerate(lengths):
+            if remaining <= length or i == len(lengths)-1:
+                fraction = max(0.0, min(1.0, remaining / length)) if length > 0 else 0.0
+                x = coords[i][0] + (coords[i+1][0]-coords[i][0]) * fraction
+                y = coords[i][1] + (coords[i+1][1]-coords[i][1]) * fraction
+                return [round(x, 3), 0.22, round(-y, 3)]
+            remaining -= length
+    if shape != "Polygon" or len(coords) < 3:
+        raise ValueError(f"Unsupported Geo Lab geometry for {feature.get('id', '')}")
+    sx, sy = float(spawn_world[0]), -float(spawn_world[2])
+    candidates = [_nearest_on_segment(sx, sy, *coords[i], *coords[(i+1) % len(coords)])
+                  for i in range(len(coords))]
+    px, py = min(candidates, key=lambda p: (p[0] - sx)**2 + (p[1] - sy)**2)
+    center_x = sum(p[0] for p in coords) / len(coords)
+    center_y = sum(p[1] for p in coords) / len(coords)
+    dx, dy = px - center_x, py - center_y
+    # If the spawn lies on the correct exterior side, prefer its direction;
+    # otherwise use the normal from the footprint centre to the boundary.
+    ux, uy = sx - px, sy - py
+    if (ux * dx + uy * dy) <= 0:
+        ux, uy = dx, dy
+    size = math.hypot(ux, uy)
+    if size < 1e-5:
+        ux, uy, size = 1.0, 0.0, 1.0
+    px += ux / size * INTERACTION_CLEARANCE_M
+    py += uy / size * INTERACTION_CLEARANCE_M
+    return [round(px, 3), 0.22, round(-py, 3)]
+
+
+def _geo_index(geo_layout: dict | None, origin: dict) -> dict[str, dict]:
+    if geo_layout is None:
+        return {}
+    if not isinstance(geo_layout, dict):
+        raise ValueError("Geo Lab layout must be a dictionary")
+    metadata = geo_layout.get("metadata", {})
+    if (not isinstance(metadata, dict) or
+            metadata.get("projection") != "EPSG:32640" or
+            abs(float(metadata.get("origin_lon", -999)) - float(origin["center_lon"])) > 1e-7 or
+            abs(float(metadata.get("origin_lat", -999)) - float(origin["center_lat"])) > 1e-7):
+        raise ValueError("Geo Lab layout projection / origin mismatch")
+    features = geo_layout.get("features")
+    if not isinstance(features, list) or len(features) > 10000:
+        raise ValueError("Invalid Geo Lab layout feature list")
+    index: dict[str, dict] = {}
+    for feature in features:
+        if not isinstance(feature, dict):
+            raise ValueError("Corrupt Geo Lab feature")
+        key = _string(feature.get("id", ""), 120, "Geo Lab ID")
+        if not key or key in index:
+            raise ValueError("Duplicate or empty Geo Lab feature ID")
+        if feature.get("type") not in GEO_KINDS:
+            raise ValueError(f"Unsupported Geo Lab object category: {key}")
+        index[key] = feature
+    return index
+
+def compile_questlab(document: dict, origin: dict, geo_layout: dict | None = None) -> dict:
     if (not isinstance(document, dict) or document.get("format") != "chernozerye.questlab"
             or document.get("version") != 1 or document.get("coordinates") != "WGS84"):
         raise ValueError("Unsupported Quest Lab JSON format or version")
@@ -50,6 +141,7 @@ def compile_questlab(document: dict, origin: dict) -> dict:
     origin_lon = float(origin["center_lon"])
     origin_lat = float(origin["center_lat"])
     cx, cy = transformer.transform(origin_lon, origin_lat)
+    objects = _geo_index(geo_layout, origin)
 
     def world(point: object, field: str) -> list[float]:
         lon, lat = _coordinates(point, field)
@@ -95,8 +187,19 @@ def compile_questlab(document: dict, origin: dict) -> dict:
             if not step_title:
                 raise ValueError("Quest step title must not be empty")
             target = raw_step.get("target")
-            # A message-only step has no geographic target.
-            target_world = None if target is None else world(target, "quest target")
+            object_id = _string(raw_step.get("objectId", ""), 120, "Geo Lab object ID")
+            if stype == "message" and object_id:
+                raise ValueError("Message-only quest step cannot link a Geo Lab object")
+            # Link-by-ID supersedes a stale editor centroid, including a missing
+            # target field. An unknown ID is a build error, not a silent fallback.
+            feature = None
+            if object_id and geo_layout is not None:
+                feature = objects.get(object_id)
+                if feature is None:
+                    raise ValueError(f"Geo Lab object not found: {object_id}")
+                target_world = _geo_object_anchor(feature, spawn_world)
+            else:
+                target_world = None if target is None else world(target, "quest target")
             if stype == "reach" and target_world is None:
                 raise ValueError(f"Reach step requires a target: {sid}")
             steps.append({
@@ -105,7 +208,10 @@ def compile_questlab(document: dict, origin: dict) -> dict:
                 "title": step_title,
                 "text": _string(raw_step.get("text", ""), 1400, "step text"),
                 "target_world": target_world,
-                "object_id": _string(raw_step.get("objectId", ""), 120, "Geo Lab object ID")
+                "object_id": object_id,
+                "object_type": str(feature.get("type", "")) if feature else "",
+                "object_name": _string(feature.get("name", ""), 120, "Geo Lab name") if feature else "",
+                "target_source": "geo_lab_id" if feature else "free_point"
             })
         result.append({
             "id": qid, "type": raw["type"], "title": title,
@@ -130,10 +236,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path)
     parser.add_argument("--output", type=Path, default=ROOT / "godot" / "questlab_runtime.json")
+    parser.add_argument("--geo-layout", type=Path, default=None,
+                        help="Reviewed local-metre Geo Lab layout; activates stable ID resolution")
     args = parser.parse_args()
     source = json.loads(args.input.read_text(encoding="utf-8"))
     origin = json.loads(WORLD.read_text(encoding="utf-8"))["metadata"]
-    converted = compile_questlab(source, origin)
+    layout = json.loads(args.geo_layout.read_text(encoding="utf-8")) if args.geo_layout else None
+    converted = compile_questlab(source, origin, layout)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(converted, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print("QUEST_LAB_CONVERTED: quests=", len(converted["quests"]),

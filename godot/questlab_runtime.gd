@@ -216,7 +216,7 @@ func _spawn_marker(step: Dictionary) -> void:
     add_child(marker_root)
     marker_root.global_position = _world_point(step["target_world"])
     print("QUESTLAB_MARKER_SPAWNED: type=", step.get("type", ""),
-        " id=", step.get("object_id", ""))
+        " id=", step.get("object_id", ""), " source=", step.get("target_source", "free_point"))
 
 func _exit_hint() -> String:
     return "F7 — выход из теста" if demo_active else "F6 — выход из теста"
@@ -297,11 +297,13 @@ func _process(delta: float) -> void:
             distance_label.text = "Назначь объект или точку в Quest Lab · " + _exit_hint()
             return
         var horizontal := _distance_to_target()
+        var kind := str(step.get("object_type", "")).to_upper()
+        var object_hint := " · GEO LAB / " + kind if str(step.get("target_source", "")) == "geo_lab_id" else ""
         if horizontal <= INTERACTION_RADIUS_M:
             var action := "E — ПОДОБРАТЬ" if step_type == "collect" else "E — ОСМОТРЕТЬ"
-            distance_label.text = action + "     ·     " + _exit_hint()
+            distance_label.text = action + object_hint + "     ·     " + _exit_hint()
         else:
-            distance_label.text = "До предмета: %d м     ·     %s" % [int(ceil(horizontal)), _exit_hint()]
+            distance_label.text = "До цели: %d м%s     ·     %s" % [int(ceil(horizontal)), object_hint, _exit_hint()]
     else:
         distance_label.text = "Тип шага не поддерживается · " + _exit_hint()
 

@@ -1,5 +1,13 @@
 # Fearless Knights of the Cordon
 
+### Game pre-alpha 0.5.6 — Quest Lab real Geo Lab object linking
+
+- The Quest Lab Python compiler now optionally accepts `--geo-layout godot/manual_layout.json`. Each non-empty `objectId` must match a stable ID in the **reviewed Geo Lab map**. Resolved `target_world` and `object_type` come from surveyed geometry, **not** stale editor coordinates; invalid IDs fail the build rather than silently pointing to an unrelated place.
+- Polygons (buildings, sheds, plots) are anchored at a nearby **exterior edge** with a 1.8m clearance from the footprint instead of the unreachable interior centre. Lines use the midpoint along their length; points retain their original exact location. Import is deterministic, preserves user map/project files, and rejects incompatible Geo Lab map origins.
+- In the F7 Godot test, the first step references the **actual Geo Lab house ID** `4499fe7a-c031-469c-aac4-96636c23eea8` and displays a discreet locator outside its footprint. The second step is a separately placed collectable paper note. Interact with **E** near the indicated location to advance, then read the message.
+- F6 still plays the unmodified user-authored two-step mission. F7 remains an opt-in, reversible test; items do **not** yet persist in the real game inventory, and background/OSM tiles without stable editable IDs are not linkable.
+- The release log shows Game **pre-alpha 0.5.6** (Studio stays at 0.5.0), and CI adds compiler geometry/linking tests, verifies conversion from the **same** 710-item geo layout used by the game and tests F7 gameplay conditions.
+
 ### Godot pre-alpha 0.5.5 — Quest Lab F7 interaction + collectible vignette
 
 - **F6** still runs the original, unmodified user-authored “ВОЗВРАЩЕНИЕ НА ЧЕРНЫЙ КОРДОН” quest (two reach steps). **F7** launches a separate, opt-in, generated Quest Lab test nearby: approach a turquoise marker and press **E** to inspect, approach a glowing paper note and press **E** to pick it up, then read a story message.
