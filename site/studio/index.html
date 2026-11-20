@@ -189,7 +189,11 @@
         <div class="bottom-notes">
           <div><span class="little">01 / СОХРАНЕНИЕ</span><p>Редакторы хранят данные раздельно в одном браузере. Существующие черновики остаются на месте.</p></div>
           <div><span class="little">02 / ФОРМАТЫ</span><p>GEO LAB — GeoJSON · QUEST LAB — JSON · MODEL LAB — JSON/GLB · FORGE — FORGE.JSON/GLB.</p></div>
-          <div><span class="little">03 / СЛЕДУЮЩИЙ ШАГ</span><p>Общая библиотека ID и объектов, размещение моделей в Geo Lab и события в Quest Lab.</p></div>
+          <div><span class="little">СНИМОК ПРОЕКТА</span>
+            <p>Карта, квесты, модели и размещения из этого браузера в одном файле.</p>
+            <button id="export-studio-project" class="context-button" type="button">Скачать снимок проекта</button>
+            <p id="studio-project-status" role="status"></p>
+          </div>
         </div>
       </section>
       <div id="editors" class="editors" hidden aria-label="Встроенные редакторы"></div>
@@ -202,6 +206,8 @@
   </footer>
 </div>
 <script src="./studio-state.js?v=1"></script>
+<script src="../object-library/library.js?v=2"></script>
+<script src="./project-snapshot.js?v=1"></script>
 <script src="./release-core.js?v=1"></script>
 <script src="./studio-releases.js?v=1"></script>
 <script src="./studio.js?v=3"></script>
