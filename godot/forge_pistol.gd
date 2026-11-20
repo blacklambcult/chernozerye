@@ -36,6 +36,19 @@ func _read_vector(values: Variant, fallback: Vector3) -> Vector3:
             return fallback
     return Vector3(float(values[0]), float(values[1]), float(values[2]))
 
+func _read_local_profile() -> Dictionary:
+    if not OS.has_feature("web"):
+        return {}
+    var raw: Variant = JavaScriptBridge.eval(
+        "(() => { try { return localStorage.getItem('chernozerye.forge.game-viewmodel.v1'); } catch (_) { return null; } })()", true)
+    if not raw is String or raw.length() > 16384:
+        return {}
+    var profile: Variant = JSON.parse_string(raw)
+    if not profile is Dictionary or profile.get("format") != "chernozerye.forge.viewmodel" \
+            or profile.get("version") != 1 or not profile.get("viewmodel") is Dictionary:
+        return {}
+    return profile["viewmodel"]
+
 func _read_profile() -> void:
     if not FileAccess.file_exists(VIEWMODEL_PROFILE):
         return
@@ -43,14 +56,15 @@ func _read_profile() -> void:
     if not parsed is Dictionary or not parsed.get("viewmodel") is Dictionary:
         push_warning("FORGE_VIEWMODEL_PROFILE_INVALID")
         return
-    var settings: Dictionary = parsed.get("viewmodel")
-    rest_pose = _read_vector(settings.get("position"), DEFAULT_REST)
+    var local := _read_local_profile()
+    var settings: Dictionary = local if not local.is_empty() else parsed["viewmodel"]
+    rest_pose = _read_vector(settings.get("position"), DEFAULT_REST).clamp(Vector3.ONE * -2, Vector3.ONE * 2)
     var rot := _read_vector(settings.get("rotation"), Vector3(0.0, 9.0, 0.0))
     rest_angles = Vector3(deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z))
     var scale_value: float = float(settings.get("scale", 0.26))
     model_scale = clampf(scale_value if is_finite(scale_value) else 0.26, 0.05, 3.0)
     hand_position = _read_vector(settings.get("hand_position"),
-        Vector3(0.025, -0.015, 0.035))
+        Vector3(0.025, -0.015, 0.035)).clamp(-Vector3.ONE, Vector3.ONE)
     var hand_rot := _read_vector(settings.get("hand_rotation"), Vector3.ZERO)
     hand_angles = Vector3(deg_to_rad(hand_rot.x),
         deg_to_rad(hand_rot.y), deg_to_rad(hand_rot.z))

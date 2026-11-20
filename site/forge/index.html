@@ -215,6 +215,10 @@
           <label class="axis z"><span>Z</span><input type="number" step="1" data-fp-field="hand_rotation" data-fp-index="2" aria-label="Поворот кисти Z"></label>
         </div></div>
         <button id="fp-reset" type="button" class="button secondary full">↶ Сбросить вид от первого лица</button>
+        <button id="apply-fp-profile" type="button" class="button primary full">Применить FP-профиль в игре</button>
+        <button id="clear-game-fp-profile" type="button" class="button secondary full">Вернуть игровой FP-профиль</button>
+        <label class="button secondary full" for="import-fp-profile">Загрузить FP-профиль JSON</label>
+        <input id="import-fp-profile" type="file" accept=".json,application/json" hidden>
         <button id="export-fp-profile" type="button" class="button secondary full">↓ Скачать FP-профиль для Godot</button>
         <p class="hint">Описания позы сохраняются в <code>.forge.json</code> и метаданных GLB. Чтобы применить их в самой игре, профиль нужно добавить в её сборку.</p>
       </section>
@@ -251,6 +255,6 @@
 </div>
 <script src="../model/model-core.js?v=1"></script>
 <script src="./forge-core.js?v=2"></script>
-<script type="module" src="./forge.mjs?v=2"></script>
+<script type="module" src="./forge.mjs?v=3"></script>
 </body>
 </html>
