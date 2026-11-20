@@ -74,6 +74,7 @@ func _load_objects(data: Variant, spread_over_frames := false) -> void:
             await RenderingServer.frame_post_draw
         var instance := template.duplicate() as Node3D
         instance.position = Vector3(point[0] - origin[0], 0.04, origin[1] - point[1])
+        instance.rotate_y(-deg_to_rad(float(placement.get("heading", 0.0))))
         add_child(instance)
         count += 1
     for scene in scenes.values():

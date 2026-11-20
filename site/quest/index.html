@@ -89,6 +89,14 @@
         <label for="local-model">Модель из Model Lab</label>
         <select id="local-model"></select>
         <button id="place-local-model" type="button" class="button full">Поставить на карту</button>
+        <div id="local-placement-edit" hidden>
+          <label for="local-heading">Поворот (° по часовой стрелке)</label>
+          <input id="local-heading" type="number" min="0" max="359.99" step="any" value="0">
+          <div class="two-buttons">
+            <button id="save-local-heading" type="button" class="button">Сохранить поворот</button>
+            <button id="cancel-local-edit" type="button" class="button">Отмена</button>
+          </div>
+        </div>
         <div id="local-model-status" class="hint" role="status"></div>
         <div id="local-placements" class="quest-list"></div>
         <a class="button full" href="../" target="_blank" rel="noopener">Открыть игру с размещениями</a>
@@ -244,6 +252,6 @@
 <script src="../map/editor-core.js?v=20"></script>
 <script src="./geo-overlay-core.js?v=2"></script>
 <script src="../object-library/library.js"></script>
-<script src="./quest.js?v=6"></script>
+<script src="./quest.js?v=7"></script>
 </body>
 </html>
