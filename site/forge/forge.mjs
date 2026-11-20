@@ -983,10 +983,44 @@ $("fp-reset").addEventListener("click",()=>{
   persist();
   renderFpInspector();
 });
+const GAME_FP_KEY = "chernozerye.forge.game-viewmodel.v1";
+
+function currentFpProfile() {
+  return { format: "chernozerye.forge.viewmodel", version: 1, viewmodel: forgeDocument().viewmodel };
+}
+$("apply-fp-profile").addEventListener("click", () => {
+  try {
+    localStorage.setItem(GAME_FP_KEY, JSON.stringify(currentFpProfile()));
+    status("Профиль применится к модели в руках при следующем запуске игры в этом браузере.");
+  } catch (error) { status("Не удалось сохранить игровой профиль: " + error.message, true); }
+});
+$("clear-game-fp-profile").addEventListener("click", () => {
+  try {
+    localStorage.removeItem(GAME_FP_KEY);
+    status("При следующем запуске игра загрузит штатный профиль.");
+  } catch (error) { status("Не удалось сбросить профиль: " + error.message, true); }
+});
+$("import-fp-profile").addEventListener("change", async event => {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  try {
+    if (file.size > 16384) throw new Error("Файл больше 16 КБ.");
+    const profile = JSON.parse(await file.text());
+    if (profile?.format !== "chernozerye.forge.viewmodel" || profile.version !== 1 || !profile.viewmodel)
+      throw new Error("Нужен FP-профиль Hellish Forge версии 1.");
+    const viewmodel = Forge.normalizeViewmodel(profile.viewmodel);
+    pushUndo();
+    forgeMeta.viewmodel = viewmodel;
+    persist();
+    renderFpInspector();
+    status("Профиль открыт в редакторе. Нажми «Применить FP-профиль в игре» для проверки.");
+  } catch (error) { status("Ошибка импорта FP-профиля: " + error.message, true); }
+});
+
 $("export-fp-profile").addEventListener("click",()=>{
   try {
-    const viewmodel=forgeDocument().viewmodel;
-    const profile={format:"chernozerye.forge.viewmodel",version:1,viewmodel};
+    const profile = currentFpProfile();
     download(new Blob([JSON.stringify(profile,null,2)+"\n"],{type:"application/json"}),
       filename()+".viewmodel.json");
     status("Профиль положения в руках сохранён. Его можно подключить в Godot.");
