@@ -98,9 +98,21 @@ func _draw_quest_bearing(center: float, top: float, heading: float) -> void:
     var target: Vector3
     var runtime := get_parent().get_parent().get_node_or_null("QuestLabRuntime")
     if runtime != null and runtime.get("snapshot_mode") == true:
-        if not runtime.call("has_target"):
+        if runtime.call("has_target"):
+            target = runtime.call("get_target_world")
+        elif runtime.get("quest_completed") == true:
+            var docs := get_parent().get_parent().get_node_or_null("WorldDocument")
+            if docs == null:
+                return
+            var note: Dictionary = docs.call("nearest_snapshot_note")
+            if note.is_empty():
+                return
+            target = note["position"]
+            var hint := "E / Прочитать записку" if note["distance"] <= 2.8 else "Записка · %d м" % int(ceil(note["distance"]))
+            draw_string(ThemeDB.fallback_font, Vector2(18, 92), hint,
+                HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#e8d2b0"))
+        else:
             return
-        target = runtime.call("get_target_world")
     else:
         var finds := get_parent().get_parent().get_node_or_null("WorldDocument")
         if finds == null:
