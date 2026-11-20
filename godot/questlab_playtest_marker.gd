@@ -20,6 +20,9 @@ func _ready() -> void:
     visual.name = "PreviewOnlyVisual"
     visual.position.y = 0.12 if linked_object else 1.55
     add_child(visual)
+    if item_type == "reach":
+        _make_reach_ring()
+        return
     var material := StandardMaterial3D.new()
     material.albedo_color = Color("#e7c59d") if item_type == "collect" else Color("#77ccb5")
     material.emission_enabled = true
@@ -68,8 +71,29 @@ func _ready() -> void:
 func _process(delta: float) -> void:
     elapsed += delta
     if visual != null:
-        if linked_object:
+        if item_type == "reach":
+            visual.scale = Vector3.ONE * (1.0 + 0.06 * sin(elapsed * 2.8))
+        elif linked_object:
             visual.position.y = 0.12 + sin(elapsed * 1.8) * 0.025
         else:
             visual.position.y = 1.55 + sin(elapsed * 1.8) * 0.12
             visual.rotation.y += delta * 0.45
+
+func _make_reach_ring() -> void:
+    visual.position.y = 0.03
+    var material := StandardMaterial3D.new()
+    material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    material.albedo_color = Color("#6ef5cf")
+    material.emission_enabled = true
+    material.emission = material.albedo_color
+    material.emission_energy_multiplier = 1.5
+    var ring := TorusMesh.new()
+    ring.inner_radius = 1.25
+    ring.outer_radius = 1.4
+    ring.rings = 32
+    ring.ring_segments = 8
+    var mesh := MeshInstance3D.new()
+    mesh.name = "ReachGroundRing"
+    mesh.mesh = ring
+    mesh.material_override = material
+    visual.add_child(mesh)

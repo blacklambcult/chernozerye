@@ -90,6 +90,7 @@ func _ready() -> void:
         runtime.snapshot_mode = true
         runtime.authored_quest = quest
         add_child(runtime)
+        _create_world_document(preload("res://studio_snapshot.gd").convert_world_items(snapshot, library))
 
 func _create_note_archive() -> void:
     var notes := Node.new()
@@ -98,11 +99,12 @@ func _create_note_archive() -> void:
     notes.set("session_only", true)
     add_child(notes)
 
-func _create_world_document() -> void:
+func _create_world_document(snapshot_items: Variant = null) -> void:
     # The surveyed map and quest compiler provide both position and note text.
     var note := Node3D.new()
     note.name = "WorldDocument"
     note.set_script(preload("res://world_document.gd"))
+    note.set("snapshot_items", snapshot_items)
     add_child(note)
 
 func _create_story_prologue() -> void:
