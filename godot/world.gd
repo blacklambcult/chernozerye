@@ -5,14 +5,14 @@ const LOGO_DATA = preload("res://logo_data.gd")
 const MAP_FILE := "res://world_data.json"
 const MANUAL_FILE := "res://manual_layout.json"
 const GAME_TITLE := "Fearless Knights of the Cordon"
-const GAME_STAGE := "Pre-Alpha 0.7.2"
+const GAME_STAGE := "Pre-Alpha 0.7.3"
 # Canonical playable start of the 710-feature Geo Lab village. Keep world
 # placements and the CI spawn-distance regression anchored to this coordinate.
 const MANUAL_VILLAGE_SPAWN := Vector3(-789.7, 0.22, -268.6)
 const MANUAL_CAMERA_NEAR := 0.16
 const MANUAL_CAMERA_FAR := 250.0
 const SEASON := "NOVEMBER"
-const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.7.2 · ЧЕРНОЗЁРЬЕ · 710 ОБЪЕКТОВ"
+const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.7.3 · ЧЕРНОЗЁРЬЕ · 710 ОБЪЕКТОВ"
 var manual_mode := false
 var manual_button: Button
 var _status_label: Label
@@ -797,6 +797,8 @@ func _toggle_manual_preview() -> void:
     if character != null:
         character.velocity = Vector3.ZERO
         character.global_position = MANUAL_VILLAGE_SPAWN if manual_mode else Vector3(130.0, 0.22, -82.0)
+        if manual_mode:
+            character.rotation.y = deg_to_rad(-69.0) # Face down the road toward the first letter.
         # The old 0.60 m near plane extended beyond the 0.46 m player capsule
         # and visibly sliced walls/windows even though collisions were working.
         # Keep the near plane well INSIDE the capsule, and shorten the far plane

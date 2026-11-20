@@ -16,6 +16,8 @@ concurrency:
 
 jobs:
   export:
+    outputs:
+      release_dir: ${{ steps.game_export.outputs.release_dir }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -397,12 +399,16 @@ jobs:
           fi
 
       - name: Export Web build
+        id: game_export
         shell: bash
         run: |
           set -euo pipefail
           # Immutable directory per commit. A static /pre-alpha-0.3.9/
           # was cached by some browsers even after a successful new publish.
-          RELEASE_DIR="pre-alpha-0.5.4-${GITHUB_SHA:0:8}"
+          GAME_VERSION=$(jq -er .current.game site/studio/releases.json)
+          RELEASE_DIR="${GAME_VERSION// /-}-${GITHUB_SHA:0:8}"
+          echo "release_dir=$RELEASE_DIR" >> "$GITHUB_OUTPUT"
+          echo "GAME_DIRECTORY=$RELEASE_DIR" >> "$GITHUB_ENV"
           mkdir -p "build/web/${RELEASE_DIR}"
           godot --headless --path godot --export-release "Web" "$(pwd)/build/web/${RELEASE_DIR}/index.html"
           test -s "build/web/${RELEASE_DIR}/index.html"
@@ -417,10 +423,10 @@ jobs:
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <meta http-equiv="refresh" content="0; url=./${RELEASE_DIR}/">
             <meta name="robots" content="noindex">
-            <title>Fearless Knights of the Cordon — Pre-Alpha 0.5.4</title>
+            <title>Fearless Knights of the Cordon — ${GAME_VERSION}</title>
           </head>
           <body>
-            <p><a href="./${RELEASE_DIR}/">Открыть Fearless Knights of the Cordon — Pre-Alpha 0.5.4</a></p>
+            <p><a href="./${RELEASE_DIR}/">Открыть Fearless Knights of the Cordon — ${GAME_VERSION}</a></p>
             <script>window.location.replace("./${RELEASE_DIR}/");</script>
           </body>
           </html>
@@ -585,7 +591,7 @@ jobs:
           sha=os.environ["GITHUB_SHA"]
           assert re.fullmatch(r"[a-f0-9]{40}",sha), sha
           assert version=="0.5.0", "Unexpected Studio release number"
-          info={"commit":sha,"studioVersion":version,
+          info={"commit":sha,"studioVersion":version,"gameDirectory":os.environ["GAME_DIRECTORY"],
                 "builtAtUtc":datetime.datetime.now(datetime.timezone.utc).isoformat()}
           Path("build/web/studio/build-meta.json").write_text(
               json.dumps(info,ensure_ascii=False,indent=2)+"\n", encoding="utf-8")
@@ -645,16 +651,16 @@ jobs:
       - name: Verify public Pages entry and active game build
         shell: bash
         env:
+          RELEASE_DIR: ${{ needs.export.outputs.release_dir }}
           SITE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
           set -euo pipefail
           # Deployment success only confirms artifact upload. Verify the live
           # HTTP endpoint and the exact hash-specific Godot directory as well.
-          RELEASE_DIR="pre-alpha-0.5.4-${GITHUB_SHA:0:8}"
           SITE_URL="${SITE_URL%/}/"
           for attempt in $(seq 1 12); do
             if curl -fsSL --max-time 20 --retry 2 --retry-delay 2 "${SITE_URL}?build=${GITHUB_SHA:0:8}" -o /tmp/pages-root.html \
-              && grep -q 'window.location.replace' /tmp/pages-root.html \
+              && grep -Fq "url=./${RELEASE_DIR}/" /tmp/pages-root.html \
               && curl -fsSL --max-time 20 "${SITE_URL}${RELEASE_DIR}/index.html" -o /tmp/pages-game.html \
               && test -s /tmp/pages-game.html \
               && curl -fsSL --max-time 20 "${SITE_URL}quest/index.html" -o /tmp/pages-quest.html \

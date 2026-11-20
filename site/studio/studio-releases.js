@@ -82,6 +82,9 @@
       const info=await response.json();
       const sha=typeof info.commit==="string"?info.commit:"";
       if(!/^[a-f0-9]{40}$/.test(sha))throw Error("Invalid build commit");
+      if (/^pre-alpha-\d+\.\d+\.\d+-[a-f0-9]{8}$/.test(info.gameDirectory) && info.gameDirectory.endsWith(sha.slice(0,8))) {
+        $("launch-game").href="../"+info.gameDirectory+"/";
+      }
       const short=Core.shortSha(sha);
       $("release-build-sha").textContent=short+" ↗";
       $("release-build-sha").href=gitBase+sha;
