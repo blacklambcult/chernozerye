@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a1013">
   <meta name="description" content="QUEST LAB — редактор сюжетных и побочных квестов Чернозёрья.">
-  <title>ЧЕРНОЗЁРЬЕ / QUEST LAB 0.1</title>
+  <title>ЧЕРНОЗЁРЬЕ / QUEST LAB 0.2</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="./quest.css?v=1">
+  <link rel="stylesheet" href="./quest.css?v=2">
   <script>if(new URLSearchParams(location.search).has("studio"))document.documentElement.classList.add("studio-embedded");</script>
   <style>
     html.studio-embedded .topbar, html.studio-embedded .statusbar { display:none!important; }
@@ -21,7 +21,7 @@
       <div class="brand-mark" aria-hidden="true">Ч</div>
       <div class="brand-copy">
         <div class="overline">CHERNOZERYE / DEVELOPMENT TOOLS</div>
-        <h1>QUEST LAB <span class="muted">/ 0.1</span></h1>
+        <h1>QUEST LAB <span class="muted">/ 0.2</span></h1>
       </div>
     </div>
     <nav class="topnav" aria-label="Инструменты проекта">
@@ -89,6 +89,7 @@
         <div class="map-actions" role="group" aria-label="Режим карты">
           <button id="tool-spawn" type="button" class="map-tool active" data-mode="spawn" aria-pressed="true">⌖ Спавн</button>
           <button id="tool-step" type="button" class="map-tool" data-mode="step" aria-pressed="false">◆ Точка шага</button>
+          <button id="tool-object" type="button" class="map-tool pick-object" data-mode="object" aria-pressed="false">▣ Выбрать объект</button>
           <button id="geo-layer-toggle" type="button" class="map-tool active" aria-pressed="true" title="Геообъекты Geo Lab: здания, лес, вода, дороги, ручная разметка">▥ Геообъекты</button>
           <button id="basemap-toggle" type="button" class="map-tool basemap">◫ Схема</button>
         </div>
@@ -141,7 +142,19 @@
         <textarea id="step-text" rows="4" maxlength="1400" placeholder="Текст для игрока или реплика повествования"></textarea>
         <div id="target-controls">
           <label for="step-object">ID объекта Geo Lab (необязательно)</label>
-          <input id="step-object" type="text" maxlength="120" placeholder="Например: house-01" autocomplete="off">
+          <input id="step-object" type="text" maxlength="120" placeholder="ID из Geo Lab или вручную" autocomplete="off">
+          <div class="object-link-panel">
+            <div class="object-link-head"><span>СВЯЗЬ С GEO LAB</span><span id="object-link-icon">◇</span></div>
+            <div id="object-link-state" class="object-link-state" role="status">Объект не выбран</div>
+            <div class="object-link-actions">
+              <button id="pick-geo-object" type="button" class="button">▣ Указать на карте</button>
+              <button id="find-geo-object" type="button" class="button" disabled>⌖ Показать объект</button>
+            </div>
+            <label for="geo-object-search">Поиск по названию, типу или ID</label>
+            <input id="geo-object-search" type="search" placeholder="Например: дом, лес, название…" autocomplete="off">
+            <div id="geo-object-results" class="geo-object-results" hidden aria-label="Результаты поиска объектов"></div>
+            <p class="object-link-hint">Можно выбрать объект из разметки Geo Lab: его ID и координаты сохранятся в этом шаге. При изменении разметки связь обновится.</p>
+          </div>
           <div class="step-target-line">
             <span id="target-coords">Точка не выбрана</span>
             <button id="clear-target" type="button" class="text-button">Очистить</button>
@@ -157,7 +170,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="./quest-core.js?v=1"></script>
 <script src="../map/editor-core.js?v=20"></script>
-<script src="./geo-overlay-core.js?v=1"></script>
-<script src="./quest.js?v=2"></script>
+<script src="./geo-overlay-core.js?v=2"></script>
+<script src="./quest.js?v=3"></script>
 </body>
 </html>

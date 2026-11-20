@@ -447,8 +447,11 @@ jobs:
           node --test tests/quest-core.test.cjs
           node --check site/quest/geo-overlay-core.js
           node --test tests/quest-geo-overlay.test.cjs
-          grep -q 'quest.js?v=2' site/quest/index.html
-          grep -q 'geo-overlay-core.js?v=1' site/quest/index.html
+          node --test tests/quest-geo-link.test.cjs
+          grep -q 'quest.js?v=3' site/quest/index.html
+          grep -q 'geo-overlay-core.js?v=2' site/quest/index.html
+          grep -q 'id="tool-object"' site/quest/index.html
+          grep -q 'id="geo-object-search"' site/quest/index.html
           grep -q '../map/editor-core.js?v=20' site/quest/index.html
           grep -q 'href="../quest/"' site/map/index.html
           mkdir -p build/web/quest
@@ -533,7 +536,7 @@ jobs:
           version=manifest["current"]["studio"]
           sha=os.environ["GITHUB_SHA"]
           assert re.fullmatch(r"[a-f0-9]{40}",sha), sha
-          assert version=="0.4.0", "Unexpected Studio release number"
+          assert version=="0.5.0", "Unexpected Studio release number"
           info={"commit":sha,"studioVersion":version,
                 "builtAtUtc":datetime.datetime.now(datetime.timezone.utc).isoformat()}
           Path("build/web/studio/build-meta.json").write_text(
@@ -619,7 +622,7 @@ jobs:
               && curl -fsSL --max-time 20 "${SITE_URL}studio/studio.js" -o /tmp/pages-studio.js \
               && grep -q 'CHERNOZERYE_STUDIO_READY' /tmp/pages-studio.js \
               && curl -fsSL --max-time 20 "${SITE_URL}studio/releases.json" -o /tmp/pages-studio-releases.json \
-              && grep -q '"studio": "0.4.0"' /tmp/pages-studio-releases.json \
+              && grep -q '"studio": "0.5.0"' /tmp/pages-studio-releases.json \
               && curl -fsSL --max-time 20 "${SITE_URL}studio/build-meta.json" -o /tmp/pages-studio-build-meta.json \
               && grep -q "${GITHUB_SHA}" /tmp/pages-studio-build-meta.json; then
               echo "LIVE_PAGES_OK: ${SITE_URL}, ${SITE_URL}${RELEASE_DIR}/, geo/, quest/, model/, forge/, studio/"

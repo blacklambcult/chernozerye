@@ -1,4 +1,4 @@
-/* QUEST LAB 0.1 — standalone browser editor. No backend or Godot writes. */
+/* QUEST LAB 0.2 — Geo Lab object links via stable manual feature IDs. */
 (() => {
   "use strict";
   const C = window.ChernoQuestCore;
@@ -25,6 +25,9 @@
   let geoReadyCount = 0;
   let geoSourceFailures = 0;
   let manualCount = 0;
+  let manualIndex = new Map();
+  let pickLayer = null;
+  let objectHighlight = null;
   const geoPublished = [];
 
 
@@ -123,6 +126,41 @@
     $("spawn-lon").value = q.spawn.lon;
     $("spawn-bearing").value = q.spawn.bearing;
   }
+  function renderObjectState() {
+    const item = step();
+    const status = Geo && item && item.type !== "message" ?
+      Geo.resolveBinding(item, manualIndex, C) : {status:"empty"};
+    const message = $("object-link-state");
+    message.classList.toggle("linked", status.status === "linked" || status.status === "moved");
+    message.classList.toggle("missing", status.status === "missing");
+    const entry = status.entry;
+    if(entry){
+      message.textContent = "✓ "+Geo.objectLabel(entry)+" · ID: "+entry.id;
+      $("object-link-icon").textContent="✓";
+    }else if(status.status==="missing"){
+      message.textContent="Объект "+item.objectId+" не найден в текущей разметке Geo Lab. Сохранённые координаты не удаляются.";
+      $("object-link-icon").textContent="!";
+    }else{
+      message.textContent="Нет привязанного объекта Geo Lab";
+      $("object-link-icon").textContent="◇";
+    }
+    $("find-geo-object").disabled=!entry;
+    $("pick-geo-object").disabled=!item||item.type==="message";
+    $("pick-geo-object").classList.toggle("active",mode==="object");
+    renderObjectHighlight();
+  }
+  function renderObjectSearch() {
+    const list=$("geo-object-results");
+    const term=$("geo-object-search").value.trim();
+    if(!term) {list.hidden=true;list.innerHTML="";return;}
+    const results=Geo ? Geo.searchObjects(manualIndex,term,12) : [];
+    list.hidden=false;
+    list.innerHTML=results.length ? results.map(entry =>
+      '<button type="button" class="geo-object-result" data-bind-geo="'+escapeHtml(entry.id)+'">'+
+      '<span><strong>'+escapeHtml(Geo.objectLabel(entry))+'</strong>'+
+      '<small>'+escapeHtml(entry.id)+'</small></span><span>↗</span></button>'
+    ).join("") : '<p class="geo-object-results-empty">Совпадений нет. Проверь разметку Geo Lab или выбери объект на карте.</p>';
+  }
   function renderStepInspector() {
     const q = quest(), item = step();
     $("step-fields").hidden = !item;
@@ -135,6 +173,7 @@
     $("target-controls").hidden = item.type === "message";
     $("target-coords").textContent = item.target ?
       item.target.lat.toFixed(6) + ", " + item.target.lon.toFixed(6) : "Точка не выбрана";
+    renderObjectState();
   }
   function renderAll(recenter = false) {
     const q = quest();
@@ -187,10 +226,15 @@
     renderMap();
   }
   function setMode(next) {
-    if (next === "step" && (!step() || step().type === "message")) {
+    if (["step","object"].includes(next) && (!step() || step().type === "message")) {
       displayStatus("Выбери задачу с географической целью, а не сообщение.", true);
       return;
     }
+    if (next === "object" && !manualIndex.size) {
+      displayStatus("В Geo Lab пока нет доступной ручной разметки. Сначала нарисуй объекты на карте.", true);
+      return;
+    }
+    if(next === "object" && !geoEnabled) toggleGeoLayers();
     mode = next;
     for (const button of document.querySelectorAll("[data-mode]")) {
       const active = button.dataset.mode === next;
@@ -199,8 +243,13 @@
     }
     $("map-hint").textContent = mode === "spawn" ?
       "Кликни на карту, чтобы установить стартовую позицию игрока." :
+      mode === "object" ? "Кликни на контур дома, участка, леса или другого объекта Geo Lab. ID и координаты шага заполнятся автоматически." :
       "Кликни на карту, чтобы привязать выбранный шаг к местности.";
-    $("quest-map").classList.add("is-placement");
+    $("map-hint").classList.toggle("picking", mode==="object");
+    $("quest-map").classList.toggle("is-object-picking", mode==="object");
+    $("quest-map").classList.toggle("is-placement",mode!=="object");
+    updatePickVisibility();
+    $("pick-geo-object").classList.toggle("active", mode==="object");
   }
   function makePin(kind) {
     return window.L.divIcon({
@@ -225,11 +274,104 @@
       const item = step();
       if (!item || item.type === "message") return;
       item.target = p;
+      // A manually placed target is a free coordinate, not an old object link.
+      item.objectId = "";
+      $("step-object").value = "";
       $("target-coords").textContent = p.lat.toFixed(6) + ", " + p.lon.toFixed(6);
+      renderObjectState();
     }
     persist();
     renderSteps();
     renderMapPins();
+  }
+  function renderObjectHighlight() {
+    if(!map || !window.L)return;
+    if(objectHighlight){map.removeLayer(objectHighlight);objectHighlight=null;}
+    const item=step();
+    const status=item&&Geo?Geo.resolveBinding(item,manualIndex,C):null;
+    if(!status?.entry||!status.point||!geoEnabled)return;
+    const center=[status.point.lat,status.point.lon];
+    objectHighlight=window.L.circleMarker(center,{
+      radius:17,color:"#d8ffd4",weight:2,opacity:0.95,fillOpacity:0.04,
+      dashArray:"4,4",interactive:false
+    }).addTo(map);
+  }
+  function bindGeoObject(objectId) {
+    const item=step();
+    if(!item||item.type==="message"){displayStatus("Сначала выбери географическую задачу.",true);return;}
+    try {
+      const updated=Geo.bindStep(item,objectId,manualIndex,C);
+      Object.assign(item,updated);
+      if(!persist())return;
+      renderStepInspector();
+      renderSteps();
+      renderMapPins();
+      $("geo-object-search").value="";
+      renderObjectSearch();
+      const entry=manualIndex.get(objectId);
+      displayStatus("Объект привязан к задаче: "+Geo.objectLabel(entry));
+      console.info("QUEST_GEO_OBJECT_LINKED: "+objectId);
+    }catch(error){displayStatus(error.message,true);}
+  }
+  function focusGeoObject() {
+    const item=step();
+    const match=item&&Geo?Geo.resolveBinding(item,manualIndex,C):null;
+    if(!match?.entry||!map)return;
+    map.setView([match.point.lat,match.point.lon],Math.max(map.getZoom(),18),{animate:false});
+    renderObjectHighlight();
+  }
+  function createPickLayer(features,index) {
+    if(!map||!window.L)return null;
+    const L=window.L;
+    return L.geoJSON({type:"FeatureCollection",features},{
+      renderer:L.canvas({padding:0.4}),interactive:true,
+      style(feature) {
+        const style=Geo.manualStyle(feature.properties?.category);
+        return {...style,weight:Math.max(3,style.weight||2),
+          opacity:1,fillOpacity:0.23,dashArray:"5,4"};
+      },
+      pointToLayer(_feature,latlng){
+        return L.circleMarker(latlng,{radius:12,color:"#b6e7ba",
+          fillColor:"#5b9e6a",weight:3,fillOpacity:.4,interactive:true});
+      },
+      onEachFeature(feature,layer){
+        const entry=index.get(feature.id);
+        if(!entry)return;
+        layer.bindTooltip(escapeHtml(Geo.objectLabel(entry)),{
+          sticky:true,className:"geo-pick-tooltip",direction:"top"});
+        layer.on("click",evt=>{
+          if(evt.originalEvent)L.DomEvent.stopPropagation(evt.originalEvent);
+          if(mode==="object")bindGeoObject(entry.id);
+        });
+      }
+    });
+  }
+  function updatePickVisibility(){
+    if(!map)return;
+    if(pickLayer){
+      if(mode==="object"&&geoEnabled){if(!map.hasLayer(pickLayer))pickLayer.addTo(map);}
+      else if(map.hasLayer(pickLayer))map.removeLayer(pickLayer);
+    }
+    if(markers){
+      if(mode==="object"&&map.hasLayer(markers))map.removeLayer(markers);
+      else if(mode!=="object"&&!map.hasLayer(markers))markers.addTo(map);
+    }
+  }
+  function reconcileGeoLinks(){
+    let changed=false;
+    for(const q of project.quests)for(const item of q.steps){
+      const match=Geo.resolveBinding(item,manualIndex,C);
+      if(match.status==="moved"){
+        item.target=match.point;
+        changed=true;
+      }
+    }
+    if(changed){
+      persist();
+      renderSteps();
+      renderMapPins();
+      console.info("QUEST_GEO_LINKS_UPDATED: manual_geometry_changed");
+    }
   }
   function renderMapPins() {
     const q = quest();
@@ -252,7 +394,7 @@
   }
   function renderMap() {
     renderMapPins();
-    setMode(mode === "step" && (!step() || step().type === "message") ? "spawn" : mode);
+    setMode(["step","object"].includes(mode) && (!step() || step().type === "message") ? "spawn" : mode);
   }
   function updateGeoStatus() {
     if (!Geo || !GeoEditor) {
@@ -292,13 +434,22 @@
     // Preserve previously drawn overlay if storage unexpectedly becomes corrupted.
     try {
       const features = Geo.readManual(raw, GeoEditor);
-      const next = makeGeoLayer({ type:"FeatureCollection", features }, feature =>
+      const next = makeGeoLayer({type:"FeatureCollection",features},feature =>
         Geo.manualStyle(feature.properties?.category));
-      if (manualLayer && map.hasLayer(manualLayer)) map.removeLayer(manualLayer);
-      manualLayer = next;
-      manualRaw = raw;
-      if (geoEnabled && manualLayer) manualLayer.addTo(map);
-      manualCount = features.length;
+      const nextIndex=Geo.objectIndex(features);
+      const nextPick=createPickLayer(features,nextIndex);
+      if(manualLayer&&map.hasLayer(manualLayer))map.removeLayer(manualLayer);
+      if(pickLayer&&map.hasLayer(pickLayer))map.removeLayer(pickLayer);
+      manualLayer=next;
+      manualIndex=nextIndex;
+      pickLayer=nextPick;
+      manualRaw=raw;
+      if(geoEnabled&&manualLayer)manualLayer.addTo(map);
+      manualCount=features.length;
+      updatePickVisibility();
+      reconcileGeoLinks();
+      renderObjectState();
+      renderObjectSearch();
       updateGeoStatus();
     } catch (error) {
       console.warn("QUEST_GEO_MANUAL_INVALID", error);
@@ -337,6 +488,8 @@
     $("geo-layer-toggle").classList.toggle("active", geoEnabled);
     $("geo-layer-toggle").setAttribute("aria-pressed", String(geoEnabled));
     $("geo-layer-toggle").textContent = geoEnabled ? "▥ Геообъекты" : "▤ Показать слои";
+    updatePickVisibility();
+    renderObjectHighlight();
   }
   // The Studio keeps Quest Lab alive in an iframe while editing Geo Lab in
   // another. Refresh the same Geo Lab localStorage data every time it opens.
@@ -369,7 +522,13 @@
     refreshGeoManual(true);
     void loadGeoPublished();
     $("geo-layer-toggle").addEventListener("click", toggleGeoLayers);
-    map.on("click", (evt) => updatePoint(evt.latlng));
+    map.on("click", evt => {
+      if(mode==="object"){
+        displayStatus("Выбери окрашенный контур из разметки Geo Lab, а не пустую точку карты.",true);
+        return;
+      }
+      updatePoint(evt.latlng);
+    });
     map.on("mousemove", (evt) => {
       $("pointer-coords").textContent = evt.latlng.lat.toFixed(6) + ", " + evt.latlng.lng.toFixed(6);
     });
@@ -486,13 +645,28 @@
   $("step-text").addEventListener("input", (evt) => {
     const item = step(); if (!item) return; item.text = evt.target.value; persist();
   });
-  $("step-object").addEventListener("input", (evt) => {
-    const item = step(); if (!item) return; item.objectId = evt.target.value; persist();
+  $("step-object").addEventListener("input", evt => {
+    const item=step();if(!item)return;
+    item.objectId=evt.target.value.trim();
+    if(manualIndex.has(item.objectId)){
+      bindGeoObject(item.objectId);
+    }else{
+      persist();
+      renderObjectState();
+    }
   });
+  $("geo-object-search").addEventListener("input",renderObjectSearch);
+  $("geo-object-results").addEventListener("click",evt=>{
+    const button=evt.target.closest("[data-bind-geo]");
+    if(button)bindGeoObject(button.dataset.bindGeo);
+  });
+  $("pick-geo-object").addEventListener("click",()=>setMode("object"));
+  $("find-geo-object").addEventListener("click",focusGeoObject);
   $("place-step").addEventListener("click", () => setMode("step"));
   $("clear-target").addEventListener("click", () => {
     const item = step(); if (!item) return;
     item.target = null;
+    item.objectId = "";
     persist(); renderSteps(); renderStepInspector(); renderMapPins();
   });
   for (const button of document.querySelectorAll("[data-mode]")) {

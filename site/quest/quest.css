@@ -123,3 +123,33 @@ select option{background:#142126}
 .map-tool#geo-layer-toggle{border-color:#4d7666;color:#c3e4d0}
 .map-tool#geo-layer-toggle:not(.active){border-color:#44565b;color:#7e9997;background:#152228}
 @media(max-width:1250px){.map-toolbar{flex-wrap:wrap}.map-toolbar h2{max-width:290px}.map-actions{justify-content:flex-start}}
+
+
+/* QUEST LAB 0.2 — direct association of manually mapped Geo Lab objects */
+.map-tool.pick-object{border-color:#577265;color:#c6e3c8}
+.map-tool.pick-object.active{background:#2e4334;border-color:#90c39a;color:#d9ffe2}
+#quest-map.is-object-picking{cursor:cell}
+.object-link-panel{border:1px solid #41635b;background:linear-gradient(145deg,#1d302c,#152426);padding:13px;margin-top:13px}
+.object-link-head{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#a1d4bd;font:800 9px ui-monospace,monospace;letter-spacing:.85px}
+.object-link-head span:last-child{font-size:17px;color:#e4bb91}
+.object-link-state{margin:9px 0;padding:10px;border-left:2px solid #4f6c5f;background:#0d201dcc;color:#c0d4c6;font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.object-link-state.missing{background:#302923;border-color:#c39961;color:#f3c29a}
+.object-link-state.linked{background:#17372c;border-color:#85cba0;color:#d3edda}
+.object-link-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.object-link-actions .button{min-height:37px;font-size:10px;padding:7px 6px}
+.object-link-actions .button.active{background:#2d5540;border-color:#8ccea2;color:#d8ffdf}
+.object-link-panel label{font-size:10px;line-height:1.4}
+.object-link-panel input[type=search]{width:100%;display:block;min-width:0;padding:9px 10px;background:#0c191a;color:#eef6ea;border:1px solid #476761}
+.geo-object-results{border:1px solid #496b60;background:#0d1f1c;max-height:190px;overflow:auto;margin-top:4px}
+.geo-object-result{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;padding:8px 10px;border:0;border-bottom:1px solid #28443b;background:transparent;color:#d4e4d9}
+.geo-object-result:hover,.geo-object-result:focus-visible{background:#295044}
+.geo-object-result:last-child{border-bottom:0}
+.geo-object-result strong{display:block;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.geo-object-result small{display:block;font:9px ui-monospace,monospace;color:#9cbaa9;margin-top:4px;word-break:break-all}
+.geo-object-result>span:last-child{font-size:14px;color:#c8b287}
+.geo-object-results-empty{font-size:10px;color:#a9c7b5;padding:11px;line-height:1.5}
+.object-link-hint{font-size:10px;color:#97b5a8;line-height:1.55;margin:9px 0 0}
+.geo-pick-tooltip{background:#10251f;border:1px solid #9acda2;color:#dcf9e5;font:11px "Segoe UI",sans-serif}
+.geo-pick-tooltip:before{border-top-color:#9acda2}
+.map-hint.picking{border-left-color:#a0d5ae;color:#d9f8e2}
+@media(max-width:1250px){.object-link-actions{grid-template-columns:1fr}}

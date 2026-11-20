@@ -1,5 +1,14 @@
 # Fearless Knights of the Cordon
 
+### CHERNOZERYE STUDIO 0.5 / QUEST LAB 0.2 — links to manually mapped objects
+
+- Quest Lab now has **«Выбрать объект»** on the map and **«Указать на карте»** in the step inspector. Select a task, enter picking mode, and click a user-authored house, forest, water polygon, road, plot or prop from the Geo Lab manual map.
+- Selecting a feature persists its **stable Geo Lab feature ID** in the existing Quest Lab v1 `objectId` field and fills the geographic `target` with a deterministic polygon centroid, line midpoint or point position. Existing Quest JSON and the Godot Quest Lab converter stay compatible.
+- The inspector supports a substring search by category/name/ID, quick navigation to a linked object, visible focus ring and warnings if an ID no longer exists.
+- Switching from Geo Lab back into Quest Lab refreshes the manual feature index. If an object moves, matching quest targets update to its current geometry and are saved; if the ID disappears, the last target and ID are retained with a warning, never silently dropped.
+- Basemap/Osm/Overture overlays remain background-only. **Only user-authored Geo Lab features with stable IDs are linkable**. No Godot gameplay trigger system or automated game publishing was added in this slice.
+- Studio release manifest is now **0.5.0**, Quest Lab **0.2**, and the completed object-link roadmap item is removed from the future-only backlog. CI has pure geometry/binding tests and checks HTML/JS wiring.
+
 ### CHERNOZERYE STUDIO 0.4 — release desk, changelog, backlog and roadmap
 
 - The **Центр управления** screen now starts with a large Release Desk showing the active Studio version, the current game release, the **actual Git SHA** of the published Web build, versioned changes and an interactive roadmap/backlog.
