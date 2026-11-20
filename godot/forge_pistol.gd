@@ -9,6 +9,11 @@ const ASSET_SCENE: PackedScene = preload("res://assets/forge_pistol.glb")
 const SHOT_STREAM: AudioStream = preload("res://revolver_report.wav")
 var indoors := false
 var rounds := CAPACITY
+var capacity := CAPACITY
+var reload_seconds := RELOAD_SECONDS
+var damage := 20.0
+var visual_recoil := 1.0
+var sound_profile := "standard"
 var cooldown := 0.0
 var reload_left := 0.0
 var bloom := 0.0
@@ -49,14 +54,52 @@ func _read_local_profile() -> Dictionary:
         return {}
     return profile["viewmodel"]
 
-func _read_profile() -> void:
+func _read_game_model() -> Dictionary:
+    if not OS.has_feature("web"):
+        return {}
+    var raw: Variant = JavaScriptBridge.eval(
+        "(() => { try { return localStorage.getItem('chernozerye.forge.game-model.v1'); } catch (_) { return null; } })()", true)
+    if not raw is String or raw.length() > 2800000:
+        return {}
+    var data: Variant = JSON.parse_string(raw)
+    if not data is Dictionary or data.get("version") != 1 \
+            or not data.get("glb") is String or not data.get("viewmodel") is Dictionary \
+            or not data.get("gameplay") is Dictionary:
+        return {}
+    if not ["sidearm", "longarm"].has(data.get("category")):
+        return {}
+    return data
+
+func _make_game_model(data: Dictionary) -> Node3D:
+    if data.is_empty():
+        return null
+    var document := GLTFDocument.new()
+    var state := GLTFState.new()
+    if document.append_from_buffer(Marshalls.base64_to_raw(data["glb"]), "", state) != OK:
+        return null
+    return document.generate_scene(state) as Node3D
+
+func _game_number(value: Variant, fallback: float, low: float, high: float) -> float:
+    if not (value is float or value is int) or not is_finite(float(value)):
+        return fallback
+    return clampf(float(value), low, high)
+
+func _apply_gameplay(specs: Dictionary) -> void:
+    capacity = int(_game_number(specs.get("capacity"), CAPACITY, 1, 30))
+    rounds = capacity
+    reload_seconds = _game_number(specs.get("reload"), RELOAD_SECONDS, 0.3, 5.0)
+    damage = _game_number(specs.get("damage"), 20.0, 1, 100)
+    visual_recoil = _game_number(specs.get("recoil"), 1.0, 0, 3)
+    sound_profile = str(specs.get("sound", "standard"))
+
+func _read_profile(override: Dictionary = {}) -> void:
     if not FileAccess.file_exists(VIEWMODEL_PROFILE):
         return
     var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(VIEWMODEL_PROFILE))
     if not parsed is Dictionary or not parsed.get("viewmodel") is Dictionary:
         push_warning("FORGE_VIEWMODEL_PROFILE_INVALID")
         return
-    var local := _read_local_profile()
+    var local := override if not override.is_empty() else _read_local_profile()
     var settings: Dictionary = local if not local.is_empty() else parsed["viewmodel"]
     rest_pose = _read_vector(settings.get("position"), DEFAULT_REST).clamp(Vector3.ONE * -2, Vector3.ONE * 2)
     var rot := _read_vector(settings.get("rotation"), Vector3(0.0, 9.0, 0.0))
@@ -79,7 +122,14 @@ func _ready() -> void:
         push_error("FORGE_PISTOL_CAMERA_MISSING")
         return
     player = eye.get_parent() as CharacterBody3D
-    _read_profile()
+    var package := _read_game_model()
+    var custom := _make_game_model(package)
+    if custom != null:
+        _read_profile(package["viewmodel"])
+        _apply_gameplay(package["gameplay"])
+        print("FORGE_GAME_MODEL_READY: ", str(package.get("name", "")))
+    else:
+        _read_profile()
     position = rest_pose
     rotation = rest_angles
     visual_holder = Node3D.new()
@@ -88,13 +138,13 @@ func _ready() -> void:
     # leaving the uploaded GLB's mesh and marker coordinates untouched.
     visual_holder.scale = Vector3.ONE * model_scale
     add_child(visual_holder)
-    imported_model = ASSET_SCENE.instantiate() as Node3D
+    imported_model = custom if custom != null else ASSET_SCENE.instantiate() as Node3D
     visual_holder.add_child(imported_model)
     grip_marker = imported_model.find_child("HF_GRIP_PRIMARY", true, false) as Node3D
     forward_marker = imported_model.find_child("HF_FORWARD", true, false) as Node3D
     magazine_marker = imported_model.find_child("HF_MAGAZINE", true, false) as Node3D
     # Position the actual author-supplied hand marker over the camera hand.
-    var grip := Vector3(0.0, 0.634, 0.3523)
+    var grip := Vector3.ZERO if custom != null else Vector3(0.0, 0.634, 0.3523)
     if grip_marker != null:
         grip = imported_model.to_local(grip_marker.global_position)
     imported_model.position = -grip
@@ -142,9 +192,9 @@ func request_shot() -> void:
     last_action = "fire"
 
 func reload() -> void:
-    if visible and rounds < CAPACITY and reload_left <= 0.0:
+    if visible and rounds < capacity and reload_left <= 0.0:
         pending = false
-        reload_left = RELOAD_SECONDS
+        reload_left = reload_seconds
         last_action = "reload"
 
 func spread_angle() -> float:
@@ -167,10 +217,13 @@ func _shoot() -> void:
     last_action = "fire"
     report.volume_db = -10.0 if indoors else -5.0
     report.pitch_scale = randf_range(1.06, 1.14)
+    match sound_profile:
+        "heavy": report.pitch_scale *= 0.78
+        "muted": report.volume_db -= 12.0
     report.play()
     if player != null:
         player.call("emit_noise", 1.0)
-        player.call("kick_view")
+        player.call("kick_view", visual_recoil)
     var origin := eye.global_position
     var direction := _shot_direction()
     var excluded: Array[RID] = []
@@ -182,6 +235,8 @@ func _shoot() -> void:
     if hit.is_empty():
         return
     var collider := hit.get("collider") as Node3D
+    if collider != null and collider.has_method("apply_damage"):
+        collider.call("apply_damage", damage)
     if collider != null and collider.is_in_group("breakable_pottery"):
         collider.queue_free()
         return
@@ -199,14 +254,14 @@ func _physics_process(delta: float) -> void:
     if reload_left > 0.0:
         reload_left = maxf(0.0, reload_left - delta)
         if reload_left == 0.0:
-            rounds = CAPACITY
+            rounds = capacity
     if pending:
         pending = false
         if player != null and player.get("controls_locked") != true and eye.current \
                 and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
             _shoot()
-    var kick := maxf(0.0, cooldown - 0.12) / 0.11
-    var reload_t := sin(PI * reload_left / RELOAD_SECONDS)
+    var kick := maxf(0.0, cooldown - 0.12) / 0.11 * visual_recoil
+    var reload_t := sin(PI * reload_left / reload_seconds)
     position = rest_pose + Vector3(0.0, -0.11 * reload_t, 0.045 * kick)
     rotation = rest_angles + Vector3(0.24 * kick, 0.0, -0.20 * reload_t)
     flash.visible = cooldown > 0.18

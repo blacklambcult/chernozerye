@@ -231,8 +231,8 @@ func _input(event: InputEvent) -> void:
         if key.pressed and not key.echo and (key.keycode == KEY_F3 or key.physical_keycode == KEY_F3):
             status_label.visible = not status_label.visible
 
-func kick_view() -> void:
-    var kick := minf(deg_to_rad(2.3), 1.45 - camera.rotation.x)
+func kick_view(strength := 1.0) -> void:
+    var kick := minf(deg_to_rad(2.3) * strength, 1.45 - camera.rotation.x)
     camera.rotation.x += kick
     recoil_pitch += kick
 
