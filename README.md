@@ -1,5 +1,12 @@
 # Fearless Knights of the Cordon
 
+### PRE-ALPHA 0.7.2 — fix village-start world items (2026-11-20)
+
+- Fixed a real production bug: the first three authored world pickups were placed near the legacy OSM world position (130,-82), while `_activate_default_village()` teleports the actual player to the surveyed Geo Lab village at (-789.7,-268.6). The distance (~936m) exceeded both the 27m beacon and 42m HUD finder ranges.
+- Relocated the first note, the rusted key and the observer note to reviewed road positions ~5m, 13m, and 21m along the actual surveyed-village road. Changed the **source Quest Lab WGS84** positions, so rebuilds do not reintroduce obsolete coordinates. The fourth find still uses its real Geo Lab house ID.
+- Established a named `MANUAL_VILLAGE_SPAWN` in `godot/world.gd`. New Python tests parse this value and compare it against compiled Quest Lab world items; new startup diagnostics and CI checks verify actual player spawn is within range of all three introductory collectibles.
+- Existing pickup, reading, journal persistence and F6/F7 gameplay stay unchanged.
+
 ### Pre-alpha 0.7.1 — findable world notes and key
 
 - Raised authored note / key visual props on low field crates, added warm glints, small nearby lights and a discoverable floating tag for the closest find within 27m.

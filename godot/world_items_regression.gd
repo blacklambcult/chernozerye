@@ -13,7 +13,9 @@ func _run() -> void:
     get_root().add_child(root)
     var actor := CharacterBody3D.new()
     actor.name = "Player"
-    actor.position = Vector3(130, 0.22, -82)
+    # Match the real surveyed-village spawn; using the old OSM spawn here
+    # allowed a previous placement bug to pass the regression unnoticed.
+    actor.position = Vector3(-789.7, 0.22, -268.6)
     root.add_child(actor)
     var cam := Camera3D.new()
     cam.name = "Camera3D"
@@ -29,6 +31,16 @@ func _run() -> void:
     manager.set_process(false)
     var entries: Array = manager.get("entries")
     var finder := manager.get("locator_label") as Label
+    var test_nearby := 0
+    for entry in entries:
+        var pos: Vector3 = entry["position"]
+        var dist := Vector2(pos.x-actor.global_position.x,
+            pos.z-actor.global_position.z).length()
+        if dist <= 27.0:
+            test_nearby += 1
+    if test_nearby < 3:
+        _fail("fewer than three loot objects within 27m of actual village spawn")
+        return
     if finder == null or not finder.visible or not finder.text.contains("Письмо") \
             or not finder.text.contains("м"):
         _fail("world items lack a clearly visible distance/direction hint near spawn")
@@ -52,7 +64,8 @@ func _run() -> void:
             or not warm_light.visible or visible_paper == null or visible_paper.position.y < 0.4:
         _fail("loot is too hard to see: missing raised model, beacon or warm light")
         return
-    actor.global_position = Vector3(133, 0.22, -85)
+    var first_position: Vector3 = record["position"]
+    actor.global_position = Vector3(first_position.x, 0.22, first_position.z)
     if not bool(manager.call("_collect_nearest")):
         _fail("E interaction did not collect an authored world note")
         return
@@ -71,7 +84,8 @@ func _run() -> void:
     if bool(manager.call("_collect_nearest")):
         _fail("a collected note can be picked again")
         return
-    actor.global_position = Vector3(138, 0.22, -88)
+    var key_position: Vector3 = entries[1]["position"]
+    actor.global_position = Vector3(key_position.x, 0.22, key_position.z)
     if not bool(manager.call("_collect_nearest")):
         _fail("ordinary loot item cannot be collected with E")
         return

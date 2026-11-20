@@ -32,8 +32,33 @@ func _ready() -> void:
     for item in authored:
         if item is Dictionary:
             _register_item(item)
+    _validate_live_spawn()
     _process(0.0)
     print("WORLD_ITEMS_READY: authored=", entries.size(), " independent_of_f7=true")
+
+func _validate_live_spawn() -> void:
+    # Prior releases placed loot at the obsolete OSM spawn (130,-82) even
+    # though the world now starts in the surveyed sector (-789.7,-268.6).
+    # Check the ACTUAL spawned player, not a simulated old test position.
+    if player == null:
+        push_error("WORLD_ITEM_SPAWN_GUARD_FAILED: player not found")
+        return
+    var nearby := 0
+    var nearest := INF
+    for entry in entries:
+        var at: Vector3 = entry["position"]
+        var delta_pos := Vector2(at.x-player.global_position.x,
+            at.z-player.global_position.z)
+        var distance := delta_pos.length()
+        nearest = minf(nearest, distance)
+        if distance <= 27.0:
+            nearby += 1
+    if nearby < 3 or nearest > 10.0:
+        push_error("WORLD_ITEM_SPAWN_GUARD_FAILED: nearest=%.1f nearby=%d at=%s"
+            % [nearest, nearby, str(player.global_position)])
+    else:
+        print("WORLD_ITEM_SPAWN_GUARD_READY: within_27m=", nearby,
+            " nearest=", snappedf(nearest, 0.1), " start=", player.global_position)
 
 func _make_pickup_hud() -> void:
     var hud := CanvasLayer.new()

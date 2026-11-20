@@ -29,10 +29,26 @@ class WorldItemsCompileTest(unittest.TestCase):
         self.assertEqual(note["type"],"note")
         self.assertIn("ноябрь 2005",note["body"])
         self.assertEqual(note["target_source"],"free_point")
-        self.assertAlmostEqual(note["position_world"][0],133,delta=0.05)
-        self.assertAlmostEqual(note["position_world"][2],-85,delta=0.05)
+        self.assertAlmostEqual(note["position_world"][0],-784.8,delta=0.05)
+        self.assertAlmostEqual(note["position_world"][2],-270.5,delta=0.05)
         self.assertEqual(by_id["world-item-rusted-key"]["type"],"item")
-        self.assertAlmostEqual(by_id["world-item-rusted-key"]["position_world"][0],138,delta=0.05)
+        self.assertAlmostEqual(by_id["world-item-rusted-key"]["position_world"][0],-776.9,delta=0.05)
+        self.assertAlmostEqual(by_id["world-note-observer"]["position_world"][0],-769.6,delta=0.05)
+
+    def test_findables_are_near_the_actual_live_village_spawn(self):
+        import math
+        import re
+        world_script=(ROOT/"godot/world.gd").read_text(encoding="utf-8")
+        found=re.search(r"const MANUAL_VILLAGE_SPAWN := Vector3\(([-.0-9]+),\s*[-.0-9]+,\s*([-.0-9]+)\)",world_script)
+        self.assertIsNotNone(found,"World must expose its canonical surveyed-village spawn")
+        sx,sz=map(float,found.groups())
+        result=compile_questlab(all_free_source(),ORIGIN)
+        distances=[math.hypot(i["position_world"][0]-sx,i["position_world"][2]-sz)
+                   for i in result["world_items"]]
+        self.assertLess(distances[0],8.0)
+        self.assertTrue(all(d<27 for d in distances),distances)
+        self.assertGreater(distances[1],distances[0])
+        self.assertGreater(distances[2],distances[1])
 
     def test_geo_link_resolves_real_survey_object_instead_of_editor_centroid(self):
         f=ROOT/"godot/manual_layout.json"

@@ -76,7 +76,14 @@ jobs:
           assert {item['type'] for item in world['world_items']}=={'note','item'}
           assert world['world_items'][-1]['target_source']=='geo_lab_id'
           assert world['world_items'][-1]['object_id']=='4499fe7a-c031-469c-aac4-96636c23eea8'
-          assert abs(world['world_items'][0]['position_world'][0]-133)<0.1
+          assert abs(world['world_items'][0]['position_world'][0]+784.8)<0.1
+          import math
+          spawn=(-789.7,-268.6)
+          offsets=[math.hypot(it['position_world'][0]-spawn[0],
+                             it['position_world'][2]-spawn[1])
+                   for it in world['world_items'][:3]]
+          assert offsets[0]<8.0 and all(dist<27.0 for dist in offsets), offsets
+          print("WORLD_ITEMS_AUTHORED_START_OK: offsets_m=", [round(x,1) for x in offsets])
           print('QUESTLAB_DATA_READY: authored=2 demo=2 world=4 geo_link=true item=true document=true')
           PY
 
@@ -256,6 +263,7 @@ jobs:
           # Boot must already be in the manually surveyed village, without
           # a click on any preview/legacy map button.
           grep -q "FEARLESS_KNIGHTS_STARTUP_READY:" /tmp/world-smoke.log
+          grep -q "WORLD_ITEM_SPAWN_GUARD_READY: within_27m=3" /tmp/world-smoke.log
           grep -q "STORY_PROLOGUE_READY:" /tmp/world-smoke.log
           grep -q "QUESTLAB_RUNTIME_READY: quests=1 steps=2 key=F6" /tmp/world-smoke.log
           grep -q "FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2" /tmp/world-smoke.log
