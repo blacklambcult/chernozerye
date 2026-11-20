@@ -95,20 +95,27 @@ func _draw_compass(view_width: float) -> void:
 func _draw_quest_bearing(center: float, top: float, heading: float) -> void:
     if player == null:
         return
-    var finds := get_parent().get_parent().get_node_or_null("WorldDocument")
-    if finds == null:
-        return
-    var quest: Dictionary = finds.call("quest_summary")
-    var title := "Сектор А / Собрать записки: %d/%d" % [quest["collected"], quest["total"]]
-    if quest["target"] == null:
-        title = "Сектор А / Все записки собраны"
-    draw_string(ThemeDB.fallback_font, Vector2(12, 23), title,
-        HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8d2b0"))
-    draw_string(ThemeDB.fallback_font, Vector2(12, 43), "J / Журнал",
-        HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#e8d2b0"))
-    if quest["target"] == null:
-        return
-    var target: Vector3 = quest["target"]
+    var target: Vector3
+    var runtime := get_parent().get_parent().get_node_or_null("QuestLabRuntime")
+    if runtime != null and runtime.get("snapshot_mode") == true:
+        if not runtime.call("has_target"):
+            return
+        target = runtime.call("get_target_world")
+    else:
+        var finds := get_parent().get_parent().get_node_or_null("WorldDocument")
+        if finds == null:
+            return
+        var quest: Dictionary = finds.call("quest_summary")
+        var title := "Сектор А / Собрать записки: %d/%d" % [quest["collected"], quest["total"]]
+        if quest["target"] == null:
+            title = "Сектор А / Все записки собраны"
+        draw_string(ThemeDB.fallback_font, Vector2(12, 23), title,
+            HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8d2b0"))
+        draw_string(ThemeDB.fallback_font, Vector2(12, 43), "J / Журнал",
+            HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#e8d2b0"))
+        if quest["target"] == null:
+            return
+        target = quest["target"]
     var direction := target - player.global_position
     if Vector2(direction.x, direction.z).length() < 1.5:
         return

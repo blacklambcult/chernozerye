@@ -8,6 +8,7 @@ const REACH_RADIUS_M := 8.0
 const INTERACTION_RADIUS_M := 3.0
 const MESSAGE_SECONDS := 3.5
 
+var snapshot_mode := false
 var player: CharacterBody3D
 var story: Node
 var note_archive: Node
@@ -40,6 +41,11 @@ func _ready() -> void:
     if note_archive != null:
         note_archive.reader_closed.connect(_on_document_closed)
     _create_hud()
+    if snapshot_mode:
+        if not activate_preview():
+            hud_layer.visible = true
+            objective_label.text = "Снимок Studio: квест не поддерживается в этой версии"
+        return
     if not FileAccess.file_exists(DATA_PATH):
         push_warning("QUESTLAB_RUNTIME_MISSING: run scripts/convert_questlab.py")
         return
@@ -228,6 +234,8 @@ func _spawn_marker(step: Dictionary) -> void:
         " id=", step.get("object_id", ""), " source=", step.get("target_source", "free_point"))
 
 func _exit_hint() -> String:
+    if snapshot_mode:
+        return "Снимок Studio"
     return "F7 — выход из теста" if demo_active else "F6 — выход из теста"
 
 func _distance_to_target() -> float:
@@ -348,7 +356,7 @@ func _unhandled_input(event: InputEvent) -> void:
         return
     var f6 := key.physical_keycode == KEY_F6 or key.keycode == KEY_F6
     var f7 := key.physical_keycode == KEY_F7 or key.keycode == KEY_F7
-    if f6 or f7:
+    if (f6 or f7) and not snapshot_mode:
         if preview_active:
             deactivate_preview()
         else:
