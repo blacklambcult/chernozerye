@@ -409,7 +409,7 @@ jobs:
           mkdir -p "build/web/${RELEASE_DIR}"
           godot --headless --path godot --export-release "Web" "$(pwd)/build/web/${RELEASE_DIR}/index.html"
           cp -a site/object-library build/web/object-library
-          sed -i '/<head>/a\    <script src="../object-library/library.js"></script>\n    <script src="../object-library/game.js"></script>' "build/web/${RELEASE_DIR}/index.html"
+          sed -i '/<head>/a\    <script src="../object-library/library.js"></script>\n    <script src="../object-library/game.js?v=2"></script>' "build/web/${RELEASE_DIR}/index.html"
           grep -Fq "object-library/game.js" "build/web/${RELEASE_DIR}/index.html"
           test -s "build/web/${RELEASE_DIR}/index.html"
           test -f "build/web/${RELEASE_DIR}/index.wasm"
