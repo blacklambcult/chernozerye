@@ -189,3 +189,7 @@ select option{background:#142126}
   border-color: var(--accent, #ffc27b);
   color: var(--accent, #ffc27b);
 }
+
+#placement-preview { display: block; width: 100%; height: auto; background: #15232a; }
+#local-placement-edit input[type="range"] { width: 100%; padding: 0; }
+#local-placement-edit output { float: right; color: #6bd3d6; }
