@@ -192,6 +192,8 @@
           <div><span class="little">СНИМОК ПРОЕКТА</span>
             <p>Карта, квесты, модели и размещения из этого браузера в одном файле.</p>
             <button id="export-studio-project" class="context-button" type="button">Скачать снимок проекта</button>
+            <button class="context-button" id="restore-studio-project" type="button">Восстановить из снимка</button>
+            <input type="file" id="restore-studio-file" accept=".json,application/json" hidden>
             <button class="context-button" id="load-studio-project" type="button">Проверить квест из снимка</button>
             <input type="file" id="play-studio-project" accept=".json,application/json" hidden>
             <p id="studio-project-status" role="status"></p>
@@ -208,8 +210,12 @@
   </footer>
 </div>
 <script src="./studio-state.js?v=1"></script>
-<script src="../object-library/library.js?v=2"></script>
-<script src="./project-snapshot.js?v=2"></script>
+<script src="../object-library/library.js?v=3"></script>
+<script src="../map/editor-core.js?v=20"></script>
+<script src="../quest/quest-core.js?v=3"></script>
+<script src="../model/model-core.js"></script>
+<script src="../forge/forge-core.js?v=3"></script>
+<script src="./project-snapshot.js?v=3"></script>
 <script src="./release-core.js?v=1"></script>
 <script src="./studio-releases.js?v=1"></script>
 <script src="./studio.js?v=3"></script>

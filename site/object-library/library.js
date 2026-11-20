@@ -15,7 +15,7 @@
         let request;
         try {
           tx = db.transaction(store, mode);
-          request = operation(tx.objectStore(store));
+          request = operation(tx.objectStore(Array.isArray(store) ? store[0] : store), tx);
         } catch (error) {
           db.close();
           reject(error);
@@ -77,6 +77,20 @@
     makeSnapshot, openSnapshot,
     models: () => access("models", "readonly", store => store.getAll()),
     placements: () => access("placements", "readonly", store => store.getAll()),
+    readProject: () => access(["models", "placements"], "readonly", (models, tx) => {
+      const modelRead = models.getAll();
+      const placementRead = tx.objectStore("placements").getAll();
+      return { get result() { return { models: modelRead.result, placements: placementRead.result }; } };
+    }),
+    replaceProject: (modelRecords, placementRecords) =>
+      access(["models", "placements"], "readwrite", (models, tx) => {
+        const placements = tx.objectStore("placements");
+        models.clear();
+        placements.clear();
+        for (const model of modelRecords) models.put(model);
+        for (const placement of placementRecords) placements.put(placement);
+        return {};
+      }),
     saveModel: record => access("models", "readwrite", store => store.put(record)),
     savePlacement: (record, nameKey) => {
       let duplicate = false;
