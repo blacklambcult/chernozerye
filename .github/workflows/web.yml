@@ -519,8 +519,9 @@ jobs:
           # Model Lab: model format and control logic must pass before deployment.
           node --check site/model/model-core.js
           node --check site/model/model.mjs
+          node --check site/model/glb-import.mjs
           node --test tests/model-core.test.cjs
-          grep -q 'model.mjs?v=2' site/model/index.html
+          grep -q 'model.mjs?v=3' site/model/index.html
           grep -q 'href="../model/"' site/quest/index.html
           grep -q 'href="../model/"' site/map/index.html
           mkdir -p build/web/model

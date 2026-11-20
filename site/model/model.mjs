@@ -1,3 +1,4 @@
+import { readLibraryGlb } from "./glb-import.mjs";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
@@ -488,6 +489,31 @@ async function makeGlb(data) {
     });
   }
 }
+async function saveLibraryModel(name, blob) {
+  const library = window.ChernoObjectLibrary;
+  await library.saveModel({ id: crypto.randomUUID(), name, blob });
+  void library.requestPersistence().catch(() => {});
+  status("Модель в локальной библиотеке · открой «Предметы» в Quest Lab");
+}
+
+$("import-library-glb").addEventListener("click", () => $("library-glb-file").click());
+$("library-glb-file").addEventListener("change", async event => {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  const button = $("import-library-glb");
+  button.disabled = true;
+  try {
+    const blob = await readLibraryGlb(file);
+    const name = file.name.replace(/\.glb$/i, "").trim().slice(0, 80) || "Импортированная модель";
+    await saveLibraryModel(name, blob);
+  } catch (error) {
+    status("Не удалось импортировать GLB: " + error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+});
+
 async function publishModel(button, saveLocally) {
   if (!project.parts.length) { status("Добавь хотя бы одну деталь.", true); return; }
   button.disabled = true;
@@ -496,10 +522,7 @@ async function publishModel(button, saveLocally) {
     const exportName = filename();
     const blob = await makeGlb(data);
     if (saveLocally) {
-      const library = window.ChernoObjectLibrary;
-      await library.saveModel({ id: crypto.randomUUID(), name: data.name, blob });
-      void library.requestPersistence().catch(() => {});
-      status("Модель в локальной библиотеке · открой «Предметы» в Quest Lab");
+      await saveLibraryModel(data.name, blob);
     } else {
       download(blob, exportName + ".glb");
       status("GLB экспортирован · " + data.parts.length + " деталей / Godot");

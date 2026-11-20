@@ -176,6 +176,8 @@
       </div>
       <section class="section export-panel">
         <div class="section-header"><h3>Экспорт модели</h3><span class="tag">GODOT READY</span></div>
+        <button id="import-library-glb" class="button full" type="button">Импорт GLB в библиотеку</button>
+        <input id="library-glb-file" type="file" accept=".glb,model/gltf-binary" hidden>
         <button id="save-library-model" class="button full" type="button">Сохранить в библиотеку</button>
         <button id="export-glb" class="button primary full" type="button">↓ Экспортировать GLB</button>
         <p id="save-status" class="save-status" role="status">Локальный проект готов.</p>
@@ -187,6 +189,6 @@
 </div>
 <script src="./model-core.js?v=1"></script>
 <script src="../object-library/library.js"></script>
-<script type="module" src="./model.mjs?v=2"></script>
+<script type="module" src="./model.mjs?v=3"></script>
 </body>
 </html>
