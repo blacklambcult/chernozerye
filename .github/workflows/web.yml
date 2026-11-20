@@ -50,8 +50,10 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s tests -p test_convert_questlab.py
           python -m unittest discover -s tests -p test_geo_quest_binding.py
+          python -m unittest discover -s tests -p test_world_items.py
           python scripts/convert_questlab.py data/questlab_return_cordon.json --geo-layout godot/manual_layout.json --output godot/questlab_runtime.json
           python scripts/convert_questlab.py data/questlab_interactions_demo.json --geo-layout godot/manual_layout.json --output godot/questlab_interactions_demo.json
+          python scripts/convert_questlab.py data/questlab_world_items.json --geo-layout godot/manual_layout.json --output godot/world_items.json
           python - <<'PY'
           import json
           doc = json.load(open('godot/questlab_runtime.json', encoding='utf-8'))
@@ -68,7 +70,14 @@ jobs:
           assert house['object_id'] == '4499fe7a-c031-469c-aac4-96636c23eea8'
           assert house['object_type'] == 'house' and house['target_source'] == 'geo_lab_id'
           assert demo['quests'][0]['steps'][1]['target_source'] == 'free_point'
-          print('QUESTLAB_DATA_READY: authored=2 demo=2 real_house=true interact=true document=true')
+          world=json.load(open('godot/world_items.json',encoding='utf-8'))
+          assert not world['quests']
+          assert len(world['world_items'])==4
+          assert {item['type'] for item in world['world_items']}=={'note','item'}
+          assert world['world_items'][-1]['target_source']=='geo_lab_id'
+          assert world['world_items'][-1]['object_id']=='4499fe7a-c031-469c-aac4-96636c23eea8'
+          assert abs(world['world_items'][0]['position_world'][0]-133)<0.1
+          print('QUESTLAB_DATA_READY: authored=2 demo=2 world=4 geo_link=true item=true document=true')
           PY
 
       - name: Build separate full and FPS low-poly GLBs
@@ -139,7 +148,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for script in world.gd player.gd forge_pistol.gd forge_pistol_regression.gd weapon_hand_viewmodel.gd geography_v07.gd live_map_v08.gd overture_3d_a.gd manual_geo.gd manual_art.gd izba_variants.gd logo_data.gd story_prologue.gd collision_regression.gd first_person_body.gd modeled_character.gd modeled_character_regression.gd fps_viewmodel.gd viewmodel_regression.gd gameplay_hud.gd character_smoking.gd revolver.gd revolver_cycle_regression.gd questlab_runtime.gd questlab_regression.gd questlab_playtest_marker.gd questlab_interaction_regression.gd note_archive.gd world_document.gd pause_overlay.gd pause_regression.gd body_gait_regression.gd body_view_regression.gd; do
+          for script in world.gd player.gd forge_pistol.gd forge_pistol_regression.gd weapon_hand_viewmodel.gd geography_v07.gd live_map_v08.gd overture_3d_a.gd manual_geo.gd manual_art.gd izba_variants.gd logo_data.gd story_prologue.gd collision_regression.gd first_person_body.gd modeled_character.gd modeled_character_regression.gd fps_viewmodel.gd viewmodel_regression.gd gameplay_hud.gd character_smoking.gd revolver.gd revolver_cycle_regression.gd questlab_runtime.gd questlab_regression.gd questlab_playtest_marker.gd questlab_interaction_regression.gd note_archive.gd world_document.gd world_items_regression.gd pause_overlay.gd pause_regression.gd body_gait_regression.gd body_view_regression.gd; do
             echo "Checking ${script}"
             godot --headless --path godot --check-only --script "res://${script}"
           done
@@ -171,6 +180,13 @@ jobs:
           set -euo pipefail
           godot --headless --path godot --script res://questlab_interaction_regression.gd 2>&1 | tee /tmp/questlab-interactions.log
           grep -q "QUESTLAB_INTERACTION_REGRESSION_OK: f7=true marker=true interact=true collect=true distance_guard=true reader=true journal=true persistent=true original_f6=true restored=true geo_link=true" /tmp/questlab-interactions.log
+
+      - name: Regression-test permanent Quest Lab world items and journal inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path godot --script res://world_items_regression.gd 2>&1 | tee /tmp/world-items-regression.log
+          grep -q "WORLD_ITEMS_REGRESSION_OK: authored=4 reader=true item=true journal=true persistence=true spawned=true" /tmp/world-items-regression.log
 
       - name: Regression-test building and fence physics
         shell: bash
@@ -468,10 +484,12 @@ jobs:
           node --check site/quest/geo-overlay-core.js
           node --test tests/quest-geo-overlay.test.cjs
           node --test tests/quest-geo-link.test.cjs
-          grep -q 'quest.js?v=4' site/quest/index.html
+          grep -q 'quest.js?v=5' site/quest/index.html
           grep -q 'geo-overlay-core.js?v=2' site/quest/index.html
-          grep -q 'quest-core.js?v=2' site/quest/index.html
+          grep -q 'quest-core.js?v=3' site/quest/index.html
           grep -q 'id="step-document-fields"' site/quest/index.html
+          grep -q 'id="world-item-fields"' site/quest/index.html
+          grep -q 'id="tool-world-place"' site/quest/index.html
           grep -q 'id="tool-object"' site/quest/index.html
           grep -q 'id="geo-object-search"' site/quest/index.html
           grep -q '../map/editor-core.js?v=20' site/quest/index.html

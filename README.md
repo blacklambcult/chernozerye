@@ -1,5 +1,14 @@
 # Fearless Knights of the Cordon
 
+### PRE-ALPHA 0.7.0 — authored permanent world items / Quest Lab 0.4
+
+- Quest Lab now supports independent `worldItems` in its existing v1 JSON project. The library has two categories: `note` and `item`. Each has a stable ID, title, full text/description, an optional Geo Lab `objectId`, and a WGS84 target point. Select **«Находки в мире»**, create a note or item, then click **«Разместить находку»** on the map or bind it to a manually drawn Geo Lab object. Existing user projects are still valid: absent `worldItems` becomes an empty list, and browser localStorage is preserved.
+- `scripts/convert_questlab.py` now compiles world finds separately from mission sequences. A standalone, reviewed `data/questlab_world_items.json` (same Quest Lab project format) contains three placed findings near the default player start and a fourth by the Geo Lab house `4499fe7a-c031-469c-aac4-96636c23eea8`. CI converts it to `godot/world_items.json` independently of F6/F7 and validates real map anchors.
+- `godot/world_document.gd` now instantiates all published finds as separate game-world 3D nodes, not temporary F7 markers. Within 2.8 m, **E** reads a note or collects an item. Notes use the full-screen aged-paper reader; ordinary items show pickup feedback and appear in the **J** journal's item list, where they can be inspected.
+- The persistent `NoteArchive` now stores both documents and collectible items in the existing, backward-compatible `user://chernozerye_field_documents_v1.json`. Picked-up objects vanish from the world and remain collected across game reloads. F7's demo no longer owns the normal-world collectible.
+- Current visuals are simple low-poly placeholders (paper / rusty key) and do **not** import the Model Lab's GLB assets yet. A browser-only Quest Lab edit does not automatically publish to the game: export the JSON, add it to the repository's authored content, then redeploy Web. Game pre-alpha 0.7.0 and Quest Lab 0.4 are tracked in the Studio release journal.
+- New Node/Python/Godot tests verify project backwards compatibility, multiple world placements, Geo Lab ID resolution, valid data, collecting, reading and saving both kinds of findings.
+
 ### Pre-alpha 0.5.7 — field documents and readable notebook pages
 
 - **E** near the home note, world note or a Quest Lab collectible with a `document` opens a dedicated aged-paper reading overlay. **E** closes it; the game is locked while the paper is on screen. The note's text is never shown as an automatic gameplay subtitle.

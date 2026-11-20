@@ -9,6 +9,8 @@
   const VERSION = 1;
   const STEP_TYPES = Object.freeze(["reach", "interact", "collect", "message"]);
   const QUEST_TYPES = Object.freeze(["main", "side"]);
+  const WORLD_ITEM_TYPES = Object.freeze(["note", "item"]);
+  const MAX_WORLD_ITEMS = 150;
   const MAX_QUESTS = 100;
   const MAX_STEPS = 100;
   const DEFAULT_SPAWN = Object.freeze({ lon: 55.852815, lat: 54.672897, bearing: 0 });
@@ -82,6 +84,27 @@
       spawn: { ...DEFAULT_SPAWN }, steps: []
     };
   }
+  function createWorldItem(type = "note", customId = makeId("world")) {
+    if (!WORLD_ITEM_TYPES.includes(type)) throw new Error("Неизвестный тип находки.");
+    return {
+      id: customId, type, title: type === "note" ? "Новая записка" : "Новый предмет",
+      body: "", target: null, objectId: ""
+    };
+  }
+  function normalizeWorldItem(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value) ||
+        !WORLD_ITEM_TYPES.includes(value.type)) throw new Error("Неизвестный тип мировой находки.");
+    const item = {
+      id: id(value.id),
+      type: value.type,
+      title: text(value.title, 140),
+      body: text(value.body ?? "", 4000),
+      target: value.target === undefined ? null : point(value.target),
+      objectId: text(value.objectId ?? "", 120)
+    };
+    if (!item.title) throw new Error("У находки должно быть название.");
+    return item;
+  }
   function normalizeQuest(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Неверный квест.");
     if (!QUEST_TYPES.includes(value.type)) throw new Error("Тип квеста должен быть главным или побочным.");
@@ -114,9 +137,19 @@
       if (seen.has(quest.id)) throw new Error("Повторяющийся ID квеста: " + quest.id);
       seen.add(quest.id);
     }
+    const rawItems = value.worldItems ?? [];
+    if (!Array.isArray(rawItems) || rawItems.length > MAX_WORLD_ITEMS)
+      throw new Error("Слишком много находок на карте.");
+    const worldItems = rawItems.map(normalizeWorldItem);
+    const worldIds = new Set();
+    for (const item of worldItems) {
+      if (worldIds.has(item.id)) throw new Error("Повторяющийся ID находки: " + item.id);
+      worldIds.add(item.id);
+    }
     const selectedId = typeof value.selectedId === "string" && seen.has(value.selectedId) ?
       value.selectedId : (quests[0]?.id || null);
-    return { format: FORMAT, version: VERSION, coordinates: "WGS84", selectedId, quests };
+    return { format: FORMAT, version: VERSION, coordinates: "WGS84",
+      selectedId, quests, worldItems };
   }
   function makeProject(quests = [], selectedId = null) {
     return normalizeProject({ format: FORMAT, version: VERSION, selectedId, quests });
@@ -131,8 +164,8 @@
     return normalized;
   }
   return Object.freeze({
-    FORMAT, VERSION, STEP_TYPES, QUEST_TYPES, DEFAULT_SPAWN,
+    FORMAT, VERSION, STEP_TYPES, QUEST_TYPES, WORLD_ITEM_TYPES, MAX_WORLD_ITEMS, DEFAULT_SPAWN,
     makeId, point, spawn, createStep, normalizeStep, createQuest, normalizeQuest,
-    makeProject, normalizeProject, moveStep
+    createWorldItem, normalizeWorldItem, makeProject, normalizeProject, moveStep
   });
 });

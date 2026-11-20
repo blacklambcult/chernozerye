@@ -67,3 +67,36 @@ test("collect steps author full note text and preserve it in old-schema Quest JS
   assert.throws(()=>core.normalizeStep({...note,document:{title:"X",body:"a".repeat(4001)}}),/длиннее/);
   assert.equal(core.normalizeStep({...note,type:"reach",document:note.document}).document,null);
 });
+
+
+test("independent world notes and items round-trip alongside legacy Quest Lab v1 projects",()=>{
+  const old=core.makeProject();
+  assert.deepEqual(old.worldItems,[]);
+  const note=core.createWorldItem("note","world-letter");
+  note.title="Письмо на дороге";
+  note.body="Содержимое записки\nВторая строка.";
+  note.target={lon:55.85485,lat:54.67368};
+  note.objectId="survey-house-123";
+  const item=core.createWorldItem("item","world-key");
+  item.title="Ключ";
+  item.body="Старый ключ";
+  item.target={lon:55.8549,lat:54.6737};
+  old.worldItems=[note,item];
+  const normalized=core.normalizeProject(old);
+  const restored=core.normalizeProject(JSON.parse(JSON.stringify(normalized)));
+  assert.deepEqual(restored.worldItems,normalized.worldItems);
+  assert.equal(restored.worldItems[0].body,"Содержимое записки\nВторая строка.");
+  assert.equal(restored.worldItems[0].objectId,"survey-house-123");
+  assert.deepEqual(core.normalizeProject({...old,worldItems:undefined}).worldItems,[]);
+});
+test("world item drafts are valid, duplicate IDs and malformed content are rejected",()=>{
+  const incomplete=core.createWorldItem("note","world-draft");
+  assert.equal(core.normalizeWorldItem(incomplete).target,null);
+  const duplicate=core.makeProject();
+  duplicate.worldItems=[incomplete,incomplete];
+  assert.throws(()=>core.normalizeProject(duplicate),/Повторяющийся ID находки/);
+  assert.throws(()=>core.normalizeWorldItem({...incomplete,type:"trap"}),/тип мировой находки/);
+  assert.throws(()=>core.normalizeWorldItem({...incomplete,target:{lon:999,lat:50}}),/WGS84/);
+  assert.throws(()=>core.normalizeWorldItem({...incomplete,body:"x".repeat(4001)}),/длиннее/);
+  assert.throws(()=>core.normalizeProject({...duplicate,worldItems:Array.from({length:151},()=>incomplete)}),/Слишком много/);
+});

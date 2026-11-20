@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORLD = ROOT / "godot" / "world_data.json"
 FORMATS = {"reach", "interact", "collect", "message"}
 QUEST_TYPES = {"main", "side"}
+WORLD_ITEM_TYPES = {"note", "item"}
 INTERACTION_CLEARANCE_M = 1.8
 GEO_KINDS = {"house", "sauna", "shed", "car", "road", "path", "plot", "forest", "water", "object"}
 
@@ -238,6 +239,47 @@ def compile_questlab(document: dict, origin: dict, geo_layout: dict | None = Non
             "spawn_bearing": float(heading),
             "steps": steps
         })
+    raw_items = document.get("worldItems", [])
+    if not isinstance(raw_items, list) or len(raw_items) > 150:
+        raise ValueError("World items must be a list of at most 150 entries")
+    world_items = []
+    seen_items: set[str] = set()
+    for raw in raw_items:
+        if not isinstance(raw, dict):
+            raise ValueError("Malformed world item")
+        item_id = _string(raw.get("id"), 120, "world item ID")
+        if not item_id or item_id in seen_items:
+            raise ValueError("Empty or repeated world item ID")
+        seen_items.add(item_id)
+        kind = raw.get("type")
+        if kind not in WORLD_ITEM_TYPES:
+            raise ValueError(f"Unsupported world item type: {item_id}")
+        title = _string(raw.get("title"), 140, "world item title")
+        body = _string(raw.get("body", ""), 4000, "world item body")
+        if not title or (kind == "note" and not body):
+            raise ValueError("World notes require a title and body")
+        geo_id = _string(raw.get("objectId", ""), 120, "Geo Lab object ID")
+        anchor = raw.get("target")
+        if geo_id:
+            if geo_layout is None:
+                raise ValueError(f"Geo Lab map required to resolve world item {item_id}")
+            geo_feature = objects.get(geo_id)
+            if geo_feature is None:
+                raise ValueError(f"Geo Lab object not found: {geo_id}")
+            # Editor target is a side-choice hint; surveyed geometry is authoritative.
+            hint = world(anchor, "world item anchor") if anchor is not None else [130, 0.22, -82]
+            local_point = _geo_object_anchor(geo_feature, hint)
+            source = "geo_lab_id"
+        else:
+            if anchor is None:
+                raise ValueError(f"World item must have a mapped position: {item_id}")
+            local_point = world(anchor, "world item position")
+            source = "free_point"
+        world_items.append({
+            "id": item_id, "type": kind, "title": title, "body": body,
+            "position_world": local_point, "object_id": geo_id,
+            "target_source": source
+        })
     requested_id = document.get("selectedId")
     selection = requested_id if requested_id in seen_quests else (result[0]["id"] if result else "")
     return {
@@ -246,7 +288,8 @@ def compile_questlab(document: dict, origin: dict, geo_layout: dict | None = Non
         "origin_lat": origin_lat,
         "origin_lon": origin_lon,
         "selected_id": selection,
-        "quests": result
+        "quests": result,
+        "world_items": world_items
     }
 
 
@@ -264,7 +307,8 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(converted, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print("QUEST_LAB_CONVERTED: quests=", len(converted["quests"]),
-          "steps=", sum(len(q["steps"]) for q in converted["quests"]))
+          "steps=", sum(len(q["steps"]) for q in converted["quests"]),
+          "world_items=", len(converted["world_items"]))
 
 
 if __name__ == "__main__":

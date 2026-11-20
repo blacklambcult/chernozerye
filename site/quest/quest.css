@@ -162,3 +162,25 @@ select option{background:#142126}
 .document-fields input,.document-fields textarea{border-color:#64584c;background:#1a1d1e}
 .document-fields textarea{line-height:1.6}
 .document-field-hint{font-size:10px;color:#c0b7a8;line-height:1.6;margin:10px 0 0}
+
+
+/* Quest Lab 0.4 — world inventory placement tools */
+.world-item-library{border-top:1px solid #705942;background:linear-gradient(#1c2929,#142128)}
+.world-item-library .hint{font-size:10px;color:#abc0b6}
+.world-item-library .quest-card.selected{border-color:#d2aa79;background:#3b3028}
+.world-item-library .quest-kind{color:#c7ae90}
+.world-tool{border-color:#ad8957!important;color:#f7d0a6!important}
+.world-tool.active{background:#5b3d2a!important;color:#fff0ce!important}
+.world-item-inspector{border-top:1px solid #bc9365;background:#212827}
+.world-item-inspector[hidden]{display:none}
+.world-item-inspector textarea{line-height:1.6}
+.world-item-inspector .world-id{font:10px ui-monospace,monospace;color:#a9bbab;overflow-wrap:anywhere;padding:6px 0}
+.world-position-details{border:1px solid #54675f;padding:11px;margin:12px 0;background:#162423}
+.world-position-details label{font-size:10px}
+#world-item-coords{font:10px ui-monospace,monospace;color:#f0c49b;margin:8px 0 11px}
+.world-link-state{font-size:10px;line-height:1.45;color:#b2c9bd}
+.world-link-state.missing{color:#ffc296}
+.world-item-inspector .button{margin-top:7px}
+.world-item-dot{background:#f0b67c!important}
+.pin-shape.world{width:17px;height:17px;background:#f3b56d;border-radius:20%;box-shadow:0 0 0 2px #f3b56d}
+.pin-shape.world-active{width:22px;height:22px;background:#fbe6ad;border-color:#32241d;box-shadow:0 0 0 3px #fbe6ad}

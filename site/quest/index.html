@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a1013">
   <meta name="description" content="QUEST LAB — редактор сюжетных и побочных квестов Чернозёрья.">
-  <title>ЧЕРНОЗЁРЬЕ / QUEST LAB 0.3</title>
+  <title>ЧЕРНОЗЁРЬЕ / QUEST LAB 0.4</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="./quest.css?v=3">
+  <link rel="stylesheet" href="./quest.css?v=4">
   <script>if(new URLSearchParams(location.search).has("studio"))document.documentElement.classList.add("studio-embedded");</script>
   <style>
     html.studio-embedded .topbar, html.studio-embedded .statusbar { display:none!important; }
@@ -21,7 +21,7 @@
       <div class="brand-mark" aria-hidden="true">Ч</div>
       <div class="brand-copy">
         <div class="overline">CHERNOZERYE / DEVELOPMENT TOOLS</div>
-        <h1>QUEST LAB <span class="muted">/ 0.3</span></h1>
+        <h1>QUEST LAB <span class="muted">/ 0.4</span></h1>
       </div>
     </div>
     <nav class="topnav" aria-label="Инструменты проекта">
@@ -69,6 +69,15 @@
         <button type="button" id="duplicate-quest" class="button full quiet">Дублировать квест</button>
         <button type="button" id="delete-quest" class="button full danger">Удалить квест</button>
       </section>
+      <section class="panel-section world-item-library">
+        <div class="section-heading"><h3>Находки в мире</h3><span class="mini-count" id="world-item-count">0</span></div>
+        <p class="hint">Отдельные записки и предметы существуют в мире независимо от квестов и теста F7.</p>
+        <div class="two-buttons">
+          <button id="add-world-note" type="button" class="button primary">+ Записка</button>
+          <button id="add-world-item" type="button" class="button">+ Предмет</button>
+        </div>
+        <div id="world-item-list" class="quest-list" aria-label="Находки для размещения"></div>
+      </section>
       <section class="panel-section bottom-section">
         <div class="section-heading"><h3>Проект</h3><span class="mini-tag">JSON / V1</span></div>
         <button type="button" id="export-json" class="button primary full">↓ Скачать проект JSON</button>
@@ -76,7 +85,7 @@
           <input id="import-json" type="file" accept=".json,application/json" hidden>
         </label>
         <div id="save-state" class="save-state" role="status">Сохранение в браузере.</div>
-        <p class="tiny-note">Файл содержит все квесты, шаги и координаты. Экспортируй JSON для резервной копии. Подключение к игровому исполнителю — следующий этап.</p>
+        <p class="tiny-note">Экспорт содержит квесты и отдельные находки с постоянными ID и координатами. Для обновления опубликованной игры экспортированный JSON нужно добавить в репозиторий и собрать Godot.</p>
       </section>
     </aside>
 
@@ -90,6 +99,7 @@
           <button id="tool-spawn" type="button" class="map-tool active" data-mode="spawn" aria-pressed="true">⌖ Спавн</button>
           <button id="tool-step" type="button" class="map-tool" data-mode="step" aria-pressed="false">◆ Точка шага</button>
           <button id="tool-object" type="button" class="map-tool pick-object" data-mode="object" aria-pressed="false">▣ Выбрать объект</button>
+          <button id="tool-world-place" type="button" class="map-tool world-tool" data-mode="world_place" aria-pressed="false">✦ Разместить находку</button>
           <button id="geo-layer-toggle" type="button" class="map-tool active" aria-pressed="true" title="Геообъекты Geo Lab: здания, лес, вода, дороги, ручная разметка">▥ Геообъекты</button>
           <button id="basemap-toggle" type="button" class="map-tool basemap">◫ Схема</button>
         </div>
@@ -102,7 +112,7 @@
         <div id="map-error" class="map-error" role="alert" hidden>Картографический модуль не загрузился. Проверь соединение с интернетом.</div>
         <noscript>Для редактора квестов нужен JavaScript.</noscript>
       </div>
-      <div class="map-footer"><span><b class="legend-dot spawn"></b> Спавн игрока</span><span><b class="legend-dot step"></b> Точка задачи</span><span><b class="legend-dot houses"></b> Дома</span><span><b class="legend-dot nature"></b> Лес / вода</span><span id="geo-layer-status" role="status">GEO LAB / ЗАГРУЗКА СЛОЁВ…</span></div>
+      <div class="map-footer"><span><b class="legend-dot spawn"></b> Спавн игрока</span><span><b class="legend-dot step"></b> Точка задачи</span><span><b class="legend-dot houses"></b> Дома</span><span><b class="legend-dot nature"></b> Лес / вода</span><span><b class="legend-dot world-item-dot"></b> Находки</span><span id="geo-layer-status" role="status">GEO LAB / ЗАГРУЗКА СЛОЁВ…</span></div>
     </main>
 
     <aside class="sidebar panel-right" aria-label="Редактор событий квеста">
@@ -171,14 +181,36 @@
         </div>
         <p class="hint">Редактор сохраняет описание и координаты. Исполнение триггеров в Godot будет добавлено отдельно.</p>
       </section>
+      <section class="panel-section world-item-inspector" id="world-item-fields" hidden>
+        <div class="section-heading"><h3>Игровая находка</h3><span class="mini-tag">WORLD ITEM</span></div>
+        <div class="world-id" id="world-item-id">—</div>
+        <label for="world-item-type">Тип</label>
+        <select id="world-item-type"><option value="note">Читаемая записка</option><option value="item">Обычный предмет</option></select>
+        <label for="world-item-title">Название</label>
+        <input id="world-item-title" type="text" maxlength="140" autocomplete="off" placeholder="Название предмета">
+        <label for="world-item-body" id="world-item-body-label">Текст записки</label>
+        <textarea id="world-item-body" rows="6" maxlength="4000" placeholder="Текст, который откроется на E"></textarea>
+        <div class="world-position-details">
+          <label>Постоянная позиция / WGS84</label>
+          <div id="world-item-coords">Точка не указана</div>
+          <label for="world-item-object-id">Привязка к Geo Lab (ID необязательно)</label>
+          <input id="world-item-object-id" type="text" maxlength="120" autocomplete="off" placeholder="ID дома, участка или объекта">
+          <p id="world-item-link-state" class="world-link-state">Свободная точка</p>
+        </div>
+        <button id="world-place" class="button primary full" type="button">⌖ Указать точку на карте</button>
+        <button id="world-bind-geo" class="button full" type="button">▣ Привязать к объекту Geo Lab</button>
+        <button id="world-go-to" class="button full" type="button">◎ Показать на карте</button>
+        <button id="world-delete" class="button full danger" type="button">Удалить находку</button>
+        <p class="hint">Свободная точка задаёт точное положение. При привязке к Geo Lab используется ID объекта и его внешняя точка взаимодействия. Для игры нужен экспорт и публикация.</p>
+      </section>
     </aside>
   </div>
   <footer class="statusbar"><span><span class="live-dot"></span> QUEST LAB / LOCAL EDITOR</span><span id="status-detail">Готов к работе</span><span>СОХРАНЕНИЕ В БРАУЗЕРЕ · WGS84</span></footer>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="./quest-core.js?v=2"></script>
+<script src="./quest-core.js?v=3"></script>
 <script src="../map/editor-core.js?v=20"></script>
 <script src="./geo-overlay-core.js?v=2"></script>
-<script src="./quest.js?v=4"></script>
+<script src="./quest.js?v=5"></script>
 </body>
 </html>

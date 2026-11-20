@@ -16,6 +16,7 @@ var mode := "closed"
 var current_document_id := ""
 var return_to_journal := false
 var collected_documents: Array[Dictionary] = []
+var collected_items: Array[Dictionary] = []
 var saved_mouse_mode := Input.MOUSE_MODE_VISIBLE
 var previously_locked := false
 var canvas: CanvasLayer
@@ -23,6 +24,7 @@ var backdrop: ColorRect
 var journal_panel: PanelContainer
 var reader_panel: PanelContainer
 var journal_list: VBoxContainer
+var item_list: VBoxContainer
 var overview_label: Label
 var reader_heading: Label
 var reader_id_label: Label
@@ -121,7 +123,17 @@ func _build_overlay() -> void:
     journal_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     journal_list.add_theme_constant_override("separation", 7)
     journal_scroll.add_child(journal_list)
-    journal_stack.add_child(_text("Выбери документ мышью или клавишами ↑ / ↓ и Enter.   J — закрыть журнал.", 11, GOLD))
+    journal_stack.add_child(_text("НАЙДЕННЫЕ ПРЕДМЕТЫ", 12, PAPER))
+    var item_scroll := ScrollContainer.new()
+    item_scroll.custom_minimum_size = Vector2(0, 75)
+    item_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    journal_stack.add_child(item_scroll)
+    item_list = VBoxContainer.new()
+    item_list.name = "WorldItems"
+    item_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    item_list.add_theme_constant_override("separation", 6)
+    item_scroll.add_child(item_list)
+    journal_stack.add_child(_text("Выбери запись мышью или клавишами ↑ / ↓ и Enter.   J — закрыть журнал.", 11, GOLD))
 
     var reader_stack := VBoxContainer.new()
     reader_stack.add_theme_constant_override("separation", 10)
@@ -149,7 +161,7 @@ func _build_overlay() -> void:
     reader_stack.add_child(reader_body)
     saved_status = _text("ДОКУМЕНТ ЗАПИСАН В ЖУРНАЛ", 11, Color("#514a3a"))
     reader_stack.add_child(saved_status)
-    var close_button := _make_button("E  /  ЗАКРЫТЬ ЗАПИСКУ", func() -> void: close_reader())
+    var close_button := _make_button("E  /  ЗАКРЫТЬ", func() -> void: close_reader())
     close_button.alignment = HORIZONTAL_ALIGNMENT_CENTER
     close_button.add_theme_color_override("font_color", Color("#d6bd99"))
     reader_stack.add_child(close_button)
@@ -179,6 +191,19 @@ func _load_archive() -> void:
             continue
         collected_documents.append({"id":id,"title":title,"body":body,
             "source":str(item.get("source", "field")).left(80)})
+    # Backwards compatible with earlier journal saves containing documents only.
+    var found_items: Variant = stored.get("items", [])
+    if found_items is Array:
+        for entry in found_items.slice(0, 150):
+            if not entry is Dictionary:
+                continue
+            var item_id := str(entry.get("id", ""))
+            var item_title := str(entry.get("title", ""))
+            var description := str(entry.get("description", ""))
+            if item_id.is_empty() or item_id.length() > 120 or item_title.is_empty()                     or item_title.length() > 140 or description.length() > 4000 or has_item(item_id):
+                continue
+            collected_items.append({"id":item_id,"title":item_title,
+                "description":description,"source":str(entry.get("source", "field")).left(80)})
 
 func _save_archive() -> void:
     var handle := FileAccess.open(SAVE_FILE, FileAccess.WRITE)
@@ -186,7 +211,8 @@ func _save_archive() -> void:
         push_warning("NOTE_ARCHIVE_SAVE_FAILED: " + str(FileAccess.get_open_error()))
         return
     handle.store_string(JSON.stringify({
-        "schema":SCHEMA,"version":VERSION,"documents":collected_documents
+        "schema":SCHEMA,"version":VERSION,"documents":collected_documents,
+        "items":collected_items
     }, "\t") + "\n")
     handle.close()
 
@@ -210,6 +236,29 @@ func collect_document(id: String, title: String, body: String, source: String = 
         collected_documents.append({"id":id,"title":title,"body":body,"source":source.left(80)})
         _save_archive()
         print("FIELD_DOCUMENT_COLLECTED: id=", id, " count=", collected_documents.size())
+    return true
+
+func has_item(id: String) -> bool:
+    for record in collected_items:
+        if str(record.get("id", "")) == id:
+            return true
+    return false
+
+func get_item(id: String) -> Dictionary:
+    for record in collected_items:
+        if str(record.get("id", "")) == id:
+            return record.duplicate(true)
+    return {}
+
+func collect_item(id: String, title: String, description: String,
+        source: String = "field") -> bool:
+    if id.is_empty() or id.length() > 120 or title.is_empty()             or title.length() > 140 or description.length() > 4000:
+        return false
+    if not has_item(id):
+        collected_items.append({"id":id,"title":title,
+            "description":description,"source":source.left(80)})
+        _save_archive()
+        print("FIELD_ITEM_COLLECTED: id=", id, " count=", collected_items.size())
     return true
 
 func is_open() -> bool:
@@ -252,13 +301,38 @@ func _refresh_journal() -> void:
         overview_label.text = "Чернозёрье · собранные документы"
     if collected_documents.is_empty():
         journal_list.add_child(_text("Записок пока нет. Найди бумагу и нажми E.", 13, Color("#b1bbaf")))
-        return
     for i in range(collected_documents.size()):
         var note: Dictionary = collected_documents[i]
         var id := str(note["id"])
         var button := _make_button("%02d  /  %s  ↗" % [i + 1, str(note["title"])],
             func() -> void: open_document(id, true))
         journal_list.add_child(button)
+    for child in item_list.get_children():
+        item_list.remove_child(child)
+        child.queue_free()
+    if collected_items.is_empty():
+        item_list.add_child(_text("Предметов пока нет.", 12, Color("#9cafa6")))
+    for i in range(collected_items.size()):
+        var item: Dictionary = collected_items[i]
+        var id := str(item["id"])
+        var button := _make_button("%02d  /  %s  ↗" % [i + 1, str(item["title"])],
+            func() -> void: open_item(id))
+        item_list.add_child(button)
+
+func open_item(id: String) -> bool:
+    var item := get_item(id)
+    if item.is_empty():
+        return false
+    return_to_journal = true
+    current_document_id = "item:" + id
+    reader_heading.text = str(item["title"])
+    reader_id_label.text = "ПРЕДМЕТ / " + id.to_upper()
+    reader_body.text = str(item["description"])
+    reader_body.scroll_to_line(0)
+    saved_status.text = "ПРЕДМЕТ В ИНВЕНТАРЕ  ·  J — ЖУРНАЛ"
+    _show_mode("reader")
+    print("FIELD_ITEM_OPENED: id=", id)
+    return true
 
 func open_journal() -> void:
     if mode == "reader":
