@@ -31,10 +31,13 @@ var reader_id_label: Label
 var reader_body: RichTextLabel
 var saved_status: Label
 
+var session_only := false
+
 func _ready() -> void:
     name = "NoteArchive"
     player = get_parent().get_node_or_null("Player") as CharacterBody3D
-    _load_archive()
+    if not session_only:
+        _load_archive()
     _build_overlay()
     print("NOTE_ARCHIVE_READY: saved=", collected_documents.size(), " key=J reader=E")
 
@@ -206,6 +209,8 @@ func _load_archive() -> void:
                 "description":description,"source":str(entry.get("source", "field")).left(80)})
 
 func _save_archive() -> void:
+    if session_only:
+        return
     var handle := FileAccess.open(SAVE_FILE, FileAccess.WRITE)
     if handle == null:
         push_warning("NOTE_ARCHIVE_SAVE_FAILED: " + str(FileAccess.get_open_error()))

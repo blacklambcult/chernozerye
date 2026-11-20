@@ -95,24 +95,26 @@ func _draw_compass(view_width: float) -> void:
 func _draw_quest_bearing(center: float, top: float, heading: float) -> void:
     if player == null:
         return
-    var target := Vector3.ZERO
-    var questlab := get_parent().get_parent().get_node_or_null("QuestLabRuntime")
-    if questlab != null and bool(questlab.get("preview_active")):
-        if not bool(questlab.call("has_target")):
-            return
-        target = questlab.call("get_target_world")
-    else:
-        var story := get_parent().get_parent().get_node_or_null("StoryPrologue")
-        if story == null or bool(story.get("chapter_completed")) or bool(story.get("inside_home")):
-            return
-        target = story.call("_gate_location")
+    var finds := get_parent().get_parent().get_node_or_null("WorldDocument")
+    if finds == null:
+        return
+    var quest: Dictionary = finds.call("quest_summary")
+    var title := "Сектор А / Собрать записки: %d/%d" % [quest["collected"], quest["total"]]
+    if quest["target"] == null:
+        title = "Сектор А / Все записки собраны"
+    draw_string(ThemeDB.fallback_font, Vector2(12, 23), title,
+        HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8d2b0"))
+    draw_string(ThemeDB.fallback_font, Vector2(12, 43), "J / Журнал",
+        HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#e8d2b0"))
+    if quest["target"] == null:
+        return
+    var target: Vector3 = quest["target"]
     var direction := target - player.global_position
     if Vector2(direction.x, direction.z).length() < 1.5:
         return
     var bearing := fposmod(rad_to_deg(atan2(direction.x, -direction.z)), 360.0)
     var delta := wrapf(bearing - heading, -180.0, 180.0)
-    if absf(delta) > COMPASS_SPAN * 0.5:
-        return
+    delta = clampf(delta, -COMPASS_SPAN * 0.5, COMPASS_SPAN * 0.5)
     var x := center + delta * (COMPASS_HALF / (COMPASS_SPAN * 0.5))
     draw_colored_polygon(PackedVector2Array([
         Vector2(x, top + 2),

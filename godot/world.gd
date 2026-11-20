@@ -5,14 +5,14 @@ const LOGO_DATA = preload("res://logo_data.gd")
 const MAP_FILE := "res://world_data.json"
 const MANUAL_FILE := "res://manual_layout.json"
 const GAME_TITLE := "Fearless Knights of the Cordon"
-const GAME_STAGE := "Pre-Alpha 0.7.3"
+const GAME_STAGE := "Pre-Alpha 0.7.4"
 # Canonical playable start of the 710-feature Geo Lab village. Keep world
 # placements and the CI spawn-distance regression anchored to this coordinate.
 const MANUAL_VILLAGE_SPAWN := Vector3(-789.7, 0.22, -268.6)
 const MANUAL_CAMERA_NEAR := 0.16
 const MANUAL_CAMERA_FAR := 250.0
 const SEASON := "NOVEMBER"
-const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.7.3 · ЧЕРНОЗЁРЬЕ · 710 ОБЪЕКТОВ"
+const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.7.4 · ЧЕРНОЗЁРЬЕ · 710 ОБЪЕКТОВ"
 var manual_mode := false
 var manual_button: Button
 var _status_label: Label
@@ -77,14 +77,13 @@ func _ready() -> void:
     _activate_default_village()
     _create_november_snow()
     _create_note_archive()
-    _create_story_prologue()
-    _create_questlab_runtime()
     _create_world_document()
 
 func _create_note_archive() -> void:
     var notes := Node.new()
     notes.name = "NoteArchive"
     notes.set_script(preload("res://note_archive.gd"))
+    notes.set("session_only", true)
     add_child(notes)
 
 func _create_world_document() -> void:

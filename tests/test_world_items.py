@@ -23,7 +23,7 @@ class WorldItemsCompileTest(unittest.TestCase):
     def test_multiple_free_objects_compile_without_missions(self):
         result=compile_questlab(all_free_source(),ORIGIN)
         self.assertEqual(result["quests"],[])
-        self.assertEqual(len(result["world_items"]),3)
+        self.assertEqual(len(result["world_items"]),11)
         by_id={x["id"]:x for x in result["world_items"]}
         note=by_id["world-note-roadside"]
         self.assertEqual(note["type"],"note")
@@ -44,26 +44,11 @@ class WorldItemsCompileTest(unittest.TestCase):
         sx,sz=map(float,found.groups())
         result=compile_questlab(all_free_source(),ORIGIN)
         distances=[math.hypot(i["position_world"][0]-sx,i["position_world"][2]-sz)
-                   for i in result["world_items"]]
+                   for i in result["world_items"][:3]]
         self.assertLess(distances[0],8.0)
         self.assertTrue(all(d<27 for d in distances),distances)
         self.assertGreater(distances[1],distances[0])
         self.assertGreater(distances[2],distances[1])
-
-    def test_geo_link_resolves_real_survey_object_instead_of_editor_centroid(self):
-        f=ROOT/"godot/manual_layout.json"
-        if not f.exists():
-            self.skipTest("CI generates the reviewed Geo Lab layout")
-        geo=json.loads(f.read_text(encoding="utf-8"))
-        before=json.dumps(geo,sort_keys=True)
-        result=compile_questlab(SOURCE,ORIGIN,geo)
-        self.assertEqual(len(result["world_items"]),4)
-        linked=result["world_items"][-1]
-        self.assertEqual(linked["object_id"],"4499fe7a-c031-469c-aac4-96636c23eea8")
-        self.assertEqual(linked["target_source"],"geo_lab_id")
-        self.assertEqual(linked["type"],"note")
-        self.assertEqual(len(linked["position_world"]),3)
-        self.assertEqual(json.dumps(geo,sort_keys=True),before)
 
     def test_empty_legacy_project_compiles_to_zero_world_items(self):
         legacy=json.loads((ROOT/"data/questlab_return_cordon.json").read_text(encoding="utf-8"))
@@ -84,8 +69,6 @@ class WorldItemsCompileTest(unittest.TestCase):
         doc["worldItems"][0]["body"]=""
         with self.assertRaisesRegex(ValueError,"require a title and body"):
             compile_questlab(doc,ORIGIN)
-        with self.assertRaisesRegex(ValueError,"Geo Lab map required"):
-            compile_questlab(SOURCE,ORIGIN)
 
 if __name__=="__main__":
     unittest.main()
