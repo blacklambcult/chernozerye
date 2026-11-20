@@ -1,0 +1,51 @@
+{
+  "format": "chernozerye.questlab",
+  "version": 1,
+  "coordinates": "WGS84",
+  "selectedId": "quest-interaction-demo",
+  "quests": [
+    {
+      "id": "quest-interaction-demo",
+      "type": "side",
+      "title": "ПОЛЕВОЙ ТЕСТ / ЗАБЫТАЯ ЗАПИСКА",
+      "description": "Демонстрация взаимодействия и подбора предмета, без изменений основного сюжета.",
+      "spawn": {
+        "lon": 55.8402765,
+        "lat": 54.6724289,
+        "bearing": 0
+      },
+      "steps": [
+        {
+          "id": "step-examine-marker",
+          "type": "interact",
+          "title": "Осмотреть найденную метку",
+          "text": "Подойди к бирюзовому маркеру и нажми E.",
+          "target": {
+            "lon": 55.84035,
+            "lat": 54.672435
+          },
+          "objectId": ""
+        },
+        {
+          "id": "step-take-note",
+          "type": "collect",
+          "title": "Подобрать старую записку",
+          "text": "Подойди к светлой записке и нажми E.",
+          "target": {
+            "lon": 55.84041,
+            "lat": 54.672451
+          },
+          "objectId": ""
+        },
+        {
+          "id": "step-read-message",
+          "type": "message",
+          "title": "Прочитать найденное",
+          "text": "На обратной стороне один знак: «КОРДОН». Этот тест не меняет основной сюжет.",
+          "target": null,
+          "objectId": ""
+        }
+      ]
+    }
+  ]
+}

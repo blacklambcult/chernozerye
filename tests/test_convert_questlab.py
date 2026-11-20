@@ -28,6 +28,18 @@ class QuestLabConversionTest(unittest.TestCase):
         self.assertAlmostEqual(quest["steps"][0]["target_world"][2], -240.13, delta=2.0)
         self.assertAlmostEqual(quest["steps"][1]["target_world"][2], -354.38, delta=2.0)
 
+    def test_interaction_collectible_demo_is_independent(self):
+        demo=json.loads((ROOT / "data" / "questlab_interactions_demo.json").read_text(encoding="utf-8"))
+        result=compile_questlab(demo,ORIGIN)
+        self.assertEqual([s["type"] for s in result["quests"][0]["steps"]],
+                         ["interact","collect","message"])
+        self.assertIsNone(result["quests"][0]["steps"][2]["target_world"])
+        self.assertTrue(result["quests"][0]["steps"][0]["target_world"])
+        self.assertTrue(result["quests"][0]["steps"][1]["target_world"])
+        self.assertNotEqual(result["quests"][0]["spawn_world"],
+                            result["quests"][0]["steps"][0]["target_world"])
+        self.assertEqual(result["quests"][0]["id"],"quest-interaction-demo")
+
     def test_invalid_geo_and_missing_target(self):
         broken = json.loads(json.dumps(DATA))
         broken["quests"][0]["steps"][0]["target"]["lat"] = float("nan")

@@ -1,5 +1,13 @@
 # Fearless Knights of the Cordon
 
+### Godot pre-alpha 0.5.5 — Quest Lab F7 interaction + collectible vignette
+
+- **F6** still runs the original, unmodified user-authored “ВОЗВРАЩЕНИЕ НА ЧЕРНЫЙ КОРДОН” quest (two reach steps). **F7** launches a separate, opt-in, generated Quest Lab test nearby: approach a turquoise marker and press **E** to inspect, approach a glowing paper note and press **E** to pick it up, then read a story message.
+- The F7 data lives in `data/questlab_interactions_demo.json` and is converted via the same WGS84 → UTM → Godot transformation as normal Quest Lab exports. The source user's quest JSON and main storyline are not modified.
+- Interaction distance is capped at 3m, with HUD guidance, a small temporary 3D marker for each current step, and a playtest-only list of collected item IDs. F7's test item **is not** a permanent inventory item or a real mapped house; this stage is a playable proof of quest events.
+- Leaving F6 or F7 restores player transform, previous story HUD and map visibility. Two headless Godot regression scripts now verify the existing F6 route, F7 interaction range, single-item collection, story message and state restoration.
+- Studio release log records game **pre-alpha 0.5.5**, while the Studio UI stays at 0.5.0. Live Geo Lab prop interactions remain planned work.
+
 ### CHERNOZERYE STUDIO 0.5 / QUEST LAB 0.2 — links to manually mapped objects
 
 - Quest Lab now has **«Выбрать объект»** on the map and **«Указать на карте»** in the step inspector. Select a task, enter picking mode, and click a user-authored house, forest, water polygon, road, plot or prop from the Geo Lab manual map.

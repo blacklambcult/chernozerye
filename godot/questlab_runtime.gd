@@ -1,14 +1,22 @@
 extends Node
-# QUEST LAB PLAYTEST (F6). Reads the validated, converted editor JSON.
-# Opt-in so the hand-authored StoryPrologue still works unchanged by default.
+# QUEST LAB PLAYTEST — F6 original authored mission, F7 interaction test.
+# Opt-in, isolated and reversible: the original prologue stays unchanged.
 const DATA_PATH := "res://questlab_runtime.json"
+const DEMO_PATH := "res://questlab_interactions_demo.json"
+const MARKER_SCRIPT = preload("res://questlab_playtest_marker.gd")
 const REACH_RADIUS_M := 8.0
+const INTERACTION_RADIUS_M := 3.0
 const MESSAGE_SECONDS := 3.5
 
 var player: CharacterBody3D
 var story: Node
 var missions: Array = []
 var selected_quest: Dictionary = {}
+var authored_quest: Dictionary = {}
+var demo_quest: Dictionary = {}
+var demo_active := false
+var collected_items: Array[String] = []
+var marker_root: Node3D
 var preview_active := false
 var quest_completed := false
 var step_index := 0
@@ -45,10 +53,25 @@ func _ready() -> void:
             break
     if selected_quest.is_empty() and not missions.is_empty() and missions[0] is Dictionary:
         selected_quest = missions[0]
+    authored_quest = selected_quest
+    _load_demo()
     if not selected_quest.is_empty():
         var steps: Array = selected_quest.get("steps", [])
         print("QUESTLAB_RUNTIME_READY: quests=", missions.size(),
-            " steps=", steps.size(), " key=F6")
+            " steps=", steps.size(), " key=F6 demo=F7")
+
+func _load_demo() -> void:
+    if not FileAccess.file_exists(DEMO_PATH):
+        return
+    var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(DEMO_PATH))
+    if not doc is Dictionary or str(doc.get("schema", "")) != "chernozerye.questlab.runtime-1":
+        push_warning("QUESTLAB_DEMO_BAD_SCHEMA")
+        return
+    var entries: Variant = doc.get("quests", [])
+    if entries is Array and not entries.is_empty() and entries[0] is Dictionary:
+        demo_quest = entries[0]
+        print("QUESTLAB_INTERACTION_DEMO_READY: steps=", (demo_quest.get("steps", []) as Array).size())
+
 
 func _make_label(at: Vector2, color: Color, font_size: int) -> Label:
     var label := Label.new()
@@ -105,13 +128,20 @@ func get_target_world() -> Vector3:
     var entry := _current_step()
     return _world_point(entry.get("target_world", null)) if not entry.is_empty() else Vector3.ZERO
 
-func activate_preview() -> bool:
-    if preview_active or player == null or selected_quest.is_empty():
+func activate_preview(use_demo: bool = false) -> bool:
+    if preview_active or player == null:
+        return false
+    if use_demo:
+        if demo_quest.is_empty():
+            return false
+    elif authored_quest.is_empty():
         return false
     if story != null and (story.get("inside_home") == true or story.get("journal_open") == true):
         return false
     if player.get("controls_locked") == true:
         return false
+    selected_quest = demo_quest if use_demo else authored_quest
+    demo_active = use_demo
     saved_transform = player.global_transform
     var camera := player.get_node_or_null("Camera3D") as Camera3D
     saved_camera_pitch = camera.rotation.x if camera != null else 0.0
@@ -127,6 +157,7 @@ func activate_preview() -> bool:
             old_hud.visible = false
     preview_active = true
     quest_completed = false
+    collected_items.clear()
     step_index = 0
     message_elapsed = 0.0
     var spawn := _world_point(selected_quest.get("spawn_world", null))
@@ -138,13 +169,14 @@ func activate_preview() -> bool:
     hud_layer.visible = true
     _show_current_step()
     print("QUESTLAB_PLAYTEST_STARTED: quest=", selected_quest.get("id", ""),
-        " spawn=", spawn)
+        " spawn=", spawn, " demo=", demo_active)
     return true
 
 func deactivate_preview() -> void:
     if not preview_active:
         return
     preview_active = false
+    _clear_marker()
     hud_layer.visible = false
     player.velocity = Vector3.ZERO
     player.global_transform = saved_transform
@@ -162,23 +194,78 @@ func deactivate_preview() -> void:
             old_hud.visible = true
         if story.has_method("_update_focus"):
             story.call("_update_focus")
+    selected_quest = authored_quest
+    demo_active = false
     print("QUESTLAB_PLAYTEST_EXITED: restored=true")
 
+func _clear_marker() -> void:
+    if marker_root != null:
+        remove_child(marker_root)
+        marker_root.queue_free()
+        marker_root = null
+
+func _spawn_marker(step: Dictionary) -> void:
+    _clear_marker()
+    if not step.get("target_world") is Array:
+        return
+    if not ["interact", "collect"].has(str(step.get("type", ""))):
+        return
+    marker_root = Node3D.new()
+    marker_root.set_script(MARKER_SCRIPT)
+    marker_root.call("configure", step)
+    add_child(marker_root)
+    marker_root.global_position = _world_point(step["target_world"])
+    print("QUESTLAB_MARKER_SPAWNED: type=", step.get("type", ""),
+        " id=", step.get("object_id", ""))
+
+func _exit_hint() -> String:
+    return "F7 — выход из теста" if demo_active else "F6 — выход из теста"
+
+func _distance_to_target() -> float:
+    var at := get_target_world()
+    return Vector2(player.global_position.x - at.x, player.global_position.z - at.z).length()
+
+func interact_selected() -> bool:
+    if not preview_active or quest_completed or player == null:
+        return false
+    if player.get("controls_locked") == true:
+        return false
+    var current := _current_step()
+    var kind := str(current.get("type", ""))
+    if not ["interact", "collect"].has(kind) or not has_target():
+        return false
+    if _distance_to_target() > INTERACTION_RADIUS_M:
+        return false
+    if kind == "collect":
+        var item_id := str(current.get("object_id", ""))
+        if item_id.is_empty():
+            item_id = str(current.get("id", ""))
+        if not collected_items.has(item_id):
+            collected_items.append(item_id)
+        print("QUESTLAB_ITEM_COLLECTED: id=", item_id)
+    else:
+        print("QUESTLAB_OBJECT_INTERACTED: id=", current.get("object_id", ""),
+            " step=", current.get("id", ""))
+    _advance_step()
+    return true
+
 func _show_current_step() -> void:
+    _clear_marker()
     var step := _current_step()
     if step.is_empty():
         quest_completed = true
         objective_label.text = "QUEST LAB / ЗАДАНИЕ ЗАВЕРШЕНО"
         detail_label.text = str(selected_quest.get("title", ""))
-        distance_label.text = "F6 — вернуться к прежнему прологу"
+        distance_label.text = _exit_hint() + " · собрано: %d" % collected_items.size()
         print("QUESTLAB_PLAYTEST_COMPLETE: quest=", selected_quest.get("id", ""))
         return
     var steps: Array = selected_quest.get("steps", [])
     objective_label.text = "QUEST LAB / " + str(selected_quest.get("title", ""))
     detail_label.text = "%d/%d  %s" % [step_index + 1, steps.size(), str(step.get("title", ""))]
-    distance_label.text = "F6 — выйти из теста"
+    distance_label.text = _exit_hint()
     subtitle_label.text = str(step.get("text", ""))
     message_elapsed = 0.0
+    _spawn_marker(step)
 
 func _advance_step() -> void:
     step_index += 1
@@ -193,20 +280,30 @@ func _process(delta: float) -> void:
     var step_type := str(step.get("type", ""))
     if step_type == "reach":
         if not has_target():
-            distance_label.text = "Для задачи не задана точка · F6 — выход"
+            distance_label.text = "Для задачи не задана точка · " + _exit_hint()
             return
         var at := get_target_world()
         var horizontal := Vector2(player.global_position.x - at.x, player.global_position.z - at.z).length()
-        distance_label.text = "До цели: %d м     ·     F6 — выход" % int(ceil(horizontal))
+        distance_label.text = "До цели: %d м     ·     %s" % [int(ceil(horizontal)), _exit_hint()]
         if horizontal <= REACH_RADIUS_M:
             _advance_step()
     elif step_type == "message":
         message_elapsed += delta
-        distance_label.text = "Сообщение · F6 — выход"
+        distance_label.text = "Сообщение · " + _exit_hint()
         if message_elapsed >= MESSAGE_SECONDS:
             _advance_step()
+    elif step_type == "interact" or step_type == "collect":
+        if not has_target():
+            distance_label.text = "Назначь объект или точку в Quest Lab · " + _exit_hint()
+            return
+        var horizontal := _distance_to_target()
+        if horizontal <= INTERACTION_RADIUS_M:
+            var action := "E — ПОДОБРАТЬ" if step_type == "collect" else "E — ОСМОТРЕТЬ"
+            distance_label.text = action + "     ·     " + _exit_hint()
+        else:
+            distance_label.text = "До предмета: %d м     ·     %s" % [int(ceil(horizontal)), _exit_hint()]
     else:
-        distance_label.text = "Этот тип условия пока не исполняется · F6 — выход"
+        distance_label.text = "Тип шага не поддерживается · " + _exit_hint()
 
 func _unhandled_input(event: InputEvent) -> void:
     if not event is InputEventKey:
@@ -214,9 +311,14 @@ func _unhandled_input(event: InputEvent) -> void:
     var key := event as InputEventKey
     if not key.pressed or key.echo:
         return
-    if key.physical_keycode == KEY_F6 or key.keycode == KEY_F6:
+    var f6 := key.physical_keycode == KEY_F6 or key.keycode == KEY_F6
+    var f7 := key.physical_keycode == KEY_F7 or key.keycode == KEY_F7
+    if f6 or f7:
         if preview_active:
             deactivate_preview()
         else:
-            activate_preview()
+            activate_preview(f7)
         get_viewport().set_input_as_handled()
+    elif preview_active and (key.physical_keycode == KEY_E or key.keycode == KEY_E):
+        if interact_selected():
+            get_viewport().set_input_as_handled()
