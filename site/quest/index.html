@@ -84,6 +84,15 @@
         </div>
         <div id="world-item-list" class="quest-list" aria-label="Находки для размещения"></div>
       </section>
+      <section class="panel-section" id="local-object-library" hidden>
+        <h3>Модели на карте</h3>
+        <label for="local-model">Модель из Model Lab</label>
+        <select id="local-model"></select>
+        <button id="place-local-model" type="button" class="button full">Поставить на карту</button>
+        <div id="local-model-status" class="hint" role="status"></div>
+        <div id="local-placements" class="quest-list"></div>
+        <a class="button full" href="../" target="_blank" rel="noopener">Открыть игру с размещениями</a>
+      </section>
       <section class="panel-section" id="character-library" hidden>
         <h3>Персонажи</h3>
         <div id="character-list" class="quest-list"></div>
@@ -234,6 +243,7 @@
 <script src="./quest-core.js?v=3"></script>
 <script src="../map/editor-core.js?v=20"></script>
 <script src="./geo-overlay-core.js?v=2"></script>
-<script src="./quest.js?v=5"></script>
+<script src="../object-library/library.js"></script>
+<script src="./quest.js?v=6"></script>
 </body>
 </html>
