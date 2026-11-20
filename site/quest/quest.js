@@ -170,6 +170,9 @@
     $("step-title").value = item.title;
     $("step-text").value = item.text;
     $("step-object").value = item.objectId;
+    $("step-document-fields").hidden = item.type !== "collect";
+    $("step-document-title").value = item.document?.title || "";
+    $("step-document-body").value = item.document?.body || "";
     $("target-controls").hidden = item.type === "message";
     $("target-coords").textContent = item.target ?
       item.target.lat.toFixed(6) + ", " + item.target.lon.toFixed(6) : "Точка не выбрана";
@@ -630,6 +633,7 @@
     const item = step(); if (!item) return;
     item.type = evt.target.value;
     if (item.type === "message") { item.target = null; item.objectId = ""; }
+    item.document = item.type === "collect" ? (item.document || {title:"",body:""}) : null;
     persist(); renderSteps(); renderStepInspector(); renderMap();
   });
   $("step-title").addEventListener("input", (evt) => {
@@ -644,6 +648,18 @@
   });
   $("step-text").addEventListener("input", (evt) => {
     const item = step(); if (!item) return; item.text = evt.target.value; persist();
+  });
+  $("step-document-title").addEventListener("input", evt => {
+    const item = step(); if (!item || item.type !== "collect") return;
+    item.document ||= {title:"",body:""};
+    item.document.title = evt.target.value;
+    persist();
+  });
+  $("step-document-body").addEventListener("input", evt => {
+    const item = step(); if (!item || item.type !== "collect") return;
+    item.document ||= {title:"",body:""};
+    item.document.body = evt.target.value;
+    persist();
   });
   $("step-object").addEventListener("input", evt => {
     const item=step();if(!item)return;

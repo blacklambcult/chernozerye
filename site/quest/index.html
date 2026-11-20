@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a1013">
   <meta name="description" content="QUEST LAB — редактор сюжетных и побочных квестов Чернозёрья.">
-  <title>ЧЕРНОЗЁРЬЕ / QUEST LAB 0.2</title>
+  <title>ЧЕРНОЗЁРЬЕ / QUEST LAB 0.3</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="./quest.css?v=2">
+  <link rel="stylesheet" href="./quest.css?v=3">
   <script>if(new URLSearchParams(location.search).has("studio"))document.documentElement.classList.add("studio-embedded");</script>
   <style>
     html.studio-embedded .topbar, html.studio-embedded .statusbar { display:none!important; }
@@ -21,7 +21,7 @@
       <div class="brand-mark" aria-hidden="true">Ч</div>
       <div class="brand-copy">
         <div class="overline">CHERNOZERYE / DEVELOPMENT TOOLS</div>
-        <h1>QUEST LAB <span class="muted">/ 0.2</span></h1>
+        <h1>QUEST LAB <span class="muted">/ 0.3</span></h1>
       </div>
     </div>
     <nav class="topnav" aria-label="Инструменты проекта">
@@ -140,6 +140,14 @@
         <input id="step-title" type="text" maxlength="140" placeholder="Например: Найти дом" autocomplete="off">
         <label for="step-text">Текст задачи / сообщение</label>
         <textarea id="step-text" rows="4" maxlength="1400" placeholder="Текст для игрока или реплика повествования"></textarea>
+        <div id="step-document-fields" class="document-fields" hidden>
+          <div class="document-fields-title"><span>▧ ДОКУМЕНТ / ЗАПИСКА</span><small>ОТКРЫВАЕТСЯ КЛАВИШЕЙ E</small></div>
+          <label for="step-document-title">Заголовок записки</label>
+          <input id="step-document-title" type="text" maxlength="140" placeholder="Например: Письмо из кордона" autocomplete="off">
+          <label for="step-document-body">Текст на бумаге</label>
+          <textarea id="step-document-body" rows="7" maxlength="4000" placeholder="Этот текст игрок прочитает на отдельном экране и сможет найти в журнале."></textarea>
+          <p class="document-field-hint">После подбора документ сохраняется в игровом журнале. E открывает и закрывает его, J показывает архив найденных записок.</p>
+        </div>
         <div id="target-controls">
           <label for="step-object">ID объекта Geo Lab (необязательно)</label>
           <input id="step-object" type="text" maxlength="120" placeholder="ID из Geo Lab или вручную" autocomplete="off">
@@ -168,9 +176,9 @@
   <footer class="statusbar"><span><span class="live-dot"></span> QUEST LAB / LOCAL EDITOR</span><span id="status-detail">Готов к работе</span><span>СОХРАНЕНИЕ В БРАУЗЕРЕ · WGS84</span></footer>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="./quest-core.js?v=1"></script>
+<script src="./quest-core.js?v=2"></script>
 <script src="../map/editor-core.js?v=20"></script>
 <script src="./geo-overlay-core.js?v=2"></script>
-<script src="./quest.js?v=3"></script>
+<script src="./quest.js?v=4"></script>
 </body>
 </html>

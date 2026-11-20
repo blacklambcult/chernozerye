@@ -21,6 +21,10 @@ func _run_tests() -> void:
     camera.name = "Camera3D"
     camera.position.y = 1.55
     player.add_child(camera)
+    var archive := Node.new()
+    archive.name = "NoteArchive"
+    archive.set_script(load("res://note_archive.gd"))
+    root.add_child(archive)
     var story := Node.new()
     story.name = "StoryPrologue"
     story.set_script(load("res://story_prologue.gd"))
@@ -94,6 +98,29 @@ func _run_tests() -> void:
     if not bool(story.get("note_found")):
         _fail("note not interactable")
         return
+    if not archive.call("is_reader_open") or not archive.call("has_document", "chapter1-home-note"):
+        _fail("Chapter 1 note must open on E and be recorded in the field journal")
+        return
+    var paper: Dictionary = archive.call("get_document", "chapter1-home-note")
+    if not str(paper.get("body","")).contains("Ушли внезапно"):
+        _fail("story clue was not preserved in its original readable document")
+        return
+    archive.call("close_reader")
+    if archive.call("is_open"):
+        _fail("E should close note and restore normal gameplay")
+        return
+    archive.call("open_journal")
+    if str(archive.get("mode")) != "journal":
+        _fail("J cannot show the field journal")
+        return
+    if not archive.call("open_document", "chapter1-home-note", true):
+        _fail("stored note cannot be selected from journal")
+        return
+    archive.call("close_reader")
+    if str(archive.get("mode")) != "journal":
+        _fail("closing a journal document should return to the journal list")
+        return
+    archive.call("close_all")
     player.global_position = room + Vector3(0, 0.25, -2.35)
     camera.look_at(story.call("_target_position", "mask"))
     story.call("_interact")
@@ -125,5 +152,5 @@ func _run_tests() -> void:
     if not home_point.is_finite():
         _fail("invalid surveyed house center")
         return
-    print("PROLOGUE_REGRESSION_OK: surveyed_home=true room=true note=true mask=true exit=true cues=2 bearing=readable")
+    print("PROLOGUE_REGRESSION_OK: surveyed_home=true room=true note=true mask=true exit=true cues=2 bearing=readable archive=true")
     quit(0)

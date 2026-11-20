@@ -20,6 +20,7 @@ var note_found := false
 var mask_found := false
 var chapter_completed := false
 var journal_open := false
+var note_archive: Node
 var objective_label: Label
 var distance_label: Label
 var journal_hint_label: Label
@@ -46,6 +47,9 @@ func _ready() -> void:
         push_error("STORY_PROLOGUE_ERROR: player missing")
         return
     view_camera = player.get_node("Camera3D") as Camera3D
+    note_archive = get_parent().get_node_or_null("NoteArchive")
+    if note_archive != null:
+        note_archive.mode_changed.connect(_on_note_archive_mode_changed)
     if not _locate_home():
         push_error("STORY_PROLOGUE_ERROR: surveyed home missing")
         return
@@ -392,6 +396,9 @@ func _build_hud() -> void:
     journal_panel.visible = false
     _update_journal()
 
+func _on_note_archive_mode_changed(new_mode: String) -> void:
+    journal_open = new_mode != "closed"
+
 func _say(line: String) -> void:
     if message_label != null:
         message_label.text = line
@@ -468,6 +475,11 @@ func _update_approach() -> void:
 func _update_focus() -> void:
     focus = ""
     if player == null:
+        return
+    if note_archive != null and note_archive.call("is_open"):
+        if prompt_label != null:
+            prompt_label.text = ""
+        _last_prompt = ""
         return
     var hint := ""
     var top_left_info := ""
@@ -572,8 +584,15 @@ func _interact() -> void:
         "enter":
             _enter_home()
         "note":
+            if note_archive != null:
+                var title := "Пожелтевшая записка"
+                var body := "Дом не был заперт. На столе осталась сырая бумага.\n\n«Ушли внезапно. Вещи оставили на месте, будто намеревались вернуться. Кто-то всё ещё приходит сюда после заката.\n\nЕсли услышишь шаги у крыльца, не открывай сразу».\n\nПоследняя строка расплылась от воды."
+                if not note_archive.call("collect_and_read", "chapter1-home-note",
+                        title, body, "Chapter 1 / Home"):
+                    return
             note_found = true
-            _say("Записка выцвела от сырости. Вещи бросили внезапно, будто собирались вернуться.")
+            if note_archive == null:
+                _say("Записка выцвела от сырости. Вещи бросили внезапно, будто собирались вернуться.")
             print("STORY_CLUE_FOUND: note")
             _update_journal()
         "mask":
@@ -586,6 +605,10 @@ func _interact() -> void:
             _leave_home()
 
 func _toggle_journal() -> void:
+    if note_archive != null:
+        note_archive.call("toggle_journal")
+        journal_open = note_archive.call("is_open")
+        return
     journal_open = not journal_open
     if journal_panel != null:
         journal_panel.visible = journal_open
@@ -604,8 +627,16 @@ func _unhandled_input(event: InputEvent) -> void:
     var code := key.physical_keycode
     var text_key := char(key.unicode).to_lower() if key.unicode != 0 else ""
     if code == KEY_J or key.keycode == KEY_J or text_key == "о":
-        _toggle_journal()
-        get_viewport().set_input_as_handled()
+        # NoteArchive handles J for every mode, so no duplicate toggling.
+        if note_archive == null:
+            _toggle_journal()
+            get_viewport().set_input_as_handled()
     elif code == KEY_E or key.keycode == KEY_E or text_key == "у":
-        _interact()
-        get_viewport().set_input_as_handled()
+        if note_archive != null and note_archive.call("is_open"):
+            return
+        # Do not consume E unless a story target is actually in focus.
+        # WorldDocument and QuestLabRuntime can now receive the same key.
+        _update_focus()
+        if not focus.is_empty():
+            _interact()
+            get_viewport().set_input_as_handled()

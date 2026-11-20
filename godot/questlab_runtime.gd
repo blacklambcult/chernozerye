@@ -10,6 +10,8 @@ const MESSAGE_SECONDS := 3.5
 
 var player: CharacterBody3D
 var story: Node
+var note_archive: Node
+var pending_document_id := ""
 var missions: Array = []
 var selected_quest: Dictionary = {}
 var authored_quest: Dictionary = {}
@@ -34,6 +36,9 @@ var subtitle_label: Label
 func _ready() -> void:
     player = get_parent().get_node_or_null("Player") as CharacterBody3D
     story = get_parent().get_node_or_null("StoryPrologue")
+    note_archive = get_parent().get_node_or_null("NoteArchive")
+    if note_archive != null:
+        note_archive.reader_closed.connect(_on_document_closed)
     _create_hud()
     if not FileAccess.file_exists(DATA_PATH):
         push_warning("QUESTLAB_RUNTIME_MISSING: run scripts/convert_questlab.py")
@@ -158,6 +163,7 @@ func activate_preview(use_demo: bool = false) -> bool:
     preview_active = true
     quest_completed = false
     collected_items.clear()
+    pending_document_id = ""
     step_index = 0
     message_elapsed = 0.0
     var spawn := _world_point(selected_quest.get("spawn_world", null))
@@ -176,6 +182,9 @@ func deactivate_preview() -> void:
     if not preview_active:
         return
     preview_active = false
+    pending_document_id = ""
+    if note_archive != null and note_archive.call("is_open"):
+        note_archive.call("close_all")
     _clear_marker()
     hud_layer.visible = false
     player.velocity = Vector3.ZERO
@@ -228,6 +237,8 @@ func _distance_to_target() -> float:
 func interact_selected() -> bool:
     if not preview_active or quest_completed or player == null:
         return false
+    if not pending_document_id.is_empty():
+        return false
     if player.get("controls_locked") == true:
         return false
     var current := _current_step()
@@ -240,6 +251,20 @@ func interact_selected() -> bool:
         var item_id := str(current.get("object_id", ""))
         if item_id.is_empty():
             item_id = str(current.get("id", ""))
+        var document: Variant = current.get("document")
+        if document is Dictionary and not str(document.get("body", "")).is_empty() \
+                and note_archive != null:
+            var paper_title := str(document.get("title", "Записка"))
+            var paper_body := str(document.get("body", ""))
+            if not note_archive.call("collect_and_read", item_id, paper_title,
+                    paper_body, "Quest Lab / " + str(selected_quest.get("id", ""))):
+                return false
+            pending_document_id = item_id
+            if not collected_items.has(item_id):
+                collected_items.append(item_id)
+            print("QUESTLAB_ITEM_COLLECTED_AND_OPENED: id=", item_id)
+            # Closing the reader with E completes this objective.
+            return true
         if not collected_items.has(item_id):
             collected_items.append(item_id)
         print("QUESTLAB_ITEM_COLLECTED: id=", item_id)
@@ -248,6 +273,12 @@ func interact_selected() -> bool:
             " step=", current.get("id", ""))
     _advance_step()
     return true
+
+func _on_document_closed(id: String) -> void:
+    if preview_active and not pending_document_id.is_empty() and id == pending_document_id:
+        pending_document_id = ""
+        print("QUESTLAB_DOCUMENT_READ: id=", id)
+        _advance_step()
 
 func _show_current_step() -> void:
     _clear_marker()
@@ -263,6 +294,7 @@ func _show_current_step() -> void:
     objective_label.text = "QUEST LAB / " + str(selected_quest.get("title", ""))
     detail_label.text = "%d/%d  %s" % [step_index + 1, steps.size(), str(step.get("title", ""))]
     distance_label.text = _exit_hint()
+    # Document contents never appear as subtitles; only the task instruction.
     subtitle_label.text = str(step.get("text", ""))
     message_elapsed = 0.0
     _spawn_marker(step)
@@ -300,7 +332,8 @@ func _process(delta: float) -> void:
         var kind := str(step.get("object_type", "")).to_upper()
         var object_hint := " · GEO LAB / " + kind if str(step.get("target_source", "")) == "geo_lab_id" else ""
         if horizontal <= INTERACTION_RADIUS_M:
-            var action := "E — ПОДОБРАТЬ" if step_type == "collect" else "E — ОСМОТРЕТЬ"
+            var action := "E — ВЗЯТЬ И ПРОЧИТАТЬ" if step_type == "collect" \
+                and step.get("document") is Dictionary else "E — ПОДОБРАТЬ" if step_type == "collect" else "E — ОСМОТРЕТЬ"
             distance_label.text = action + object_hint + "     ·     " + _exit_hint()
         else:
             distance_label.text = "До цели: %d м%s     ·     %s" % [int(ceil(horizontal)), object_hint, _exit_hint()]
@@ -322,5 +355,7 @@ func _unhandled_input(event: InputEvent) -> void:
             activate_preview(f7)
         get_viewport().set_input_as_handled()
     elif preview_active and (key.physical_keycode == KEY_E or key.keycode == KEY_E):
+        if note_archive != null and note_archive.call("is_open"):
+            return
         if interact_selected():
             get_viewport().set_input_as_handled()

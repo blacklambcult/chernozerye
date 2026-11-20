@@ -19,6 +19,10 @@ func _run() -> void:
     var camera := Camera3D.new()
     camera.name = "Camera3D"
     actor.add_child(camera)
+    var archive := Node.new()
+    archive.name = "NoteArchive"
+    archive.set_script(load("res://note_archive.gd"))
+    root.add_child(archive)
     var story := Node.new()
     story.name = "StoryPrologue"
     root.add_child(story)
@@ -35,7 +39,7 @@ func _run() -> void:
         _fail("compiled F7 demo missing")
         return
     var demo_steps: Array = demo.get("steps", [])
-    if demo_steps.size() != 3 or str(demo_steps[0].get("type", "")) != "interact" \
+    if demo_steps.size() != 2 or str(demo_steps[0].get("type", "")) != "interact" \
             or str(demo_steps[1].get("type", "")) != "collect":
         _fail("F7 demo has wrong step types")
         return
@@ -80,19 +84,44 @@ func _run() -> void:
         _fail("item can be collected from a distance")
         return
     actor.global_position = Vector3(float(next[0]), 0.22, float(next[2]))
-    if not bool(runtime.call("interact_selected")) or int(runtime.get("step_index")) != 2:
-        _fail("E does not pick up item")
+    if not bool(runtime.call("interact_selected")) or int(runtime.get("step_index")) != 1:
+        _fail("E should pick up the note and open it, without skipping reading")
         return
     if (runtime.get("collected_items") as Array).size() != 1:
-        _fail("note was not recorded in temporary playtest inventory")
+        _fail("document was not collected")
+        return
+    if not archive.call("is_reader_open"):
+        _fail("note was not opened in full-page reader")
+        return
+    var record: Dictionary = archive.call("get_document", "step-take-note")
+    if not str(record.get("body", "")).contains("КОРДОН") or str(record.get("title", "")).is_empty():
+        _fail("journal did not preserve the full text of the collected note")
+        return
+    if runtime.call("interact_selected"):
+        _fail("a second interaction must not skip an open reader")
+        return
+    if str((runtime.get("subtitle_label") as Label).text).contains("третьего удара"):
+        _fail("note body incorrectly appeared as a subtitle")
+        return
+    archive.call("close_reader")
+    if archive.call("is_open") or not bool(runtime.get("quest_completed")):
+        _fail("E must close the note, then finish the quest without a redundant message")
         return
     if runtime.get("marker_root") != null:
         _fail("collect marker persisted after collection")
         return
-    runtime.call("_process", 4.0)
-    if not bool(runtime.get("quest_completed")):
-        _fail("message after collectible did not finish")
+    if not FileAccess.file_exists("user://chernozerye_field_documents_v1.json"):
+        _fail("found paper was not persisted in the journal file")
         return
+    archive.call("open_journal")
+    if not archive.call("open_document", "step-take-note", true):
+        _fail("document cannot be reopened from journal")
+        return
+    archive.call("close_reader")
+    if str(archive.get("mode")) != "journal":
+        _fail("reading from journal did not return to archive list")
+        return
+    archive.call("close_all")
     runtime.call("deactivate_preview")
     if bool(runtime.get("preview_active")) or not old_hud.visible:
         _fail("F7 did not restore the original HUD")
@@ -108,5 +137,5 @@ func _run() -> void:
         _fail("original user-authored mission was replaced")
         return
     runtime.call("deactivate_preview")
-    print("QUESTLAB_INTERACTION_REGRESSION_OK: f7=true marker=true interact=true collect=true distance_guard=true message=true original_f6=true restored=true geo_link=true")
+    print("QUESTLAB_INTERACTION_REGRESSION_OK: f7=true marker=true interact=true collect=true distance_guard=true reader=true journal=true persistent=true original_f6=true restored=true geo_link=true")
     quit(0)

@@ -1,5 +1,14 @@
 # Fearless Knights of the Cordon
 
+### Pre-alpha 0.5.7 — field documents and readable notebook pages
+
+- **E** near the home note, world note or a Quest Lab collectible with a `document` opens a dedicated aged-paper reading overlay. **E** closes it; the game is locked while the paper is on screen. The note's text is never shown as an automatic gameplay subtitle.
+- **J** opens the unified Field Journal with the chapter objective and a selectable list of collected notes. Click a document to reread it; **E** returns to the journal. Works outside Quest Lab, after F7 or in the main game.
+- Note IDs, headings, text and source are persisted in `user://chernozerye_field_documents_v1.json` (browser profile storage in Web); duplicates do not overwrite a saved collectible. If notes were collected, their permanent in-world paper props disappear on subsequent loads, while entries remain readable.
+- The old StoryPrologue table note now also enters this journal. The map-authored F7 house still resolves to its Geo Lab ID; the nearby note has authored content. F7 advances the collect step **only after closing** the reading screen, and F6 keeps its original mission.
+- **Quest Lab 0.3** adds document title and body fields for collect steps; these survive Quest Lab JSON normalization and the Python → Godot mission compiler. Both old Quest Lab v1 and new notes use the existing schema.
+- Scene startup, GDScript sources, chapter story regression, new F7 interaction+reading regression, quest data validator and public Web build are CI checked.
+
 ### Game pre-alpha 0.5.6 — Quest Lab real Geo Lab object linking
 
 - The Quest Lab Python compiler now optionally accepts `--geo-layout godot/manual_layout.json`. Each non-empty `objectId` must match a stable ID in the **reviewed Geo Lab map**. Resolved `target_world` and `object_type` come from surveyed geometry, **not** stale editor coordinates; invalid IDs fail the build rather than silently pointing to an unrelated place.

@@ -130,6 +130,23 @@ def _geo_index(geo_layout: dict | None, origin: dict) -> dict[str, dict]:
         index[key] = feature
     return index
 
+def _document_for_step(step: dict, kind: str) -> dict | None:
+    if kind != "collect":
+        return None
+    note = step.get("document")
+    if note is None:
+        return None
+    if not isinstance(note, dict):
+        raise ValueError("Collectible document must be a dictionary")
+    title = _string(note.get("title", ""), 140, "document title")
+    body = _string(note.get("body", ""), 4000, "document body")
+    if not title and not body:
+        return None
+    if not title or not body:
+        raise ValueError("A collectible note needs both title and body")
+    return {"title": title, "body": body}
+
+
 def compile_questlab(document: dict, origin: dict, geo_layout: dict | None = None) -> dict:
     if (not isinstance(document, dict) or document.get("format") != "chernozerye.questlab"
             or document.get("version") != 1 or document.get("coordinates") != "WGS84"):
@@ -211,7 +228,8 @@ def compile_questlab(document: dict, origin: dict, geo_layout: dict | None = Non
                 "object_id": object_id,
                 "object_type": str(feature.get("type", "")) if feature else "",
                 "object_name": _string(feature.get("name", ""), 120, "Geo Lab name") if feature else "",
-                "target_source": "geo_lab_id" if feature else "free_point"
+                "target_source": "geo_lab_id" if feature else "free_point",
+                "document": _document_for_step(raw_step, stype)
             })
         result.append({
             "id": qid, "type": raw["type"], "title": title,

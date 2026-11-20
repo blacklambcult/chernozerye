@@ -49,7 +49,8 @@
   function createStep(type = "reach", customId = makeId("step")) {
     if (!STEP_TYPES.includes(type)) throw new Error("Неизвестный тип задачи.");
     const labels = { reach: "Дойти до точки", interact: "Взаимодействовать", collect: "Найти предмет", message: "Сообщение" };
-    return { id: customId, type, title: labels[type], text: "", target: null, objectId: "" };
+    return { id: customId, type, title: labels[type], text: "", target: null, objectId: "",
+      document: type === "collect" ? { title: "", body: "" } : null };
   }
   function normalizeStep(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Неверная задача.");
@@ -60,8 +61,17 @@
       title: text(value.title, 140),
       text: text(value.text ?? "", 1400),
       target: value.target === undefined ? null : point(value.target),
-      objectId: text(value.objectId ?? "", 120)
+      objectId: text(value.objectId ?? "", 120),
+      document: null
     };
+    if (result.type === "collect" && value.document !== null && value.document !== undefined) {
+      if (typeof value.document !== "object" || Array.isArray(value.document))
+        throw new Error("У записки должны быть название и текст.");
+      result.document = {
+        title: text(value.document.title ?? "", 140),
+        body: text(value.document.body ?? "", 4000)
+      };
+    }
     if (!result.title) throw new Error("У задачи должно быть название.");
     return result;
   }

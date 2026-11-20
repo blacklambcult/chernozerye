@@ -73,8 +73,23 @@ func _ready() -> void:
     # The original sector/preview buttons are no longer part of the player HUD.
     _activate_default_village()
     _create_november_snow()
+    _create_note_archive()
     _create_story_prologue()
     _create_questlab_runtime()
+    _create_world_document()
+
+func _create_note_archive() -> void:
+    var notes := Node.new()
+    notes.name = "NoteArchive"
+    notes.set_script(preload("res://note_archive.gd"))
+    add_child(notes)
+
+func _create_world_document() -> void:
+    # The surveyed map and quest compiler provide both position and note text.
+    var note := Node3D.new()
+    note.name = "WorldDocument"
+    note.set_script(preload("res://world_document.gd"))
+    add_child(note)
 
 func _create_story_prologue() -> void:
     var story := Node.new()

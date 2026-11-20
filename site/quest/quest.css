@@ -153,3 +153,12 @@ select option{background:#142126}
 .geo-pick-tooltip:before{border-top-color:#9acda2}
 .map-hint.picking{border-left-color:#a0d5ae;color:#d9f8e2}
 @media(max-width:1250px){.object-link-actions{grid-template-columns:1fr}}
+
+/* Quest Lab 0.3 — authorable paper documents for collect steps. */
+.document-fields{margin:14px 0;border:1px solid #9b765d;background:#2b2622;padding:13px}
+.document-fields[hidden]{display:none}
+.document-fields-title{display:flex;justify-content:space-between;flex-wrap:wrap;gap:7px;color:#efc19a;font:850 10px ui-monospace,monospace;margin:1px 0 12px}
+.document-fields-title small{color:#9eb4ae;font-size:9px}
+.document-fields input,.document-fields textarea{border-color:#64584c;background:#1a1d1e}
+.document-fields textarea{line-height:1.6}
+.document-field-hint{font-size:10px;color:#c0b7a8;line-height:1.6;margin:10px 0 0}

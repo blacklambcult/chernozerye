@@ -52,3 +52,18 @@ test("refuses malformed imports, colliding IDs, invalid locations, and rogue nod
   assert.throws(() => core.normalizeQuest({ ...q, steps: [core.createStep("reach", "x"), core.createStep("message", "x")] }), /ID задачи/);
   assert.throws(() => core.normalizeQuest({ ...q, title: "x".repeat(141) }), /длиннее/);
 });
+
+test("collect steps author full note text and preserve it in old-schema Quest JSON",()=>{
+  const note=core.createStep("collect","note-cordon");
+  note.document={title:"Старая записка",body:"Строка первая\nСтрока вторая"};
+  const q=core.createQuest("side","notes-demo");
+  q.steps=[note];
+  const project=core.makeProject([q]);
+  const restored=core.normalizeProject(JSON.parse(JSON.stringify(project)));
+  assert.equal(restored.quests[0].steps[0].document.title,"Старая записка");
+  assert.equal(restored.quests[0].steps[0].document.body,"Строка первая\nСтрока вторая");
+  const legacy=core.normalizeStep({...note,document:undefined});
+  assert.equal(legacy.document,null);
+  assert.throws(()=>core.normalizeStep({...note,document:{title:"X",body:"a".repeat(4001)}}),/длиннее/);
+  assert.equal(core.normalizeStep({...note,type:"reach",document:note.document}).document,null);
+});

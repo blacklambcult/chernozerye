@@ -32,8 +32,8 @@ class QuestLabConversionTest(unittest.TestCase):
         demo=json.loads((ROOT / "data" / "questlab_interactions_demo.json").read_text(encoding="utf-8"))
         result=compile_questlab(demo,ORIGIN)
         self.assertEqual([s["type"] for s in result["quests"][0]["steps"]],
-                         ["interact","collect","message"])
-        self.assertIsNone(result["quests"][0]["steps"][2]["target_world"])
+                         ["interact","collect"])
+        self.assertEqual(result["quests"][0]["steps"][1]["document"]["title"],"Сырая записка у дома")
         self.assertTrue(result["quests"][0]["steps"][0]["target_world"])
         self.assertTrue(result["quests"][0]["steps"][1]["target_world"])
         self.assertNotEqual(result["quests"][0]["spawn_world"],
@@ -63,3 +63,30 @@ class QuestLabConversionTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class QuestDocumentCompileTest(unittest.TestCase):
+    def test_note_text_compiles_and_older_steps_remain_supported(self):
+        data=json.loads((ROOT/"data/questlab_interactions_demo.json").read_text(encoding="utf-8"))
+        compiled=compile_questlab(data,ORIGIN)
+        steps=compiled["quests"][0]["steps"]
+        self.assertEqual([x["type"] for x in steps],["interact","collect"])
+        note=steps[1]["document"]
+        self.assertTrue(note["title"])
+        self.assertIn("КОРДОН",note["body"])
+        self.assertTrue(len(note["body"])>100)
+        self.assertIsNone(steps[0]["document"])
+        legacy=json.loads((ROOT/"data/questlab_return_cordon.json").read_text(encoding="utf-8"))
+        legacy_compiled=compile_questlab(legacy,ORIGIN)
+        self.assertTrue(all(x["document"] is None for x in legacy_compiled["quests"][0]["steps"]))
+
+    def test_note_text_limits_and_pairing(self):
+        import copy
+        data=json.loads((ROOT/"data/questlab_interactions_demo.json").read_text(encoding="utf-8"))
+        broken=copy.deepcopy(data)
+        broken["quests"][0]["steps"][1]["document"]={"title":"Дневник","body":""}
+        with self.assertRaisesRegex(ValueError,"both title and body"):
+            compile_questlab(broken,ORIGIN)
+        broken["quests"][0]["steps"][1]["document"]["body"]="X"*4001
+        with self.assertRaisesRegex(ValueError,"Invalid document body"):
+            compile_questlab(broken,ORIGIN)
