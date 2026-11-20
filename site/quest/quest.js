@@ -35,6 +35,7 @@
   let pendingPlacement = null;
   let draftMarker = null;
   let localModels = [];
+  let localPlacements = [];
   let selectedCharacterId = null;
   let selectedStepId = null;
   let selectedWorldItemId = null;
@@ -282,6 +283,7 @@
     try {
       const [models, placements] = await Promise.all([objects.models(), objects.placements()]);
       localModels = models;
+      localPlacements = placements;
       const picker = $("local-model");
       const selected = picker.value;
       picker.replaceChildren(...models.map(model => new Option(model.name, model.id)));
@@ -380,20 +382,32 @@
     }
   }
 
+  function defaultPlacementName(model, id) {
+    const base = (model?.name?.trim() || "Объект").slice(0, 80);
+    const used = new Set(localPlacements.filter(item => item.id !== id && item.name)
+      .map(item => item.name.trim().normalize("NFC").toLocaleLowerCase("ru")));
+    let name = base;
+    for (let number = 2; used.has(name.normalize("NFC").toLocaleLowerCase("ru")); number++) {
+      const suffix = " " + number;
+      name = base.slice(0, 80 - suffix.length) + suffix;
+    }
+    return name;
+  }
+
   function beginPlacement(item) {
     cancelPlacement();
     setMode("browse");
     pendingPlacement = { ...item };
     syncPlacementSelection();
     $("local-placement-edit").hidden = false;
-    $("local-placement-name").value = item.name || (item.id ? localModels.find(model => model.id === item.modelId)?.name || "" : "");
+    const model = localModels.find(entry => entry.id === item.modelId);
+    $("local-placement-name").value = item.name || defaultPlacementName(model, item.id);
     $("local-heading").value = item.heading ?? 0;
     $("local-scale").value = item.scale ?? 1;
     $("local-east").value = 0;
     $("local-north").value = 0;
     $("local-model-status").textContent = "Клик по карте задаёт опорную точку. Оранжевая метка показывает новую позицию.";
     updatePlacementDraft();
-    const model = localModels.find(entry => entry.id === item.modelId);
     window.showPlacementPreview?.(model?.blob)?.catch(() => {
       $("local-model-status").textContent = "Не удалось показать модель в 3D.";
     });
