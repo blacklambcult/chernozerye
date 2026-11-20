@@ -1,5 +1,12 @@
 # Fearless Knights of the Cordon
 
+### Pre-alpha 0.7.1 — findable world notes and key
+
+- Raised authored note / key visual props on low field crates, added warm glints, small nearby lights and a discoverable floating tag for the closest find within 27m.
+- New compact in-game navigator shows the nearest uncollected find's title, compass-relative arrow and distance within 42m. When the nearest item is collected, the guide automatically switches to the next. Already collected entries remain hidden from the world but readable in **J**.
+- All authored coordinates, item IDs, note texts, inventory persistence and E interactions remain unchanged. F6/F7 and Chapter 1 remain independent.
+- The world-items Godot regression now fails if the default spawn does not display the finder or if the first note lacks a light, a distant beacon and a raised model.
+
 ### PRE-ALPHA 0.7.0 — authored permanent world items / Quest Lab 0.4
 
 - Quest Lab now supports independent `worldItems` in its existing v1 JSON project. The library has two categories: `note` and `item`. Each has a stable ID, title, full text/description, an optional Geo Lab `objectId`, and a WGS84 target point. Select **«Находки в мире»**, create a note or item, then click **«Разместить находку»** on the map or bind it to a manually drawn Geo Lab object. Existing user projects are still valid: absent `worldItems` becomes an empty list, and browser localStorage is preserved.
