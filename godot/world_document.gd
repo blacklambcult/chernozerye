@@ -203,6 +203,21 @@ func _nearest_collectible(max_distance: float = PICKUP_RADIUS) -> Dictionary:
             nearest = entry
     return nearest
 
+func nearest_snapshot_note() -> Dictionary:
+    if snapshot_items == null or player == null:
+        return {}
+    var best := INF
+    var found: Dictionary = {}
+    for entry in entries:
+        if entry["type"] != "note" or _is_collected(entry):
+            continue
+        var offset: Vector3 = entry["position"] - player.global_position
+        var distance := Vector2(offset.x, offset.z).length()
+        if distance < best:
+            best = distance
+            found = {"position": entry["position"], "distance": distance}
+    return found
+
 func quest_summary() -> Dictionary:
     var summary := {"total": 0, "collected": 0, "target": null}
     for entry in entries:

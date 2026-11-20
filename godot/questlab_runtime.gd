@@ -325,7 +325,8 @@ func _process(delta: float) -> void:
         var at := get_target_world()
         var horizontal := Vector2(player.global_position.x - at.x, player.global_position.z - at.z).length()
         distance_label.text = "До цели: %d м     ·     %s" % [int(ceil(horizontal)), _exit_hint()]
-        if horizontal <= REACH_RADIUS_M:
+        var reach_radius := 2.0 if snapshot_mode else REACH_RADIUS_M
+        if horizontal <= reach_radius:
             _advance_step()
     elif step_type == "message":
         message_elapsed += delta

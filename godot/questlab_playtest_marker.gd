@@ -80,7 +80,7 @@ func _process(delta: float) -> void:
             visual.rotation.y += delta * 0.45
 
 func _make_reach_ring() -> void:
-    visual.position.y = 0.03
+    visual.position.y = 0.18
     var material := StandardMaterial3D.new()
     material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
     material.albedo_color = Color("#6ef5cf")
@@ -88,8 +88,8 @@ func _make_reach_ring() -> void:
     material.emission = material.albedo_color
     material.emission_energy_multiplier = 1.5
     var ring := TorusMesh.new()
-    ring.inner_radius = 1.25
-    ring.outer_radius = 1.4
+    ring.outer_radius = 2.0
+    ring.inner_radius = 1.65
     ring.rings = 32
     ring.ring_segments = 8
     var mesh := MeshInstance3D.new()
@@ -97,3 +97,22 @@ func _make_reach_ring() -> void:
     mesh.mesh = ring
     mesh.material_override = material
     visual.add_child(mesh)
+
+    var beacon := MeshInstance3D.new()
+    beacon.name = "ReachBeacon"
+    var shaft := CylinderMesh.new()
+    shaft.top_radius = 0.05
+    shaft.bottom_radius = 0.12
+    shaft.height = 2.8
+    beacon.mesh = shaft
+    beacon.position.y = 1.4
+    beacon.material_override = material
+    visual.add_child(beacon)
+    var label := Label3D.new()
+    label.text = "ЦЕЛЬ"
+    label.position.y = 3.0
+    label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+    label.font_size = 32
+    label.pixel_size = 0.012
+    label.modulate = material.albedo_color
+    visual.add_child(label)
