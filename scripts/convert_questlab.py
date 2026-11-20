@@ -166,6 +166,11 @@ def compile_questlab(document: dict, origin: dict, geo_layout: dict | None = Non
         east, north = transformer.transform(lon, lat)
         return [round(east - cx, 3), 0.22, round(cy - north, 3)]
 
+    raw_items = document.get("worldItems", [])
+    if not isinstance(raw_items, list) or len(raw_items) > 150:
+        raise ValueError("World items must be a list of at most 150 entries")
+    catalog = {item.get("id"): item for item in raw_items
+               if isinstance(item, dict) and isinstance(item.get("id"), str)}
     result = []
     seen_quests: set[str] = set()
     for raw in raw_quests:
@@ -204,6 +209,14 @@ def compile_questlab(document: dict, origin: dict, geo_layout: dict | None = Non
             step_title = _string(raw_step.get("title"), 140, "step title")
             if not step_title:
                 raise ValueError("Quest step title must not be empty")
+            note_id = _string(raw_step.get("noteId", ""), 120, "catalog note ID")
+            if note_id:
+                note = catalog.get(note_id)
+                if stype != "collect" or note is None or note.get("type") != "note":
+                    raise ValueError(f"Invalid catalog note for step: {sid}")
+                raw_step = {**raw_step, "target": note.get("target"),
+                            "objectId": note.get("objectId", ""),
+                            "document": {"title": note.get("title"), "body": note.get("body")}}
             target = raw_step.get("target")
             object_id = _string(raw_step.get("objectId", ""), 120, "Geo Lab object ID")
             if stype == "message" and object_id:
@@ -218,7 +231,7 @@ def compile_questlab(document: dict, origin: dict, geo_layout: dict | None = Non
                 target_world = _geo_object_anchor(feature, spawn_world)
             else:
                 target_world = None if target is None else world(target, "quest target")
-            if stype == "reach" and target_world is None:
+            if (stype == "reach" or note_id) and target_world is None:
                 raise ValueError(f"Reach step requires a target: {sid}")
             steps.append({
                 "id": sid,
@@ -239,9 +252,6 @@ def compile_questlab(document: dict, origin: dict, geo_layout: dict | None = Non
             "spawn_bearing": float(heading),
             "steps": steps
         })
-    raw_items = document.get("worldItems", [])
-    if not isinstance(raw_items, list) or len(raw_items) > 150:
-        raise ValueError("World items must be a list of at most 150 entries")
     world_items = []
     seen_items: set[str] = set()
     for raw in raw_items:

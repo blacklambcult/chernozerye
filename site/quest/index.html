@@ -41,7 +41,13 @@
         <h2>Конструктор квестов</h2>
         <p class="subtle">Создавай задания и настраивай последовательность игровых событий. Все изменения сохраняются локально.</p>
       </div>
-      <section class="panel-section">
+      <nav class="panel-section two-buttons" aria-label="Разделы Quest Lab">
+        <button class="button" type="button" data-library="quest" aria-pressed="true">Квесты</button>
+        <button class="button" type="button" data-library="note" aria-pressed="false">Записки</button>
+        <button class="button" type="button" data-library="item" aria-pressed="false">Предметы</button>
+        <button class="button" type="button" data-library="character" aria-pressed="false">Персонажи</button>
+      </nav>
+      <section class="panel-section" id="quest-library">
         <div class="section-heading"><h3>Квесты</h3><span id="quest-count" class="mini-count">0</span></div>
         <div class="two-buttons">
           <button type="button" id="add-main" class="button primary">+ Главный</button>
@@ -69,14 +75,26 @@
         <button type="button" id="duplicate-quest" class="button full quiet">Дублировать квест</button>
         <button type="button" id="delete-quest" class="button full danger">Удалить квест</button>
       </section>
-      <section class="panel-section world-item-library">
-        <div class="section-heading"><h3>Находки в мире</h3><span class="mini-count" id="world-item-count">0</span></div>
+      <section class="panel-section world-item-library" id="world-library" hidden>
+        <div class="section-heading"><h3 id="world-library-title">Записки</h3><span class="mini-count" id="world-item-count">0</span></div>
         <p class="hint">Отдельные записки и предметы существуют в мире независимо от квестов и теста F7.</p>
         <div class="two-buttons">
           <button id="add-world-note" type="button" class="button primary">+ Записка</button>
           <button id="add-world-item" type="button" class="button">+ Предмет</button>
         </div>
         <div id="world-item-list" class="quest-list" aria-label="Находки для размещения"></div>
+      </section>
+      <section class="panel-section" id="character-library" hidden>
+        <h3>Персонажи</h3>
+        <div id="character-list" class="quest-list"></div>
+        <button id="add-character" type="button" class="button full">+ Персонаж</button>
+        <div id="character-fields" hidden>
+          <label for="character-name">Имя</label>
+          <input id="character-name" type="text" maxlength="140">
+          <label for="character-description">Роль и описание</label>
+          <textarea id="character-description" rows="4" maxlength="1200"></textarea>
+          <button id="delete-character" type="button" class="button danger full">Удалить персонажа</button>
+        </div>
       </section>
       <section class="panel-section bottom-section">
         <div class="section-heading"><h3>Проект</h3><span class="mini-tag">JSON / V1</span></div>
@@ -116,6 +134,7 @@
     </main>
 
     <aside class="sidebar panel-right" aria-label="Редактор событий квеста">
+      <div id="quest-scenario">
       <div class="panel-section heading-section">
         <div class="eyebrow">03 / СЦЕНАРИЙ</div>
         <h2>Логика квеста</h2>
@@ -125,6 +144,9 @@
         <div class="section-heading"><h3>Последовательность</h3><span id="step-count" class="mini-count">0</span></div>
         <div id="step-list" class="step-list"></div>
         <div class="add-step">
+          <label for="catalog-note">Записка из каталога</label>
+          <select id="catalog-note"></select>
+          <button type="button" id="add-catalog-note" class="button full">Добавить записку в квест</button>
           <label for="new-step-type">Новый шаг</label>
           <div class="add-step-actions">
             <select id="new-step-type">
@@ -139,6 +161,8 @@
       </section>
       <section class="panel-section" id="step-fields" hidden>
         <div class="section-heading"><h3>Инспектор шага</h3><span id="step-index" class="mini-tag">STEP 01</span></div>
+        <p id="linked-note-info" class="hint" hidden></p>
+        <div id="inline-step-type">
         <label for="step-type">Тип действия</label>
         <select id="step-type">
           <option value="reach">Дойти до точки</option>
@@ -146,6 +170,7 @@
           <option value="collect">Найти предмет</option>
           <option value="message">Показать сообщение</option>
         </select>
+        </div>
         <label for="step-title">Название</label>
         <input id="step-title" type="text" maxlength="140" placeholder="Например: Найти дом" autocomplete="off">
         <label for="step-text">Текст задачи / сообщение</label>
@@ -179,13 +204,11 @@
           </div>
           <button id="place-step" type="button" class="button full">◆ Поставить точку на карте</button>
         </div>
-        <p class="hint">Редактор сохраняет описание и координаты. Исполнение триггеров в Godot будет добавлено отдельно.</p>
       </section>
+      </div>
       <section class="panel-section world-item-inspector" id="world-item-fields" hidden>
         <div class="section-heading"><h3>Игровая находка</h3><span class="mini-tag">WORLD ITEM</span></div>
         <div class="world-id" id="world-item-id">—</div>
-        <label for="world-item-type">Тип</label>
-        <select id="world-item-type"><option value="note">Читаемая записка</option><option value="item">Обычный предмет</option></select>
         <label for="world-item-title">Название</label>
         <input id="world-item-title" type="text" maxlength="140" autocomplete="off" placeholder="Название предмета">
         <label for="world-item-body" id="world-item-body-label">Текст записки</label>

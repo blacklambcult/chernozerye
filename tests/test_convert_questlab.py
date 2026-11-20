@@ -40,6 +40,20 @@ class QuestLabConversionTest(unittest.TestCase):
                             result["quests"][0]["steps"][0]["target_world"])
         self.assertEqual(result["quests"][0]["id"],"quest-interaction-demo")
 
+    def test_catalog_note_uses_current_text_and_position(self):
+        project = json.loads(json.dumps(DATA))
+        step = project["quests"][0]["steps"][0]
+        step.update(type="collect", noteId="letter")
+        project["worldItems"] = [{"id": "letter", "type": "note", "title": "Письмо",
+                                 "body": "Новый текст", "target": project["quests"][0]["spawn"]}]
+        result = compile_questlab(project, ORIGIN)
+        compiled = result["quests"][0]["steps"][0]
+        self.assertEqual(compiled["document"]["body"], "Новый текст")
+        self.assertEqual(compiled["target_world"], result["world_items"][0]["position_world"])
+        project["worldItems"].clear()
+        with self.assertRaisesRegex(ValueError, "Invalid catalog note"):
+            compile_questlab(project, ORIGIN)
+
     def test_invalid_geo_and_missing_target(self):
         broken = json.loads(json.dumps(DATA))
         broken["quests"][0]["steps"][0]["target"]["lat"] = float("nan")

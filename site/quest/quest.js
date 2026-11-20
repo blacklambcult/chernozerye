@@ -11,6 +11,8 @@
   const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (char) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
   let project;
+  let library = "quest";
+  let selectedCharacterId = null;
   let selectedStepId = null;
   let selectedWorldItemId = null;
   let mode = "spawn";
@@ -132,9 +134,10 @@
     $("spawn-bearing").value = q.spawn.bearing;
   }
   function renderWorldItemList() {
-    $("world-item-count").textContent = String(project.worldItems.length);
-    $("world-item-list").innerHTML = project.worldItems.length ?
-      project.worldItems.map(item =>
+    const items = project.worldItems.filter(item => item.type === library);
+    $("world-item-count").textContent = String(items.length);
+    $("world-item-list").innerHTML = items.length ?
+      items.map(item =>
         '<button type="button" class="quest-card'+(item.id===selectedWorldItemId?" selected":"")+
         '" data-world-id="'+escapeHtml(item.id)+'"><span class="quest-symbol">✦</span>'+
         '<span><span class="quest-name">'+escapeHtml(item.title)+'</span>'+
@@ -148,7 +151,6 @@
     $("world-item-fields").hidden=!item;
     if(!item)return;
     $("world-item-id").textContent="ID / "+item.id;
-    $("world-item-type").value=item.type;
     $("world-item-title").value=item.title;
     $("world-item-body").value=item.body;
     $("world-item-body-label").textContent=item.type==="note"?
@@ -186,8 +188,10 @@
   function selectWorldItem(id) {
     const item=project.worldItems.find(x=>x.id===id);
     if(!item)return;
+    library = item.type;
     selectedWorldItemId=id;
     selectedStepId=null;
+    renderLibrary();
     renderWorldItemList();
     renderWorldItemInspector();
     renderStepInspector();
@@ -239,13 +243,52 @@
     $("step-title").value = item.title;
     $("step-text").value = item.text;
     $("step-object").value = item.objectId;
-    $("step-document-fields").hidden = item.type !== "collect";
+    const note = catalogNote(item);
+    $("inline-step-type").hidden = !!note;
+    $("linked-note-info").hidden = !note;
+    $("linked-note-info").textContent = note ? "Записка из каталога · " + note.title : "";
+    $("step-document-fields").hidden = !!note || item.type !== "collect";
     $("step-document-title").value = item.document?.title || "";
     $("step-document-body").value = item.document?.body || "";
-    $("target-controls").hidden = item.type === "message";
+    $("target-controls").hidden = !!note || item.type === "message";
     $("target-coords").textContent = item.target ?
       item.target.lat.toFixed(6) + ", " + item.target.lon.toFixed(6) : "Точка не выбрана";
     renderObjectState();
+  }
+  function catalogNote(item) {
+    return project.worldItems.find(note => note.id === item?.noteId);
+  }
+  function renderLibrary() {
+    const isQuest = library === "quest";
+    const isFind = library === "note" || library === "item";
+    for (const tab of document.querySelectorAll("[data-library]"))
+      tab.setAttribute("aria-pressed", String(tab.dataset.library === library));
+    $("quest-library").hidden = !isQuest;
+    $("quest-scenario").hidden = !isQuest;
+    if (!isQuest) $("quest-fields").hidden = true;
+    $("world-library").hidden = !isFind;
+    $("character-library").hidden = library !== "character";
+    $("world-library-title").textContent = library === "note" ? "Записки" : "Предметы";
+    $("add-world-note").hidden = library !== "note";
+    $("add-world-item").hidden = library !== "item";
+    const notes = project.worldItems.filter(item => item.type === "note");
+    $("catalog-note").replaceChildren(...notes.map(note => new Option(note.title, note.id)));
+    $("catalog-note").disabled = !notes.length || !quest();
+    renderCharacters();
+    $("add-catalog-note").disabled = $("catalog-note").disabled;
+  }
+  function character() {
+    return project.characters?.find(item => item.id === selectedCharacterId);
+  }
+  function renderCharacters() {
+    const selected = character();
+    $("character-list").innerHTML = (project.characters || []).map(item =>
+      '<button type="button" class="quest-card' + (item === selected ? ' selected' : '') +
+      '" data-character="' + escapeHtml(item.id) + '">' + escapeHtml(item.name) + '</button>'
+    ).join("");
+    $("character-fields").hidden = !selected;
+    $("character-name").value = selected?.name ?? "";
+    $("character-description").value = selected?.description ?? "";
   }
   function renderAll(recenter = false) {
     const q = quest();
@@ -254,6 +297,7 @@
     else if (!q.steps.some((s) => s.id === selectedStepId)) selectedStepId = q.steps[0]?.id || null;
     renderQuests();
     renderQuestInspector();
+    renderLibrary();
     renderSteps();
     renderStepInspector();
     renderWorldItemList();
@@ -311,6 +355,10 @@
       displayStatus("Выбери задачу с географической целью, а не сообщение.", true);
       return;
     }
+    if (["step", "object"].includes(next) && !worldItem() && step()?.noteId) {
+      displayStatus("Точка задаётся в разделе «Записки».", true);
+      return;
+    }
     if (next === "world_place" && !worldItem()) {
       displayStatus("Сначала создай или выбери находку.",true);
       return;
@@ -330,10 +378,10 @@
       "Кликни на карту, чтобы установить стартовую позицию игрока." :
       mode === "object" ? "Кликни на геообъект Geo Lab. Привязка сохранит ID для выбранной находки или шага." :
       mode === "world_place" ? "Кликни на карту, чтобы разместить постоянную находку. Её можно передвигать за маркер." :
-      "Кликни на карту, чтобы привязать выбранный шаг к местности.";
+      mode === "step" ? "Кликни на карту, чтобы привязать выбранный шаг к местности." : "Просмотр карты";
     $("map-hint").classList.toggle("picking", mode==="object");
     $("quest-map").classList.toggle("is-object-picking", mode==="object");
-    $("quest-map").classList.toggle("is-placement",mode!=="object");
+    $("quest-map").classList.toggle("is-placement",mode!=="object" && mode!=="browse");
     updatePickVisibility();
     $("pick-geo-object").classList.toggle("active", mode==="object");
   }
@@ -345,6 +393,7 @@
     });
   }
   function updatePoint(location, destination = mode) {
+    if (destination === "browse") return;
     const p = C.point({ lat: location.lat, lon: location.lng });
     if(destination==="world_place"){
       const item=worldItem();
@@ -501,6 +550,7 @@
     spawnPin.on("dragend", (evt) => updatePoint(evt.target.getLatLng(), "spawn"));
     for (let i = 0; i < q.steps.length; i++) {
       const item = q.steps[i];
+      if (item.noteId) continue; // The catalog pin already represents this location.
       if (!item.target) continue;
       const active = selectedStepId === item.id;
       const marker = window.L.marker([item.target.lat, item.target.lon], {
@@ -662,16 +712,74 @@
   }
 
 
+  for (const tab of document.querySelectorAll("[data-library]")) {
+    tab.addEventListener("click", () => {
+      library = tab.dataset.library;
+      selectedWorldItemId = null;
+      renderAll();
+      setMode(library === "quest" ? "spawn" : "browse");
+    });
+  }
+  $("character-list").addEventListener("click", event => {
+    const button = event.target.closest("[data-character]");
+    if (!button) return;
+    selectedCharacterId = button.dataset.character;
+    renderCharacters();
+  });
+  $("add-character").addEventListener("click", () => {
+    project.characters ??= [];
+    if (project.characters.length >= 150) {
+      displayStatus("В проекте уже 150 персонажей.", true);
+      return;
+    }
+    const id = C.makeId("character");
+    project.characters.push({ id, name: "Новый персонаж", description: "" });
+    selectedCharacterId = id;
+    persist();
+    renderCharacters();
+    $("character-name").select();
+  });
+  $("character-name").addEventListener("change", event => {
+    if (!character()) return;
+    character().name = event.target.value.trim() || "Без имени";
+    persist();
+    renderCharacters();
+  });
+  $("character-description").addEventListener("input", event => {
+    if (!character()) return;
+    character().description = event.target.value;
+    persist();
+  });
+  $("delete-character").addEventListener("click", () => {
+    const item = character();
+    if (!item || !window.confirm("Удалить персонажа «" + item.name + "»?")) return;
+    project.characters = project.characters.filter(entry => entry !== item);
+    selectedCharacterId = null;
+    persist();
+    renderCharacters();
+  });
+  $("add-catalog-note").addEventListener("click", () => {
+    const q = quest();
+    const note = project.worldItems.find(item => item.id === $("catalog-note").value);
+    if (!q || !note) return;
+    if (q.steps.some(item => item.noteId === note.id)) {
+      displayStatus("Эта записка уже есть в квесте.", true);
+      return;
+    }
+    const item = C.createStep("collect");
+    item.title = "Найти: " + note.title.slice(0, 132);
+    item.noteId = note.id;
+    q.steps.push(item);
+    selectedStepId = item.id;
+    persist();
+    renderAll();
+    setMode("browse");
+  });
   $("add-world-note").addEventListener("click",()=>addWorldItem("note"));
   $("add-world-item").addEventListener("click",()=>addWorldItem("item"));
   $("world-item-list").addEventListener("click",evt=>{
     const button=evt.target.closest("[data-world-id]");
     if(button)selectWorldItem(button.dataset.worldId);
-  });
-  $("world-item-type").addEventListener("change",evt=>{
-    const item=worldItem();if(!item)return;
-    item.type=evt.target.value;
-    persist();renderWorldItemList();renderWorldItemInspector();renderMapPins();
   });
   $("world-item-title").addEventListener("input",evt=>{
     const item=worldItem();if(!item)return;
@@ -705,6 +813,10 @@
   });
   $("world-delete").addEventListener("click",()=>{
     const item=worldItem();
+    if (item && project.quests.some(q => q.steps.some(step => step.noteId === item.id))) {
+      displayStatus("Сначала убери связанные шаги из квестов.", true);
+      return;
+    }
     if(!item||!window.confirm("Удалить находку «"+item.title+"»?"))return;
     project.worldItems=project.worldItems.filter(x=>x.id!==item.id);
     selectedWorldItemId=null;
@@ -878,7 +990,7 @@
     if (file.size > 1024 * 1024) { displayStatus("Файл слишком большой (лимит 1 МБ).", true); return; }
     try {
       const imported = C.normalizeProject(JSON.parse(await file.text()));
-      if ((project.quests.length||project.worldItems.length) &&
+      if ((project.quests.length||project.worldItems.length||project.characters?.length) &&
           !window.confirm("Импорт заменит квесты и находки. Продолжить?")) return;
       project = imported;
       selectedStepId = null;
