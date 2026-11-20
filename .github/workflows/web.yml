@@ -498,7 +498,7 @@ jobs:
           node --check site/quest/geo-overlay-core.js
           node --test tests/quest-geo-overlay.test.cjs
           node --test tests/quest-geo-link.test.cjs
-          grep -q 'quest.js?v=8' site/quest/index.html
+          grep -q 'quest.js?v=9' site/quest/index.html
           grep -q 'geo-overlay-core.js?v=2' site/quest/index.html
           grep -q 'quest-core.js?v=3' site/quest/index.html
           grep -q 'id="step-document-fields"' site/quest/index.html
@@ -510,6 +510,8 @@ jobs:
           grep -q 'href="../quest/"' site/map/index.html
           mkdir -p build/web/quest
           cp -a site/quest/. build/web/quest/
+          cp godot/manual_layout.json build/web/quest/game-layout.json
+          node --check site/quest/placement-preview.mjs
           test -s build/web/quest/index.html
           test -s build/web/quest/quest.js
           test -s build/web/quest/quest-core.js

@@ -94,6 +94,9 @@
         <button id="place-local-model" type="button" class="button full">Поставить на карту</button>
         <div id="local-placement-edit" hidden>
           <canvas id="placement-preview" width="280" height="170" aria-label="Предпросмотр модели"></canvas>
+          <p id="placement-context-status" class="hint" role="status"></p>
+          <label for="placement-context-zoom">Обзор окружения</label>
+          <input id="placement-context-zoom" type="range" min="10" max="80" value="32">
           <label for="local-heading">Поворот <output id="local-heading-value"></output></label>
           <input id="local-heading" type="range" min="0" max="359" step="1" value="0">
           <label for="local-scale">Масштаб <output id="local-scale-value"></output></label>
@@ -268,7 +271,7 @@
 <script src="../map/editor-core.js?v=20"></script>
 <script src="./geo-overlay-core.js?v=2"></script>
 <script src="../object-library/library.js"></script>
-<script src="./quest.js?v=8"></script>
-<script type="module" src="./placement-preview.mjs"></script>
+<script src="./quest.js?v=9"></script>
+<script type="module" src="./placement-preview.mjs?v=2"></script>
 </body>
 </html>
