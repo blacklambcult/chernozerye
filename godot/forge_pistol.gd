@@ -63,7 +63,8 @@ var model_animation: AnimationPlayer
 var inventory_slot := 2
 var package_override: Dictionary = {}
 var model_override: PackedScene
-var comparison_label := ""
+var test_label := ""
+var test_slot_label := ""
 var custom_model_loaded := false
 var flash_left := 0.0
 var casing_port: Node3D
@@ -237,8 +238,8 @@ func _ready() -> void:
         if not players.is_empty():
             model_animation = players[0] as AnimationPlayer
             if model_override != null:
-                # Both comparison weapons instantiate the same imported scene.
-                # Each needs its own clips before adjusting Fire or repair tracks.
+                # Packaged scenes may share animation resources between instances.
+                # Copy clips before modifying Fire or adding repair tracks.
                 for library_name in model_animation.get_animation_library_list():
                     var source := model_animation.get_animation_library(library_name)
                     var library := AnimationLibrary.new()
