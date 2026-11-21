@@ -268,7 +268,7 @@ jobs:
           grep -q "FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2" /tmp/world-smoke.log
           grep -q "MODELED_CHARACTER_READY: fps_body=disabled full_body=f4_only fps_arms=independent" /tmp/world-smoke.log
           grep -q "CHARACTER_SEQUENCE_READY: cosmetic=true selected_slot_required=true duration=120 states=8" /tmp/world-smoke.log
-          grep -q "SURVIVAL_HUD_READY: compass=center hp=100 hotbar=4 cigarette_pack=slot1" /tmp/world-smoke.log
+          grep -q "SURVIVAL_HUD_READY: compass=center hp=100 hotbar=10 cigarette_pack=slot1" /tmp/world-smoke.log
           grep -q "manual_mode=true" /tmp/world-smoke.log
           grep -q "MANUAL_NIGHT_READY: true" /tmp/world-smoke.log
           grep -q "NOVEMBER_SNOW_READY: cpu=true amount=340 follow_player=true" /tmp/world-smoke.log
@@ -533,7 +533,7 @@ jobs:
           node --check site/forge/forge-core.js
           node --check site/forge/forge.mjs
           node --test tests/forge-core.test.cjs
-          grep -q 'forge.mjs?v=7' site/forge/index.html
+          grep -q 'forge.mjs?v=8' site/forge/index.html
           grep -q 'forge-core.js?v=5' site/forge/index.html
           grep -q 'id="fp-preview-toggle"' site/forge/index.html
           grep -q 'id="fp-scale-slider"' site/forge/index.html

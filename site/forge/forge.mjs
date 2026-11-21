@@ -1105,6 +1105,8 @@ function readWeaponProfile() {
 }
 
 function fillWeaponProfile(record) {
+  const slot = Number(record.slot);
+  $("game-slot").value = String(Number.isInteger(slot) && slot >= 3 && slot <= 10 ? slot : 3);
   const type = record.recipe?.weaponType;
   const defaultClass = {revolver:"revolver",pistol:"pistol",smg:"smg",assault:"rifle",
     boltrifle:"rifle",semirifle:"rifle",pumpshotgun:"shotgun",doubleshotgun:"shotgun"}[type] || "other";
@@ -1182,7 +1184,8 @@ async function saveCatalogWeapon(sendToGame) {
     if (!name) throw new Error("Введи название варианта.");
     const gameplay = readWeaponProfile();
     const viewmodel = Forge.normalizeViewmodel(forgeMeta.viewmodel);
-    const saved = {...record, name, gameplay, viewmodel, updatedAt:new Date().toISOString()};
+    const slot = Number($("game-slot").value);
+    const saved = {...record, name, gameplay, viewmodel, slot, updatedAt:new Date().toISOString()};
     await window.ChernoObjectLibrary.saveModel(saved);
     weapons.set(saved.id, saved);
     if (transferred?.record.id === saved.id) {
@@ -1191,17 +1194,17 @@ async function saveCatalogWeapon(sendToGame) {
       $("viewport-title").textContent = name;
     }
     if (sendToGame) {
-      if (saved.blob.size > 2 * 1024 * 1024) throw new Error("В библиотеке сохранено. Для слота 3 требуется GLB до 2 МБ.");
+      if (saved.blob.size > 2 * 1024 * 1024) throw new Error("В библиотеке сохранено. Для отправки в игру требуется GLB до 2 МБ.");
       const glb = await new Promise((resolve,reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result.split(",")[1]);
         reader.onerror = () => reject(reader.error);
         reader.readAsDataURL(saved.blob);
       });
-      localStorage.setItem(GAME_MODEL_KEY, JSON.stringify({version:1, name, glb,
+      localStorage.setItem(GAME_MODEL_KEY, JSON.stringify({version:1, name, glb, slot,
         category:gameplay.grip, gameplay, viewmodel, weaponType:saved.recipe?.weaponType}));
     }
-    feedback.textContent = sendToGame ? "Профиль сохранён. Перезапусти игру и выбери слот 3." : "Профиль сохранён в библиотеке.";
+    feedback.textContent = sendToGame ? "Профиль сохранён. Перезапусти игру и нажми " + (slot === 10 ? 0 : slot) + "." : "Профиль сохранён в библиотеке.";
   } catch (error) { feedback.textContent = error.message; }
   finally { button.disabled = !transferred; }
 }

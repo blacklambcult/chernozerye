@@ -9,7 +9,7 @@ const FRAME := Color(0.10, 0.115, 0.115, 0.84)
 const FRAME_STROKE := Color("#655f54")
 const GOLD := Color("#d4b886")
 const HEALTH := Color("#9e5548")
-const SLOT_COUNT := 4
+const SLOT_COUNT := 10
 const COMPASS_SPAN := 142.0
 const COMPASS_HALF := 226.0
 
@@ -24,7 +24,7 @@ func _ready() -> void:
     set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     mouse_filter = Control.MOUSE_FILTER_IGNORE
     player = get_parent().get_parent().get_node_or_null("Player") as CharacterBody3D
-    print("SURVIVAL_HUD_READY: compass=center hp=100 hotbar=4 cigarette_pack=slot1")
+    print("SURVIVAL_HUD_READY: compass=center hp=100 hotbar=10 cigarette_pack=slot1")
 
 func choose_slot(n: int) -> void:
     if n < 0 or n >= SLOT_COUNT:
@@ -155,9 +155,14 @@ func _draw_health(view_height: float) -> void:
         8), HEALTH)
 
 func _draw_slots(view_width: float, view_height: float) -> void:
-    var x0 := view_width - 4.0 * 62.0 - 18.0
-    var y := view_height - 84.0
-    draw_rect(Rect2(x0 - 8.0, y - 28.0, 263.0, 98.0), FRAME)
+    var width := SLOT_COUNT * 62.0
+    var zoom := clampf((view_width - 32.0) / width, 0.05, 1.0)
+    draw_set_transform(Vector2(view_width - width * zoom - 18.0, view_height - 84.0 * zoom), 0.0, Vector2.ONE * zoom)
+    var x0 := 0.0
+    var y := 0.0
+    var pistol: Node3D = player.get("forge_pistol") if player != null else null
+    var forge_slot := int(pistol.get("inventory_slot")) if pistol != null else 2
+    draw_rect(Rect2(x0 - 8.0, y - 28.0, width + 15.0, 106.0), FRAME)
     _write(x0, y - 9.0, "БЫСТРЫЕ ПРЕДМЕТЫ", 12, MUTED)
     for index in range(SLOT_COUNT):
         var x := x0 + float(index) * 62.0
@@ -166,7 +171,7 @@ func _draw_slots(view_width: float, view_height: float) -> void:
             Color(0.19, 0.20, 0.19, 0.94), true)
         draw_rect(Rect2(x, y, 56, 56),
             GOLD if chosen else FRAME_STROKE, false, 2.0 if chosen else 1.0)
-        _write(x + 5.0, y + 15.0, str(index + 1), 12,
+        _write(x + 5.0, y + 15.0, str((index + 1) % 10), 12,
             GOLD if chosen else MUTED)
         if index == 0:
             # Fictional unbranded inventory icon: simple cream cardboard pack.
@@ -177,7 +182,7 @@ func _draw_slots(view_width: float, view_height: float) -> void:
             draw_line(Vector2(x+10,y+25),Vector2(x+41,y+25),INK,4)
             draw_circle(Vector2(x+31,y+29),6,GOLD)
             draw_line(Vector2(x+39,y+28),Vector2(x+44,y+40),Color("#a37c57"),6)
-        elif index == 2:
+        elif index == forge_slot:
             # New Forge asset: simple compact silhouette independent of revolver art.
             draw_rect(Rect2(x + 10, y + 24, 34, 7), Color("#b7a38c"))
             draw_rect(Rect2(x + 11, y + 20, 26, 6), Color("#86705d"))
@@ -192,8 +197,7 @@ func _draw_slots(view_width: float, view_height: float) -> void:
         var status := "ПЕРЕЗАРЯДКА" if float(gun.get("reload_left")) > 0 else "%d / 6" % int(gun.get("rounds"))
         var action := "ЛКМ — ВЫСТРЕЛ" if bool(gun.get("cocked")) else "ЛКМ — ВЗВЕСТИ"
         _write(x0, y + 72, status + "    " + action + "    R — ЗАРЯДИТЬ", 11, GOLD)
-    elif selected_slot == 2 and player != null:
-        var pistol: Node3D = player.get("forge_pistol")
+    elif selected_slot == forge_slot and pistol != null:
         var rounds := int(pistol.get("rounds"))
         var status := "%d / %d" % [rounds, int(pistol.get("capacity"))]
         var action := "ЛКМ — ВЫСТРЕЛ"
@@ -205,7 +209,8 @@ func _draw_slots(view_width: float, view_height: float) -> void:
             action = "КОЛЕСО ВНИЗ — ВЗВЕСТИ"
         _write(x0, y + 72, status + "   " + action + "   R — ПЕРЕЗАРЯДКА", 11, GOLD)
     else:
-        _write(x0, y + 72, "1 ПАЧКА · V     2 РЕВОЛЬВЕР     3 ПИСТОЛЕТ", 11, MUTED)
+        _write(x0, y + 72, "1–0 — ВЫБОР ЯЧЕЙКИ   ·   V — ПАЧКА", 11, MUTED)
+    draw_set_transform(Vector2.ZERO)
 
 func _draw_reticle() -> void:
     if player == null or bool(player.get("controls_locked")):

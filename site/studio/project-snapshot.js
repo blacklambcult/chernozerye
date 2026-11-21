@@ -26,7 +26,8 @@
         ...(model.kind ? {kind:model.kind} : {}), ...(model.source ? {source:model.source} : {}),
         ...(model.recipe ? {recipe:model.recipe} : {}), ...(model.updatedAt ? {updatedAt:model.updatedAt} : {}),
         ...(model.viewmodel ? {viewmodel:model.viewmodel} : {}),
-        ...(model.gameplay ? {gameplay:model.gameplay} : {}) });
+        ...(model.gameplay ? {gameplay:model.gameplay} : {}),
+        ...(Number.isInteger(model.slot) ? {slot:model.slot} : {}) });
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(model.blob);
     });
