@@ -29,6 +29,7 @@ var player: CharacterBody3D
 var visual_holder: Node3D
 var imported_model: Node3D
 var model_animation: AnimationPlayer
+var inventory_slot := 2
 var casing_port: Node3D
 var spent_cases := 0
 var eject_at := 0.0
@@ -143,6 +144,9 @@ func _ready() -> void:
     var package := _read_game_model()
     var custom := _make_game_model(package)
     if custom != null:
+        var slot: Variant = package.get("slot", 3)
+        if (slot is int or slot is float) and slot >= 3 and slot <= 10 and floorf(float(slot)) == float(slot):
+            inventory_slot = int(slot) - 1
         _read_profile(package["viewmodel"])
         _apply_gameplay(package["gameplay"])
         var weapon_class: String = str(package["gameplay"].get("class", package.get("weaponType", "")))

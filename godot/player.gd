@@ -168,7 +168,7 @@ func _armed_slot() -> bool:
 
 func _pistol_slot() -> bool:
     var hud := get_parent().get_node_or_null("GameplayHUD/SurvivalHUD")
-    return hud != null and int(hud.get("selected_slot")) == 2
+    return hud != null and int(hud.get("selected_slot")) == forge_pistol.inventory_slot
 
 func _sync_equipped_weapons() -> void:
     revolver.equip(not _inspect_enabled and _armed_slot())
@@ -222,12 +222,13 @@ func _input(event: InputEvent) -> void:
         if _matches(key, KEY_S, "ы"): pressed["s"] = key.pressed
         if _matches(key, KEY_D, "в"): pressed["d"] = key.pressed
         if _matches(key, KEY_M, "ь"): pressed["m"] = key.pressed
-        if key.pressed and not key.echo and key.physical_keycode in [KEY_1, KEY_2, KEY_3, KEY_4]:
+        if key.pressed and not key.echo and key.physical_keycode >= KEY_0 and key.physical_keycode <= KEY_9:
             var survival_hud := get_parent().get_node_or_null("GameplayHUD/SurvivalHUD")
             if survival_hud != null:
                 # Inventory selection stays responsive during the ambient visual.
                 # The cigarette is a separate camera attachment, not a hand item.
-                survival_hud.call("choose_slot", int(key.physical_keycode) - KEY_1)
+                var slot := 9 if key.physical_keycode == KEY_0 else int(key.physical_keycode) - KEY_1
+                survival_hud.call("choose_slot", slot)
                 _sync_equipped_weapons()
         if key.pressed and not key.echo and _matches(key, KEY_R, "к"):
             if revolver.visible:
