@@ -161,7 +161,7 @@ func _draw_slots(view_width: float, view_height: float) -> void:
     var x0 := 0.0
     var y := 0.0
     var pistol: Node3D = player.get("forge_pistol") if player != null else null
-    var forge_slot := int(pistol.get("inventory_slot")) if pistol != null else 2
+    var forge_slots: Dictionary = player.get("forge_weapons") if player != null else {}
     draw_rect(Rect2(x0 - 8.0, y - 28.0, width + 15.0, 106.0), FRAME)
     _write(x0, y - 9.0, "БЫСТРЫЕ ПРЕДМЕТЫ", 12, MUTED)
     for index in range(SLOT_COUNT):
@@ -182,7 +182,7 @@ func _draw_slots(view_width: float, view_height: float) -> void:
             draw_line(Vector2(x+10,y+25),Vector2(x+41,y+25),INK,4)
             draw_circle(Vector2(x+31,y+29),6,GOLD)
             draw_line(Vector2(x+39,y+28),Vector2(x+44,y+40),Color("#a37c57"),6)
-        elif index == forge_slot:
+        elif forge_slots.has(index):
             # New Forge asset: simple compact silhouette independent of revolver art.
             draw_rect(Rect2(x + 10, y + 24, 34, 7), Color("#b7a38c"))
             draw_rect(Rect2(x + 11, y + 20, 26, 6), Color("#86705d"))
@@ -197,7 +197,7 @@ func _draw_slots(view_width: float, view_height: float) -> void:
         var status := "ПЕРЕЗАРЯДКА" if float(gun.get("reload_left")) > 0 else "%d / 6" % int(gun.get("rounds"))
         var action := "ЛКМ — ВЫСТРЕЛ" if bool(gun.get("cocked")) else "ЛКМ — ВЗВЕСТИ"
         _write(x0, y + 72, status + "    " + action + "    R — ЗАРЯДИТЬ", 11, GOLD)
-    elif selected_slot == forge_slot and pistol != null:
+    elif forge_slots.has(selected_slot) and pistol != null:
         var rounds := int(pistol.get("rounds"))
         var status := "%d / %d" % [rounds, int(pistol.get("capacity"))]
         var action := "ЛКМ — ВЫСТРЕЛ"

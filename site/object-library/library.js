@@ -2,10 +2,10 @@
   "use strict";
   function access(store, mode, operation) {
     return new Promise((resolve, reject) => {
-      const open = indexedDB.open("chernozerye-object-library", 1);
+      const open = indexedDB.open("chernozerye-object-library", 2);
       open.onupgradeneeded = () => {
-        for (const name of ["models", "placements"])
-          open.result.createObjectStore(name, { keyPath: "id" });
+        for (const name of ["models", "placements", "forge_slots"])
+          if (!open.result.objectStoreNames.contains(name)) open.result.createObjectStore(name, { keyPath: "id" });
       };
       open.onerror = () => reject(open.error);
       open.onblocked = () => reject(new Error("Хранилище открыто в другой вкладке"));
@@ -78,6 +78,9 @@
     models: () => access("models", "readonly", store => store.getAll()),
     placements: () => access("placements", "readonly", store => store.getAll()),
     saveModel: record => access("models", "readwrite", store => store.put(record)),
+    forgeSlots: () => access("forge_slots", "readonly", store => store.getAll()),
+    saveForgeSlot: record => access("forge_slots", "readwrite", store => store.put(record)),
+    removeForgeSlot: slot => access("forge_slots", "readwrite", store => store.delete(slot)),
     savePlacement: (record, nameKey) => {
       let duplicate = false;
       return access("placements", "readwrite", store => {

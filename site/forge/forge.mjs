@@ -609,9 +609,14 @@ async function deliverModel(button, inGame) {
 
 $("export-glb").addEventListener("click", event => deliverModel(event.currentTarget, false));
 $("send-game-model").addEventListener("click", () => saveCatalogWeapon(true));
-$("reset-game-model").addEventListener("click", () => {
-  try { localStorage.removeItem(GAME_MODEL_KEY); status("Штатная модель вернётся при следующем запуске игры."); }
-  catch (error) { status(error.message, true); }
+$("reset-game-model").addEventListener("click", async () => {
+  const slot = Number($("game-slot").value);
+  try {
+    await window.ChernoObjectLibrary.removeForgeSlot(slot);
+    const legacy = JSON.parse(localStorage.getItem(GAME_MODEL_KEY) || "null");
+    if (legacy && (legacy.slot ?? 3) === slot) localStorage.removeItem(GAME_MODEL_KEY);
+    feedback.textContent = "Назначение снято. Перезапусти игру.";
+  } catch (error) { feedback.textContent = error.message; }
 });
 window.addEventListener("keydown", (event) => {
   const target = event.target;
@@ -1195,14 +1200,8 @@ async function saveCatalogWeapon(sendToGame) {
     }
     if (sendToGame) {
       if (saved.blob.size > 2 * 1024 * 1024) throw new Error("В библиотеке сохранено. Для отправки в игру требуется GLB до 2 МБ.");
-      const glb = await new Promise((resolve,reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(",")[1]);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(saved.blob);
-      });
-      localStorage.setItem(GAME_MODEL_KEY, JSON.stringify({version:1, name, glb, slot,
-        category:gameplay.grip, gameplay, viewmodel, weaponType:saved.recipe?.weaponType}));
+      await window.ChernoObjectLibrary.saveForgeSlot({id:slot, version:1, name, blob:saved.blob, slot,
+        category:gameplay.grip, gameplay, viewmodel, weaponType:saved.recipe?.weaponType});
     }
     feedback.textContent = sendToGame ? "Профиль сохранён. Перезапусти игру и нажми " + (slot === 10 ? 0 : slot) + "." : "Профиль сохранён в библиотеке.";
   } catch (error) { feedback.textContent = error.message; }

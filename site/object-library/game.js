@@ -2,6 +2,16 @@
   "use strict";
   window.chernozeryeLocalObjects = "";
   const library = window.ChernoObjectLibrary;
+  window.chernozeryeForgeSlots = null;
+  library.forgeSlots().then(async records => {
+    const results = await Promise.allSettled(records.map(async ({blob, ...record}) =>
+      ({...record, glb:await base64(blob)})));
+    window.chernozeryeForgeSlots = JSON.stringify(results.flatMap(result =>
+      result.status === "fulfilled" ? [result.value] : []));
+  }).catch(error => {
+    console.warn("Не удалось прочитать тестовые ячейки Кузни", error);
+    window.chernozeryeForgeSlots = "[]";
+  });
   function base64(blob) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();

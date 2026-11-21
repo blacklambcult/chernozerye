@@ -30,6 +30,9 @@ var visual_holder: Node3D
 var imported_model: Node3D
 var model_animation: AnimationPlayer
 var inventory_slot := 2
+var package_override: Dictionary = {}
+var custom_model_loaded := false
+var flash_left := 0.0
 var casing_port: Node3D
 var spent_cases := 0
 var eject_at := 0.0
@@ -75,13 +78,14 @@ func _read_game_model() -> Dictionary:
     if not raw is String or raw.length() > 2800000:
         return {}
     var data: Variant = JSON.parse_string(raw)
+    return data if accepts_package(data) else {}
+
+func accepts_package(data: Variant) -> bool:
     if not data is Dictionary or data.get("version") != 1 \
             or not data.get("glb") is String or not data.get("viewmodel") is Dictionary \
             or not data.get("gameplay") is Dictionary:
-        return {}
-    if not ["sidearm", "longarm"].has(data.get("category")):
-        return {}
-    return data
+        return false
+    return data["glb"].length() <= 2800000 and ["sidearm", "longarm"].has(data.get("category"))
 
 func _make_game_model(data: Dictionary) -> Node3D:
     if data.is_empty():
@@ -141,8 +145,10 @@ func _ready() -> void:
         push_error("FORGE_PISTOL_CAMERA_MISSING")
         return
     player = eye.get_parent() as CharacterBody3D
-    var package := _read_game_model()
+    var package := package_override if not package_override.is_empty() else _read_game_model()
+    package_override = {}
     var custom := _make_game_model(package)
+    custom_model_loaded = custom != null
     if custom != null:
         var slot: Variant = package.get("slot", 3)
         if (slot is int or slot is float) and slot >= 3 and slot <= 10 and floorf(float(slot)) == float(slot):
@@ -195,12 +201,14 @@ func _ready() -> void:
     add_child(weapon_hand)
     flash.position = Vector3(0.0, 0.11, -0.51)
     if forward_marker != null:
-        flash.position = visual_holder.to_local(forward_marker.global_position)
-    flash.light_color = Color("#ffba75")
-    flash.omni_range = 4.0
+        flash.position = to_local(forward_marker.global_position)
+    flash.light_color = Color("#ffb84d")
+    flash.omni_range = 2.8
     flash.light_energy = 3.0
     flash.visible = false
     add_child(flash)
+    _add_flash_cone(0.036, 0.12, 5, Color("#ffd275"))
+    _add_flash_cone(0.024, 0.09, 4, Color.WHITE)
     report.stream = SHOT_STREAM
     report.bus = &"Effects"
     report.volume_db = -5.0
@@ -211,6 +219,23 @@ func _ready() -> void:
         grip_marker != null, " forward_marker=", forward_marker != null,
         " magazine_marker=", magazine_marker != null,
         " model_scale=", model_scale, " hand_visible=", weapon_hand != null)
+
+func _add_flash_cone(radius: float, length: float, sides: int, color: Color) -> void:
+    var cone := CylinderMesh.new()
+    cone.top_radius = 0.0
+    cone.bottom_radius = radius
+    cone.height = length
+    cone.radial_segments = sides
+    var material := StandardMaterial3D.new()
+    material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    material.albedo_color = color
+    var instance := MeshInstance3D.new()
+    instance.mesh = cone
+    instance.material_override = material
+    instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    instance.rotation.x = -PI / 2.0
+    instance.position.z = -0.06
+    flash.add_child(instance)
 
 func equip(value: bool) -> void:
     visible = value
@@ -223,6 +248,7 @@ func equip(value: bool) -> void:
             cocked = false
         cocking_left = 0.0
         flash.visible = false
+        flash_left = 0.0
         last_action = "holstered"
         if model_animation != null:
             model_animation.stop()
@@ -356,6 +382,7 @@ func _shoot() -> void:
         return
     pending = false
     rounds -= 1
+    flash_left = 0.065
     if cocking_clip == &"CockHammer":
         cocked = false
         trigger_held = false
@@ -400,6 +427,7 @@ func _shoot() -> void:
 
 func _physics_process(delta: float) -> void:
     cooldown = maxf(0.0, cooldown - delta)
+    flash_left = maxf(0.0, flash_left - delta)
     bloom = move_toward(bloom, 0.0, delta * 2.2)
     if not visible:
         return
@@ -428,4 +456,6 @@ func _physics_process(delta: float) -> void:
     var reload_t := sin(PI * reload_left / reload_seconds)
     position = rest_pose + Vector3(0.0, -0.11 * reload_t, 0.045 * kick)
     rotation = rest_angles + Vector3(0.24 * kick, 0.0, -0.20 * reload_t)
-    flash.visible = cooldown > 0.0 and shot_age < 0.05
+    if forward_marker != null:
+        flash.position = to_local(forward_marker.global_position)
+    flash.visible = flash_left > 0.0
