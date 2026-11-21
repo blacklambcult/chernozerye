@@ -159,6 +159,32 @@ func _run() -> void:
     if not is_zero_approx(hinge.rotation.x) or shell.scale.x > 0.01:
         _fail("Fire did not restore the closed pose")
         return
+    var body := Node3D.new()
+    body.name = "Weapon_Body"
+    model.add_child(body)
+    var fire := animator.get_animation(&"Fire")
+    var body_track := fire.add_track(Animation.TYPE_POSITION_3D)
+    fire.track_set_path(body_track, ^"Weapon_Body")
+    fire.position_track_insert_key(body_track, 0.0, Vector3.ZERO)
+    fire.position_track_insert_key(body_track, 0.05, Vector3.BACK * 0.04)
+    pistol.call("_apply_gameplay", {"bodycam": 1.0})
+    pistol.call("_tune_fire_body_tracks")
+    if not Vector3(fire.track_get_key_value(body_track, 1)).is_zero_approx() \
+            or not is_zero_approx(hinge.rotation.x):
+        _fail("bodycam must remove the baked body kick and keep the closed hinge")
+        return
+    pistol.set("cooldown", 0.0)
+    pistol.call("_shoot")
+    var eye := actor.get("camera") as Camera3D
+    if is_zero_approx(eye.v_offset) or float(pistol.get("shot_impulse")) <= 0.0:
+        _fail("bodycam shot did not kick the camera and the weapon")
+        return
+    for frame in range(90):
+        actor.call("_physics_process", 1.0 / 60.0)
+        pistol.call("_physics_process", 1.0 / 60.0)
+    if absf(eye.v_offset) > 0.0001 or absf(pistol.position.z - rest_pose.z) > 0.001:
+        _fail("bodycam offset and viewmodel thrust must settle")
+        return
     var wav := Marshalls.raw_to_base64(FileAccess.get_file_as_bytes("res://revolver_report.wav"))
     var sounds := {}
     for action in ["fire", "cock", "reload", "empty"]:
@@ -172,6 +198,39 @@ func _run() -> void:
     revolver.call("equip", true)
     if int(revolver.get("rounds")) != 6 or not revolver_hand.is_visible_in_tree():
         _fail("original six-round revolver or its holding hand was changed")
+        return
+    var comparison_actor := CharacterBody3D.new()
+    comparison_actor.set_script(load("res://player.gd"))
+    comparison_actor.set("comparison_loadout", true)
+    get_root().add_child(comparison_actor)
+    var slots: Dictionary = comparison_actor.get("forge_weapons")
+    if slots.size() != 2 or not slots.has(2) or not slots.has(3) \
+            or bool(comparison_actor.get("revolver").visible):
+        _fail("comparison inventory must contain only Forge weapons in slots 3 and 4")
+        return
+    for index in [2, 3]:
+        var weapon: Node3D = slots[index]
+        var comparison_clips := weapon.get("model_animation") as AnimationPlayer
+        if weapon.get("weapon_type") != "revolver" or weapon.get("rounds") != 6 \
+                or weapon.get("casing_port") == null or weapon.get("forward_marker") == null \
+                or weapon.get("cocking_clip") != &"CockHammer" or comparison_clips == null \
+                or not comparison_clips.has_animation(&"Fire") or not comparison_clips.has_animation(&"Reload"):
+            _fail("generated comparison revolver missing clips, markers or profile")
+            return
+        if not is_equal_approx(float(weapon.get("bodycam_strength")), 0.0 if index == 2 else 0.8):
+            _fail("comparison revolvers must use different bodycam profile values")
+            return
+    var standard := slots[2].get("model_animation") as AnimationPlayer
+    var bodycam := slots[3].get("model_animation") as AnimationPlayer
+    var standard_fire := standard.get_animation(&"Fire")
+    var bodycam_fire := bodycam.get_animation(&"Fire")
+    var track := standard_fire.find_track(
+        standard.get_node(standard.root_node).get_path_to(
+            slots[2].get("imported_model").find_child("Weapon_Body")), Animation.TYPE_POSITION_3D)
+    if standard_fire == bodycam_fire or track < 0 \
+            or Vector3(standard_fire.track_get_key_value(track, 1)).length() <= \
+                Vector3(bodycam_fire.track_get_key_value(track, 1)).length():
+        _fail("compare original and reduced baked body motion without shared animation mutation")
         return
     print("FORGE_PISTOL_REGRESSION_OK: uploaded_glb=true anchors=3 parts>=10 capacity=7 one_click=true reload=true original_revolver=true hands=2 fp_profile=true")
     quit(0)

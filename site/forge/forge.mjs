@@ -1093,7 +1093,7 @@ const profileButtons = ["save-transferred-asset", "send-game-model"];
 const numericFields = {
   damage:[1,100], recoil:[0,3], capacity:[1,30], reload:[0.3,5],
   weight:[0.1,20], rate:[60,1200], noise:[0,100],
-  pushback:[0,3], recovery:[0.25,3], inertia:[0,3], impact:[0,3]
+  pushback:[0,3], recovery:[0.25,3], inertia:[0,3], impact:[0,3], bodycam:[0,1]
 };
 const choiceFields = ["class","grip","mode","sound"];
 
@@ -1192,7 +1192,7 @@ function fillWeaponProfile(record) {
   const grip = ["pistol","revolver"].includes(defaultClass) ? "sidearm" : "longarm";
   const old = record.recipe?.gameplay ?? {};
   const specs = {...Forge.normalizeGameplay(null, grip), class:defaultClass, grip,
-    pushback:1, recovery:1, inertia:1, impact:1,
+    pushback:1, recovery:1, inertia:1, impact:1, bodycam:0,
     mode:"single", weight:grip === "sidearm" ? 1 : 3, rate:260, noise:old.sound === "muted" ? 20 : 100,
     ...old, ...record.gameplay};
   if (!classes.includes(specs.class)) specs.class = defaultClass;

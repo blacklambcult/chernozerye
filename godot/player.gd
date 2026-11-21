@@ -11,10 +11,12 @@ const WALK_ACCELERATION := 9.0
 const WALK_FRICTION := 12.0
 const JUMP := 4.5
 const MOUSE_SENS := 0.002
+const COMPARISON_REVOLVER := preload("res://assets/bodycam_revolver.glb")
 
 var revolver := preload("res://revolver.gd").new()
 var forge_pistol := preload("res://forge_pistol.gd").new()
 var forge_weapons: Dictionary = {}
+var comparison_loadout := false
 var step_sound := AudioStreamPlayer.new()
 var music := preload("res://location_music.gd").new()
 var wind := AudioStreamPlayer.new()
@@ -33,6 +35,9 @@ var _modeled_character: Node3D
 var recoil_pitch := 0.0
 var recoil_recovery := 1.0
 var recoil_roll := 0.0
+var bodycam_offset := Vector2.ZERO
+var bodycam_roll := 0.0
+var bodycam_recovery := 1.0
 var _inspection_camera: Camera3D
 var _inspection_hint: Label
 var _inspection_light: SpotLight3D
@@ -101,9 +106,15 @@ func _ready() -> void:
     _modeled_character.set_script(preload("res://modeled_character.gd"))
     add_child(_modeled_character)
     camera.add_child(revolver)
-    camera.add_child(forge_pistol)
-    forge_weapons[forge_pistol.inventory_slot] = forge_pistol
-    _load_forge_slots()
+    if comparison_loadout and OS.has_feature("web"):
+        comparison_loadout = JavaScriptBridge.eval(
+            "new URLSearchParams(location.search).get('forge')", true) != "local"
+    if comparison_loadout:
+        _load_comparison_weapons()
+    else:
+        camera.add_child(forge_pistol)
+        forge_weapons[forge_pistol.inventory_slot] = forge_pistol
+        _load_forge_slots()
     _character_sequence = Node3D.new()
     _character_sequence.name = "CharacterSmoking"
     _character_sequence.set_script(preload("res://character_smoking.gd"))
@@ -169,7 +180,32 @@ func _start_character_sequence() -> bool:
 
 func _armed_slot() -> bool:
     var hud := get_parent().get_node_or_null("GameplayHUD/SurvivalHUD")
-    return hud != null and int(hud.get("selected_slot")) == 1
+    return not comparison_loadout and hud != null and int(hud.get("selected_slot")) == 1
+
+func _load_comparison_weapons() -> void:
+    var viewmodel := {
+        "position": [0.245, -0.235, -0.47],
+        "rotation": [0.0, 6.0, 0.0],
+        "scale": 0.95,
+        "hand_position": [0.012, 0.015, 0.025],
+    }
+    var gameplay := {
+        "class": "revolver", "capacity": 6, "damage": 28,
+        "recoil": 1.25, "reload": 2.2, "sound": "heavy", "weight": 1.2,
+    }
+    for index in range(2):
+        var weapon := forge_pistol if index == 0 else preload("res://forge_pistol.gd").new()
+        var label := "ОБЫЧНЫЙ" if index == 0 else "BODYCAM"
+        var profile := gameplay.duplicate()
+        profile["bodycam"] = 0.0 if index == 0 else 0.8
+        weapon.comparison_label = label
+        weapon.model_override = COMPARISON_REVOLVER
+        weapon.package_override = {
+            "name": "Кордоновский револьвер · " + label, "slot": index + 3,
+            "weaponType": "revolver", "gameplay": profile, "viewmodel": viewmodel,
+        }
+        camera.add_child(weapon)
+        forge_weapons[weapon.inventory_slot] = weapon
 
 func _load_forge_slots() -> void:
     if not OS.has_feature("web"):
@@ -303,6 +339,14 @@ func kick_view(strength := 1.0, recovery_speed := 1.0, twist := 0.0) -> void:
     recoil_recovery = recovery_speed
     recoil_roll = clampf(recoil_roll + twist * 0.4, -0.07, 0.07)
 
+func kick_bodycam(strength: float, twist: float, recovery_speed: float) -> void:
+    bodycam_offset = (bodycam_offset + Vector2(twist * 0.16, -0.022) * strength).limit_length(0.045)
+    bodycam_roll = clampf(bodycam_roll + twist * minf(strength, 1.0) * 0.65, -0.045, 0.045)
+    bodycam_recovery = recovery_speed
+    camera.h_offset = bodycam_offset.x
+    camera.v_offset = bodycam_offset.y
+    camera.rotation.z = recoil_roll + bodycam_roll
+
 func _movement_speed(sprinting: bool, quiet: bool = false) -> float:
     if quiet:
         return QUIET_SPEED
@@ -315,7 +359,12 @@ func _physics_process(delta: float) -> void:
     camera.rotation.x = maxf(-1.45, camera.rotation.x - recovery)
     recoil_pitch -= recovery
     recoil_roll *= exp(-12.0 * recoil_recovery * delta)
-    camera.rotation.z = recoil_roll
+    var bodycam_decay := exp(-19.0 * bodycam_recovery * delta)
+    bodycam_offset *= bodycam_decay
+    bodycam_roll *= bodycam_decay
+    camera.h_offset = bodycam_offset.x
+    camera.v_offset = bodycam_offset.y
+    camera.rotation.z = recoil_roll + bodycam_roll
     if not is_on_floor():
         velocity.y -= 17.0 * delta
     if (Input.is_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_SPACE)) and is_on_floor():
