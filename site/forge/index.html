@@ -19,6 +19,12 @@
   <style>
     html.studio-embedded .topbar, html.studio-embedded .footer { display:none!important; }
     html.studio-embedded .app { height:100vh!important; min-height:0!important; }
+    @media (min-width:1001px) {
+      .workspace.forge-transfer { grid-template-columns:minmax(0,1fr) minmax(280px,350px); }
+    }
+    .fp-position-sliders { grid-template-columns:1fr; }
+    .fp-position-sliders .axis { display:grid; grid-template-columns:1.5rem minmax(0,1fr) 5rem; align-items:center; gap:8px; }
+    .fp-position-sliders output { text-align:right; font-variant-numeric:tabular-nums; }
   </style>
 </head>
 <body>
@@ -187,10 +193,16 @@
         </section>
       </div>
       <section class="section forge-fp-panel" id="fp-inspector">
+        <section id="transferred-asset" hidden>
+          <label for="transferred-name">Название варианта</label>
+          <input id="transferred-name" maxlength="90">
+          <button id="save-transferred-asset" class="button primary full" type="button">Сохранить в библиотеку</button>
+          <p id="transfer-status" role="status"></p>
+        </section>
         <div class="section-header"><h3>Вид от первого лица</h3><span class="tag">FPS / CAMERA</span></div>
         <p class="hint">Посмотри, как игровой предмет выглядит в правой руке персонажа. Движок использует <b>75° FOV</b>; единицы позиций — игровые метры.</p>
         <button id="fp-preview-panel" type="button" class="button fp-preview-button full">◉ Включить предпросмотр в руке</button>
-        <div class="field-group"><label>Положение на экране / XYZ, м</label><div class="triplet">
+        <div class="field-group"><label>Положение в руке</label><div class="triplet fp-position-sliders">
           <label class="axis x"><span>X</span><input type="number" step=".01" data-fp-field="position" data-fp-index="0" aria-label="Положение предмета X"></label>
           <label class="axis y"><span>Y</span><input type="number" step=".01" data-fp-field="position" data-fp-index="1" aria-label="Положение предмета Y"></label>
           <label class="axis z"><span>Z</span><input type="number" step=".01" data-fp-field="position" data-fp-index="2" aria-label="Положение предмета Z"></label>
@@ -268,6 +280,7 @@
 </div>
 <script src="../model/model-core.js?v=1"></script>
 <script src="./forge-core.js?v=3"></script>
-<script type="module" src="./forge.mjs?v=4"></script>
+<script src="../object-library/library.js?v=2"></script>
+<script type="module" src="./forge.mjs?v=5"></script>
 </body>
 </html>
