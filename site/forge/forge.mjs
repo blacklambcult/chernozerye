@@ -654,7 +654,10 @@ function resize() {
   camera.updateProjectionMatrix();
 }
 new ResizeObserver(resize).observe(canvas);
+const animationClock = new THREE.Clock();
 function frame() {
+  const delta = Math.min(animationClock.getDelta(), 0.05);
+  transferred?.mixer.update(delta);
   resize();
   if(!fpPreviewActive) orbit.update();
   if (selectionBox) selectionBox.update();
@@ -911,7 +914,7 @@ function renderFpInspector() {
     if (input.type === "range") input.nextElementSibling.value = Number(input.value).toFixed(3) + " м";
   }
   $("fp-scale").value=String(vm.scale);
-  $("fp-scale-slider").value=String(Math.min(1.2,vm.scale));
+  $("fp-scale-slider").value=String(vm.scale);
   $("fp-scale-output").value=vm.scale.toFixed(3)+"×";
   $("fp-preview-toggle").classList.toggle("active",fpPreviewActive);
   $("fp-preview-toggle").setAttribute("aria-pressed",String(fpPreviewActive));
@@ -983,10 +986,11 @@ function changeViewmodel(field, value) {
   }
 }
 for(const input of document.querySelectorAll("[data-fp-field]")){
-  if (input.dataset.fpField === "position") {
+  if (["position", "hand_position"].includes(input.dataset.fpField)) {
+    const limit = input.dataset.fpField === "position" ? 2 : 1;
     input.type = "range";
-    input.min = "-2";
-    input.max = "2";
+    input.min = String(-limit);
+    input.max = String(limit);
     input.step = ".001";
     input.after(document.createElement("output"));
   }
@@ -1068,6 +1072,16 @@ window.__hellishForgeLoaded = true;
 requestAnimationFrame(frame);
 
 const catalog = $("weapon-library");
+const clipPicker = $("weapon-clip");
+clipPicker.addEventListener("change", () => {
+  if (!transferred) return;
+  transferred.mixer.stopAllAction();
+  const clip = transferred.clips[Number(clipPicker.value)];
+  if (clipPicker.value !== "" && clip) {
+    const action = transferred.mixer.clipAction(clip);
+    action.reset().setLoop(THREE.LoopOnce, 1).play();
+  }
+});
 const feedback = $("transfer-status");
 const profileButtons = ["save-transferred-asset", "send-game-model"];
 const numericFields = {
@@ -1107,6 +1121,8 @@ let catalogRequest = 0;
 const weapons = new Map();
 async function openCatalogWeapon(id) {
   const request = ++catalogRequest;
+  clipPicker.length = 1;
+  clipPicker.disabled = true;
   for (const button of profileButtons) $(button).disabled = true;
   if (fpPreviewActive) clearFpPreview();
   transferred = null;
@@ -1119,7 +1135,9 @@ async function openCatalogWeapon(id) {
     forgeMeta.viewmodel = Forge.normalizeViewmodel(record.viewmodel ?? {
       ...Forge.DEFAULT_VIEWMODEL, scale: record.recipe?.gameplay?.scale ?? Forge.DEFAULT_VIEWMODEL.scale
     });
-    transferred = {record, scene:gltf.scene};
+    transferred = {record, scene:gltf.scene, clips:gltf.animations, mixer:new THREE.AnimationMixer(gltf.scene)};
+    gltf.animations.forEach((clip, index) => clipPicker.add(new Option(clip.name, String(index))));
+    clipPicker.disabled = gltf.animations.length === 0;
     $("transferred-name").value = record.name;
     $("viewport-title").textContent = record.name;
     if (!fpPreviewActive) toggleFpPreview();

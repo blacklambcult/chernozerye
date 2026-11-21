@@ -78,6 +78,30 @@ func _run() -> void:
     if int(pistol.get("rounds")) != 7:
         _fail("reload did not refill seven rounds")
         return
+    for clip in [&"CockHammer", &"RackSlide", &"RackBolt"]:
+        pistol.set("cocking_clip", clip)
+        pistol.set("rounds", 1)
+        pistol.call("reload")
+        pistol.call("_physics_process", 2.0)
+        pistol.call("request_shot")
+        if pistol.get("pending"):
+            _fail("unprepared weapon queued a shot after reload")
+            return
+        pistol.call("cock")
+        pistol.call("request_shot")
+        if pistol.get("pending"):
+            _fail("weapon fired before cocking completed")
+            return
+        pistol.call("_physics_process", 1.0)
+        pistol.call("request_shot")
+        if not pistol.get("pending"):
+            _fail("prepared weapon did not accept a shot")
+            return
+        pistol.call("_shoot")
+        if bool(pistol.get("cocked")) != (clip != &"CockHammer"):
+            _fail("wrong readiness state after shot")
+            return
+        pistol.call("_physics_process", 1.0)
     pistol.call("equip", false)
     revolver.call("equip", true)
     if int(revolver.get("rounds")) != 6 or not revolver_hand.is_visible_in_tree():

@@ -28,6 +28,10 @@ var eye: Camera3D
 var player: CharacterBody3D
 var visual_holder: Node3D
 var imported_model: Node3D
+var model_animation: AnimationPlayer
+var cocking_clip: StringName = &""
+var cocked := true
+var cocking_left := 0.0
 var grip_marker: Node3D
 var forward_marker: Node3D
 var magazine_marker: Node3D
@@ -116,7 +120,7 @@ func _read_profile(override: Dictionary = {}) -> void:
     var rot := _read_vector(settings.get("rotation"), Vector3(0.0, 9.0, 0.0))
     rest_angles = Vector3(deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z))
     var scale_value: float = float(settings.get("scale", 0.26))
-    model_scale = clampf(scale_value if is_finite(scale_value) else 0.26, 0.05, 3.0)
+    model_scale = clampf(scale_value if is_finite(scale_value) else 0.26, 0.05, 8.0)
     hand_position = _read_vector(settings.get("hand_position"),
         Vector3(0.025, -0.015, 0.035)).clamp(-Vector3.ONE, Vector3.ONE)
     var hand_rot := _read_vector(settings.get("hand_rotation"), Vector3.ZERO)
@@ -138,6 +142,9 @@ func _ready() -> void:
     if custom != null:
         _read_profile(package["viewmodel"])
         _apply_gameplay(package["gameplay"])
+        var weapon_class: String = str(package["gameplay"].get("class", package.get("weaponType", "")))
+        cocking_clip = { "revolver": &"CockHammer", "pistol": &"RackSlide", "smg": &"RackBolt" }.get(weapon_class, &"")
+        cocked = cocking_clip != &"CockHammer"
         print("FORGE_GAME_MODEL_READY: ", str(package.get("name", "")))
     else:
         _read_profile()
@@ -151,6 +158,10 @@ func _ready() -> void:
     add_child(visual_holder)
     imported_model = custom if custom != null else ASSET_SCENE.instantiate() as Node3D
     visual_holder.add_child(imported_model)
+    if custom != null:
+        var players := imported_model.find_children("*", "AnimationPlayer", true, false)
+        if not players.is_empty():
+            model_animation = players[0] as AnimationPlayer
     grip_marker = imported_model.find_child("HF_GRIP_PRIMARY", true, false) as Node3D
     forward_marker = imported_model.find_child("HF_FORWARD", true, false) as Node3D
     magazine_marker = imported_model.find_child("HF_MAGAZINE", true, false) as Node3D
@@ -198,21 +209,74 @@ func equip(value: bool) -> void:
         pending = false
         trigger_held = false
         reload_left = 0.0
+        if cocking_left > 0.0 or cocking_clip == &"CockHammer":
+            cocked = false
+        cocking_left = 0.0
         flash.visible = false
         last_action = "holstered"
+        if model_animation != null:
+            model_animation.stop()
+            model_animation.clear_queue()
+            model_animation.speed_scale = 1.0
+            if model_animation.has_animation(&"RESET"):
+                model_animation.play(&"RESET")
+                model_animation.advance(0.0)
+
+func _play_model_clips(clips: Array[StringName], seconds: float) -> void:
+    if model_animation == null:
+        return
+    var duration := 0.0
+    for clip in clips:
+        if not model_animation.has_animation(clip):
+            return
+        duration += model_animation.get_animation(clip).length
+    if duration <= 0.0:
+        return
+    model_animation.stop()
+    model_animation.clear_queue()
+    model_animation.speed_scale = duration / seconds
+    model_animation.play(clips[0], 0.0)
+    for index in range(1, clips.size()):
+        model_animation.queue(clips[index])
+    model_animation.advance(0.0)
+
+func cock() -> void:
+    if not visible or cocking_clip == &"" or cocked or rounds <= 0 \
+            or reload_left > 0.0 or cooldown > 0.0 or cocking_left > 0.0:
+        return
+    trigger_held = false
+    pending = false
+    cocking_left = 0.35
+    if model_animation != null and model_animation.has_animation(cocking_clip):
+        cocking_left = maxf(0.05, model_animation.get_animation(cocking_clip).length)
+        _play_model_clips([cocking_clip], cocking_left)
 
 func request_shot() -> void:
-    # No separate cocking phase; each valid click queues exactly one game shot.
     if not visible or rounds <= 0 or reload_left > 0.0 or cooldown > 0.0:
+        return
+    if not cocked:
+        trigger_held = false
         return
     pending = true
     last_action = "fire"
 
 func reload() -> void:
-    if visible and rounds < capacity and reload_left <= 0.0:
+    if visible and rounds < capacity and reload_left <= 0.0 and cocking_left <= 0.0:
         pending = false
+        trigger_held = false
+        if cocking_clip != &"":
+            cocked = false
         reload_left = reload_seconds
         last_action = "reload"
+        if model_animation != null:
+            if model_animation.has_animation(&"ReloadMag"):
+                _play_model_clips([&"ReloadMag"], reload_seconds)
+            elif model_animation.has_animation(&"BreakOpen"):
+                _play_model_clips([&"BreakOpen", &"InsertShells", &"CloseBarrel"], reload_seconds)
+            elif model_animation.has_animation(&"LoadShells"):
+                _play_model_clips([&"LoadShells"], reload_seconds)
+            else:
+                _play_model_clips([&"Reload"], reload_seconds)
 
 func spread_angle() -> float:
     var speed := Vector2(player.velocity.x, player.velocity.z).length() if player != null else 0.0
@@ -224,14 +288,19 @@ func _shot_direction() -> Vector3:
     return (eye.global_basis * Vector3(cos(angle) * radius, sin(angle) * radius, -1)).normalized()
 
 func _shoot() -> void:
-    if rounds <= 0 or reload_left > 0.0:
+    if rounds <= 0 or reload_left > 0.0 or not cocked:
         pending = false
         return
     pending = false
     rounds -= 1
+    if cocking_clip == &"CockHammer":
+        cocked = false
+        trigger_held = false
     cooldown = shot_interval
     bloom = minf(2.6, bloom + 0.78)
     last_action = "fire"
+    if model_animation != null and model_animation.has_animation(&"Fire"):
+        _play_model_clips([&"Fire"], minf(shot_interval, model_animation.get_animation(&"Fire").length))
     report.volume_db = -10.0 if indoors else -5.0
     report.pitch_scale = randf_range(1.06, 1.14)
     match sound_profile:
@@ -270,6 +339,10 @@ func _physics_process(delta: float) -> void:
     bloom = move_toward(bloom, 0.0, delta * 2.2)
     if not visible:
         return
+    if cocking_left > 0.0:
+        cocking_left = maxf(0.0, cocking_left - delta)
+        if cocking_left == 0.0:
+            cocked = true
     if reload_left > 0.0:
         reload_left = maxf(0.0, reload_left - delta)
         if reload_left == 0.0:

@@ -194,8 +194,16 @@ func _draw_slots(view_width: float, view_height: float) -> void:
         _write(x0, y + 72, status + "    " + action + "    R — ЗАРЯДИТЬ", 11, GOLD)
     elif selected_slot == 2 and player != null:
         var pistol: Node3D = player.get("forge_pistol")
-        var status := "ПЕРЕЗАРЯДКА" if float(pistol.get("reload_left")) > 0.0 else "%d / 7" % int(pistol.get("rounds"))
-        _write(x0, y + 72, "FORGE · " + status + "   ЛКМ — ВЫСТРЕЛ   R — ПЕРЕЗАРЯДКА", 11, GOLD)
+        var rounds := int(pistol.get("rounds"))
+        var status := "%d / %d" % [rounds, int(pistol.get("capacity"))]
+        var action := "ЛКМ — ВЫСТРЕЛ"
+        if float(pistol.get("reload_left")) > 0.0:
+            action = "ПЕРЕЗАРЯДКА"
+        elif float(pistol.get("cocking_left")) > 0.0:
+            action = "ВЗВЕДЕНИЕ"
+        elif rounds > 0 and not bool(pistol.get("cocked")):
+            action = "КОЛЕСО ↓ — ВЗВЕСТИ"
+        _write(x0, y + 72, status + "   " + action + "   R — ПЕРЕЗАРЯДКА", 11, GOLD)
     else:
         _write(x0, y + 72, "1 ПАЧКА · V     2 РЕВОЛЬВЕР     3 ПИСТОЛЕТ", 11, MUTED)
 

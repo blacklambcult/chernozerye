@@ -64,7 +64,7 @@
     return {
       position:vec(value.position,-2,2,"FP позиция"),
       rotation:vec(value.rotation,-180,180,"FP поворот"),
-      scale:finite(value.scale,0.05,3,"FP масштаб"),
+      scale:finite(value.scale,0.05,8,"FP масштаб"),
       hand_position:vec(value.hand_position,-1,1,"FP положение кисти"),
       hand_rotation:vec(value.hand_rotation,-180,180,"FP поворот кисти")
     };
