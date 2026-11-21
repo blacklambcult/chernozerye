@@ -557,7 +557,21 @@ jobs:
           test -s build/web/forge/index.html
           test -s build/web/forge/forge-core.js
           test -s build/web/forge/forge.mjs
-          # Studio embeds all four editors without deleting existing local drafts.
+          # Procedural weapon generator stays a standalone UMD/WebView-safe editor.
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const html = fs.readFileSync("site/weapon-generator/index.html", "utf8");
+          const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(x => x[1]).filter(Boolean);
+          for (const source of scripts) new Function(source);
+          if (!html.includes("data-action=\"save-library\"") || !html.includes("data-action=\"send-game\"") ||
+              !html.includes("QuaternionKeyframeTrack") || !html.includes("MuzzlePoint")) process.exit(1);
+          console.log("WEAPON_GENERATOR_READY: classes=8 library=true game=true animations=true");
+          NODE
+          node --test tests/weapon-generator.test.cjs
+          mkdir -p build/web/weapon-generator
+          cp -a site/weapon-generator/. build/web/weapon-generator/
+          test -s build/web/weapon-generator/index.html
+          # Studio embeds all five editors without deleting existing local drafts.
           node --check site/studio/studio-state.js
           node --check site/studio/project-snapshot.js
           node --check site/studio/studio.js
@@ -569,10 +583,11 @@ jobs:
           grep -q 'release-core.js?v=1' site/studio/index.html
           grep -q 'studio-releases.js?v=1' site/studio/index.html
           grep -q 'studio.css?v=4' site/studio/index.html
-          grep -q 'studio.js?v=3' site/studio/index.html
+          grep -q 'studio.js?v=4' site/studio/index.html
           grep -q 'id="release-list"' site/studio/index.html
           grep -q 'id="roadmap-list"' site/studio/index.html
           grep -q 'id="rail-toggle"' site/studio/index.html
+          grep -q 'data-target="weapon"' site/studio/index.html
           grep -q 'href="../studio/"' site/map/index.html
           grep -q 'href="../studio/"' site/quest/index.html
           grep -q 'href="../studio/"' site/model/index.html
@@ -594,7 +609,7 @@ jobs:
           version=manifest["current"]["studio"]
           sha=os.environ["GITHUB_SHA"]
           assert re.fullmatch(r"[a-f0-9]{40}",sha), sha
-          assert version=="0.5.0", "Unexpected Studio release number"
+          assert version=="0.6.0", "Unexpected Studio release number"
           info={"commit":sha,"studioVersion":version,"gameDirectory":os.environ["GAME_DIRECTORY"],
                 "builtAtUtc":datetime.datetime.now(datetime.timezone.utc).isoformat()}
           Path("build/web/studio/build-meta.json").write_text(
@@ -675,15 +690,17 @@ jobs:
               && grep -q 'HELLISH FORGE' /tmp/pages-forge.html \
               && curl -fsSL --max-time 20 "${SITE_URL}forge/forge-core.js" -o /tmp/pages-forge-core.js \
               && grep -q 'chernozerye.hellish-forge' /tmp/pages-forge-core.js \
+              && curl -fsSL --max-time 20 "${SITE_URL}weapon-generator/index.html" -o /tmp/pages-weapon-generator.html \
+              && grep -q 'WEAPON GENERATOR\|Генератор Оружия' /tmp/pages-weapon-generator.html \
               && curl -fsSL --max-time 20 "${SITE_URL}studio/index.html" -o /tmp/pages-studio.html \
               && grep -q 'CHERNOZERYE' /tmp/pages-studio.html \
               && curl -fsSL --max-time 20 "${SITE_URL}studio/studio.js" -o /tmp/pages-studio.js \
               && grep -q 'CHERNOZERYE_STUDIO_READY' /tmp/pages-studio.js \
               && curl -fsSL --max-time 20 "${SITE_URL}studio/releases.json" -o /tmp/pages-studio-releases.json \
-              && grep -q '"studio": "0.5.0"' /tmp/pages-studio-releases.json \
+              && grep -q '"studio": "0.6.0"' /tmp/pages-studio-releases.json \
               && curl -fsSL --max-time 20 "${SITE_URL}studio/build-meta.json" -o /tmp/pages-studio-build-meta.json \
               && grep -q "${GITHUB_SHA}" /tmp/pages-studio-build-meta.json; then
-              echo "LIVE_PAGES_OK: ${SITE_URL}, ${SITE_URL}${RELEASE_DIR}/, geo/, quest/, model/, forge/, studio/"
+              echo "LIVE_PAGES_OK: ${SITE_URL}, ${SITE_URL}${RELEASE_DIR}/, geo/, quest/, model/, forge/, weapon-generator/, studio/"
               exit 0
             fi
             echo "Public Pages check ${attempt}/12 not ready"

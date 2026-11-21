@@ -143,6 +143,11 @@ func _ready() -> void:
     grip_marker = imported_model.find_child("HF_GRIP_PRIMARY", true, false) as Node3D
     forward_marker = imported_model.find_child("HF_FORWARD", true, false) as Node3D
     magazine_marker = imported_model.find_child("HF_MAGAZINE", true, false) as Node3D
+    # Procedural Weapon Generator exports its native Godot socket names.
+    # The grip pivot is already at Weapon_Body origin, while MuzzlePoint can
+    # directly drive the existing flash position.
+    if forward_marker == null:
+        forward_marker = imported_model.find_child("MuzzlePoint", true, false) as Node3D
     # Position the actual author-supplied hand marker over the camera hand.
     var grip := Vector3.ZERO if custom != null else Vector3(0.0, 0.634, 0.3523)
     if grip_marker != null:

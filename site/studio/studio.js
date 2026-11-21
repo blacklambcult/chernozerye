@@ -8,7 +8,8 @@
     geo: {kicker:"GEOGRAPHIC WORKSPACE / 01", name:"GEO LAB · РЕДАКТОР МЕСТНОСТИ", url:"../map/", file:"../map/?studio=1"},
     quest: {kicker:"MISSION WORKSPACE / 02", name:"QUEST LAB · РЕДАКТОР КВЕСТОВ", url:"../quest/", file:"../quest/?studio=1"},
     model: {kicker:"ASSET WORKSPACE / 03", name:"MODEL LAB · 3D-КОНСТРУКТОР", url:"../model/", file:"../model/?studio=1"},
-    forge: {kicker:"ARMORY ASSET WORKSPACE / 04", name:"HELLISH FORGE · ИГРОВЫЕ МОДЕЛИ", url:"../forge/", file:"../forge/?studio=1"}
+    forge: {kicker:"ARMORY ASSET WORKSPACE / 04", name:"HELLISH FORGE · ИГРОВЫЕ МОДЕЛИ", url:"../forge/", file:"../forge/?studio=1"},
+    weapon: {kicker:"PROCEDURAL ARMORY / 05", name:"ГЕНЕРАТОР ОРУЖИЯ · 8 КЛАССОВ", url:"../weapon-generator/", file:"../weapon-generator/?studio=1"}
   });
   const COLLAPSE_KEY = "chernozerye.studio.rail-collapsed.v1";
   const cached = new Map();
@@ -69,14 +70,15 @@
         let url;
         try { url = new URL(link.href, frame.contentWindow.location.href); } catch { return; }
         if (url.origin !== window.location.origin) return;
-        const match = url.pathname.match(/\/chernozerye\/(map|quest|model|forge|studio)\/?$/);
+        const match = url.pathname.match(/\/chernozerye\/(map|quest|model|forge|weapon-generator|studio)\/?$/);
         if (!match) return;
         event.preventDefault();
-        show(match[1] === "map" ? "geo" : match[1] === "studio" ? "home" : match[1]);
+        show(match[1] === "map" ? "geo" : match[1] === "studio" ? "home" :
+          match[1] === "weapon-generator" ? "weapon" : match[1]);
       }, {capture: true});
       doc.addEventListener("keydown", (event) => {
         if (!event.altKey || event.ctrlKey || event.metaKey) return;
-        const next = { Digit0:"home", Digit1:"geo", Digit2:"quest", Digit3:"model", Digit4:"forge" }[event.code];
+        const next = { Digit0:"home", Digit1:"geo", Digit2:"quest", Digit3:"model", Digit4:"forge", Digit5:"weapon" }[event.code];
         if (next) { event.preventDefault(); event.stopImmediatePropagation(); show(next); }
       }, {capture: true});
     } catch (error) {
@@ -186,11 +188,11 @@
       return;
     }
     if (!evt.altKey || evt.ctrlKey || evt.metaKey) return;
-    const id = {Digit0:"home",Digit1:"geo",Digit2:"quest",Digit3:"model",Digit4:"forge"}[evt.code];
+    const id = {Digit0:"home",Digit1:"geo",Digit2:"quest",Digit3:"model",Digit4:"forge",Digit5:"weapon"}[evt.code];
     if (id) { evt.preventDefault(); show(id); }
   });
   setRailCollapsed(railCollapsed);
   refreshStats();
   show(State.toolId(location.hash), false);
-  console.info("CHERNOZERYE_STUDIO_READY: geo=true quest=true model=true forge=true workspace=local");
+  console.info("CHERNOZERYE_STUDIO_READY: geo=true quest=true model=true forge=true weapon=true workspace=local");
 })();
