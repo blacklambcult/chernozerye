@@ -4,8 +4,12 @@
   const library = window.ChernoObjectLibrary;
   window.chernozeryeForgeSlots = null;
   library.forgeSlots().then(async records => {
-    const results = await Promise.allSettled(records.map(async ({blob, ...record}) =>
-      ({...record, glb:await base64(blob)})));
+    const results = await Promise.allSettled(records.map(async ({blob, sounds, ...record}) => {
+      const clips = await Promise.allSettled(Object.entries(sounds ?? {}).map(async ([action, sound]) =>
+        [action, {format:sound.format, data:await base64(sound.blob)}]));
+      return {...record, glb:await base64(blob), sounds:Object.fromEntries(clips.flatMap(clip =>
+        clip.status === "fulfilled" ? [clip.value] : []))};
+    }));
     window.chernozeryeForgeSlots = JSON.stringify(results.flatMap(result =>
       result.status === "fulfilled" ? [result.value] : []));
   }).catch(error => {

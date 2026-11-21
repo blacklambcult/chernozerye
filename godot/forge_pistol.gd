@@ -136,6 +136,9 @@ func _read_profile(override: Dictionary = {}) -> void:
         deg_to_rad(hand_rot.y), deg_to_rad(hand_rot.z))
 
 var report := AudioStreamPlayer.new()
+var action_audio := AudioStreamPlayer.new()
+var action_sounds: Dictionary = {}
+var custom_report := false
 var flash := OmniLight3D.new()
 
 func _ready() -> void:
@@ -210,10 +213,17 @@ func _ready() -> void:
     _add_flash_cone(0.036, 0.12, 5, Color("#ffd275"))
     _add_flash_cone(0.024, 0.09, 4, Color.WHITE)
     report.stream = SHOT_STREAM
+    _load_action_sounds(package.get("sounds", {}))
+    if action_sounds.has("fire"):
+        report.stream = action_sounds["fire"]
+        custom_report = true
     report.bus = &"Effects"
     report.volume_db = -5.0
     report.max_polyphony = 3
     add_child(report)
+    action_audio.bus = &"Effects"
+    action_audio.max_polyphony = 3
+    add_child(action_audio)
     visible = false
     print("FORGE_PISTOL_READY: model=uploaded_glb capacity=7 one_click=true grip_marker=",
         grip_marker != null, " forward_marker=", forward_marker != null,
@@ -327,6 +337,31 @@ func _play_model_clips(clips: Array[StringName], seconds: float) -> void:
         model_animation.queue(clips[index])
     model_animation.advance(0.0)
 
+func _load_action_sounds(sounds: Variant) -> void:
+    if not sounds is Dictionary:
+        return
+    for action in ["fire", "cock", "reload", "empty"]:
+        var sound: Variant = sounds.get(action)
+        if not sound is Dictionary or not sound.get("data") is String:
+            continue
+        if sound["data"].length() > 699052:
+            continue
+        var bytes := Marshalls.base64_to_raw(sound["data"])
+        if bytes.is_empty() or bytes.size() > 512 * 1024:
+            continue
+        var stream: AudioStream
+        match sound.get("format"):
+            "wav": stream = AudioStreamWAV.load_from_buffer(bytes)
+            "ogg": stream = AudioStreamOggVorbis.load_from_buffer(bytes)
+            "mp3": stream = AudioStreamMP3.load_from_buffer(bytes)
+        if stream != null:
+            action_sounds[action] = stream
+
+func _play_action_sound(action: String) -> void:
+    if action_sounds.has(action):
+        action_audio.stream = action_sounds[action]
+        action_audio.play()
+
 func cock() -> void:
     if not visible or cocking_clip == &"" or cocked or rounds <= 0 \
             or reload_left > 0.0 or cooldown > 0.0 or cocking_left > 0.0:
@@ -334,12 +369,17 @@ func cock() -> void:
     trigger_held = false
     pending = false
     cocking_left = 0.35
+    _play_action_sound("cock")
     if model_animation != null and model_animation.has_animation(cocking_clip):
         cocking_left = maxf(0.05, model_animation.get_animation(cocking_clip).length)
         _play_model_clips([cocking_clip], cocking_left)
 
 func request_shot() -> void:
-    if not visible or rounds <= 0 or reload_left > 0.0 or cooldown > 0.0:
+    if not visible or reload_left > 0.0 or cooldown > 0.0:
+        return
+    if rounds <= 0:
+        trigger_held = false
+        _play_action_sound("empty")
         return
     if not cocked:
         trigger_held = false
@@ -357,6 +397,7 @@ func reload() -> void:
         if cocking_clip == &"CockHammer" and spent_cases > 0:
             eject_at = reload_seconds * (1.0 - 0.34 / 1.38)
         last_action = "reload"
+        _play_action_sound("reload")
         if model_animation != null:
             if model_animation.has_animation(&"ReloadMag"):
                 _play_model_clips([&"ReloadMag"], reload_seconds)
@@ -393,9 +434,11 @@ func _shoot() -> void:
     if model_animation != null and model_animation.has_animation(&"Fire"):
         _play_model_clips([&"Fire"], minf(shot_interval, model_animation.get_animation(&"Fire").length))
     report.volume_db = -10.0 if indoors else -5.0
-    report.pitch_scale = randf_range(1.06, 1.14)
+    report.pitch_scale = 1.0 if custom_report else randf_range(1.06, 1.14)
     match sound_profile:
-        "heavy": report.pitch_scale *= 0.78
+        "heavy":
+            if not custom_report:
+                report.pitch_scale *= 0.78
         "muted": report.volume_db -= 12.0
     if sound_profile != "silent":
         report.play()

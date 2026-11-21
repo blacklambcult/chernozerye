@@ -615,6 +615,7 @@ $("reset-game-model").addEventListener("click", async () => {
     await window.ChernoObjectLibrary.removeForgeSlot(slot);
     const legacy = JSON.parse(localStorage.getItem(GAME_MODEL_KEY) || "null");
     if (legacy && (legacy.slot ?? 3) === slot) localStorage.removeItem(GAME_MODEL_KEY);
+    await refreshForgeAssignments();
     feedback.textContent = "Назначение снято. Перезапусти игру.";
   } catch (error) { feedback.textContent = error.message; }
 });
@@ -1109,9 +1110,81 @@ function readWeaponProfile() {
   return {...values, ...Forge.normalizeGameplay(values, values.grip)};
 }
 
+const forgeAssignments = new Map();
+const soundFields = {fire:"Выстрел", cock:"Взвод", reload:"Перезарядка", empty:"Попытка выстрела без патронов"};
+const soundPanel = $("weapon-audio");
+const soundPreview = new Audio();
+let soundPreviewUrl;
+function stopSoundPreview() {
+  soundPreview.pause();
+  soundPreview.removeAttribute("src");
+  if (soundPreviewUrl) URL.revokeObjectURL(soundPreviewUrl);
+  soundPreviewUrl = null;
+}
+
+function renderWeaponSounds() {
+  for (const action of Object.keys(soundFields)) {
+    const sound = transferred?.sounds[action];
+    $("sound-name-" + action).textContent = sound?.name ?? "Звук по умолчанию";
+    $("sound-play-" + action).disabled = !sound;
+    $("sound-clear-" + action).disabled = !sound;
+  }
+}
+
+for (const [action, title] of Object.entries(soundFields)) {
+  const row = document.createElement("div");
+  row.innerHTML = `<label>${title}<input type="file" accept=".wav,.ogg,.mp3"></label>
+    <p id="sound-name-${action}"></p>
+    <button type="button" id="sound-play-${action}">Прослушать</button>
+    <button type="button" id="sound-clear-${action}">Сбросить</button>`;
+  soundPanel.append(row);
+  const input = row.querySelector("input");
+  input.addEventListener("change", () => {
+    const file = input.files[0];
+    input.value = "";
+    if (!file || !transferred) return;
+    const format = file.name.split(".").pop().toLowerCase();
+    if (!["wav","ogg","mp3"].includes(format) || !file.size || file.size > 512 * 1024) {
+      feedback.textContent = "Выбери WAV, OGG Vorbis или MP3 размером до 512 КБ.";
+      return;
+    }
+    transferred.sounds[action] = {name:file.name, format, blob:file};
+    feedback.textContent = "Звук добавлен. Сохрани профиль или отправь модель в игру.";
+    renderWeaponSounds();
+  });
+  $("sound-play-" + action).addEventListener("click", () => {
+    const sound = transferred?.sounds[action];
+    if (!sound) return;
+    stopSoundPreview();
+    soundPreviewUrl = URL.createObjectURL(sound.blob);
+    soundPreview.src = soundPreviewUrl;
+    soundPreview.play().catch(() => { feedback.textContent = "Браузер не смог воспроизвести этот файл."; });
+  });
+  $("sound-clear-" + action).addEventListener("click", () => {
+    if (!transferred) return;
+    stopSoundPreview();
+    delete transferred.sounds[action];
+    renderWeaponSounds();
+  });
+}
+async function refreshForgeAssignments() {
+  const records = await window.ChernoObjectLibrary.forgeSlots();
+  forgeAssignments.clear();
+  for (const record of records) forgeAssignments.set(record.slot, record);
+  for (const option of $("game-slot").options) {
+    const slot = Number(option.value);
+    const label = slot === 10 ? "10 (клавиша 0)" : option.value;
+    option.textContent = label + " — " + (forgeAssignments.get(slot)?.name ?? "свободна");
+  }
+}
+
 function fillWeaponProfile(record) {
-  const slot = Number(record.slot);
-  $("game-slot").value = String(Number.isInteger(slot) && slot >= 3 && slot <= 10 ? slot : 3);
+  const slots = Array.from($("game-slot").options, option => Number(option.value));
+  const assigned = slots.find(slot => forgeAssignments.get(slot)?.modelId === record.id);
+  const preferred = Number(record.slot);
+  const free = slots.find(slot => !forgeAssignments.has(slot));
+  const slot = assigned ?? (slots.includes(preferred) && !forgeAssignments.has(preferred) ? preferred : free);
+  $("game-slot").value = slot == null ? "" : String(slot);
   const type = record.recipe?.weaponType;
   const defaultClass = {revolver:"revolver",pistol:"pistol",smg:"smg",assault:"rifle",
     boltrifle:"rifle",semirifle:"rifle",pumpshotgun:"shotgun",doubleshotgun:"shotgun"}[type] || "other";
@@ -1128,6 +1201,8 @@ let catalogRequest = 0;
 const weapons = new Map();
 async function openCatalogWeapon(id) {
   const request = ++catalogRequest;
+  stopSoundPreview();
+  soundPanel.disabled = true;
   clipPicker.length = 1;
   clipPicker.disabled = true;
   for (const button of profileButtons) $(button).disabled = true;
@@ -1137,12 +1212,17 @@ async function openCatalogWeapon(id) {
   if (!record) { feedback.textContent = "Выбери модель или создай её в генераторе."; return; }
   feedback.textContent = "Загрузка модели…";
   try {
-    const gltf = await new GLTFLoader().parseAsync(await record.blob.arrayBuffer(), "");
+    const [gltf] = await Promise.all([
+      new GLTFLoader().parseAsync(await record.blob.arrayBuffer(), ""),
+      refreshForgeAssignments()
+    ]);
     if (request !== catalogRequest) return;
     forgeMeta.viewmodel = Forge.normalizeViewmodel(record.viewmodel ?? {
       ...Forge.DEFAULT_VIEWMODEL, scale: record.recipe?.gameplay?.scale ?? Forge.DEFAULT_VIEWMODEL.scale
     });
-    transferred = {record, scene:gltf.scene, clips:gltf.animations, mixer:new THREE.AnimationMixer(gltf.scene)};
+    transferred = {record, sounds:{...record.sounds}, scene:gltf.scene, clips:gltf.animations, mixer:new THREE.AnimationMixer(gltf.scene)};
+    soundPanel.disabled = false;
+    renderWeaponSounds();
     gltf.animations.forEach((clip, index) => clipPicker.add(new Option(clip.name, String(index))));
     clipPicker.disabled = gltf.animations.length === 0;
     $("transferred-name").value = record.name;
@@ -1190,7 +1270,10 @@ async function saveCatalogWeapon(sendToGame) {
     const gameplay = readWeaponProfile();
     const viewmodel = Forge.normalizeViewmodel(forgeMeta.viewmodel);
     const slot = Number($("game-slot").value);
-    const saved = {...record, name, gameplay, viewmodel, slot, updatedAt:new Date().toISOString()};
+    if (sendToGame && (!Number.isInteger(slot) || slot < 3 || slot > 10))
+      throw new Error("Выбери тестовую ячейку. Если все заняты, выбери, какую заменить.");
+    const saved = {...record, name, gameplay, viewmodel, sounds:{...transferred.sounds},
+      slot:slot || record.slot, updatedAt:new Date().toISOString()};
     await window.ChernoObjectLibrary.saveModel(saved);
     weapons.set(saved.id, saved);
     if (transferred?.record.id === saved.id) {
@@ -1200,8 +1283,9 @@ async function saveCatalogWeapon(sendToGame) {
     }
     if (sendToGame) {
       if (saved.blob.size > 2 * 1024 * 1024) throw new Error("В библиотеке сохранено. Для отправки в игру требуется GLB до 2 МБ.");
-      await window.ChernoObjectLibrary.saveForgeSlot({id:slot, version:1, name, blob:saved.blob, slot,
-        category:gameplay.grip, gameplay, viewmodel, weaponType:saved.recipe?.weaponType});
+      await window.ChernoObjectLibrary.saveForgeSlot({id:slot, modelId:saved.id, version:1, name, blob:saved.blob, slot,
+        category:gameplay.grip, gameplay, viewmodel, sounds:saved.sounds, weaponType:saved.recipe?.weaponType});
+      await refreshForgeAssignments();
     }
     feedback.textContent = sendToGame ? "Профиль сохранён. Перезапусти игру и нажми " + (slot === 10 ? 0 : slot) + "." : "Профиль сохранён в библиотеке.";
   } catch (error) { feedback.textContent = error.message; }

@@ -184,10 +184,13 @@ func _load_forge_slots() -> void:
     if not records is Array:
         return
     for record in records.slice(0, 8):
-        if not record is Dictionary or not record.get("slot") is float:
+        if not record is Dictionary:
             continue
-        var slot := int(record["slot"]) - 1
-        if slot < 2 or slot > 9 or float(slot + 1) != record["slot"]:
+        var slot_number: Variant = record.get("slot")
+        if not (slot_number is int or slot_number is float):
+            continue
+        var slot := int(slot_number) - 1
+        if slot < 2 or slot > 9 or float(slot + 1) != float(slot_number):
             continue
         var weapon := preload("res://forge_pistol.gd").new()
         if not weapon.accepts_package(record):
