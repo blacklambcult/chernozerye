@@ -19,6 +19,8 @@ var pushback := 1.0
 var recovery_speed := 1.0
 var inertia_strength := 1.0
 var impact_strength := 1.0
+var bodycam_strength := 0.0
+var shot_impulse := 0.0
 var recoil_energy := 0.0
 var recoil_pose := 0.0
 var recoil_twist := 0.0
@@ -126,6 +128,7 @@ func _apply_gameplay(specs: Dictionary) -> void:
     recovery_speed = _game_number(specs.get("recovery"), 1.0, 0.25, 3.0)
     inertia_strength = _game_number(specs.get("inertia"), 1.0, 0.0, 3.0)
     impact_strength = _game_number(specs.get("impact"), 1.0, 0.0, 3.0)
+    bodycam_strength = _game_number(specs.get("bodycam"), 0.0, 0.0, 1.0)
     shot_noise = _game_number(specs.get("noise"), 100.0, 0.0, 100.0) / 100.0
     if sound_profile == "silent":
         shot_noise = 0.0
@@ -204,6 +207,7 @@ func _ready() -> void:
         var players := imported_model.find_children("*", "AnimationPlayer", true, false)
         if not players.is_empty():
             model_animation = players[0] as AnimationPlayer
+            _tune_fire_body_tracks()
             if weapon_type == "doubleshotgun":
                 _repair_break_action_clips()
             else:
@@ -294,6 +298,7 @@ func equip(value: bool) -> void:
         recoil_energy = 0.0
         recoil_pose = 0.0
         recoil_twist = 0.0
+        shot_impulse = 0.0
         look_lag = Vector2.ZERO
         movement_lag = Vector3.ZERO
         flash_left = 0.0
@@ -305,6 +310,29 @@ func equip(value: bool) -> void:
             if model_animation.has_animation(&"RESET"):
                 model_animation.play(&"RESET")
                 model_animation.advance(0.0)
+
+func _tune_fire_body_tracks() -> void:
+    if bodycam_strength == 0.0 or not model_animation.has_animation(&"Fire"):
+        return
+    var root := model_animation.get_node_or_null(model_animation.root_node)
+    if root == null:
+        return
+    var body := imported_model.find_child("Weapon_Body", true, false)
+    if body == null:
+        return
+    var fire := model_animation.get_animation(&"Fire")
+    var path := root.get_path_to(body)
+    # Keep each generator clip's neutral pose and animated internal parts.
+    for type in [Animation.TYPE_POSITION_3D, Animation.TYPE_ROTATION_3D]:
+        var track := fire.find_track(path, type)
+        if track < 0 or fire.track_get_key_count(track) == 0:
+            continue
+        var first: Variant = fire.track_get_key_value(track, 0)
+        for key in range(1, fire.track_get_key_count(track)):
+            var value: Variant = fire.track_get_key_value(track, key)
+            var pose: Variant = value.lerp(first, bodycam_strength) if type == Animation.TYPE_POSITION_3D \
+                else value.slerp(first, bodycam_strength)
+            fire.track_set_key_value(track, key, pose)
 
 func _complete_revolver_pivot_tracks() -> void:
     var root := model_animation.get_node_or_null(model_animation.root_node)
@@ -573,8 +601,10 @@ func _shoot() -> void:
     var direction := _shot_direction()
     rounds -= 1
     recoil_energy = minf(recoil_energy + visual_recoil, 4.5)
-    recoil_twist = clampf(recoil_twist + randf_range(-0.035, 0.035) * visual_recoil, -0.16, 0.16)
-    flash_left = 0.065
+    var twist := randf_range(-0.035, 0.035) * visual_recoil
+    recoil_twist = clampf(recoil_twist + twist, -0.16, 0.16)
+    shot_impulse = minf(shot_impulse + visual_recoil * bodycam_strength, 3.0)
+    flash_left = lerpf(0.065, 0.048, bodycam_strength)
     if cocking_clip in [&"CockHammer", &"CycleBolt", &"PumpAction"]:
         cocked = false
         trigger_held = false
@@ -602,7 +632,10 @@ func _shoot() -> void:
     if player != null:
         if shot_noise > 0.0:
             player.call("emit_noise", shot_noise)
-        player.call("kick_view", visual_recoil, recovery_speed, recoil_twist)
+        player.call("kick_view", visual_recoil * (1.0 - 0.65 * bodycam_strength),
+            recovery_speed, recoil_twist * (1.0 - bodycam_strength))
+        if shot_impulse > 0.0 and player.has_method("kick_bodycam"):
+            player.call("kick_bodycam", visual_recoil * bodycam_strength, twist, recovery_speed)
     var origin := eye.global_position
     var excluded: Array[RID] = []
     if player != null:
@@ -667,12 +700,21 @@ func _physics_process(delta: float) -> void:
         movement = Vector3(-local_speed.x * 0.005, -local_speed.y * 0.004, -local_speed.z * 0.003)
         movement = movement.limit_length(0.04) * inertia_strength
     movement_lag = movement_lag.lerp(movement, 1.0 - exp(-10.0 / mass * delta))
+    var lift := recoil_pose * lerpf(0.105, 0.068, bodycam_strength) / mass
+    var shove := (0.06 * recoil_pose + 0.05 * shot_impulse) * pushback / mass
+    var wrist_drop := 0.017 * shot_impulse / mass
+    shot_impulse *= exp(-32.0 * recovery_speed / sqrt(mass) * delta)
     var reload_t := sin(PI * reload_left / reload_seconds)
     position = rest_pose + movement_lag + Vector3(
-        look_lag.x * 0.26, -0.11 * reload_t - recoil_pose * 0.01 - look_lag.y * 0.22,
-        0.06 * recoil_pose * pushback / mass)
+        look_lag.x * 0.26, -0.11 * reload_t - recoil_pose * 0.01 - wrist_drop - look_lag.y * 0.22,
+        shove)
     rotation = rest_angles + Vector3(
-        0.105 * recoil_pose / mass + look_lag.y, look_lag.x, recoil_twist - 0.20 * reload_t)
+        lift + look_lag.y, look_lag.x, recoil_twist - 0.20 * reload_t)
     if forward_marker != null:
         flash.position = to_local(forward_marker.global_position)
     flash.visible = flash_left > 0.0
+    if flash.visible and bodycam_strength > 0.0:
+        var intensity := flash_left / lerpf(0.065, 0.048, bodycam_strength)
+        flash.light_energy = lerpf(3.0, 4.5 * intensity * intensity, bodycam_strength)
+        for shape: MeshInstance3D in flash.get_children():
+            shape.scale = Vector3.ONE * lerpf(1.0, 0.3 + 0.7 * intensity, bodycam_strength)

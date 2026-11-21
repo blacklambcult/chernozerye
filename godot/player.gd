@@ -33,6 +33,9 @@ var _modeled_character: Node3D
 var recoil_pitch := 0.0
 var recoil_recovery := 1.0
 var recoil_roll := 0.0
+var bodycam_offset := Vector2.ZERO
+var bodycam_roll := 0.0
+var bodycam_recovery := 1.0
 var _inspection_camera: Camera3D
 var _inspection_hint: Label
 var _inspection_light: SpotLight3D
@@ -303,6 +306,14 @@ func kick_view(strength := 1.0, recovery_speed := 1.0, twist := 0.0) -> void:
     recoil_recovery = recovery_speed
     recoil_roll = clampf(recoil_roll + twist * 0.4, -0.07, 0.07)
 
+func kick_bodycam(strength: float, twist: float, recovery_speed: float) -> void:
+    bodycam_offset = (bodycam_offset + Vector2(twist * 0.16, -0.022) * strength).limit_length(0.045)
+    bodycam_roll = clampf(bodycam_roll + twist * minf(strength, 1.0) * 0.65, -0.045, 0.045)
+    bodycam_recovery = recovery_speed
+    camera.h_offset = bodycam_offset.x
+    camera.v_offset = bodycam_offset.y
+    camera.rotation.z = recoil_roll + bodycam_roll
+
 func _movement_speed(sprinting: bool, quiet: bool = false) -> float:
     if quiet:
         return QUIET_SPEED
@@ -315,7 +326,12 @@ func _physics_process(delta: float) -> void:
     camera.rotation.x = maxf(-1.45, camera.rotation.x - recovery)
     recoil_pitch -= recovery
     recoil_roll *= exp(-12.0 * recoil_recovery * delta)
-    camera.rotation.z = recoil_roll
+    var bodycam_decay := exp(-19.0 * bodycam_recovery * delta)
+    bodycam_offset *= bodycam_decay
+    bodycam_roll *= bodycam_decay
+    camera.h_offset = bodycam_offset.x
+    camera.v_offset = bodycam_offset.y
+    camera.rotation.z = recoil_roll + bodycam_roll
     if not is_on_floor():
         velocity.y -= 17.0 * delta
     if (Input.is_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_SPACE)) and is_on_floor():
