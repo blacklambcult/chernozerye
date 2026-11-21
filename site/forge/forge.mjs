@@ -1186,13 +1186,14 @@ function fillWeaponProfile(record) {
   const slot = assigned ?? (slots.includes(preferred) && !forgeAssignments.has(preferred) ? preferred : free);
   $("game-slot").value = slot == null ? "" : String(slot);
   const type = record.recipe?.weaponType;
-  const defaultClass = {revolver:"revolver",pistol:"pistol",smg:"smg",assault:"rifle",
-    boltrifle:"rifle",semirifle:"rifle",pumpshotgun:"shotgun",doubleshotgun:"shotgun"}[type] || "other";
+  const classes = Array.from($("game-class").options, option => option.value);
+  const defaultClass = classes.includes(type) ? type : "other";
   const grip = ["pistol","revolver"].includes(defaultClass) ? "sidearm" : "longarm";
   const old = record.recipe?.gameplay ?? {};
   const specs = {...Forge.normalizeGameplay(null, grip), class:defaultClass, grip,
     mode:"single", weight:grip === "sidearm" ? 1 : 3, rate:260, noise:old.sound === "muted" ? 20 : 100,
     ...old, ...record.gameplay};
+  if (!classes.includes(specs.class)) specs.class = defaultClass;
   for (const key of [...Object.keys(numericFields), ...choiceFields])
     $("game-" + key).value = specs[key];
 }
