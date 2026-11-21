@@ -257,6 +257,22 @@ func _run() -> void:
         if weapon.get("rounds") != rounds_before - 1 or haze == null or not haze.visible:
             _fail("test weapon did not fire with Bodycam: " + classes[index])
             return
+        if classes[index] == "boltrifle":
+            weapon.call("_physics_process", 1.0)
+            var rifle := weapon.get("imported_model") as Node3D
+            var bolt := rifle.find_child("Bolt", true, false) as Node3D
+            var closed := bolt.position
+            weapon.call("cock")
+            animation_player.advance(0.36)
+            if bolt.position.is_equal_approx(closed):
+                _fail("bolt did not move during the cocking animation")
+                return
+            animation_player.advance(0.64)
+            weapon.call("_physics_process", 1.0)
+            if animation_player.is_playing() or not bolt.position.is_equal_approx(closed) \
+                    or not bool(weapon.get("cocked")):
+                _fail("bolt action must finish once and leave the bolt closed")
+                return
     var last_weapon: Node3D = slots[9]
     var unarmed := InputEventKey.new()
     unarmed.physical_keycode = KEY_2

@@ -540,7 +540,10 @@ func _play_model_clips(clips: Array[StringName], seconds: float) -> void:
     for clip in clips:
         if not model_animation.has_animation(clip):
             return
-        duration += model_animation.get_animation(clip).length
+        var action := model_animation.get_animation(clip)
+        # Godot imports some GLTF actions (such as CycleBolt) as loops.
+        action.loop_mode = Animation.LOOP_NONE
+        duration += action.length
     if duration <= 0.0:
         return
     model_animation.stop()
