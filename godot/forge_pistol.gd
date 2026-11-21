@@ -29,6 +29,9 @@ var player: CharacterBody3D
 var visual_holder: Node3D
 var imported_model: Node3D
 var model_animation: AnimationPlayer
+var casing_port: Node3D
+var spent_cases := 0
+var eject_at := 0.0
 var cocking_clip: StringName = &""
 var cocked := true
 var cocking_left := 0.0
@@ -162,6 +165,8 @@ func _ready() -> void:
         var players := imported_model.find_children("*", "AnimationPlayer", true, false)
         if not players.is_empty():
             model_animation = players[0] as AnimationPlayer
+            _complete_revolver_pivot_tracks()
+    casing_port = imported_model.find_child("EjectionPort", true, false) as Node3D
     grip_marker = imported_model.find_child("HF_GRIP_PRIMARY", true, false) as Node3D
     forward_marker = imported_model.find_child("HF_FORWARD", true, false) as Node3D
     magazine_marker = imported_model.find_child("HF_MAGAZINE", true, false) as Node3D
@@ -209,6 +214,7 @@ func equip(value: bool) -> void:
         pending = false
         trigger_held = false
         reload_left = 0.0
+        eject_at = 0.0
         if cocking_left > 0.0 or cocking_clip == &"CockHammer":
             cocked = false
         cocking_left = 0.0
@@ -221,6 +227,57 @@ func equip(value: bool) -> void:
             if model_animation.has_animation(&"RESET"):
                 model_animation.play(&"RESET")
                 model_animation.advance(0.0)
+
+func _complete_revolver_pivot_tracks() -> void:
+    var root := model_animation.get_node_or_null(model_animation.root_node)
+    if root == null or imported_model.find_child("CylinderPivot", true, false) == null:
+        return
+    for pivot_name in ["CylinderPivot", "HammerPivot"]:
+        var pivot := imported_model.find_child(pivot_name, true, false) as Node3D
+        if pivot == null:
+            continue
+        var path := root.get_path_to(pivot)
+        for name in model_animation.get_animation_list():
+            var clip := model_animation.get_animation(name)
+            for channel in [Animation.TYPE_POSITION_3D, Animation.TYPE_ROTATION_3D]:
+                if clip.find_track(path, channel) >= 0:
+                    continue
+                var index := clip.add_track(channel)
+                clip.track_set_path(index, path)
+                if channel == Animation.TYPE_POSITION_3D:
+                    clip.position_track_insert_key(index, 0.0, pivot.position)
+                else:
+                    clip.rotation_track_insert_key(index, 0.0, pivot.quaternion)
+
+func _eject_revolver_cases() -> void:
+    var count := spent_cases
+    spent_cases = 0
+    if casing_port == null:
+        return
+    var world := get_tree().current_scene
+    if world == null:
+        return
+    for index in range(count):
+        var casing := MeshInstance3D.new()
+        var mesh := CylinderMesh.new()
+        mesh.top_radius = 0.005
+        mesh.bottom_radius = 0.006
+        mesh.height = 0.027
+        mesh.radial_segments = 6
+        casing.mesh = mesh
+        var brass := StandardMaterial3D.new()
+        brass.albedo_color = Color("#bb8948")
+        casing.material_override = brass
+        casing.top_level = true
+        world.add_child(casing)
+        casing.global_position = casing_port.global_position + eye.global_basis.y * (0.005 * index)
+        var origin := casing.position
+        var drift := -eye.global_basis.x * randf_range(0.16, 0.34)
+        var tween := casing.create_tween()
+        tween.tween_method(func(t: float) -> void:
+            casing.position = origin + drift * t + Vector3.UP * (0.38 * t - 1.8 * t * t)
+            casing.rotation = Vector3(t * 12.0, t * 8.0, t * 5.0), 0.0, 1.0, 0.8)
+        tween.tween_callback(casing.queue_free)
 
 func _play_model_clips(clips: Array[StringName], seconds: float) -> void:
     if model_animation == null:
@@ -267,6 +324,8 @@ func reload() -> void:
         if cocking_clip != &"":
             cocked = false
         reload_left = reload_seconds
+        if cocking_clip == &"CockHammer" and spent_cases > 0:
+            eject_at = reload_seconds * (1.0 - 0.34 / 1.38)
         last_action = "reload"
         if model_animation != null:
             if model_animation.has_animation(&"ReloadMag"):
@@ -296,6 +355,7 @@ func _shoot() -> void:
     if cocking_clip == &"CockHammer":
         cocked = false
         trigger_held = false
+        spent_cases += 1
     cooldown = shot_interval
     bloom = minf(2.6, bloom + 0.78)
     last_action = "fire"
@@ -345,6 +405,9 @@ func _physics_process(delta: float) -> void:
             cocked = true
     if reload_left > 0.0:
         reload_left = maxf(0.0, reload_left - delta)
+        if eject_at > 0.0 and reload_left <= eject_at:
+            eject_at = 0.0
+            _eject_revolver_cases()
         if reload_left == 0.0:
             rounds = capacity
     if automatic and trigger_held and player != null and player.get("controls_locked") != true \
