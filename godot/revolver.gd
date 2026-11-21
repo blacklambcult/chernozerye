@@ -188,7 +188,7 @@ func _shoot() -> void:
         return
     _surface_feedback(hit)
 
-func _surface_feedback(hit: Dictionary) -> void:
+func _surface_feedback(hit: Dictionary, intensity := 1.0) -> void:
     var body := hit.collider as Node3D
     var surface: StringName = body.get_meta("impact_surface", &"solid")
     var mark := MeshInstance3D.new()
@@ -222,12 +222,14 @@ func _surface_feedback(hit: Dictionary) -> void:
         # Raised log relief projects just past the building collision hull.
         if body.name == &"CollisionTimberBuildings":
             mark.global_position += normal * 0.023
+    if intensity > 0.0:
+        _impact_burst(mark, surface, material.albedo_color, intensity)
     if impact_sounds.has(surface):
         var sound := AudioStreamPlayer3D.new()
         sound.bus = &"Effects"
         sound.stream = impact_sounds[surface]
         sound.unit_size = 9.0
-        sound.volume_db = -4.0
+        sound.volume_db = -8.0 + 4.0 * minf(intensity, 2.0)
         sound.pitch_scale = randf_range(0.92, 1.07)
         mark.add_child(sound)
         sound.finished.connect(sound.queue_free)
@@ -237,3 +239,24 @@ func _surface_feedback(hit: Dictionary) -> void:
         var oldest := marks.pop_front() as MeshInstance3D
         if is_instance_valid(oldest):
             oldest.queue_free()
+
+func _impact_burst(mark: Node3D, surface: StringName, tint: Color, intensity: float) -> void:
+    var mesh := BoxMesh.new()
+    mesh.size = Vector3(0.027, 0.012, 0.015) * sqrt(intensity)
+    var material := StandardMaterial3D.new()
+    material.albedo_color = tint.lightened(0.20)
+    if surface == &"metal":
+        material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+        material.albedo_color = Color("#ffcb82")
+    mesh.material = material
+    var duration := 0.16 if surface == &"metal" else 0.30
+    for index in range(clampi(roundi(5.0 * intensity), 1, 12)):
+        var chip := MeshInstance3D.new()
+        chip.mesh = mesh
+        chip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        mark.add_child(chip)
+        var drift := Vector3(randf_range(-0.16, 0.16), randf_range(0.09, 0.30), randf_range(-0.16, 0.16))
+        var tween := chip.create_tween().set_parallel()
+        tween.tween_property(chip, "position", drift * sqrt(intensity), duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+        tween.tween_property(chip, "scale", Vector3.ONE * 0.01, duration)
+        tween.chain().tween_callback(chip.queue_free)

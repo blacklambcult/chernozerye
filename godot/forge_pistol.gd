@@ -15,6 +15,15 @@ var damage := 20.0
 var visual_recoil := 1.0
 var shot_interval := 0.23
 var weapon_weight := 1.0
+var pushback := 1.0
+var recovery_speed := 1.0
+var inertia_strength := 1.0
+var impact_strength := 1.0
+var recoil_energy := 0.0
+var recoil_pose := 0.0
+var recoil_twist := 0.0
+var look_lag := Vector2.ZERO
+var movement_lag := Vector3.ZERO
 var shot_noise := 1.0
 var automatic := false
 var trigger_held := false
@@ -113,6 +122,10 @@ func _apply_gameplay(specs: Dictionary) -> void:
     sound_profile = str(specs.get("sound", "standard"))
     shot_interval = 60.0 / _game_number(specs.get("rate"), 60.0 / 0.23, 60.0, 1200.0)
     weapon_weight = _game_number(specs.get("weight"), 1.0, 0.1, 20.0)
+    pushback = _game_number(specs.get("pushback"), 1.0, 0.0, 3.0)
+    recovery_speed = _game_number(specs.get("recovery"), 1.0, 0.25, 3.0)
+    inertia_strength = _game_number(specs.get("inertia"), 1.0, 0.0, 3.0)
+    impact_strength = _game_number(specs.get("impact"), 1.0, 0.0, 3.0)
     shot_noise = _game_number(specs.get("noise"), 100.0, 0.0, 100.0) / 100.0
     if sound_profile == "silent":
         shot_noise = 0.0
@@ -278,6 +291,11 @@ func equip(value: bool) -> void:
             cocked = false
         cocking_left = 0.0
         flash.visible = false
+        recoil_energy = 0.0
+        recoil_pose = 0.0
+        recoil_twist = 0.0
+        look_lag = Vector2.ZERO
+        movement_lag = Vector3.ZERO
         flash_left = 0.0
         last_action = "holstered"
         if model_animation != null:
@@ -543,12 +561,19 @@ func _shot_direction() -> Vector3:
     var radius := sqrt(randf()) * tan(spread_angle())
     return (eye.global_basis * Vector3(cos(angle) * radius, sin(angle) * radius, -1)).normalized()
 
+func add_look_motion(relative: Vector2) -> void:
+    var lag := clampf(sqrt(weapon_weight), 0.65, 2.5) * inertia_strength
+    look_lag = (look_lag + relative * (0.0007 * lag)).limit_length(0.13)
+
 func _shoot() -> void:
     if rounds <= 0 or break_stage != 0 or reload_left > 0.0 or not cocked:
         pending = false
         return
     pending = false
+    var direction := _shot_direction()
     rounds -= 1
+    recoil_energy = minf(recoil_energy + visual_recoil, 4.5)
+    recoil_twist = clampf(recoil_twist + randf_range(-0.035, 0.035) * visual_recoil, -0.16, 0.16)
     flash_left = 0.065
     if cocking_clip in [&"CockHammer", &"CycleBolt", &"PumpAction"]:
         cocked = false
@@ -577,9 +602,8 @@ func _shoot() -> void:
     if player != null:
         if shot_noise > 0.0:
             player.call("emit_noise", shot_noise)
-        player.call("kick_view", visual_recoil)
+        player.call("kick_view", visual_recoil, recovery_speed, recoil_twist)
     var origin := eye.global_position
-    var direction := _shot_direction()
     var excluded: Array[RID] = []
     if player != null:
         excluded.append(player.get_rid())
@@ -598,7 +622,7 @@ func _shoot() -> void:
     if player != null:
         var legacy := player.get("revolver") as Node3D
         if legacy != null:
-            legacy.call("_surface_feedback", hit)
+            legacy.call("_surface_feedback", hit, impact_strength)
 
 func _physics_process(delta: float) -> void:
     cooldown = maxf(0.0, cooldown - delta)
@@ -632,12 +656,23 @@ func _physics_process(delta: float) -> void:
         if player != null and player.get("controls_locked") != true and eye.current \
                 and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
             _shoot()
-    var kick_time := minf(shot_interval, 0.11 * sqrt(weapon_weight))
-    var shot_age := shot_interval - cooldown
-    var kick := maxf(0.0, 1.0 - shot_age / kick_time) * visual_recoil
+    var mass := clampf(sqrt(weapon_weight), 0.65, 2.5)
+    recoil_pose = lerpf(recoil_pose, recoil_energy, 1.0 - exp(-55.0 * delta))
+    recoil_energy *= exp(-15.0 * recovery_speed / mass * delta)
+    recoil_twist *= exp(-13.0 * recovery_speed / mass * delta)
+    look_lag *= exp(-14.0 / mass * delta)
+    var movement := Vector3.ZERO
+    if player != null:
+        var local_speed := eye.global_basis.inverse() * player.velocity
+        movement = Vector3(-local_speed.x * 0.005, -local_speed.y * 0.004, -local_speed.z * 0.003)
+        movement = movement.limit_length(0.04) * inertia_strength
+    movement_lag = movement_lag.lerp(movement, 1.0 - exp(-10.0 / mass * delta))
     var reload_t := sin(PI * reload_left / reload_seconds)
-    position = rest_pose + Vector3(0.0, -0.11 * reload_t, 0.045 * kick)
-    rotation = rest_angles + Vector3(0.24 * kick, 0.0, -0.20 * reload_t)
+    position = rest_pose + movement_lag + Vector3(
+        look_lag.x * 0.26, -0.11 * reload_t - recoil_pose * 0.01 - look_lag.y * 0.22,
+        0.06 * recoil_pose * pushback / mass)
+    rotation = rest_angles + Vector3(
+        0.105 * recoil_pose / mass + look_lag.y, look_lag.x, recoil_twist - 0.20 * reload_t)
     if forward_marker != null:
         flash.position = to_local(forward_marker.global_position)
     flash.visible = flash_left > 0.0

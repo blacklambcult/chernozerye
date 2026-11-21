@@ -297,6 +297,10 @@
         <p class="hint">Ячейки 1 и 2 заняты пачкой и штатным револьвером.</p>
         <label for="game-damage">Урон</label><input id="game-damage" type="number" min="1" max="100" step="1">
         <label for="game-recoil">Визуальная отдача</label><input id="game-recoil" type="number" min="0" max="3" step="0.05">
+        <label for="game-pushback">Толчок назад</label><input id="game-pushback" type="number" min="0" max="3" step="0.05">
+        <label for="game-recovery">Скорость возврата после выстрела</label><input id="game-recovery" type="number" min="0.25" max="3" step="0.05">
+        <label for="game-inertia">Инерция при движении и повороте</label><input id="game-inertia" type="number" min="0" max="3" step="0.05">
+        <label for="game-impact">Выраженность попадания</label><input id="game-impact" type="number" min="0" max="3" step="0.05">
         <label for="game-capacity">Ёмкость</label><input id="game-capacity" type="number" min="1" max="30" step="1">
         <label for="game-reload">Перезарядка, с</label><input id="game-reload" type="number" min="0.3" max="5" step="0.1">
         <label for="game-sound">Звуковой профиль</label>
@@ -318,6 +322,6 @@
 <script src="../model/model-core.js?v=1"></script>
 <script src="./forge-core.js?v=5"></script>
 <script src="../object-library/library.js?v=3"></script>
-<script type="module" src="./forge.mjs?v=12"></script>
+<script type="module" src="./forge.mjs?v=13"></script>
 </body>
 </html>
