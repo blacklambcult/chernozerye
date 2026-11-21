@@ -120,6 +120,34 @@ func _run() -> void:
     if not pistol.get("pending") or pistol.get("rounds") != 2:
         _fail("break-action weapon did not become ready after closing")
         return
+    # Mimic an older GLB with a hinge, but no exported shell meshes or Fire hinge track.
+    var hinge := Node3D.new()
+    hinge.name = "BarrelPivot"
+    model.add_child(hinge)
+    var animator := AnimationPlayer.new()
+    model.add_child(animator)
+    var clips := AnimationLibrary.new()
+    animator.add_animation_library(&"", clips)
+    var insertion := Animation.new()
+    insertion.length = 0.88
+    var hinge_track := insertion.add_track(Animation.TYPE_ROTATION_3D)
+    insertion.track_set_path(hinge_track, ^"BarrelPivot")
+    insertion.rotation_track_insert_key(hinge_track, 0.0, Quaternion(Vector3.RIGHT, -0.72))
+    clips.add_animation(&"InsertShells", insertion)
+    clips.add_animation(&"Fire", Animation.new())
+    pistol.set("model_animation", animator)
+    pistol.call("_repair_break_action_clips")
+    animator.play(&"InsertShells")
+    animator.seek(0.2, true)
+    var shell := hinge.get_node_or_null("ReloadShell_L") as Node3D
+    if shell == null or shell.scale.x < 0.9 or is_zero_approx(hinge.rotation.x):
+        _fail("older GLB did not show the animated insertion shell")
+        return
+    animator.play(&"Fire")
+    animator.advance(0.0)
+    if not is_zero_approx(hinge.rotation.x) or shell.scale.x > 0.01:
+        _fail("Fire did not restore the closed pose")
+        return
     var wav := Marshalls.raw_to_base64(FileAccess.get_file_as_bytes("res://revolver_report.wav"))
     var sounds := {}
     for action in ["fire", "cock", "reload", "empty"]:
