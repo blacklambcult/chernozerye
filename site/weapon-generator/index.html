@@ -894,6 +894,7 @@
                         <div class="actions-grid">
                             <button type="button" class="btn-godot" data-action="save-library">▣ СОХРАНИТЬ В БИБЛИОТЕКУ</button>
                             <button type="button" class="btn-amber" data-action="send-game">▶ ОТПРАВИТЬ В ИГРУ</button>
+                            <button type="button" class="btn-amber" data-action="open-forge">Настроить в Кузне</button>
                         </div>
                         <div class="studio-note">Библиотечный образец доступен другим редакторам Studio. Отправка заменяет тестовое оружие в слоте 3 этого браузера. Классовая логика и последовательности клипов будут подключаться отдельным этапом.</div>
                     </div>
@@ -1213,6 +1214,7 @@
             let playWeaponClip = function () {};
             let exportGLB = function () { showToast('3D-движок ещё загружается...', true); };
             let saveStudioModel = function () { showToast('3D-движок ещё загружается...', true); };
+            let openForge = saveStudioModel;
             let sendStudioGame = function () { showToast('3D-движок ещё загружается...', true); };
 
             /* =========================================================
@@ -1408,6 +1410,8 @@
                     exportGLB();
                 } else if (act === 'save-library') {
                     saveStudioModel();
+                } else if (act === 'open-forge') {
+                    openForge(btn);
                 } else if (act === 'send-game') {
                     sendStudioGame();
                 } else if (act === 'reset-cam') {
@@ -3846,7 +3850,7 @@
                 /* ---------------------------------------------------------
                    5.9 GODOT 4 BINARY .GLB EXPORT (TEXTURES + SOCKETS + CLIPS)
                    --------------------------------------------------------- */
-                function buildExportBlob() {
+                function buildExportBlob(includeStand = !state.noStand) {
                     return new Promise(function (resolve, reject) {
                     if (typeof THREE.GLTFExporter === 'undefined') {
                         reject(new Error('GLTFExporter не загружен'));
@@ -3868,7 +3872,7 @@
                     }
 
                     let target = currentWeaponRoot;
-                    if (!state.noStand) {
+                    if (includeStand) {
                         const wrap = new THREE.Group();
                         wrap.name = currentWeaponRoot.name + '_WithStand';
                         wrap.add(currentWeaponRoot.clone(true));
@@ -3926,6 +3930,24 @@
                         showToast('Экспорт Godot 4 (' + currentClips.length + ' клипов): ' + result.fileName, false);
                     } catch (err) {
                         showToast('Ошибка экспорта .GLB: ' + err.message, true);
+                    }
+                };
+
+                openForge = async function (button) {
+                    button.disabled = true;
+                    try {
+                        const recipe = { ...currentRecipe(), noStand: true };
+                        const { blob } = await buildExportBlob(false);
+                        if (blob.type !== 'model/gltf-binary') throw new Error('Не получен бинарный GLB');
+                        const glb = await blobToBase64(blob);
+                        sessionStorage.setItem('chernozerye.forge.transfer.v1', JSON.stringify({
+                            id: newAssetId(), name: recipe.gameplay.name, recipe, glb
+                        }));
+                        window.top.location.assign(new URL('../forge/?transfer=1', location.href));
+                    } catch (error) {
+                        showToast('Не удалось передать модель: ' + error.message, true);
+                    } finally {
+                        button.disabled = false;
                     }
                 };
 

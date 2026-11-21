@@ -2,10 +2,13 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const C = window.ChernoModelCore;
 const Forge = window.ChernoHellishForge;
 const KEY = Forge.STORAGE_KEY;
+const TRANSFER_KEY = "chernozerye.forge.transfer.v1";
+let transferred = null;
 const $ = (id) => document.getElementById(id);
 const TYPE_NAMES = { box:"КУБ", cylinder:"ЦИЛИНДР", sphere:"СФЕРА", cone:"КОНУС", plane:"ПЛОСКОСТЬ" };
 const TYPE_GLYPHS = { box:"▣", cylinder:"▥", sphere:"◉", cone:"△", plane:"▱" };
@@ -252,6 +255,12 @@ function select(id) {
 }
 function persist() {
   try {
+    if (transferred) {
+      transferred.record.viewmodel = Forge.normalizeViewmodel(forgeMeta.viewmodel);
+      sessionStorage.setItem(TRANSFER_KEY, JSON.stringify(transferred.record));
+      updateFpPreview();
+      return true;
+    }
     const checked=forgeDocument();
     project=C.makeProject(checked.name,checked.parts);
     forgeMeta={category:checked.category,subtype:checked.subtype,partRoles:{...checked.partRoles},
@@ -621,7 +630,7 @@ $("reset-game-model").addEventListener("click", () => {
 });
 window.addEventListener("keydown", (event) => {
   const target = event.target;
-  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
+  if (transferred || target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
   if (event.ctrlKey || event.metaKey) {
     if (event.code === "KeyD" && part()) { event.preventDefault(); duplicateSelected(); }
     else if (event.code === "KeyZ" && undoHistory.length) {
@@ -868,6 +877,7 @@ function fpHandGeometry(parent) {
   }
 }
 function clearFpPreview() {
+  transferred?.scene.removeFromParent();
   for (const child of [...fpRoot.children]) {
     fpRoot.remove(child);
     child.traverse((node)=>{
@@ -891,8 +901,9 @@ function updateFpPreview() {
   // The imported GLB is centred at HF_GRIP_PRIMARY by the Godot viewmodel.
   const grip = forgeMeta.anchors.grip_primary.enabled ?
     forgeMeta.anchors.grip_primary.position : [0,0,0];
-  importedModel.position.set(-grip[0]*vm.scale,-grip[1]*vm.scale,-grip[2]*vm.scale);
-  for(const p of project.parts) {
+  if (transferred) importedModel.add(transferred.scene);
+  else importedModel.position.set(-grip[0]*vm.scale,-grip[1]*vm.scale,-grip[2]*vm.scale);
+  for(const p of transferred ? [] : project.parts) {
     const mesh=meshFor(p);
     mesh.castShadow=false;
     importedModel.add(mesh);
@@ -915,6 +926,7 @@ function renderFpInspector() {
     const field=input.dataset.fpField;
     const index=Number(input.dataset.fpIndex);
     input.value=String(vm[field][index]);
+    if (input.type === "range") input.nextElementSibling.value = Number(input.value).toFixed(3) + " м";
   }
   $("fp-scale").value=String(vm.scale);
   $("fp-scale-slider").value=String(Math.min(1.2,vm.scale));
@@ -979,7 +991,7 @@ function toggleFpPreview() {
 function changeViewmodel(field, value) {
   try {
     const checked=Forge.normalizeViewmodel({...forgeMeta.viewmodel,[field]:value});
-    pushUndo();
+    if (!transferred) pushUndo();
     forgeMeta.viewmodel=checked;
     persist();
     renderFpInspector();
@@ -989,7 +1001,14 @@ function changeViewmodel(field, value) {
   }
 }
 for(const input of document.querySelectorAll("[data-fp-field]")){
-  input.addEventListener("change",()=>{
+  if (input.dataset.fpField === "position") {
+    input.type = "range";
+    input.min = "-2";
+    input.max = "2";
+    input.step = ".001";
+    input.after(document.createElement("output"));
+  }
+  input.addEventListener(input.type === "range" ? "input" : "change",()=>{
     const field=input.dataset.fpField;
     const values=[...forgeMeta.viewmodel[field]];
     if(input.value.trim()==="") {renderFpInspector();return;}
@@ -1066,4 +1085,59 @@ persist();
 if (startupWarning) status(startupWarning, true);
 window.__hellishForgeLoaded = true;
 requestAnimationFrame(frame);
+
+async function loadTransferredAsset() {
+  if (!new URLSearchParams(location.search).has("transfer")) return;
+  const panel = $("transferred-asset");
+  const feedback = $("transfer-status");
+  const save = $("save-transferred-asset");
+  panel.hidden = false;
+  save.disabled = true;
+  feedback.textContent = "Загрузка модели…";
+  try {
+    const record = JSON.parse(sessionStorage.getItem(TRANSFER_KEY));
+    if (!record?.glb || !record.id) throw new Error("В этой вкладке нет переданной модели.");
+    const bytes = Uint8Array.from(atob(record.glb), char => char.charCodeAt(0));
+    const gltf = await new GLTFLoader().parseAsync(bytes.buffer, "");
+    const viewmodel = Forge.normalizeViewmodel(record.viewmodel ?? {
+      ...Forge.DEFAULT_VIEWMODEL, scale: record.recipe.gameplay.scale
+    });
+    transferred = { record, scene: gltf.scene, blob: new Blob([bytes], {type:"model/gltf-binary"}) };
+    forgeMeta.viewmodel = viewmodel;
+    $("transferred-name").value = record.name;
+    $("viewport-title").textContent = record.name;
+    const workspace = document.querySelector(".workspace");
+    workspace.classList.add("forge-transfer");
+    document.querySelector(".sidebar.left").hidden = true;
+    for (const section of document.querySelector(".sidebar.right").children)
+      section.hidden = section.id !== "fp-inspector";
+    if (!fpPreviewActive) toggleFpPreview();
+    else updateFpPreview();
+    for (const id of ["fp-preview-toggle", "fp-preview-panel", "apply-fp-profile", "clear-game-fp-profile"])
+      $(id).hidden = true;
+    feedback.textContent = "";
+    save.disabled = false;
+    save.addEventListener("click", async () => {
+      const name = $("transferred-name").value.trim();
+      if (!name) { feedback.textContent = "Введи название варианта."; return; }
+      save.disabled = true;
+      try {
+        const pose = Forge.normalizeViewmodel(forgeMeta.viewmodel);
+        const recipe = {...record.recipe, gameplay: {...record.recipe.gameplay, name, scale:pose.scale}};
+        await window.ChernoObjectLibrary.saveModel({
+          id:record.id, name, blob:transferred.blob, kind:"weapon", source:"weapon-generator",
+          recipe, viewmodel:pose, updatedAt:new Date().toISOString()
+        });
+        record.name = name;
+        persist();
+        feedback.textContent = "Вариант с настроенной позой сохранён.";
+      } catch (error) {
+        feedback.textContent = "Ошибка сохранения: " + error.message;
+      } finally { save.disabled = false; }
+    });
+  } catch (error) {
+    feedback.textContent = "Ошибка загрузки: " + error.message;
+  }
+}
+loadTransferredAsset();
 console.info("HELLISH_FORGE_READY: categories=5 anchors=6 json=true glb=true parts=" + project.parts.length);
