@@ -14,6 +14,7 @@ const MOUSE_SENS := 0.002
 
 var revolver := preload("res://revolver.gd").new()
 var forge_pistol := preload("res://forge_pistol.gd").new()
+var forge_weapons: Dictionary = {}
 var step_sound := AudioStreamPlayer.new()
 var music := preload("res://location_music.gd").new()
 var wind := AudioStreamPlayer.new()
@@ -99,6 +100,8 @@ func _ready() -> void:
     add_child(_modeled_character)
     camera.add_child(revolver)
     camera.add_child(forge_pistol)
+    forge_weapons[forge_pistol.inventory_slot] = forge_pistol
+    _load_forge_slots()
     _character_sequence = Node3D.new()
     _character_sequence.name = "CharacterSmoking"
     _character_sequence.set_script(preload("res://character_smoking.gd"))
@@ -166,13 +169,56 @@ func _armed_slot() -> bool:
     var hud := get_parent().get_node_or_null("GameplayHUD/SurvivalHUD")
     return hud != null and int(hud.get("selected_slot")) == 1
 
-func _pistol_slot() -> bool:
-    var hud := get_parent().get_node_or_null("GameplayHUD/SurvivalHUD")
-    return hud != null and int(hud.get("selected_slot")) == forge_pistol.inventory_slot
+func _load_forge_slots() -> void:
+    if not OS.has_feature("web"):
+        return
+    var raw: Variant = JavaScriptBridge.eval("window.chernozeryeForgeSlots", true)
+    for attempt in range(100):
+        if raw is String:
+            break
+        await get_tree().create_timer(0.05).timeout
+        raw = JavaScriptBridge.eval("window.chernozeryeForgeSlots", true)
+    if not raw is String:
+        return
+    var records: Variant = JSON.parse_string(raw)
+    if not records is Array:
+        return
+    for record in records.slice(0, 8):
+        if not record is Dictionary or not record.get("slot") is float:
+            continue
+        var slot := int(record["slot"]) - 1
+        if slot < 2 or slot > 9 or float(slot + 1) != record["slot"]:
+            continue
+        var weapon := preload("res://forge_pistol.gd").new()
+        if not weapon.accepts_package(record):
+            weapon.free()
+            continue
+        weapon.package_override = record
+        weapon.indoors = forge_pistol.indoors
+        camera.add_child(weapon)
+        if not weapon.custom_model_loaded:
+            weapon.queue_free()
+            continue
+        var previous: Node3D = forge_weapons.get(slot)
+        if previous != null:
+            previous.hide()
+            previous.queue_free()
+            if forge_pistol == previous:
+                forge_pistol = weapon
+        forge_weapons[slot] = weapon
+    _sync_equipped_weapons()
 
 func _sync_equipped_weapons() -> void:
     revolver.equip(not _inspect_enabled and _armed_slot())
-    forge_pistol.equip(not _inspect_enabled and _pistol_slot())
+    var hud := get_parent().get_node_or_null("GameplayHUD/SurvivalHUD")
+    var slot := int(hud.get("selected_slot")) if hud != null else -1
+    for index in forge_weapons:
+        var weapon = forge_weapons[index]
+        var selected: bool = not _inspect_enabled and index == slot
+        if selected:
+            forge_pistol = weapon
+        if weapon.visible != selected:
+            weapon.equip(selected)
 
 func _matches(event: InputEventKey, latin: int, cyrillic: String) -> bool:
     return event.physical_keycode == latin or event.keycode == latin or (event.unicode != 0 and char(event.unicode).to_lower() == cyrillic)
@@ -288,7 +334,8 @@ func _physics_process(delta: float) -> void:
 func set_indoors(value: bool) -> void:
     music.set_indoors(value)
     revolver.indoors = value
-    forge_pistol.indoors = value
+    for weapon in forge_weapons.values():
+        weapon.indoors = value
     wind.volume_db = -80.0 if value else -75.0  # Remain silent; preserve the old interior mix relationship
     step_sound.stream = BOARD_STEP if value else EARTH_STEP
     step_distance = 0.0
