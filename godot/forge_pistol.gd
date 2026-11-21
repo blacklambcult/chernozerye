@@ -36,6 +36,9 @@ var flash_left := 0.0
 var casing_port: Node3D
 var spent_cases := 0
 var eject_at := 0.0
+var weapon_type := ""
+var break_stage := 0
+var casing_delay := 0.0
 var cocking_clip: StringName = &""
 var cocked := true
 var cocking_left := 0.0
@@ -159,7 +162,17 @@ func _ready() -> void:
         _read_profile(package["viewmodel"])
         _apply_gameplay(package["gameplay"])
         var weapon_class: String = str(package["gameplay"].get("class", package.get("weaponType", "")))
+        weapon_type = str(package.get("weaponType", weapon_class))
         cocking_clip = { "revolver": &"CockHammer", "pistol": &"RackSlide", "smg": &"RackBolt" }.get(weapon_class, &"")
+        cocking_clip = {
+            "assault": &"RackBolt", "semirifle": &"RackBolt",
+            "boltrifle": &"CycleBolt", "pumpshotgun": &"PumpAction",
+            "doubleshotgun": &""
+        }.get(weapon_type, cocking_clip)
+        if weapon_type == "doubleshotgun":
+            capacity = 2
+            rounds = capacity
+            automatic = false
         cocked = cocking_clip != &"CockHammer"
         print("FORGE_GAME_MODEL_READY: ", str(package.get("name", "")))
     else:
@@ -254,6 +267,10 @@ func equip(value: bool) -> void:
         trigger_held = false
         reload_left = 0.0
         eject_at = 0.0
+        casing_delay = 0.0
+        if weapon_type in ["pistol", "smg", "assault", "semirifle"]:
+            spent_cases = 0
+        break_stage = 0
         if cocking_left > 0.0 or cocking_clip == &"CockHammer":
             cocked = false
         cocking_left = 0.0
@@ -289,7 +306,7 @@ func _complete_revolver_pivot_tracks() -> void:
                 else:
                     clip.rotation_track_insert_key(index, 0.0, pivot.quaternion)
 
-func _eject_revolver_cases() -> void:
+func _eject_cases() -> void:
     var count := spent_cases
     spent_cases = 0
     if casing_port == null:
@@ -312,7 +329,15 @@ func _eject_revolver_cases() -> void:
         world.add_child(casing)
         casing.global_position = casing_port.global_position + eye.global_basis.y * (0.005 * index)
         var origin := casing.position
-        var drift := -eye.global_basis.x * randf_range(0.16, 0.34)
+        var direction := eye.global_basis.x
+        if weapon_type in ["assault", "semirifle", "smg"] or cocking_clip == &"CockHammer":
+            direction = -direction
+        elif weapon_type == "doubleshotgun":
+            direction = eye.global_basis.z
+        var drift := direction * randf_range(0.16, 0.34)
+        if weapon_type in ["doubleshotgun", "pumpshotgun"]:
+            casing.scale = Vector3(1.5, 1.65, 1.5)
+            brass.albedo_color = Color("#a63f31")
         var tween := casing.create_tween()
         tween.tween_method(func(t: float) -> void:
             casing.position = origin + drift * t + Vector3.UP * (0.38 * t - 1.8 * t * t)
@@ -363,7 +388,7 @@ func _play_action_sound(action: String) -> void:
         action_audio.play()
 
 func cock() -> void:
-    if not visible or cocking_clip == &"" or cocked or rounds <= 0 \
+    if not visible or cocking_clip == &"" or cocked or (rounds <= 0 and spent_cases == 0) \
             or reload_left > 0.0 or cooldown > 0.0 or cocking_left > 0.0:
         return
     trigger_held = false
@@ -373,9 +398,11 @@ func cock() -> void:
     if model_animation != null and model_animation.has_animation(cocking_clip):
         cocking_left = maxf(0.05, model_animation.get_animation(cocking_clip).length)
         _play_model_clips([cocking_clip], cocking_left)
+    if spent_cases > 0 and cocking_clip in [&"CycleBolt", &"PumpAction"]:
+        casing_delay = cocking_left * (0.34 / 0.78 if cocking_clip == &"CycleBolt" else 0.22 / 0.56)
 
 func request_shot() -> void:
-    if not visible or reload_left > 0.0 or cooldown > 0.0:
+    if not visible or break_stage != 0 or reload_left > 0.0 or cooldown > 0.0:
         return
     if rounds <= 0:
         trigger_held = false
@@ -388,10 +415,13 @@ func request_shot() -> void:
     last_action = "fire"
 
 func reload() -> void:
+    if weapon_type == "doubleshotgun":
+        _toggle_break_action()
+        return
     if visible and rounds < capacity and reload_left <= 0.0 and cocking_left <= 0.0:
         pending = false
         trigger_held = false
-        if cocking_clip != &"":
+        if cocking_clip != &"" and cocking_clip != &"PumpAction":
             cocked = false
         reload_left = reload_seconds
         if cocking_clip == &"CockHammer" and spent_cases > 0:
@@ -408,6 +438,32 @@ func reload() -> void:
             else:
                 _play_model_clips([&"Reload"], reload_seconds)
 
+func _toggle_break_action() -> void:
+    if not visible or reload_left > 0.0 or cooldown > 0.0:
+        return
+    pending = false
+    trigger_held = false
+    if break_stage == 0:
+        if rounds == capacity:
+            return
+        break_stage = 1
+        reload_left = 0.56
+        if spent_cases > 0:
+            casing_delay = 0.26
+        _play_model_clips([&"BreakOpen"], reload_left)
+    else:
+        break_stage = 3 if break_stage == 2 else 4
+        reload_left = 0.44
+        _play_model_clips([&"CloseBarrel"], reload_left)
+
+func insert_shells() -> void:
+    if not visible or weapon_type != "doubleshotgun" or break_stage != 1 or reload_left > 0.0:
+        return
+    break_stage = 2
+    reload_left = 0.88
+    _play_action_sound("reload")
+    _play_model_clips([&"InsertShells"], reload_left)
+
 func spread_angle() -> float:
     var speed := Vector2(player.velocity.x, player.velocity.z).length() if player != null else 0.0
     return deg_to_rad(0.40 + minf(speed * 0.34, 2.1) + bloom)
@@ -418,16 +474,22 @@ func _shot_direction() -> Vector3:
     return (eye.global_basis * Vector3(cos(angle) * radius, sin(angle) * radius, -1)).normalized()
 
 func _shoot() -> void:
-    if rounds <= 0 or reload_left > 0.0 or not cocked:
+    if rounds <= 0 or break_stage != 0 or reload_left > 0.0 or not cocked:
         pending = false
         return
     pending = false
     rounds -= 1
     flash_left = 0.065
-    if cocking_clip == &"CockHammer":
+    if cocking_clip in [&"CockHammer", &"CycleBolt", &"PumpAction"]:
         cocked = false
         trigger_held = false
         spent_cases += 1
+    elif weapon_type == "doubleshotgun":
+        spent_cases += 1
+    elif weapon_type in ["pistol", "smg", "assault", "semirifle"]:
+        spent_cases += 1
+        if casing_delay <= 0.0:
+            casing_delay = minf(0.04, shot_interval * 0.5)
     cooldown = shot_interval
     bloom = minf(2.6, bloom + 0.78)
     last_action = "fire"
@@ -474,6 +536,10 @@ func _physics_process(delta: float) -> void:
     bloom = move_toward(bloom, 0.0, delta * 2.2)
     if not visible:
         return
+    if casing_delay > 0.0:
+        casing_delay = maxf(0.0, casing_delay - delta)
+        if casing_delay == 0.0:
+            _eject_cases()
     if cocking_left > 0.0:
         cocking_left = maxf(0.0, cocking_left - delta)
         if cocking_left == 0.0:
@@ -482,9 +548,12 @@ func _physics_process(delta: float) -> void:
         reload_left = maxf(0.0, reload_left - delta)
         if eject_at > 0.0 and reload_left <= eject_at:
             eject_at = 0.0
-            _eject_revolver_cases()
+            _eject_cases()
         if reload_left == 0.0:
-            rounds = capacity
+            if weapon_type != "doubleshotgun" or break_stage == 3:
+                rounds = capacity
+            if break_stage >= 3:
+                break_stage = 0
     if automatic and trigger_held and player != null and player.get("controls_locked") != true \
             and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
         request_shot()

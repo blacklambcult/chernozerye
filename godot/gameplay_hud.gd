@@ -205,7 +205,11 @@ func _draw_slots(view_width: float, view_height: float) -> void:
             action = "ПЕРЕЗАРЯДКА"
         elif float(pistol.get("cocking_left")) > 0.0:
             action = "ВЗВЕДЕНИЕ"
-        elif rounds > 0 and not bool(pistol.get("cocked")):
+        elif int(pistol.get("break_stage")) == 1:
+            action = "КОЛЕСО ВВЕРХ — ВСТАВИТЬ"
+        elif int(pistol.get("break_stage")) == 2:
+            action = "R — ЗАКРЫТЬ"
+        elif not bool(pistol.get("cocked")) and (rounds > 0 or int(pistol.get("spent_cases")) > 0):
             action = "КОЛЕСО ВНИЗ — ВЗВЕСТИ"
         _write(x0, y + 72, status + "   " + action + "   R — ПЕРЕЗАРЯДКА", 11, GOLD)
     else:

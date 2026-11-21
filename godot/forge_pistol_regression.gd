@@ -102,6 +102,24 @@ func _run() -> void:
             _fail("wrong readiness state after shot")
             return
         pistol.call("_physics_process", 1.0)
+    pistol.set("weapon_type", "doubleshotgun")
+    pistol.set("cocking_clip", &"")
+    pistol.set("rounds", 0)
+    pistol.set("capacity", 2)
+    pistol.call("reload")
+    pistol.call("_physics_process", 1.0)
+    pistol.call("insert_shells")
+    pistol.call("_physics_process", 1.0)
+    pistol.call("request_shot")
+    if pistol.get("pending") or pistol.get("rounds") != 0:
+        _fail("break-action weapon became ready while open")
+        return
+    pistol.call("reload")
+    pistol.call("_physics_process", 1.0)
+    pistol.call("request_shot")
+    if not pistol.get("pending") or pistol.get("rounds") != 2:
+        _fail("break-action weapon did not become ready after closing")
+        return
     var wav := Marshalls.raw_to_base64(FileAccess.get_file_as_bytes("res://revolver_report.wav"))
     var sounds := {}
     for action in ["fire", "cock", "reload", "empty"]:
