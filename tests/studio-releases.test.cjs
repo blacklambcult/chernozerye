@@ -9,7 +9,7 @@ test("release manifest includes current published Studio version",()=>{
   assert.equal(R.normalize(doc),doc);
   assert.equal(doc.schema,"chernozerye.studio.release-notes");
   assert.equal(doc.formatVersion,1);
-  assert.equal(doc.current.studio,"0.5.0");
+  assert.equal(doc.current.studio,"0.6.0");
   assert.equal(doc.current.game,"pre-alpha 0.7.4");
   assert.equal(doc.releases[0].version,doc.current.studio);
   assert.equal(doc.releases[0].area,"studio");

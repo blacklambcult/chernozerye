@@ -11,7 +11,7 @@
     model: "chernozerye.modellab.v1",
     forge: "chernozerye.hellish-forge.v1"
   });
-  const TOOLS = Object.freeze(["home", "geo", "quest", "model", "forge"]);
+  const TOOLS = Object.freeze(["home", "geo", "quest", "model", "forge", "weapon"]);
   function toolId(hash) {
     const id = typeof hash === "string" ? hash.replace(/^#/, "").toLowerCase() : "";
     return TOOLS.includes(id) ? id : "home";

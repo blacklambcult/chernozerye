@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1114">
   <meta name="description" content="Чернозёрье Studio — рабочее пространство, журнал обновлений и роадмап Geo Lab, Quest Lab, Model Lab и Hellish Forge.">
-  <title>Чернозёрье / STUDIO 0.5 — журнал и роадмап</title>
+  <title>Чернозёрье / STUDIO 0.6 — генератор оружия</title>
   <link rel="stylesheet" href="./studio.css?v=4">
 </head>
 <body>
@@ -17,7 +17,7 @@
         <span class="eyebrow">FEARLESS KNIGHTS OF THE CORDON / DEV TOOLS</span>
         <h1>CHERNOZERYE <span>STUDIO</span></h1>
       </div>
-      <span class="version" id="studio-version-top">STUDIO 0.5.0</span>
+      <span class="version" id="studio-version-top">STUDIO 0.6.0</span>
     </div>
     <div class="topright">
       <span class="connection"><span class="light"></span> LOCAL WORKSPACE</span>
@@ -58,6 +58,11 @@
         <span class="navcopy"><strong>HELLISH FORGE</strong><small>Игровые модели и маркеры</small></span>
         <span class="nav-arrow">↗</span>
       </button>
+      <button class="navitem" data-target="weapon" type="button" aria-label="Генератор оружия" title="Генератор оружия">
+        <span class="navindex">05</span><span class="nav-icon">⌁</span>
+        <span class="navcopy"><strong>WEAPON GENERATOR</strong><small>8 классов и анимации</small></span>
+        <span class="nav-arrow">↗</span>
+      </button>
       <div class="rail-spacer"></div>
       <div class="library">
         <div class="rail-label">ЛОКАЛЬНАЯ БИБЛИОТЕКА</div>
@@ -86,10 +91,10 @@
 
       <section class="overview" id="overview">
         <div class="intro">
-          <div class="intro-index">4 МОДУЛЯ · 1 РАБОЧЕЕ ПРОСТРАНСТВО</div>
-          <h3>ЧЕТЫРЕ МАСТЕРСКИЕ.<br><em>ОДИН МИР.</em></h3>
+          <div class="intro-index">5 МОДУЛЕЙ · 1 РАБОЧЕЕ ПРОСТРАНСТВО</div>
+          <h3>ПЯТЬ МАСТЕРСКИХ.<br><em>ОДИН МИР.</em></h3>
           <p>Создавай географию, сценарии, пропсы и игровые модели в одной студии. Переключайся между редакторами — они сохраняют открытые сцены и черновики в браузере.</p>
-          <span class="intro-footnote">PRE-ALPHA / EDITOR SUITE 0.5.0 · РАЗРАБОТКА ВЕДЁТСЯ ОТКРЫТО</span>
+          <span class="intro-footnote">PRE-ALPHA / EDITOR SUITE 0.6.0 · РАЗРАБОТКА ВЕДЁТСЯ ОТКРЫТО</span>
         </div>
         <section class="release-hub" aria-label="Беклог, актуальная версия и история изменений">
           <div class="release-headline">
@@ -106,7 +111,7 @@
             <div class="current-main">
               <div class="current-label"><span class="current-dot"></span> АКТУАЛЬНАЯ ВЕРСИЯ / ПРЕДВАРИТЕЛЬНАЯ</div>
               <div class="current-version-line">
-                <span class="current-version" id="release-current-version">STUDIO 0.5.0</span>
+                <span class="current-version" id="release-current-version">STUDIO 0.6.0</span>
                 <span class="current-state">PRE-ALPHA / ACTIVE</span>
               </div>
               <h5 id="release-current-title">Единый центр разработки Чернозёрья</h5>
@@ -163,7 +168,7 @@
             </aside>
           </div>
         </section>
-        <div class="module-section-title"><span class="section-kicker">EDITOR SUITE / 04</span><h4>РАБОЧИЕ ИНСТРУМЕНТЫ</h4></div>
+        <div class="module-section-title"><span class="section-kicker">EDITOR SUITE / 05</span><h4>РАБОЧИЕ ИНСТРУМЕНТЫ</h4></div>
         <div class="module-grid">
           <button type="button" data-open="geo" class="module-card">
             <span class="card-top"><span class="card-number">/ 01</span><span class="card-icon">⌗</span></span>
@@ -185,6 +190,11 @@
             <span class="card-content"><strong>HELLISH FORGE</strong><small>Игровые предметы / Роли / Маркеры</small><span class="card-desc">Отдельная кузница игровых моделей: категории, габариты, отметки деталей и точки для интеграции в Godot.</span></span>
             <span class="card-bottom">ОТКРЫТЬ КУЗНИЦУ <span>↗</span></span>
           </button>
+          <button type="button" data-open="weapon" class="module-card forge-card">
+            <span class="card-top"><span class="card-number">/ 05</span><span class="card-icon">⌁</span></span>
+            <span class="card-content"><strong>WEAPON GENERATOR</strong><small>8 классов / Варианты / Анимации</small><span class="card-desc">Процедурная сборка оружия, состояния износа, заговоры, сокеты и запечённые клипы Godot.</span></span>
+            <span class="card-bottom">ОТКРЫТЬ ГЕНЕРАТОР <span>↗</span></span>
+          </button>
         </div>
         <div class="bottom-notes">
           <div><span class="little">01 / СОХРАНЕНИЕ</span><p>Редакторы хранят данные раздельно в одном браузере. Существующие черновики остаются на месте.</p></div>
@@ -204,7 +214,7 @@
   <footer class="statusbar">
     <span><i class="pulse"></i> CHERNOZERYE STUDIO / READY</span>
     <span id="last-status">СЕССИЯ / ВАШ БРАУЗЕР</span>
-    <span>ALT+1 / GEO · ALT+2 / QUEST · ALT+3 / MODEL · ALT+4 / FORGE</span>
+    <span>ALT+1 / GEO · ALT+2 / QUEST · ALT+3 / MODEL · ALT+4 / FORGE · ALT+5 / WEAPON</span>
   </footer>
 </div>
 <script src="./studio-state.js?v=1"></script>
@@ -212,6 +222,6 @@
 <script src="./project-snapshot.js?v=2"></script>
 <script src="./release-core.js?v=1"></script>
 <script src="./studio-releases.js?v=1"></script>
-<script src="./studio.js?v=3"></script>
+<script src="./studio.js?v=4"></script>
 </body>
 </html>
