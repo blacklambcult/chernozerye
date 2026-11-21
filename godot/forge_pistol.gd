@@ -13,6 +13,11 @@ var capacity := CAPACITY
 var reload_seconds := RELOAD_SECONDS
 var damage := 20.0
 var visual_recoil := 1.0
+var shot_interval := 0.23
+var weapon_weight := 1.0
+var shot_noise := 1.0
+var automatic := false
+var trigger_held := false
 var sound_profile := "standard"
 var cooldown := 0.0
 var reload_left := 0.0
@@ -91,6 +96,12 @@ func _apply_gameplay(specs: Dictionary) -> void:
     damage = _game_number(specs.get("damage"), 20.0, 1, 100)
     visual_recoil = _game_number(specs.get("recoil"), 1.0, 0, 3)
     sound_profile = str(specs.get("sound", "standard"))
+    shot_interval = 60.0 / _game_number(specs.get("rate"), 60.0 / 0.23, 60.0, 1200.0)
+    weapon_weight = _game_number(specs.get("weight"), 1.0, 0.1, 20.0)
+    shot_noise = _game_number(specs.get("noise"), 100.0, 0.0, 100.0) / 100.0
+    if sound_profile == "silent":
+        shot_noise = 0.0
+    automatic = specs.get("mode") == "auto"
 
 func _read_profile(override: Dictionary = {}) -> void:
     if not FileAccess.file_exists(VIEWMODEL_PROFILE):
@@ -185,6 +196,7 @@ func equip(value: bool) -> void:
     visible = value
     if not value:
         pending = false
+        trigger_held = false
         reload_left = 0.0
         flash.visible = false
         last_action = "holstered"
@@ -217,7 +229,7 @@ func _shoot() -> void:
         return
     pending = false
     rounds -= 1
-    cooldown = 0.23
+    cooldown = shot_interval
     bloom = minf(2.6, bloom + 0.78)
     last_action = "fire"
     report.volume_db = -10.0 if indoors else -5.0
@@ -225,9 +237,11 @@ func _shoot() -> void:
     match sound_profile:
         "heavy": report.pitch_scale *= 0.78
         "muted": report.volume_db -= 12.0
-    report.play()
+    if sound_profile != "silent":
+        report.play()
     if player != null:
-        player.call("emit_noise", 1.0)
+        if shot_noise > 0.0:
+            player.call("emit_noise", shot_noise)
         player.call("kick_view", visual_recoil)
     var origin := eye.global_position
     var direction := _shot_direction()
@@ -260,13 +274,18 @@ func _physics_process(delta: float) -> void:
         reload_left = maxf(0.0, reload_left - delta)
         if reload_left == 0.0:
             rounds = capacity
+    if automatic and trigger_held and player != null and player.get("controls_locked") != true \
+            and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+        request_shot()
     if pending:
         pending = false
         if player != null and player.get("controls_locked") != true and eye.current \
                 and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
             _shoot()
-    var kick := maxf(0.0, cooldown - 0.12) / 0.11 * visual_recoil
+    var kick_time := minf(shot_interval, 0.11 * sqrt(weapon_weight))
+    var shot_age := shot_interval - cooldown
+    var kick := maxf(0.0, 1.0 - shot_age / kick_time) * visual_recoil
     var reload_t := sin(PI * reload_left / reload_seconds)
     position = rest_pose + Vector3(0.0, -0.11 * reload_t, 0.045 * kick)
     rotation = rest_angles + Vector3(0.24 * kick, 0.0, -0.20 * reload_t)
-    flash.visible = cooldown > 0.18
+    flash.visible = cooldown > 0.0 and shot_age < 0.05

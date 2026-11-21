@@ -25,7 +25,8 @@
       reader.onload = () => resolve({ id: model.id, name: model.name, glb: reader.result.split(",")[1],
         ...(model.kind ? {kind:model.kind} : {}), ...(model.source ? {source:model.source} : {}),
         ...(model.recipe ? {recipe:model.recipe} : {}), ...(model.updatedAt ? {updatedAt:model.updatedAt} : {}),
-        ...(model.viewmodel ? {viewmodel:model.viewmodel} : {}) });
+        ...(model.viewmodel ? {viewmodel:model.viewmodel} : {}),
+        ...(model.gameplay ? {gameplay:model.gameplay} : {}) });
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(model.blob);
     });

@@ -97,7 +97,7 @@
     if (value == null) return category === "longarm"
       ? {damage:35, recoil:1.4, capacity:5, reload:1.8, sound:"heavy"}
       : {damage:20, recoil:1, capacity:7, reload:1.2, sound:"standard"};
-    if (!["standard", "heavy", "muted"].includes(value.sound) || !Number.isInteger(value.capacity))
+    if (!["standard", "heavy", "muted", "silent"].includes(value.sound) || !Number.isInteger(value.capacity))
       throw new Error("Проверь звуковой профиль и ёмкость.");
     return {damage:finite(value.damage, 1, 100, "игровой урон"),
       recoil:finite(value.recoil, 0, 3, "визуальная отдача"),

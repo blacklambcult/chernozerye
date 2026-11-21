@@ -25,6 +25,8 @@
     .fp-position-sliders { grid-template-columns:1fr; }
     .fp-position-sliders .axis { display:grid; grid-template-columns:1.5rem minmax(0,1fr) 5rem; align-items:center; gap:8px; }
     .fp-position-sliders output { text-align:right; font-variant-numeric:tabular-nums; }
+    .forge-transfer > .left, .forge-transfer > .right > :not(#fp-inspector):not(#weapon-gameplay),
+    .forge-transfer .toolbar-actions { display:none; }
   </style>
 </head>
 <body>
@@ -46,7 +48,7 @@
       <a href="../" class="game-link">↗ ИГРА</a>
     </nav>
   </header>
-  <div class="workspace">
+  <div class="workspace forge-transfer">
     <aside class="left sidebar" aria-label="Список деталей и готовые шаблоны">
       <section class="section">
         <div class="micro amber">01 / ОБЪЕКТ</div>
@@ -193,7 +195,11 @@
         </section>
       </div>
       <section class="section forge-fp-panel" id="fp-inspector">
-        <section id="transferred-asset" hidden>
+        <section id="transferred-asset">
+          <h3>Библиотека оружия</h3>
+          <label for="weapon-library">Модель из генератора</label>
+          <select id="weapon-library"><option value="">Выбери модель</option></select>
+          <a href="../studio/#weapon" target="_top">Открыть генератор</a>
           <label for="transferred-name">Название варианта</label>
           <input id="transferred-name" maxlength="90">
           <button id="save-transferred-asset" class="button primary full" type="button">Сохранить в библиотеку</button>
@@ -255,15 +261,24 @@
         </div>
         <p class="hint" id="anchor-caption">Метки сохраняются в Forge JSON и GLB.</p>
       </section>
-      <section class="section">
-        <h3>Игровой образец</h3>
+      <section class="section" id="weapon-gameplay">
+        <h3>Игровые свойства</h3>
+        <label for="game-class">Класс</label>
+        <select id="game-class"><option value="pistol">Пистолет</option><option value="revolver">Револьвер</option><option value="smg">Пистолет-пулемёт</option><option value="rifle">Винтовка</option><option value="shotgun">Дробовик</option><option value="other">Другое</option></select>
+        <label for="game-grip">Хват</label>
+        <select id="game-grip"><option value="sidearm">Одноручное</option><option value="longarm">Двуручное</option></select>
+        <label for="game-mode">Режим огня</label>
+        <select id="game-mode"><option value="single">Одиночный</option><option value="auto">Автоматический</option></select>
+        <label for="game-weight">Вес, кг</label><input id="game-weight" type="number" min=".1" max="20" step=".1">
+        <label for="game-rate">Темп, выстр./мин</label><input id="game-rate" type="number" min="60" max="1200" step="1">
+        <label for="game-noise">Игровой шум, %</label><input id="game-noise" type="number" min="0" max="100" step="1">
         <p class="hint">Отправка в слот 3 для одноручных и двуручных моделей. Остальные категории требуют отдельного игрового поведения.</p>
         <label for="game-damage">Урон</label><input id="game-damage" type="number" min="1" max="100" step="1">
         <label for="game-recoil">Визуальная отдача</label><input id="game-recoil" type="number" min="0" max="3" step="0.05">
         <label for="game-capacity">Ёмкость</label><input id="game-capacity" type="number" min="1" max="30" step="1">
         <label for="game-reload">Перезарядка, с</label><input id="game-reload" type="number" min="0.3" max="5" step="0.1">
         <label for="game-sound">Звуковой профиль</label>
-        <select id="game-sound"><option value="standard">Стандартный</option><option value="heavy">Глухой</option><option value="muted">Тихий</option></select>
+        <select id="game-sound"><option value="standard">Стандартный</option><option value="heavy">Глухой</option><option value="muted">Приглушённый</option><option value="silent">Бесшумный</option></select>
         <button id="send-game-model" type="button" class="button primary full">Отправить модель в игру</button>
         <button id="reset-game-model" type="button" class="button secondary full">Вернуть штатную модель</button>
         <a href="../" target="_blank" rel="noopener">Открыть игру</a>
@@ -279,8 +294,8 @@
   <footer class="footer"><span>CHERNOZERYE <b>HELLISH FORGE 0.1</b></span><span id="global-status">3D / РЕДАКТОР ПРОПСОВ</span><span>ЛОКАЛЬНОЕ СОХРАНЕНИЕ · JSON + GLB</span></footer>
 </div>
 <script src="../model/model-core.js?v=1"></script>
-<script src="./forge-core.js?v=3"></script>
+<script src="./forge-core.js?v=4"></script>
 <script src="../object-library/library.js?v=2"></script>
-<script type="module" src="./forge.mjs?v=5"></script>
+<script type="module" src="./forge.mjs?v=6"></script>
 </body>
 </html>

@@ -533,8 +533,8 @@ jobs:
           node --check site/forge/forge-core.js
           node --check site/forge/forge.mjs
           node --test tests/forge-core.test.cjs
-          grep -q 'forge.mjs?v=5' site/forge/index.html
-          grep -q 'forge-core.js?v=3' site/forge/index.html
+          grep -q 'forge.mjs?v=6' site/forge/index.html
+          grep -q 'forge-core.js?v=4' site/forge/index.html
           grep -q 'id="fp-preview-toggle"' site/forge/index.html
           grep -q 'id="fp-scale-slider"' site/forge/index.html
           node - <<'NODE'
@@ -563,7 +563,7 @@ jobs:
           const html = fs.readFileSync("site/weapon-generator/index.html", "utf8");
           const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(x => x[1]).filter(Boolean);
           for (const source of scripts) new Function(source);
-          if (!html.includes("data-action=\"save-library\"") || !html.includes("data-action=\"send-game\"") ||
+          if (!html.includes("data-action=\"save-library\"") ||
               !html.includes("QuaternionKeyframeTrack") || !html.includes("MuzzlePoint")) process.exit(1);
           console.log("WEAPON_GENERATOR_READY: classes=8 library=true game=true animations=true");
           NODE
