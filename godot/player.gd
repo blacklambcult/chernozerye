@@ -198,6 +198,7 @@ func _load_comparison_weapons() -> void:
         var label := "ОБЫЧНЫЙ" if index == 0 else "BODYCAM"
         var profile := gameplay.duplicate()
         profile["bodycam"] = 0.0 if index == 0 else 0.8
+        profile["bodycamProfile"] = 2
         weapon.comparison_label = label
         weapon.model_override = COMPARISON_REVOLVER
         weapon.package_override = {
@@ -340,8 +341,8 @@ func kick_view(strength := 1.0, recovery_speed := 1.0, twist := 0.0) -> void:
     recoil_roll = clampf(recoil_roll + twist * 0.4, -0.07, 0.07)
 
 func kick_bodycam(strength: float, twist: float, recovery_speed: float) -> void:
-    bodycam_offset = (bodycam_offset + Vector2(twist * 0.16, -0.022) * strength).limit_length(0.045)
-    bodycam_roll = clampf(bodycam_roll + twist * minf(strength, 1.0) * 0.65, -0.045, 0.045)
+    bodycam_offset = (bodycam_offset + Vector2(twist * 0.25, -0.031) * strength).limit_length(0.055)
+    bodycam_roll = clampf(bodycam_roll + twist * minf(strength, 1.0) * 0.78, -0.045, 0.045)
     bodycam_recovery = recovery_speed
     camera.h_offset = bodycam_offset.x
     camera.v_offset = bodycam_offset.y

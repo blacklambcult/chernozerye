@@ -13,6 +13,7 @@ var rounds := CAPACITY
 var cooldown := 0.0
 var reload_left := 0.0
 var bloom := 0.0
+var shot_impulse := 0.0
 var pending := false
 var cocked := false
 var last_action := "idle"
@@ -107,6 +108,7 @@ func equip(value: bool) -> void:
         pending = false
         cocked = false
         reload_left = 0.0
+        shot_impulse = 0.0
         flash.visible = false
         last_action = "holstered"
 
@@ -148,8 +150,10 @@ func _physics_process(delta: float) -> void:
             _shoot()
     var kick := maxf(0, cooldown - 0.12) / 0.12
     var reload_t := sin(PI * reload_left / RELOAD_SECONDS)
-    position = REST + Vector3(0, -0.13 * reload_t + (0.012 if cocked else 0.0), kick * 0.045)
-    rotation = Vector3(kick * 0.28 + (0.045 if cocked else 0.0), 0.19, -0.46 * reload_t)
+    position = REST + Vector3(0, -0.13 * reload_t - shot_impulse * 0.020 + (0.012 if cocked else 0.0),
+        kick * 0.045 + shot_impulse * 0.062)
+    rotation = Vector3(kick * 0.15 + (0.045 if cocked else 0.0), 0.19, -0.46 * reload_t)
+    shot_impulse *= exp(-26.0 * delta)
     flash.visible = cooldown > 0.19
 
 func spread_angle() -> float:
@@ -170,7 +174,8 @@ func _shoot() -> void:
     rounds -= 1
     cooldown = 0.24
     cylinder.rotate_object_local(Vector3.UP, PI / 3)
-    flash.light_energy = 3.6
+    shot_impulse = 1.0
+    flash.light_energy = 5.2
     report.volume_db = -8.0 if indoors else -3.0
     report.pitch_scale = randf_range(0.97, 1.03)
     report.play()
@@ -178,7 +183,9 @@ func _shoot() -> void:
     var start := eye.global_position
     var direction := _shot_direction()
     bloom = minf(2.5, bloom + 1.05)
-    player.call("kick_view")
+    player.call("kick_view", 0.55)
+    if player.has_method("kick_bodycam"):
+        player.call("kick_bodycam", 1.12, randf_range(-0.035, 0.035), 0.88)
     var ray := PhysicsRayQueryParameters3D.create(start, start + direction * 90, 0xffffffff, [player.get_rid()])
     var hit := eye.get_world_3d().direct_space_state.intersect_ray(ray)
     if hit.is_empty():
