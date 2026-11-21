@@ -270,7 +270,7 @@ func _ready() -> void:
     action_audio.max_polyphony = 3
     add_child(action_audio)
     visible = false
-    print("FORGE_PISTOL_READY: model=uploaded_glb capacity=7 one_click=true grip_marker=",
+    print("FORGE_PISTOL_READY: model=uploaded_glb capacity=", capacity, " grip_marker=",
         grip_marker != null, " forward_marker=", forward_marker != null,
         " magazine_marker=", magazine_marker != null,
         " model_scale=", model_scale, " hand_visible=", weapon_hand != null)
