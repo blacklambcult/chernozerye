@@ -191,7 +191,10 @@ func _ready() -> void:
         var players := imported_model.find_children("*", "AnimationPlayer", true, false)
         if not players.is_empty():
             model_animation = players[0] as AnimationPlayer
-            _complete_revolver_pivot_tracks()
+            if weapon_type == "doubleshotgun":
+                _repair_break_action_clips()
+            else:
+                _complete_revolver_pivot_tracks()
     casing_port = imported_model.find_child("EjectionPort", true, false) as Node3D
     grip_marker = imported_model.find_child("HF_GRIP_PRIMARY", true, false) as Node3D
     forward_marker = imported_model.find_child("HF_FORWARD", true, false) as Node3D
@@ -305,6 +308,73 @@ func _complete_revolver_pivot_tracks() -> void:
                     clip.position_track_insert_key(index, 0.0, pivot.position)
                 else:
                     clip.rotation_track_insert_key(index, 0.0, pivot.quaternion)
+
+func _repair_break_action_clips() -> void:
+    var hinge := imported_model.find_child("BarrelPivot", true, false) as Node3D
+    var root := model_animation.get_node_or_null(model_animation.root_node)
+    if hinge == null or root == null:
+        return
+    var path := root.get_path_to(hinge)
+    for name in model_animation.get_animation_list():
+        var clip := model_animation.get_animation(name)
+        if clip.find_track(path, Animation.TYPE_ROTATION_3D) >= 0:
+            continue
+        var index := clip.add_track(Animation.TYPE_ROTATION_3D)
+        clip.track_set_path(index, path)
+        clip.rotation_track_insert_key(index, 0.0, hinge.quaternion)
+    if not model_animation.has_animation(&"InsertShells"):
+        return
+    var chambers: Array[Vector3] = []
+    for child in hinge.get_children():
+        if child is MeshInstance3D and absf(child.position.z - 0.001) < 0.0005:
+            chambers.append(child.position)
+    if chambers.size() != 2:
+        chambers = [Vector3(-0.016, 0.040, 0.001), Vector3(0.016, 0.040, 0.001)]
+    var insertion := model_animation.get_animation(&"InsertShells")
+    for i in range(2):
+        var shell_name := "ReloadShell_L" if i == 0 else "ReloadShell_R"
+        var shell := hinge.get_node_or_null(NodePath(shell_name)) as Node3D
+        if shell == null:
+            shell = Node3D.new()
+            shell.name = shell_name
+            hinge.add_child(shell)
+            for is_rim in [false, true]:
+                var part := MeshInstance3D.new()
+                var mesh := CylinderMesh.new()
+                mesh.top_radius = 0.012 if is_rim else 0.0105
+                mesh.bottom_radius = mesh.top_radius
+                mesh.height = 0.014 if is_rim else 0.056
+                mesh.radial_segments = 8
+                var material := StandardMaterial3D.new()
+                material.albedo_color = Color("#bb8948") if is_rim else Color("#a6261f")
+                part.mesh = mesh
+                part.material_override = material
+                part.rotation.x = PI / 2.0
+                part.position.z = 0.009 if is_rim else -0.022
+                shell.add_child(part)
+        var shell_path := root.get_path_to(shell)
+        var hidden_scale := Vector3.ONE * 0.001
+        shell.scale = hidden_scale
+        var start := 0.04 if i == 0 else 0.34
+        var end := 0.42 if i == 0 else 0.78
+        if insertion.find_track(shell_path, Animation.TYPE_POSITION_3D) < 0:
+            var index := insertion.add_track(Animation.TYPE_POSITION_3D)
+            insertion.track_set_path(index, shell_path)
+            var chamber := chambers[i]
+            insertion.position_track_insert_key(index, start, Vector3(chamber.x, chamber.y, 0.14))
+            insertion.position_track_insert_key(index, end, Vector3(chamber.x, chamber.y, -0.018))
+        for name in model_animation.get_animation_list():
+            var clip := model_animation.get_animation(name)
+            if clip.find_track(shell_path, Animation.TYPE_SCALE_3D) >= 0:
+                continue
+            var index := clip.add_track(Animation.TYPE_SCALE_3D)
+            clip.track_set_path(index, shell_path)
+            clip.scale_track_insert_key(index, 0.0, hidden_scale)
+            if clip == insertion:
+                clip.scale_track_insert_key(index, start - 0.01, hidden_scale)
+                clip.scale_track_insert_key(index, start, Vector3.ONE)
+                clip.scale_track_insert_key(index, end, Vector3.ONE)
+                clip.scale_track_insert_key(index, end + 0.02, hidden_scale)
 
 func _eject_cases() -> void:
     var count := spent_cases
