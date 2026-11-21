@@ -209,51 +209,61 @@ func _run() -> void:
     if not is_zero_approx(float(pistol.get("bodycam_strength"))):
         _fail("an explicit off setting in the current profile must be respected")
         return
-    var comparison_actor := CharacterBody3D.new()
-    comparison_actor.set_script(load("res://player.gd"))
-    comparison_actor.set("comparison_loadout", true)
-    get_root().add_child(comparison_actor)
-    var slots: Dictionary = comparison_actor.get("forge_weapons")
-    if slots.size() != 2 or not slots.has(2) or not slots.has(3) \
-            or bool(comparison_actor.get("revolver").visible):
-        _fail("comparison inventory must contain only Forge weapons in slots 3 and 4")
+    var harness := Node3D.new()
+    get_root().add_child(harness)
+    var test_actor := CharacterBody3D.new()
+    test_actor.name = "Player"
+    test_actor.set_script(load("res://player.gd"))
+    test_actor.set("test_loadout", true)
+    harness.add_child(test_actor)
+    var hud_layer := CanvasLayer.new()
+    hud_layer.name = "GameplayHUD"
+    harness.add_child(hud_layer)
+    var hud := Control.new()
+    hud.set_script(load("res://gameplay_hud.gd"))
+    hud_layer.add_child(hud)
+    var slots: Dictionary = test_actor.get("forge_weapons")
+    var classes := ["revolver", "pistol", "smg", "assault", "boltrifle", "semirifle", "doubleshotgun", "pumpshotgun"]
+    var action_clips := [&"CockHammer", &"RackSlide", &"RackBolt", &"RackBolt", &"CycleBolt", &"RackBolt", &"InsertShells", &"PumpAction"]
+    if slots.size() != classes.size() or bool(test_actor.get("revolver").visible):
+        _fail("test inventory must contain eight generated weapons and no legacy revolver")
         return
-    for index in [2, 3]:
-        var weapon: Node3D = slots[index]
-        var comparison_clips := weapon.get("model_animation") as AnimationPlayer
-        if weapon.get("weapon_type") != "revolver" or weapon.get("rounds") != 6 \
-                or weapon.get("casing_port") == null or weapon.get("forward_marker") == null \
-                or weapon.get("cocking_clip") != &"CockHammer" or comparison_clips == null \
-                or not comparison_clips.has_animation(&"Fire") or not comparison_clips.has_animation(&"Reload"):
-            _fail("generated comparison revolver missing clips, markers or profile")
+    for index in range(classes.size()):
+        var slot := index + 2
+        var weapon := slots.get(slot) as Node3D
+        if weapon == null or weapon.get("weapon_type") != classes[index]:
+            _fail("wrong weapon class in test slot %d" % (slot + 1))
             return
-        if not is_equal_approx(float(weapon.get("bodycam_strength")), 0.0 if index == 2 else 0.8):
-            _fail("comparison revolvers must use different bodycam profile values")
+        var animation_player := weapon.get("model_animation") as AnimationPlayer
+        if weapon.get("casing_port") == null or weapon.get("forward_marker") == null \
+                or animation_player == null or not animation_player.has_animation(&"Fire") \
+                or not animation_player.has_animation(action_clips[index]) \
+                or not is_equal_approx(float(weapon.get("bodycam_strength")), 0.8):
+            _fail("test weapon missing sockets, animations or Bodycam: " + classes[index])
             return
-    var test_revolver: Node3D = slots[3]
-    test_revolver.call("equip", true)
-    test_revolver.call("cock")
-    test_revolver.call("_physics_process", 1.0)
-    test_revolver.call("_shoot")
-    test_revolver.call("_physics_process", 1.0 / 60.0)
-    if not (test_revolver.get("muzzle_haze") as MeshInstance3D).visible:
-        _fail("Bodycam muzzle haze must appear after firing")
-        return
-    test_revolver.call("equip", false)
-    if (test_revolver.get("muzzle_haze") as MeshInstance3D).visible:
-        _fail("holstered weapons must clear their muzzle effect")
-        return
-    var standard := slots[2].get("model_animation") as AnimationPlayer
-    var bodycam := slots[3].get("model_animation") as AnimationPlayer
-    var standard_fire := standard.get_animation(&"Fire")
-    var bodycam_fire := bodycam.get_animation(&"Fire")
-    var track := standard_fire.find_track(
-        standard.get_node(standard.root_node).get_path_to(
-            slots[2].get("imported_model").find_child("Weapon_Body")), Animation.TYPE_POSITION_3D)
-    if standard_fire == bodycam_fire or track < 0 \
-            or Vector3(standard_fire.track_get_key_value(track, 1)).length() <= \
-                Vector3(bodycam_fire.track_get_key_value(track, 1)).length():
-        _fail("compare original and reduced baked body motion without shared animation mutation")
+        var key := InputEventKey.new()
+        key.physical_keycode = KEY_0 if slot == 9 else KEY_1 + slot
+        key.pressed = true
+        test_actor.call("_input", key)
+        if hud.get("selected_slot") != slot or test_actor.get("forge_pistol") != weapon or not weapon.visible:
+            _fail("number key did not equip test weapon: " + classes[index])
+            return
+        weapon.call("cock")
+        weapon.call("_physics_process", 1.0)
+        var rounds_before: int = weapon.get("rounds")
+        weapon.call("_shoot")
+        weapon.call("_physics_process", 1.0 / 60.0)
+        var haze := weapon.get("muzzle_haze") as MeshInstance3D
+        if weapon.get("rounds") != rounds_before - 1 or haze == null or not haze.visible:
+            _fail("test weapon did not fire with Bodycam: " + classes[index])
+            return
+    var last_weapon: Node3D = slots[9]
+    var unarmed := InputEventKey.new()
+    unarmed.physical_keycode = KEY_2
+    unarmed.pressed = true
+    test_actor.call("_input", unarmed)
+    if last_weapon.visible or last_weapon.get("muzzle_haze").visible or test_actor.get("revolver").visible:
+        _fail("empty test slot must clear the weapon and its muzzle effect")
         return
     print("FORGE_PISTOL_REGRESSION_OK: uploaded_glb=true anchors=3 parts>=10 capacity=7 one_click=true reload=true original_revolver=true hands=2 fp_profile=true")
     quit(0)

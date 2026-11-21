@@ -11,12 +11,45 @@ const WALK_ACCELERATION := 9.0
 const WALK_FRICTION := 12.0
 const JUMP := 4.5
 const MOUSE_SENS := 0.002
-const COMPARISON_REVOLVER := preload("res://assets/bodycam_revolver.glb")
+const TEST_WEAPONS := [
+    {"class": "revolver", "label": "РЕВОЛЬВЕР", "short": "РЕВ",
+     "model": preload("res://assets/weapon_test/revolver.glb"), "scale": 0.95,
+     "capacity": 6, "damage": 28, "recoil": 1.25, "reload": 2.2, "weight": 1.2,
+     "sound": "heavy"},
+    {"class": "pistol", "label": "ПИСТОЛЕТ", "short": "ПСТ",
+     "model": preload("res://assets/weapon_test/pistol.glb"), "scale": 0.95,
+     "capacity": 8, "damage": 20, "recoil": 1.0, "reload": 1.2, "weight": 0.9,
+     "sound": "standard"},
+    {"class": "smg", "label": "ПИСТОЛЕТ-ПУЛЕМЁТ", "short": "ПП",
+     "model": preload("res://assets/weapon_test/smg.glb"), "scale": 0.82,
+     "capacity": 20, "damage": 16, "recoil": 0.8, "reload": 1.6, "weight": 2.3,
+     "sound": "standard", "mode": "auto", "rate": 650},
+    {"class": "assault", "label": "АВТОМАТ", "short": "АВТ",
+     "model": preload("res://assets/weapon_test/assault.glb"), "scale": 0.7,
+     "capacity": 30, "damage": 32, "recoil": 1.45, "reload": 1.8, "weight": 3.35,
+     "sound": "heavy", "mode": "auto", "rate": 600},
+    {"class": "boltrifle", "label": "БОЛТОВАЯ ВИНТОВКА", "short": "БОЛТ",
+     "model": preload("res://assets/weapon_test/boltrifle.glb"), "scale": 0.64,
+     "capacity": 5, "damage": 72, "recoil": 2.2, "reload": 2.4, "weight": 3.8,
+     "sound": "heavy"},
+    {"class": "semirifle", "label": "САМОЗАРЯДНАЯ ВИНТОВКА", "short": "САМ",
+     "model": preload("res://assets/weapon_test/semirifle.glb"), "scale": 0.68,
+     "capacity": 10, "damage": 48, "recoil": 1.75, "reload": 2.0, "weight": 3.65,
+     "sound": "heavy"},
+    {"class": "doubleshotgun", "label": "ДВУСТВОЛКА", "short": "ДВУ",
+     "model": preload("res://assets/weapon_test/doubleshotgun.glb"), "scale": 0.84,
+     "capacity": 2, "damage": 64, "recoil": 2.4, "reload": 2.6, "weight": 3.0,
+     "sound": "heavy"},
+    {"class": "pumpshotgun", "label": "ПОМПОВЫЙ ДРОБОВИК", "short": "ПОМП",
+     "model": preload("res://assets/weapon_test/pumpshotgun.glb"), "scale": 0.72,
+     "capacity": 6, "damage": 52, "recoil": 2.0, "reload": 2.8, "weight": 3.45,
+     "sound": "heavy"},
+]
 
 var revolver := preload("res://revolver.gd").new()
 var forge_pistol := preload("res://forge_pistol.gd").new()
 var forge_weapons: Dictionary = {}
-var comparison_loadout := false
+var test_loadout := false
 var step_sound := AudioStreamPlayer.new()
 var music := preload("res://location_music.gd").new()
 var wind := AudioStreamPlayer.new()
@@ -106,11 +139,11 @@ func _ready() -> void:
     _modeled_character.set_script(preload("res://modeled_character.gd"))
     add_child(_modeled_character)
     camera.add_child(revolver)
-    if comparison_loadout and OS.has_feature("web"):
-        comparison_loadout = JavaScriptBridge.eval(
+    if test_loadout and OS.has_feature("web"):
+        test_loadout = JavaScriptBridge.eval(
             "new URLSearchParams(location.search).get('forge')", true) != "local"
-    if comparison_loadout:
-        _load_comparison_weapons()
+    if test_loadout:
+        _load_test_weapons()
     else:
         camera.add_child(forge_pistol)
         forge_weapons[forge_pistol.inventory_slot] = forge_pistol
@@ -180,30 +213,25 @@ func _start_character_sequence() -> bool:
 
 func _armed_slot() -> bool:
     var hud := get_parent().get_node_or_null("GameplayHUD/SurvivalHUD")
-    return not comparison_loadout and hud != null and int(hud.get("selected_slot")) == 1
+    return not test_loadout and hud != null and int(hud.get("selected_slot")) == 1
 
-func _load_comparison_weapons() -> void:
-    var viewmodel := {
-        "position": [0.245, -0.235, -0.47],
-        "rotation": [0.0, 6.0, 0.0],
-        "scale": 0.95,
-        "hand_position": [0.012, 0.015, 0.025],
-    }
-    var gameplay := {
-        "class": "revolver", "capacity": 6, "damage": 28,
-        "recoil": 1.25, "reload": 2.2, "sound": "heavy", "weight": 1.2,
-    }
-    for index in range(2):
+func _load_test_weapons() -> void:
+    for index in range(TEST_WEAPONS.size()):
+        var specs: Dictionary = TEST_WEAPONS[index]
+        var sidearm := index < 2
         var weapon := forge_pistol if index == 0 else preload("res://forge_pistol.gd").new()
-        var label := "ОБЫЧНЫЙ" if index == 0 else "BODYCAM"
-        var profile := gameplay.duplicate()
-        profile["bodycam"] = 0.0 if index == 0 else 0.8
-        profile["bodycamProfile"] = 2
-        weapon.comparison_label = label
-        weapon.model_override = COMPARISON_REVOLVER
+        weapon.test_label = specs["label"]
+        weapon.test_slot_label = specs["short"]
+        weapon.model_override = specs["model"]
         weapon.package_override = {
-            "name": "Кордоновский револьвер · " + label, "slot": index + 3,
-            "weaponType": "revolver", "gameplay": profile, "viewmodel": viewmodel,
+            "name": specs["label"], "slot": index + 3, "weaponType": specs["class"],
+            "gameplay": specs,
+            "viewmodel": {
+                "position": [0.245, -0.235, -0.47] if sidearm else [0.255, -0.23, -0.57],
+                "rotation": [0.0, 6.0, 0.0],
+                "scale": specs["scale"],
+                "hand_position": [0.012, 0.015, 0.025],
+            },
         }
         camera.add_child(weapon)
         forge_weapons[weapon.inventory_slot] = weapon
