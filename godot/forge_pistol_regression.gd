@@ -102,6 +102,15 @@ func _run() -> void:
             _fail("wrong readiness state after shot")
             return
         pistol.call("_physics_process", 1.0)
+    var wav := Marshalls.raw_to_base64(FileAccess.get_file_as_bytes("res://revolver_report.wav"))
+    var sounds := {}
+    for action in ["fire", "cock", "reload", "empty"]:
+        sounds[action] = {"format": "wav", "data": wav}
+    pistol.call("_load_action_sounds", sounds)
+    var imported_sounds: Dictionary = pistol.get("action_sounds")
+    if imported_sounds.size() != 4:
+        _fail("custom WAV sounds were not decoded for all four actions")
+        return
     pistol.call("equip", false)
     revolver.call("equip", true)
     if int(revolver.get("rounds")) != 6 or not revolver_hand.is_visible_in_tree():
