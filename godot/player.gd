@@ -236,9 +236,12 @@ func _input(event: InputEvent) -> void:
             return
     if _inspect_enabled or controls_locked:
         return
-    if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
+    if event is InputEventMouseButton and event.button_index in [MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_UP] and event.pressed:
         if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and forge_pistol.visible:
-            forge_pistol.cock()
+            if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+                forge_pistol.cock()
+            else:
+                forge_pistol.insert_shells()
             get_viewport().set_input_as_handled()
         return
     if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
