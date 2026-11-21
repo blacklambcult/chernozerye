@@ -178,6 +178,8 @@ func _matches(event: InputEventKey, latin: int, cyrillic: String) -> bool:
     return event.physical_keycode == latin or event.keycode == latin or (event.unicode != 0 and char(event.unicode).to_lower() == cyrillic)
 
 func _input(event: InputEvent) -> void:
+    if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+        forge_pistol.trigger_held = false
     if event is InputEventKey:
         var inspect_key := event as InputEventKey
         if inspect_key.pressed and not inspect_key.echo and (inspect_key.keycode == KEY_F4 or inspect_key.physical_keycode == KEY_F4):
@@ -200,6 +202,7 @@ func _input(event: InputEvent) -> void:
         if revolver.visible:
             revolver.request_shot()
         elif forge_pistol.visible:
+            forge_pistol.trigger_held = true
             forge_pistol.request_shot()
     elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
         rotate_y(-event.relative.x * mouse_sensitivity)

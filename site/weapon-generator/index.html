@@ -864,39 +864,10 @@
                     </div>
 
                     <div id="pane-studio" class="tab-pane">
-                        <div class="studio-grid">
-                            <label class="studio-field wide">Название образца
-                                <input id="studio-name" data-studio-field="name" maxlength="90" autocomplete="off">
-                            </label>
-                            <label class="studio-field">Урон
-                                <input id="studio-damage" data-studio-field="damage" type="number" min="1" max="100" step="1">
-                            </label>
-                            <label class="studio-field">Отдача
-                                <input id="studio-recoil" data-studio-field="recoil" type="number" min="0" max="3" step="0.05">
-                            </label>
-                            <label class="studio-field">Ёмкость
-                                <input id="studio-capacity" data-studio-field="capacity" type="number" min="1" max="30" step="1">
-                            </label>
-                            <label class="studio-field">Перезарядка, с
-                                <input id="studio-reload" data-studio-field="reload" type="number" min="0.3" max="5" step="0.1">
-                            </label>
-                            <label class="studio-field">Звуковой профиль
-                                <select id="studio-sound" data-studio-field="sound">
-                                    <option value="standard">Стандартный</option>
-                                    <option value="heavy">Тяжёлый</option>
-                                    <option value="muted">Приглушённый</option>
-                                </select>
-                            </label>
-                            <label class="studio-field">Масштаб в руке
-                                <input id="studio-scale" data-studio-field="scale" type="number" min="0.05" max="3" step="0.01">
-                            </label>
-                        </div>
-                        <div class="actions-grid">
-                            <button type="button" class="btn-godot" data-action="save-library">▣ СОХРАНИТЬ В БИБЛИОТЕКУ</button>
-                            <button type="button" class="btn-amber" data-action="send-game">▶ ОТПРАВИТЬ В ИГРУ</button>
-                            <button type="button" class="btn-amber" data-action="open-forge">Настроить в Кузне</button>
-                        </div>
-                        <div class="studio-note">Библиотечный образец доступен другим редакторам Studio. Отправка заменяет тестовое оружие в слоте 3 этого браузера. Классовая логика и последовательности клипов будут подключаться отдельным этапом.</div>
+                        <label class="studio-field">Название образца
+                            <input id="studio-name" data-studio-field="name" maxlength="90" autocomplete="off">
+                        </label>
+                        <button type="button" class="btn-amber" data-action="save-library">Сохранить в библиотеку и открыть в Кузне</button>
                     </div>
                 </div>
             </div>
@@ -1214,8 +1185,6 @@
             let playWeaponClip = function () {};
             let exportGLB = function () { showToast('3D-движок ещё загружается...', true); };
             let saveStudioModel = function () { showToast('3D-движок ещё загружается...', true); };
-            let openForge = saveStudioModel;
-            let sendStudioGame = function () { showToast('3D-движок ещё загружается...', true); };
 
             /* =========================================================
                3. IMMEDIATE UI RENDERING & DOCUMENT EVENT DELEGATION
@@ -1409,11 +1378,7 @@
                 } else if (act === 'export-glb') {
                     exportGLB();
                 } else if (act === 'save-library') {
-                    saveStudioModel();
-                } else if (act === 'open-forge') {
-                    openForge(btn);
-                } else if (act === 'send-game') {
-                    sendStudioGame();
+                    saveStudioModel(btn);
                 } else if (act === 'reset-cam') {
                     resetCamera();
                 } else if (act === 'toggle-sockets') {
@@ -3933,81 +3898,22 @@
                     }
                 };
 
-                openForge = async function (button) {
+                saveStudioModel = async function (button) {
                     button.disabled = true;
                     try {
                         const recipe = { ...currentRecipe(), noStand: true };
                         const { blob } = await buildExportBlob(false);
                         if (blob.type !== 'model/gltf-binary') throw new Error('Не получен бинарный GLB');
-                        const glb = await blobToBase64(blob);
-                        sessionStorage.setItem('chernozerye.forge.transfer.v1', JSON.stringify({
-                            id: newAssetId(), name: recipe.gameplay.name, recipe, glb
-                        }));
-                        window.top.location.assign(new URL('../forge/?transfer=1', location.href));
+                        const id = newAssetId();
+                        await window.ChernoObjectLibrary.saveModel({
+                            id, name: recipe.gameplay.name, blob, kind: 'weapon',
+                            source: 'weapon-generator', recipe, updatedAt: new Date().toISOString()
+                        });
+                        window.top.location.assign(new URL('../forge/?weapon=' + encodeURIComponent(id), location.href));
                     } catch (error) {
-                        showToast('Не удалось передать модель: ' + error.message, true);
+                        showToast('Не удалось сохранить модель: ' + error.message, true);
                     } finally {
                         button.disabled = false;
-                    }
-                };
-
-                saveStudioModel = async function () {
-                    const library = window.ChernoObjectLibrary;
-                    if (!library) { showToast('Общая библиотека Studio недоступна', true); return; }
-                    try {
-                        const result = await buildExportBlob();
-                        if (result.blob.size > 2 * 1024 * 1024) throw new Error('GLB больше 2 МБ');
-                        const studio = studioWeapon();
-                        await library.saveModel({
-                            id: studio.assetId,
-                            name: studio.name,
-                            blob: result.blob,
-                            kind: 'weapon',
-                            source: 'weapon-generator',
-                            recipe: currentRecipe(),
-                            updatedAt: new Date().toISOString()
-                        });
-                        await library.requestPersistence();
-                        persistStudioState();
-                        showToast('Сохранено в общей библиотеке: ' + studio.name, false);
-                    } catch (err) {
-                        showToast('Не удалось сохранить: ' + err.message, true);
-                    }
-                };
-
-                sendStudioGame = async function () {
-                    try {
-                        const result = await buildExportBlob();
-                        if (result.blob.size > 2 * 1024 * 1024) throw new Error('GLB больше 2 МБ');
-                        const studio = studioWeapon();
-                        const sidearm = state.weaponType === 'revolver' || state.weaponType === 'pistol';
-                        const payload = {
-                            version: 1,
-                            name: studio.name,
-                            category: sidearm ? 'sidearm' : 'longarm',
-                            weaponType: state.weaponType,
-                            glb: await blobToBase64(result.blob),
-                            gameplay: {
-                                damage: studio.damage,
-                                recoil: studio.recoil,
-                                capacity: studio.capacity,
-                                reload: studio.reload,
-                                sound: studio.sound
-                            },
-                            viewmodel: {
-                                position: [0.285, -0.225, -0.47],
-                                rotation: [0, 9, 0],
-                                scale: studio.scale,
-                                hand_position: [-0.01, 0.06, -0.01],
-                                hand_rotation: [0, 0, 0]
-                            },
-                            recipe: currentRecipe()
-                        };
-                        localStorage.setItem('chernozerye.forge.game-model.v1', JSON.stringify(payload));
-                        persistStudioState();
-                        showToast('Отправлено в слот 3. Перезапусти игру.', false);
-                    } catch (err) {
-                        showToast('Не удалось отправить в игру: ' + err.message, true);
                     }
                 };
 

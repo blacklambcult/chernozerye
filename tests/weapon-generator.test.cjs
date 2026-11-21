@@ -15,12 +15,11 @@ test("procedural generator keeps all eight weapon classes and Godot sockets",()=
   assert.ok(html.includes("QuaternionKeyframeTrack"));
 });
 
-test("Studio bridge exposes library and game delivery with editable specs",()=>{
-  for(const field of ["name","damage","recoil","capacity","reload","sound","scale"])
-    assert.match(html,new RegExp(`data-studio-field="${field}"`));
+test("Generator saves the asset in the shared catalog and opens it in Forge",()=>{
+  assert.match(html,/data-studio-field="name"/);
   assert.ok(html.includes('data-action="save-library"'));
-  assert.ok(html.includes('data-action="send-game"'));
-  assert.ok(html.includes("chernozerye.forge.game-model.v1"));
+  assert.match(html,/forge\/\?weapon=/);
+  assert.doesNotMatch(html,/data-action="send-game"/);
   assert.ok(html.includes("ChernoObjectLibrary"));
 });
 

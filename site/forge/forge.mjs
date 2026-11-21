@@ -7,7 +7,6 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 const C = window.ChernoModelCore;
 const Forge = window.ChernoHellishForge;
 const KEY = Forge.STORAGE_KEY;
-const TRANSFER_KEY = "chernozerye.forge.transfer.v1";
 let transferred = null;
 const $ = (id) => document.getElementById(id);
 const TYPE_NAMES = { box:"КУБ", cylinder:"ЦИЛИНДР", sphere:"СФЕРА", cone:"КОНУС", plane:"ПЛОСКОСТЬ" };
@@ -256,8 +255,6 @@ function select(id) {
 function persist() {
   try {
     if (transferred) {
-      transferred.record.viewmodel = Forge.normalizeViewmodel(forgeMeta.viewmodel);
-      sessionStorage.setItem(TRANSFER_KEY, JSON.stringify(transferred.record));
       updateFpPreview();
       return true;
     }
@@ -587,18 +584,6 @@ async function exportForgeGlb(data) {
     }
 }
 
-for (const key of ["damage","recoil","capacity","reload","sound"]) {
-  $("game-" + key).addEventListener("change", () => {
-    try {
-      const specs = Forge.normalizeGameplay(forgeMeta.gameplay, forgeMeta.category);
-      const input = $("game-" + key);
-      specs[key] = key === "sound" ? input.value : input.valueAsNumber;
-      forgeMeta.gameplay = Forge.normalizeGameplay(specs, forgeMeta.category);
-      persist();
-    } catch (error) { renderFpInspector(); status(error.message, true); }
-  });
-}
-
 async function deliverModel(button, inGame) {
   if (!project.parts.length) { status("Добавь хотя бы одну деталь.", true); return; }
   button.disabled = true;
@@ -623,14 +608,14 @@ async function deliverModel(button, inGame) {
 }
 
 $("export-glb").addEventListener("click", event => deliverModel(event.currentTarget, false));
-$("send-game-model").addEventListener("click", event => deliverModel(event.currentTarget, true));
+$("send-game-model").addEventListener("click", () => saveCatalogWeapon(true));
 $("reset-game-model").addEventListener("click", () => {
   try { localStorage.removeItem(GAME_MODEL_KEY); status("Штатная модель вернётся при следующем запуске игры."); }
   catch (error) { status(error.message, true); }
 });
 window.addEventListener("keydown", (event) => {
   const target = event.target;
-  if (transferred || target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
+  if (fpPreviewActive || target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
   if (event.ctrlKey || event.metaKey) {
     if (event.code === "KeyD" && part()) { event.preventDefault(); duplicateSelected(); }
     else if (event.code === "KeyZ" && undoHistory.length) {
@@ -903,7 +888,7 @@ function updateFpPreview() {
     forgeMeta.anchors.grip_primary.position : [0,0,0];
   if (transferred) importedModel.add(transferred.scene);
   else importedModel.position.set(-grip[0]*vm.scale,-grip[1]*vm.scale,-grip[2]*vm.scale);
-  for(const p of transferred ? [] : project.parts) {
+  for(const p of document.querySelector(".forge-transfer") ? [] : project.parts) {
     const mesh=meshFor(p);
     mesh.castShadow=false;
     importedModel.add(mesh);
@@ -917,9 +902,6 @@ function updateFpPreview() {
   fpRoot.add(hand);
 }
 function renderFpInspector() {
-  const specs = Forge.normalizeGameplay(forgeMeta.gameplay, forgeMeta.category);
-  for (const [key, value] of Object.entries(specs)) $("game-" + key).value = value;
-  $("send-game-model").disabled = !["sidearm", "longarm"].includes(forgeMeta.category);
   if(!forgeMeta?.viewmodel) return;
   const vm=forgeMeta.viewmodel;
   for(const input of document.querySelectorAll("[data-fp-field]")) {
@@ -1081,63 +1063,133 @@ $("export-fp-profile").addEventListener("click",()=>{
 
 rebuild();
 frameModel();
-persist();
 if (startupWarning) status(startupWarning, true);
 window.__hellishForgeLoaded = true;
 requestAnimationFrame(frame);
 
-async function loadTransferredAsset() {
-  if (!new URLSearchParams(location.search).has("transfer")) return;
-  const panel = $("transferred-asset");
-  const feedback = $("transfer-status");
-  const save = $("save-transferred-asset");
-  panel.hidden = false;
-  save.disabled = true;
+const catalog = $("weapon-library");
+const feedback = $("transfer-status");
+const profileButtons = ["save-transferred-asset", "send-game-model"];
+const numericFields = {
+  damage:[1,100], recoil:[0,3], capacity:[1,30], reload:[0.3,5],
+  weight:[0.1,20], rate:[60,1200], noise:[0,100]
+};
+const choiceFields = ["class","grip","mode","sound"];
+
+function readWeaponProfile() {
+  const values = {};
+  for (const [key,[min,max]] of Object.entries(numericFields)) {
+    const value = $("game-" + key).valueAsNumber;
+    if (!Number.isFinite(value) || value < min || value > max ||
+        (["capacity","rate","noise"].includes(key) && !Number.isInteger(value)))
+      throw new Error("Проверь поле «" + $("game-" + key).labels[0].textContent + "».");
+    values[key] = value;
+  }
+  for (const key of choiceFields) values[key] = $("game-" + key).value;
+  if (values.sound === "silent") values.noise = 0;
+  return {...values, ...Forge.normalizeGameplay(values, values.grip)};
+}
+
+function fillWeaponProfile(record) {
+  const type = record.recipe?.weaponType;
+  const defaultClass = {revolver:"revolver",pistol:"pistol",smg:"smg",assault:"rifle",
+    boltrifle:"rifle",semirifle:"rifle",pumpshotgun:"shotgun",doubleshotgun:"shotgun"}[type] || "other";
+  const grip = ["pistol","revolver"].includes(defaultClass) ? "sidearm" : "longarm";
+  const old = record.recipe?.gameplay ?? {};
+  const specs = {...Forge.normalizeGameplay(null, grip), class:defaultClass, grip,
+    mode:"single", weight:grip === "sidearm" ? 1 : 3, rate:260, noise:old.sound === "muted" ? 20 : 100,
+    ...old, ...record.gameplay};
+  for (const key of [...Object.keys(numericFields), ...choiceFields])
+    $("game-" + key).value = specs[key];
+}
+
+let catalogRequest = 0;
+const weapons = new Map();
+async function openCatalogWeapon(id) {
+  const request = ++catalogRequest;
+  for (const button of profileButtons) $(button).disabled = true;
+  if (fpPreviewActive) clearFpPreview();
+  transferred = null;
+  const record = weapons.get(id);
+  if (!record) { feedback.textContent = "Выбери модель или создай её в генераторе."; return; }
   feedback.textContent = "Загрузка модели…";
   try {
-    const record = JSON.parse(sessionStorage.getItem(TRANSFER_KEY));
-    if (!record?.glb || !record.id) throw new Error("В этой вкладке нет переданной модели.");
-    const bytes = Uint8Array.from(atob(record.glb), char => char.charCodeAt(0));
-    const gltf = await new GLTFLoader().parseAsync(bytes.buffer, "");
-    const viewmodel = Forge.normalizeViewmodel(record.viewmodel ?? {
-      ...Forge.DEFAULT_VIEWMODEL, scale: record.recipe.gameplay.scale
+    const gltf = await new GLTFLoader().parseAsync(await record.blob.arrayBuffer(), "");
+    if (request !== catalogRequest) return;
+    forgeMeta.viewmodel = Forge.normalizeViewmodel(record.viewmodel ?? {
+      ...Forge.DEFAULT_VIEWMODEL, scale: record.recipe?.gameplay?.scale ?? Forge.DEFAULT_VIEWMODEL.scale
     });
-    transferred = { record, scene: gltf.scene, blob: new Blob([bytes], {type:"model/gltf-binary"}) };
-    forgeMeta.viewmodel = viewmodel;
+    transferred = {record, scene:gltf.scene};
     $("transferred-name").value = record.name;
     $("viewport-title").textContent = record.name;
-    const workspace = document.querySelector(".workspace");
-    workspace.classList.add("forge-transfer");
-    document.querySelector(".sidebar.left").hidden = true;
-    for (const section of document.querySelector(".sidebar.right").children)
-      section.hidden = section.id !== "fp-inspector";
     if (!fpPreviewActive) toggleFpPreview();
-    else updateFpPreview();
-    for (const id of ["fp-preview-toggle", "fp-preview-panel", "apply-fp-profile", "clear-game-fp-profile"])
-      $(id).hidden = true;
+    else { updateFpPreview(); renderFpInspector(); }
+    fillWeaponProfile(record);
+    for (const button of profileButtons) $(button).disabled = false;
     feedback.textContent = "";
-    save.disabled = false;
-    save.addEventListener("click", async () => {
-      const name = $("transferred-name").value.trim();
-      if (!name) { feedback.textContent = "Введи название варианта."; return; }
-      save.disabled = true;
-      try {
-        const pose = Forge.normalizeViewmodel(forgeMeta.viewmodel);
-        const recipe = {...record.recipe, gameplay: {...record.recipe.gameplay, name, scale:pose.scale}};
-        await window.ChernoObjectLibrary.saveModel({
-          id:record.id, name, blob:transferred.blob, kind:"weapon", source:"weapon-generator",
-          recipe, viewmodel:pose, updatedAt:new Date().toISOString()
-        });
-        record.name = name;
-        persist();
-        feedback.textContent = "Вариант с настроенной позой сохранён.";
-      } catch (error) {
-        feedback.textContent = "Ошибка сохранения: " + error.message;
-      } finally { save.disabled = false; }
-    });
   } catch (error) {
-    feedback.textContent = "Ошибка загрузки: " + error.message;
+    if (request === catalogRequest) feedback.textContent = "Ошибка загрузки: " + error.message;
   }
 }
-loadTransferredAsset();
-console.info("HELLISH_FORGE_READY: categories=5 anchors=6 json=true glb=true parts=" + project.parts.length);
+
+async function refreshWeaponLibrary() {
+  const selected = transferred?.record.id || catalog.value || new URLSearchParams(location.search).get("weapon");
+  try {
+    const records = await window.ChernoObjectLibrary.models();
+    weapons.clear();
+    catalog.length = 1;
+    for (const record of records.filter(item => item.kind === "weapon").sort((a,b) => a.name.localeCompare(b.name))) {
+      weapons.set(record.id, record);
+      catalog.add(new Option(record.name, record.id));
+    }
+    catalog.value = weapons.has(selected) ? selected : "";
+    if (!transferred && catalog.value) await openCatalogWeapon(catalog.value);
+    else if (!transferred) feedback.textContent = "Выбери модель или создай её в генераторе.";
+  } catch (error) { feedback.textContent = "Не удалось открыть библиотеку: " + error.message; }
+}
+catalog.addEventListener("change", () => openCatalogWeapon(catalog.value));
+$("game-sound").addEventListener("change", () => {
+  if ($("game-sound").value === "silent") $("game-noise").value = "0";
+});
+window.addEventListener("focus", refreshWeaponLibrary);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshWeaponLibrary(); });
+
+async function saveCatalogWeapon(sendToGame) {
+  if (!transferred) return;
+  const record = transferred.record;
+  const button = $(sendToGame ? "send-game-model" : "save-transferred-asset");
+  button.disabled = true;
+  try {
+    const name = $("transferred-name").value.trim();
+    if (!name) throw new Error("Введи название варианта.");
+    const gameplay = readWeaponProfile();
+    const viewmodel = Forge.normalizeViewmodel(forgeMeta.viewmodel);
+    const saved = {...record, name, gameplay, viewmodel, updatedAt:new Date().toISOString()};
+    await window.ChernoObjectLibrary.saveModel(saved);
+    weapons.set(saved.id, saved);
+    if (transferred?.record.id === saved.id) {
+      transferred.record = saved;
+      catalog.selectedOptions[0].textContent = name;
+      $("viewport-title").textContent = name;
+    }
+    if (sendToGame) {
+      if (saved.blob.size > 2 * 1024 * 1024) throw new Error("В библиотеке сохранено. Для слота 3 требуется GLB до 2 МБ.");
+      const glb = await new Promise((resolve,reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(",")[1]);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(saved.blob);
+      });
+      localStorage.setItem(GAME_MODEL_KEY, JSON.stringify({version:1, name, glb,
+        category:gameplay.grip, gameplay, viewmodel, weaponType:saved.recipe?.weaponType}));
+    }
+    feedback.textContent = sendToGame ? "Профиль сохранён. Перезапусти игру и выбери слот 3." : "Профиль сохранён в библиотеке.";
+  } catch (error) { feedback.textContent = error.message; }
+  finally { button.disabled = !transferred; }
+}
+$("save-transferred-asset").addEventListener("click", () => saveCatalogWeapon(false));
+for (const id of profileButtons) $(id).disabled = true;
+for (const id of ["fp-preview-panel", "apply-fp-profile", "clear-game-fp-profile"])
+  $(id).hidden = true;
+toggleFpPreview();
+refreshWeaponLibrary();
