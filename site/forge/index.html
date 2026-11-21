@@ -199,6 +199,8 @@
           <h3>Библиотека оружия</h3>
           <label for="weapon-library">Модель из генератора</label>
           <select id="weapon-library"><option value="">Выбери модель</option></select>
+          <label for="weapon-clip">Предпросмотр анимации</label>
+          <select id="weapon-clip" disabled><option value="">Поза покоя</option></select>
           <a href="../studio/#weapon" target="_top">Открыть генератор</a>
           <label for="transferred-name">Название варианта</label>
           <input id="transferred-name" maxlength="90">
@@ -219,10 +221,10 @@
           <label class="axis z"><span>Z</span><input type="number" step="1" data-fp-field="rotation" data-fp-index="2" aria-label="Поворот предмета Z"></label>
         </div></div>
         <div class="field-group"><div class="fp-scale-heading"><label for="fp-scale">Масштаб в руках</label><output id="fp-scale-output">0.260×</output></div>
-          <input id="fp-scale-slider" type="range" min=".05" max="1.2" step=".01" aria-label="Масштаб оружия в первом лице">
-          <input id="fp-scale" type="number" step=".01" min=".05" max="3" aria-label="Точный масштаб оружия">
+          <input id="fp-scale-slider" type="range" min=".05" max="8" step=".01" aria-label="Масштаб оружия в первом лице">
+          <input id="fp-scale" type="number" step=".01" min=".05" max="8" aria-label="Точный масштаб оружия">
         </div>
-        <div class="field-group"><label>Положение кисти / XYZ, м</label><div class="triplet">
+        <div class="field-group"><label>Положение кисти / XYZ, м</label><div class="triplet fp-position-sliders">
           <label class="axis x"><span>X</span><input type="number" step=".01" data-fp-field="hand_position" data-fp-index="0" aria-label="Положение кисти X"></label>
           <label class="axis y"><span>Y</span><input type="number" step=".01" data-fp-field="hand_position" data-fp-index="1" aria-label="Положение кисти Y"></label>
           <label class="axis z"><span>Z</span><input type="number" step=".01" data-fp-field="hand_position" data-fp-index="2" aria-label="Положение кисти Z"></label>
@@ -294,8 +296,8 @@
   <footer class="footer"><span>CHERNOZERYE <b>HELLISH FORGE 0.1</b></span><span id="global-status">3D / РЕДАКТОР ПРОПСОВ</span><span>ЛОКАЛЬНОЕ СОХРАНЕНИЕ · JSON + GLB</span></footer>
 </div>
 <script src="../model/model-core.js?v=1"></script>
-<script src="./forge-core.js?v=4"></script>
+<script src="./forge-core.js?v=5"></script>
 <script src="../object-library/library.js?v=2"></script>
-<script type="module" src="./forge.mjs?v=6"></script>
+<script type="module" src="./forge.mjs?v=7"></script>
 </body>
 </html>

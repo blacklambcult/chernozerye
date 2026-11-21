@@ -187,6 +187,11 @@ func _input(event: InputEvent) -> void:
             return
     if _inspect_enabled or controls_locked:
         return
+    if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
+        if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and forge_pistol.visible:
+            forge_pistol.cock()
+            get_viewport().set_input_as_handled()
+        return
     if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
         # GUI buttons need the click; never capture mouse before their pressed event.
         if get_viewport().gui_get_hovered_control() is Button:
