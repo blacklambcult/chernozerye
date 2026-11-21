@@ -55,6 +55,7 @@ func _run() -> void:
     if revolver.visible or not pistol_hand.is_visible_in_tree():
         _fail("pistol holding hand hidden or legacy revolver unexpectedly visible")
         return
+    var rest_pose: Vector3 = pistol.get("rest_pose")
     for count in range(7):
         pistol.set("cooldown", 0.0)
         pistol.call("request_shot")
@@ -65,6 +66,16 @@ func _run() -> void:
         if int(pistol.get("rounds")) != 6-count or bool(pistol.get("pending")):
             _fail("each click must consume exactly one of seven rounds")
             return
+        if count == 0:
+            pistol.call("_physics_process", 1.0 / 60.0)
+            if pistol.position.z <= rest_pose.z or float(pistol.get("recoil_pose")) <= 0.0:
+                _fail("shot did not push the viewmodel backward")
+                return
+            for frame in range(90):
+                pistol.call("_physics_process", 1.0 / 60.0)
+            if absf(pistol.position.z - rest_pose.z) > 0.001:
+                _fail("viewmodel did not settle back after recoil")
+                return
     pistol.set("cooldown", 0.0)
     pistol.call("request_shot")
     if bool(pistol.get("pending")):
