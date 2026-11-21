@@ -7,6 +7,19 @@ const VIEWMODEL_PROFILE := "res://assets/forge_pistol.viewmodel.json"
 const DEFAULT_REST := Vector3(0.285, -0.225, -0.47)
 const ASSET_SCENE: PackedScene = preload("res://assets/forge_pistol.glb")
 const SHOT_STREAM: AudioStream = preload("res://revolver_report.wav")
+const DEFAULT_BODYCAM := 0.8
+const MUZZLE_HAZE_SECONDS := 0.20
+# Bodycam response scales: backward shove, muzzle lift, recovery time.
+const CLASS_RESPONSE := {
+    "revolver": Vector3(1.16, 1.10, 1.15),
+    "pistol": Vector3(0.86, 1.00, 0.85),
+    "smg": Vector3(0.74, 0.82, 0.82),
+    "assault": Vector3(1.14, 0.88, 1.00),
+    "boltrifle": Vector3(1.43, 0.90, 1.30),
+    "semirifle": Vector3(1.26, 0.86, 1.15),
+    "doubleshotgun": Vector3(1.62, 1.11, 1.40),
+    "pumpshotgun": Vector3(1.46, 0.98, 1.30),
+}
 var indoors := false
 var rounds := CAPACITY
 var capacity := CAPACITY
@@ -19,8 +32,15 @@ var pushback := 1.0
 var recovery_speed := 1.0
 var inertia_strength := 1.0
 var impact_strength := 1.0
-var bodycam_strength := 0.0
+var bodycam_strength := DEFAULT_BODYCAM
+var bodycam_response := Vector3.ONE
 var shot_impulse := 0.0
+var recoil_follow := 0.0
+var haze_left := 0.0
+var haze_origin := Vector3.ZERO
+var haze_direction := Vector3.FORWARD
+var muzzle_haze: MeshInstance3D
+var haze_material: StandardMaterial3D
 var recoil_energy := 0.0
 var recoil_pose := 0.0
 var recoil_twist := 0.0
@@ -130,7 +150,13 @@ func _apply_gameplay(specs: Dictionary) -> void:
     recovery_speed = _game_number(specs.get("recovery"), 1.0, 0.25, 3.0)
     inertia_strength = _game_number(specs.get("inertia"), 1.0, 0.0, 3.0)
     impact_strength = _game_number(specs.get("impact"), 1.0, 0.0, 3.0)
-    bodycam_strength = _game_number(specs.get("bodycam"), 0.0, 0.0, 1.0)
+    var previous_bodycam := _game_number(specs.get("bodycam"), DEFAULT_BODYCAM, 0.0, 1.0)
+    # Earlier Forge builds saved zero even when the field was never edited.
+    bodycam_strength = DEFAULT_BODYCAM if previous_bodycam == 0.0 and specs.get("bodycamProfile") != 2 else previous_bodycam
+    var response_class := str(specs.get("class", ""))
+    if not CLASS_RESPONSE.has(response_class):
+        response_class = weapon_type
+    bodycam_response = CLASS_RESPONSE.get(response_class, Vector3.ONE)
     shot_noise = _game_number(specs.get("noise"), 100.0, 0.0, 100.0) / 100.0
     if sound_profile == "silent":
         shot_noise = 0.0
@@ -178,9 +204,9 @@ func _ready() -> void:
         if (slot is int or slot is float) and slot >= 3 and slot <= 10 and floorf(float(slot)) == float(slot):
             inventory_slot = int(slot) - 1
         _read_profile(package["viewmodel"])
-        _apply_gameplay(package["gameplay"])
         var weapon_class: String = str(package["gameplay"].get("class", package.get("weaponType", "")))
         weapon_type = str(package.get("weaponType", weapon_class))
+        _apply_gameplay(package["gameplay"])
         cocking_clip = { "revolver": &"CockHammer", "pistol": &"RackSlide", "smg": &"RackBolt" }.get(weapon_class, &"")
         cocking_clip = {
             "assault": &"RackBolt", "semirifle": &"RackBolt",
@@ -195,6 +221,7 @@ func _ready() -> void:
         print("FORGE_GAME_MODEL_READY: ", str(package.get("name", "")))
     else:
         _read_profile()
+        bodycam_response = CLASS_RESPONSE["pistol"]
     position = rest_pose
     rotation = rest_angles
     visual_holder = Node3D.new()
@@ -257,6 +284,8 @@ func _ready() -> void:
     add_child(flash)
     _add_flash_cone(0.036, 0.12, 5, Color("#ffd275"))
     _add_flash_cone(0.024, 0.09, 4, Color.WHITE)
+    if bodycam_strength > 0.0:
+        _add_muzzle_haze()
     report.stream = SHOT_STREAM
     _load_action_sounds(package.get("sounds", {}))
     if action_sounds.has("fire"):
@@ -292,6 +321,33 @@ func _add_flash_cone(radius: float, length: float, sides: int, color: Color) -> 
     instance.position.z = -0.06
     flash.add_child(instance)
 
+func _add_muzzle_haze() -> void:
+    var gradient := Gradient.new()
+    gradient.offsets = PackedFloat32Array([0.0, 0.80, 1.0])
+    gradient.colors = PackedColorArray([Color.WHITE, Color(1, 1, 1, 0.08), Color(1, 1, 1, 0)])
+    var texture := GradientTexture2D.new()
+    texture.width = 32
+    texture.height = 32
+    texture.gradient = gradient
+    texture.fill = GradientTexture2D.FILL_RADIAL
+    texture.fill_from = Vector2(0.5, 0.5)
+    texture.fill_to = Vector2(1.0, 0.5)
+    haze_material = StandardMaterial3D.new()
+    haze_material.albedo_texture = texture
+    haze_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+    haze_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    haze_material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+    haze_material.billboard_keep_scale = true
+    var quad := QuadMesh.new()
+    quad.size = Vector2.ONE
+    muzzle_haze = MeshInstance3D.new()
+    muzzle_haze.top_level = true
+    muzzle_haze.mesh = quad
+    muzzle_haze.material_override = haze_material
+    muzzle_haze.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    muzzle_haze.hide()
+    add_child(muzzle_haze)
+
 func equip(value: bool) -> void:
     visible = value
     if not value:
@@ -311,6 +367,10 @@ func equip(value: bool) -> void:
         recoil_pose = 0.0
         recoil_twist = 0.0
         shot_impulse = 0.0
+        recoil_follow = 0.0
+        haze_left = 0.0
+        if muzzle_haze != null:
+            muzzle_haze.hide()
         look_lag = Vector2.ZERO
         movement_lag = Vector3.ZERO
         flash_left = 0.0
@@ -616,6 +676,10 @@ func _shoot() -> void:
     var twist := randf_range(-0.035, 0.035) * visual_recoil
     recoil_twist = clampf(recoil_twist + twist, -0.16, 0.16)
     shot_impulse = minf(shot_impulse + visual_recoil * bodycam_strength, 3.0)
+    haze_left = MUZZLE_HAZE_SECONDS * sqrt(bodycam_strength)
+    if muzzle_haze != null:
+        haze_origin = forward_marker.global_position if forward_marker != null else flash.global_position
+        haze_direction = -global_basis.z.normalized()
     flash_left = lerpf(0.065, 0.048, bodycam_strength)
     if cocking_clip in [&"CockHammer", &"CycleBolt", &"PumpAction"]:
         cocked = false
@@ -647,7 +711,8 @@ func _shoot() -> void:
         player.call("kick_view", visual_recoil * (1.0 - 0.65 * bodycam_strength),
             recovery_speed, recoil_twist * (1.0 - bodycam_strength))
         if shot_impulse > 0.0 and player.has_method("kick_bodycam"):
-            player.call("kick_bodycam", visual_recoil * bodycam_strength, twist, recovery_speed)
+            player.call("kick_bodycam", visual_recoil * bodycam_strength * bodycam_response.x,
+                twist, recovery_speed / lerpf(1.0, bodycam_response.z, bodycam_strength))
     var origin := eye.global_position
     var excluded: Array[RID] = []
     if player != null:
@@ -667,11 +732,12 @@ func _shoot() -> void:
     if player != null:
         var legacy := player.get("revolver") as Node3D
         if legacy != null:
-            legacy.call("_surface_feedback", hit, impact_strength)
+            legacy.call("_surface_feedback", hit, minf(3.0, impact_strength * (1.0 + bodycam_strength * 0.35)))
 
 func _physics_process(delta: float) -> void:
     cooldown = maxf(0.0, cooldown - delta)
     flash_left = maxf(0.0, flash_left - delta)
+    haze_left = maxf(0.0, haze_left - delta)
     bloom = move_toward(bloom, 0.0, delta * 2.2)
     if not visible:
         return
@@ -712,10 +778,16 @@ func _physics_process(delta: float) -> void:
         movement = Vector3(-local_speed.x * 0.005, -local_speed.y * 0.004, -local_speed.z * 0.003)
         movement = movement.limit_length(0.04) * inertia_strength
     movement_lag = movement_lag.lerp(movement, 1.0 - exp(-10.0 / mass * delta))
-    var lift := recoil_pose * lerpf(0.105, 0.068, bodycam_strength) / mass
-    var shove := (0.06 * recoil_pose + 0.05 * shot_impulse) * pushback / mass
-    var wrist_drop := 0.017 * shot_impulse / mass
-    shot_impulse *= exp(-32.0 * recovery_speed / sqrt(mass) * delta)
+    var settle := recovery_speed / lerpf(1.0, bodycam_response.z, bodycam_strength)
+    recoil_follow = lerpf(recoil_follow, shot_impulse, 1.0 - exp(-19.0 * settle * delta))
+    var rebound := maxf(0.0, recoil_follow - shot_impulse * 0.8)
+    var lift := (recoil_pose * lerpf(0.105, 0.075 * bodycam_response.y, bodycam_strength)
+        - 0.055 * rebound) / mass
+    var shove := 0.06 * recoil_pose * pushback / mass
+    if bodycam_strength > 0.0:
+        shove = minf(shove + 0.085 * shot_impulse * bodycam_response.x * pushback / mass, 0.19)
+    var wrist_drop := (0.024 * shot_impulse - 0.012 * rebound) / mass
+    shot_impulse *= exp(-32.0 * settle / sqrt(mass) * delta)
     var reload_t := sin(PI * reload_left / reload_seconds)
     position = rest_pose + movement_lag + Vector3(
         look_lag.x * 0.26, -0.11 * reload_t - recoil_pose * 0.01 - wrist_drop - look_lag.y * 0.22,
@@ -727,6 +799,13 @@ func _physics_process(delta: float) -> void:
     flash.visible = flash_left > 0.0
     if flash.visible and bodycam_strength > 0.0:
         var intensity := flash_left / lerpf(0.065, 0.048, bodycam_strength)
-        flash.light_energy = lerpf(3.0, 4.5 * intensity * intensity, bodycam_strength)
+        flash.light_energy = lerpf(3.0, 6.5 * intensity * intensity, bodycam_strength)
         for shape: MeshInstance3D in flash.get_children():
             shape.scale = Vector3.ONE * lerpf(1.0, 0.3 + 0.7 * intensity, bodycam_strength)
+    if muzzle_haze != null:
+        muzzle_haze.visible = haze_left > 0.0
+        if muzzle_haze.visible:
+            var age := 1.0 - haze_left / (MUZZLE_HAZE_SECONDS * sqrt(bodycam_strength))
+            muzzle_haze.global_position = haze_origin + haze_direction * (0.035 + 0.11 * age) + Vector3.UP * (0.05 * age)
+            muzzle_haze.scale = Vector3.ONE * lerpf(0.065, 0.19, age)
+            haze_material.albedo_color = Color(0.58, 0.61, 0.66, 0.32 * bodycam_strength * pow(1.0 - age, 2.0))

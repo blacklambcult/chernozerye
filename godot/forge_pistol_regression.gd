@@ -199,6 +199,16 @@ func _run() -> void:
     if int(revolver.get("rounds")) != 6 or not revolver_hand.is_visible_in_tree():
         _fail("original six-round revolver or its holding hand was changed")
         return
+    for weapon_class in ["revolver", "pistol", "smg", "assault", "boltrifle", "semirifle", "doubleshotgun", "pumpshotgun"]:
+        pistol.call("_apply_gameplay", {"class": weapon_class, "bodycam": 0.0})
+        if not is_equal_approx(float(pistol.get("bodycam_strength")), 0.8) \
+                or Vector3(pistol.get("bodycam_response")).is_equal_approx(Vector3.ONE):
+            _fail("old weapon profiles must inherit a class-specific Bodycam response")
+            return
+    pistol.call("_apply_gameplay", {"bodycam": 0.0, "bodycamProfile": 2})
+    if not is_zero_approx(float(pistol.get("bodycam_strength"))):
+        _fail("an explicit off setting in the current profile must be respected")
+        return
     var comparison_actor := CharacterBody3D.new()
     comparison_actor.set_script(load("res://player.gd"))
     comparison_actor.set("comparison_loadout", true)
@@ -220,6 +230,19 @@ func _run() -> void:
         if not is_equal_approx(float(weapon.get("bodycam_strength")), 0.0 if index == 2 else 0.8):
             _fail("comparison revolvers must use different bodycam profile values")
             return
+    var test_revolver: Node3D = slots[3]
+    test_revolver.call("equip", true)
+    test_revolver.call("cock")
+    test_revolver.call("_physics_process", 1.0)
+    test_revolver.call("_shoot")
+    test_revolver.call("_physics_process", 1.0 / 60.0)
+    if not (test_revolver.get("muzzle_haze") as MeshInstance3D).visible:
+        _fail("Bodycam muzzle haze must appear after firing")
+        return
+    test_revolver.call("equip", false)
+    if (test_revolver.get("muzzle_haze") as MeshInstance3D).visible:
+        _fail("holstered weapons must clear their muzzle effect")
+        return
     var standard := slots[2].get("model_animation") as AnimationPlayer
     var bodycam := slots[3].get("model_animation") as AnimationPlayer
     var standard_fire := standard.get_animation(&"Fire")

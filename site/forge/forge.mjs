@@ -1108,7 +1108,7 @@ function readWeaponProfile() {
   }
   for (const key of choiceFields) values[key] = $("game-" + key).value;
   if (values.sound === "silent") values.noise = 0;
-  return {...values, ...Forge.normalizeGameplay(values, values.grip)};
+  return {...values, ...Forge.normalizeGameplay(values, values.grip), bodycamProfile:2};
 }
 
 const forgeAssignments = new Map();
@@ -1192,10 +1192,11 @@ function fillWeaponProfile(record) {
   const grip = ["pistol","revolver"].includes(defaultClass) ? "sidearm" : "longarm";
   const old = record.recipe?.gameplay ?? {};
   const specs = {...Forge.normalizeGameplay(null, grip), class:defaultClass, grip,
-    pushback:1, recovery:1, inertia:1, impact:1, bodycam:0,
+    pushback:1, recovery:1, inertia:1, impact:1, bodycam:0.8,
     mode:"single", weight:grip === "sidearm" ? 1 : 3, rate:260, noise:old.sound === "muted" ? 20 : 100,
     ...old, ...record.gameplay};
   if (!classes.includes(specs.class)) specs.class = defaultClass;
+  if (specs.bodycam === 0 && specs.bodycamProfile !== 2) specs.bodycam = 0.8;
   for (const key of [...Object.keys(numericFields), ...choiceFields])
     $("game-" + key).value = specs[key];
 }
