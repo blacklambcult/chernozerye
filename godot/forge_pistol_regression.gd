@@ -199,5 +199,38 @@ func _run() -> void:
     if int(revolver.get("rounds")) != 6 or not revolver_hand.is_visible_in_tree():
         _fail("original six-round revolver or its holding hand was changed")
         return
+    var comparison_actor := CharacterBody3D.new()
+    comparison_actor.set_script(load("res://player.gd"))
+    comparison_actor.set("comparison_loadout", true)
+    get_root().add_child(comparison_actor)
+    var slots: Dictionary = comparison_actor.get("forge_weapons")
+    if slots.size() != 2 or not slots.has(2) or not slots.has(3) \
+            or bool(comparison_actor.get("revolver").visible):
+        _fail("comparison inventory must contain only Forge weapons in slots 3 and 4")
+        return
+    for index in [2, 3]:
+        var weapon: Node3D = slots[index]
+        var comparison_clips := weapon.get("model_animation") as AnimationPlayer
+        if weapon.get("weapon_type") != "revolver" or weapon.get("rounds") != 6 \
+                or weapon.get("casing_port") == null or weapon.get("forward_marker") == null \
+                or weapon.get("cocking_clip") != &"CockHammer" or comparison_clips == null \
+                or not comparison_clips.has_animation(&"Fire") or not comparison_clips.has_animation(&"Reload"):
+            _fail("generated comparison revolver missing clips, markers or profile")
+            return
+        if not is_equal_approx(float(weapon.get("bodycam_strength")), 0.0 if index == 2 else 0.8):
+            _fail("comparison revolvers must use different bodycam profile values")
+            return
+    var standard := slots[2].get("model_animation") as AnimationPlayer
+    var bodycam := slots[3].get("model_animation") as AnimationPlayer
+    var standard_fire := standard.get_animation(&"Fire")
+    var bodycam_fire := bodycam.get_animation(&"Fire")
+    var track := standard_fire.find_track(
+        standard.get_node(standard.root_node).get_path_to(
+            slots[2].get("imported_model").find_child("Weapon_Body")), Animation.TYPE_POSITION_3D)
+    if standard_fire == bodycam_fire or track < 0 \
+            or Vector3(standard_fire.track_get_key_value(track, 1)).length() <= \
+                Vector3(bodycam_fire.track_get_key_value(track, 1)).length():
+        _fail("compare original and reduced baked body motion without shared animation mutation")
+        return
     print("FORGE_PISTOL_REGRESSION_OK: uploaded_glb=true anchors=3 parts>=10 capacity=7 one_click=true reload=true original_revolver=true hands=2 fp_profile=true")
     quit(0)

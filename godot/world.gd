@@ -409,6 +409,7 @@ func _create_player() -> void:
     var player := CharacterBody3D.new()
     player.name = "Player"
     player.set_script(PLAYER_SCRIPT)
+    player.set("comparison_loadout", true)
     # Spawn on the existing OSM village road, rather than 74 m away in an empty clearing.
     player.position = Vector3(130, 0.2, -82)
     player.rotation.y = deg_to_rad(-125.0)

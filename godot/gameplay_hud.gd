@@ -162,8 +162,9 @@ func _draw_slots(view_width: float, view_height: float) -> void:
     var y := 0.0
     var pistol: Node3D = player.get("forge_pistol") if player != null else null
     var forge_slots: Dictionary = player.get("forge_weapons") if player != null else {}
+    var comparison := player != null and bool(player.get("comparison_loadout"))
     draw_rect(Rect2(x0 - 8.0, y - 28.0, width + 15.0, 106.0), FRAME)
-    _write(x0, y - 9.0, "БЫСТРЫЕ ПРЕДМЕТЫ", 12, MUTED)
+    _write(x0, y - 9.0, "3 — ОБЫЧНЫЙ   ·   4 — BODYCAM" if comparison else "БЫСТРЫЕ ПРЕДМЕТЫ", 12, MUTED)
     for index in range(SLOT_COUNT):
         var x := x0 + float(index) * 62.0
         var chosen := index == selected_slot
@@ -178,7 +179,7 @@ func _draw_slots(view_width: float, view_height: float) -> void:
             draw_rect(Rect2(x + 19, y + 16, 24, 31), Color("#d6cabb"))
             draw_rect(Rect2(x + 19, y + 31, 24, 8), Color("#97735f"))
             draw_rect(Rect2(x + 22, y + 18, 18, 2), Color("#f1ede1"))
-        elif index == 1:
+        elif (index == 1 and not comparison) or (comparison and forge_slots.has(index)):
             draw_line(Vector2(x+10,y+25),Vector2(x+41,y+25),INK,4)
             draw_circle(Vector2(x+31,y+29),6,GOLD)
             draw_line(Vector2(x+39,y+28),Vector2(x+44,y+40),Color("#a37c57"),6)
@@ -192,7 +193,7 @@ func _draw_slots(view_width: float, view_height: float) -> void:
         else:
             draw_line(Vector2(x + 20, y + 31),
                 Vector2(x + 37, y + 31), Color("#565850"), 1.0)
-    if selected_slot == 1 and player != null:
+    if selected_slot == 1 and player != null and not comparison:
         var gun: Node3D = player.get("revolver")
         var status := "ПЕРЕЗАРЯДКА" if float(gun.get("reload_left")) > 0 else "%d / 6" % int(gun.get("rounds"))
         var action := "ЛКМ — ВЫСТРЕЛ" if bool(gun.get("cocked")) else "ЛКМ — ВЗВЕСТИ"
@@ -211,7 +212,9 @@ func _draw_slots(view_width: float, view_height: float) -> void:
             action = "R — ЗАКРЫТЬ"
         elif not bool(pistol.get("cocked")) and (rounds > 0 or int(pistol.get("spent_cases")) > 0):
             action = "КОЛЕСО ВНИЗ — ВЗВЕСТИ"
-        _write(x0, y + 72, status + "   " + action + "   R — ПЕРЕЗАРЯДКА", 11, GOLD)
+        var title: String = pistol.get("comparison_label")
+        var prefix := title + "   ·   " if not title.is_empty() else ""
+        _write(x0, y + 72, prefix + status + "   " + action + "   R — ПЕРЕЗАРЯДКА", 11, GOLD)
     else:
         _write(x0, y + 72, "1–0 — ВЫБОР ЯЧЕЙКИ   ·   V — ПАЧКА", 11, MUTED)
     draw_set_transform(Vector2.ZERO)

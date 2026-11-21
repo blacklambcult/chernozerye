@@ -11,10 +11,12 @@ const WALK_ACCELERATION := 9.0
 const WALK_FRICTION := 12.0
 const JUMP := 4.5
 const MOUSE_SENS := 0.002
+const COMPARISON_REVOLVER := preload("res://assets/bodycam_revolver.glb")
 
 var revolver := preload("res://revolver.gd").new()
 var forge_pistol := preload("res://forge_pistol.gd").new()
 var forge_weapons: Dictionary = {}
+var comparison_loadout := false
 var step_sound := AudioStreamPlayer.new()
 var music := preload("res://location_music.gd").new()
 var wind := AudioStreamPlayer.new()
@@ -104,9 +106,15 @@ func _ready() -> void:
     _modeled_character.set_script(preload("res://modeled_character.gd"))
     add_child(_modeled_character)
     camera.add_child(revolver)
-    camera.add_child(forge_pistol)
-    forge_weapons[forge_pistol.inventory_slot] = forge_pistol
-    _load_forge_slots()
+    if comparison_loadout and OS.has_feature("web"):
+        comparison_loadout = JavaScriptBridge.eval(
+            "new URLSearchParams(location.search).get('forge')", true) != "local"
+    if comparison_loadout:
+        _load_comparison_weapons()
+    else:
+        camera.add_child(forge_pistol)
+        forge_weapons[forge_pistol.inventory_slot] = forge_pistol
+        _load_forge_slots()
     _character_sequence = Node3D.new()
     _character_sequence.name = "CharacterSmoking"
     _character_sequence.set_script(preload("res://character_smoking.gd"))
@@ -172,7 +180,32 @@ func _start_character_sequence() -> bool:
 
 func _armed_slot() -> bool:
     var hud := get_parent().get_node_or_null("GameplayHUD/SurvivalHUD")
-    return hud != null and int(hud.get("selected_slot")) == 1
+    return not comparison_loadout and hud != null and int(hud.get("selected_slot")) == 1
+
+func _load_comparison_weapons() -> void:
+    var viewmodel := {
+        "position": [0.245, -0.235, -0.47],
+        "rotation": [0.0, 6.0, 0.0],
+        "scale": 0.95,
+        "hand_position": [0.012, 0.015, 0.025],
+    }
+    var gameplay := {
+        "class": "revolver", "capacity": 6, "damage": 28,
+        "recoil": 1.25, "reload": 2.2, "sound": "heavy", "weight": 1.2,
+    }
+    for index in range(2):
+        var weapon := forge_pistol if index == 0 else preload("res://forge_pistol.gd").new()
+        var label := "ОБЫЧНЫЙ" if index == 0 else "BODYCAM"
+        var profile := gameplay.duplicate()
+        profile["bodycam"] = 0.0 if index == 0 else 0.8
+        weapon.comparison_label = label
+        weapon.model_override = COMPARISON_REVOLVER
+        weapon.package_override = {
+            "name": "Кордоновский револьвер · " + label, "slot": index + 3,
+            "weaponType": "revolver", "gameplay": profile, "viewmodel": viewmodel,
+        }
+        camera.add_child(weapon)
+        forge_weapons[weapon.inventory_slot] = weapon
 
 func _load_forge_slots() -> void:
     if not OS.has_feature("web"):

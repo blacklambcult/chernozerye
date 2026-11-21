@@ -42,6 +42,8 @@ var imported_model: Node3D
 var model_animation: AnimationPlayer
 var inventory_slot := 2
 var package_override: Dictionary = {}
+var model_override: PackedScene
+var comparison_label := ""
 var custom_model_loaded := false
 var flash_left := 0.0
 var casing_port: Node3D
@@ -169,7 +171,7 @@ func _ready() -> void:
     player = eye.get_parent() as CharacterBody3D
     var package := package_override if not package_override.is_empty() else _read_game_model()
     package_override = {}
-    var custom := _make_game_model(package)
+    var custom := model_override.instantiate() as Node3D if model_override != null else _make_game_model(package)
     custom_model_loaded = custom != null
     if custom != null:
         var slot: Variant = package.get("slot", 3)
@@ -207,6 +209,16 @@ func _ready() -> void:
         var players := imported_model.find_children("*", "AnimationPlayer", true, false)
         if not players.is_empty():
             model_animation = players[0] as AnimationPlayer
+            if model_override != null:
+                # Both comparison weapons instantiate the same imported scene.
+                # Each needs its own clips before adjusting Fire or repair tracks.
+                for library_name in model_animation.get_animation_library_list():
+                    var source := model_animation.get_animation_library(library_name)
+                    var library := AnimationLibrary.new()
+                    for clip_name in source.get_animation_list():
+                        library.add_animation(clip_name, source.get_animation(clip_name).duplicate())
+                    model_animation.remove_animation_library(library_name)
+                    model_animation.add_animation_library(library_name, library)
             _tune_fire_body_tracks()
             if weapon_type == "doubleshotgun":
                 _repair_break_action_clips()
