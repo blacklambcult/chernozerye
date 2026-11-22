@@ -6,6 +6,7 @@ const RELOAD_SECONDS := 1.20
 const VIEWMODEL_PROFILE := "res://assets/forge_pistol.viewmodel.json"
 const DEFAULT_REST := Vector3(0.285, -0.225, -0.47)
 const ASSET_SCENE: PackedScene = preload("res://assets/forge_pistol.glb")
+const REVOLVER_AUDIO := preload("res://revolver.gd")
 const SHOT_STREAM: AudioStream = preload("res://revolver_report.wav")
 const DEFAULT_MODEL_SCALE := 1.36
 const DEFAULT_BODYCAM := 0.8
@@ -188,6 +189,7 @@ var report := AudioStreamPlayer.new()
 var action_audio := AudioStreamPlayer.new()
 var action_sounds: Dictionary = {}
 var custom_report := false
+var uses_revolver_sounds := false
 var flash := OmniLight3D.new()
 
 func _ready() -> void:
@@ -208,6 +210,7 @@ func _ready() -> void:
         _read_profile(package["viewmodel"])
         var weapon_class: String = str(package["gameplay"].get("class", package.get("weaponType", "")))
         weapon_type = str(package.get("weaponType", weapon_class))
+        uses_revolver_sounds = weapon_class == "revolver" or (weapon_class.is_empty() and weapon_type == "revolver")
         _apply_gameplay(package["gameplay"])
         cocking_clip = { "revolver": &"CockHammer", "pistol": &"RackSlide", "smg": &"RackBolt" }.get(weapon_class, &"")
         cocking_clip = {
@@ -290,9 +293,11 @@ func _ready() -> void:
         _add_muzzle_haze()
     report.stream = SHOT_STREAM
     _load_action_sounds(package.get("sounds", {}))
+    custom_report = action_sounds.has("fire")
+    if uses_revolver_sounds:
+        action_sounds = REVOLVER_AUDIO.DEFAULT_SOUNDS.merged(action_sounds, true)
     if action_sounds.has("fire"):
         report.stream = action_sounds["fire"]
-        custom_report = true
     report.bus = &"Effects"
     report.volume_db = -5.0
     report.max_polyphony = 3
@@ -578,6 +583,7 @@ func _load_action_sounds(sounds: Variant) -> void:
 func _play_action_sound(action: String) -> void:
     if action_sounds.has(action):
         action_audio.stream = action_sounds[action]
+        action_audio.volume_db = -7.0 if action_audio.stream == REVOLVER_AUDIO.DEFAULT_SOUNDS.get(action) else 0.0
         action_audio.play()
 
 func cock() -> void:
@@ -701,11 +707,14 @@ func _shoot() -> void:
     last_action = "fire"
     if model_animation != null and model_animation.has_animation(&"Fire"):
         _play_model_clips([&"Fire"], minf(shot_interval, model_animation.get_animation(&"Fire").length))
-    report.volume_db = -10.0 if indoors else -5.0
-    report.pitch_scale = 1.0 if custom_report else randf_range(1.06, 1.14)
+    var bundled_revolver := uses_revolver_sounds and not custom_report
+    if bundled_revolver:
+        report.stream = REVOLVER_AUDIO.ROOM_REPORT if indoors else action_sounds["fire"]
+    report.volume_db = -4.0 if indoors and bundled_revolver else (-10.0 if indoors else -5.0)
+    report.pitch_scale = 1.0 if custom_report or bundled_revolver else randf_range(1.06, 1.14)
     match sound_profile:
         "heavy":
-            if not custom_report:
+            if not custom_report and not bundled_revolver:
                 report.pitch_scale *= 0.78
         "muted": report.volume_db -= 12.0
     if sound_profile != "silent":

@@ -2,11 +2,13 @@ extends Node3D
 # Camera-space prop and arcade interaction with the first solid world surface.
 const REST := Vector3(0.23, -0.19, -0.53)
 const CAPACITY := 6
-# Compatibility sounds keep the current online build functional until the
-# project's supplied OGG assets are imported to res://audio/.
-const SHOT_STREAM := preload("res://revolver_report.wav")
-const COCK_STREAM := preload("res://impacts/metal.wav")
-const CYLINDER_STREAM := preload("res://impacts/wood.wav")
+const DEFAULT_SOUNDS := {
+    "fire": preload("res://audio/revolver_shot.ogg"),
+    "cock": preload("res://audio/revolver_cock.ogg"),
+    "reload": preload("res://audio/revolver_cylinder.ogg"),
+    "empty": preload("res://audio/revolver_empty.ogg"),
+}
+const ROOM_REPORT := preload("res://audio/revolver_shot_room.ogg")
 const RELOAD_SECONDS := 1.55
 var indoors := false
 var rounds := CAPACITY
@@ -23,11 +25,20 @@ var flash := OmniLight3D.new()
 var report := AudioStreamPlayer.new()
 var cock_audio := AudioStreamPlayer.new()
 var cylinder_audio := AudioStreamPlayer.new()
+var empty_audio := AudioStreamPlayer.new()
 var marks: Array[MeshInstance3D] = []
-var impact_sounds := {
+const IMPACT_SOUNDS := {
     &"soil": preload("res://impacts/soil.wav"),
     &"wood": preload("res://impacts/wood.wav"),
-    &"metal": preload("res://impacts/metal.wav")
+    &"metal": preload("res://impacts/metal.wav"),
+    &"solid": preload("res://impacts/stone.ogg"),
+}
+# Loudness at impact, reference distance and pitch by surface.
+const IMPACT_MIX := {
+    &"soil": Vector3(-12.0, 5.0, 0.92),
+    &"wood": Vector3(-8.0, 8.0, 1.0),
+    &"metal": Vector3(-7.0, 12.0, 1.05),
+    &"solid": Vector3(-9.0, 8.0, 1.0),
 }
 var cylinder: MeshInstance3D
 var weapon_hand: Node3D
@@ -89,18 +100,22 @@ func _ready() -> void:
     flash.visible = false
     add_child(flash)
     report.bus = &"Effects"
-    report.stream = load("res://audio/revolver_shot.ogg") if ResourceLoader.exists("res://audio/revolver_shot.ogg") else SHOT_STREAM
+    report.stream = DEFAULT_SOUNDS["fire"]
     report.max_polyphony = 3
     report.volume_db = -3.0
     add_child(report)
-    cock_audio.stream = load("res://audio/revolver_cock.ogg") if ResourceLoader.exists("res://audio/revolver_cock.ogg") else COCK_STREAM
+    cock_audio.stream = DEFAULT_SOUNDS["cock"]
     cock_audio.bus = &"Effects"
     cock_audio.volume_db = -5.0
     add_child(cock_audio)
-    cylinder_audio.stream = load("res://audio/revolver_cylinder.ogg") if ResourceLoader.exists("res://audio/revolver_cylinder.ogg") else CYLINDER_STREAM
+    cylinder_audio.stream = DEFAULT_SOUNDS["reload"]
     cylinder_audio.bus = &"Effects"
     cylinder_audio.volume_db = -8.0
     add_child(cylinder_audio)
+    empty_audio.stream = DEFAULT_SOUNDS["empty"]
+    empty_audio.bus = &"Effects"
+    empty_audio.volume_db = -7.0
+    add_child(empty_audio)
 
 func equip(value: bool) -> void:
     visible = value
@@ -113,7 +128,10 @@ func equip(value: bool) -> void:
         last_action = "holstered"
 
 func request_shot() -> void:
-    if not visible or rounds <= 0 or cooldown > 0.0 or reload_left > 0.0:
+    if not visible or cooldown > 0.0 or reload_left > 0.0:
+        return
+    if rounds <= 0:
+        empty_audio.play()
         return
     if not cocked:
         # Alternating game inputs: first click raises the hammer, second fires.
@@ -176,7 +194,8 @@ func _shoot() -> void:
     cylinder.rotate_object_local(Vector3.UP, PI / 3)
     shot_impulse = 1.0
     flash.light_energy = 5.2
-    report.volume_db = -8.0 if indoors else -3.0
+    report.stream = ROOM_REPORT if indoors else DEFAULT_SOUNDS["fire"]
+    report.volume_db = -4.0 if indoors else -5.0
     report.pitch_scale = randf_range(0.97, 1.03)
     report.play()
     player.call("emit_noise", 1.0)
@@ -231,16 +250,16 @@ func _surface_feedback(hit: Dictionary, intensity := 1.0) -> void:
             mark.global_position += normal * 0.023
     if intensity > 0.0:
         _impact_burst(mark, surface, material.albedo_color, intensity)
-    if impact_sounds.has(surface):
-        var sound := AudioStreamPlayer3D.new()
-        sound.bus = &"Effects"
-        sound.stream = impact_sounds[surface]
-        sound.unit_size = 9.0
-        sound.volume_db = -8.0 + 4.0 * minf(intensity, 2.0)
-        sound.pitch_scale = randf_range(0.92, 1.07)
-        mark.add_child(sound)
-        sound.finished.connect(sound.queue_free)
-        sound.play()
+    var mix: Vector3 = IMPACT_MIX.get(surface, IMPACT_MIX[&"solid"])
+    var sound := AudioStreamPlayer3D.new()
+    sound.bus = &"Effects"
+    sound.stream = IMPACT_SOUNDS.get(surface, IMPACT_SOUNDS[&"solid"])
+    sound.unit_size = mix.y
+    sound.volume_db = mix.x + 2.5 * clampf(intensity, 0.0, 2.0)
+    sound.pitch_scale = mix.z * randf_range(0.94, 1.08)
+    mark.add_child(sound)
+    sound.finished.connect(sound.queue_free)
+    sound.play()
     marks.append(mark)
     if marks.size() > 32:
         var oldest := marks.pop_front() as MeshInstance3D

@@ -533,7 +533,7 @@ jobs:
           node --check site/forge/forge-core.js
           node --check site/forge/forge.mjs
           node --test tests/forge-core.test.cjs
-          grep -q 'forge.mjs?v=15' site/forge/index.html
+          grep -q 'forge.mjs?v=16' site/forge/index.html
           grep -q 'forge-core.js?v=6' site/forge/index.html
           grep -q 'id="fp-preview-toggle"' site/forge/index.html
           grep -q 'id="fp-scale-slider"' site/forge/index.html
@@ -554,6 +554,8 @@ jobs:
           NODE
           mkdir -p build/web/forge
           cp -a site/forge/. build/web/forge/
+          mkdir -p build/web/forge/audio
+          cp godot/audio/revolver_{shot,cock,cylinder,empty}.ogg build/web/forge/audio/
           test -s build/web/forge/index.html
           test -s build/web/forge/forge-core.js
           test -s build/web/forge/forge.mjs
