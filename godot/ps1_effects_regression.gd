@@ -52,8 +52,10 @@ func _run() -> void:
     assert(fx.pixels_enabled)
     await process_frame
     await process_frame
-    for mesh in meshes:
-        assert(mesh.material_override is ShaderMaterial)
+    assert(meshes[0].material_override is ShaderMaterial)
+    assert(meshes[1].material_override is StandardMaterial3D)
+    assert(meshes[2].material_override is StandardMaterial3D)
+    assert(meshes[3].material_override is ShaderMaterial)
     var late_mesh := MeshInstance3D.new()
     late_mesh.mesh = BoxMesh.new()
     world.add_child(late_mesh)

@@ -4,9 +4,11 @@ extends Node
 const PIXEL_SHADER := preload("res://ps1_pixels.gdshader")
 const JITTER_VERTEX := """
     vec4 clip = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
-    if (clip.w > 0.0001) {
-        vec2 grid = vec2(144.0, 108.0);
-        clip.xy = floor(clip.xy / clip.w * grid + 0.5) / grid * clip.w;
+    if (clip.w > 0.75) {
+        vec2 grid = max(VIEWPORT_SIZE / 4.0, vec2(144.0, 108.0));
+        vec2 ndc = clip.xy / clip.w;
+        vec2 snapped = floor(ndc * grid + 0.5) / grid;
+        clip.xy += (snapped - ndc) * clip.w * 0.65 * smoothstep(0.75, 2.5, clip.w);
     }
     POSITION = clip;
 """
@@ -23,7 +25,6 @@ uniform float roughness = 1.0;
 uniform float metallic = 0.0;
 uniform vec3 emission : source_color;
 void vertex() {
-    BILLBOARD
     JITTER
 }
 void fragment() {
@@ -38,7 +39,6 @@ void fragment() {
     ROUGHNESS = roughness;
     METALLIC = metallic;
     EMISSION = emission;
-    ALPHA_MODE
 }
 """
 var pixels_enabled := false
@@ -113,6 +113,12 @@ func _restore(node: GeometryInstance3D, id: int) -> void:
 func _apply_jitter(node: GeometryInstance3D, cache_material := true) -> void:
     if not jitter_enabled or not is_instance_valid(node) or not get_parent().is_ancestor_of(node):
         return
+    # Camera-attached viewmodels use finely layered meshes and authored materials.
+    var ancestor := node.get_parent()
+    while ancestor != null:
+        if ancestor is Camera3D:
+            return
+        ancestor = ancestor.get_parent()
     var id := node.get_instance_id()
     if _originals.has(id):
         return
@@ -131,8 +137,6 @@ func _apply_jitter(node: GeometryInstance3D, cache_material := true) -> void:
                 node.set_surface_override_material(surface, replacement)
     elif node is MultiMeshInstance3D and node.multimesh != null:
         _apply_single_surface(node, node.multimesh.mesh, cache_material)
-    elif node is CPUParticles3D:
-        _apply_single_surface(node, node.mesh, cache_material)
     if node.material_override != override or not surfaces.is_empty():
         _originals[id] = {"override": override, "surfaces": surfaces}
 
@@ -143,6 +147,9 @@ func _apply_single_surface(node: GeometryInstance3D, mesh: Mesh, cache_material:
 
 
 func _jitter_material(source: Material, cache_material: bool) -> Material:
+    if source is BaseMaterial3D and (source.billboard_mode != BaseMaterial3D.BILLBOARD_DISABLED \
+            or source.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or source.no_depth_test):
+        return source
     if _materials.has(source):
         return _materials[source]
     var shader: Shader
@@ -187,8 +194,6 @@ func _cached_shader(code: String) -> Shader:
 func _surface_code(base: BaseMaterial3D) -> String:
     var options := ["cull_back"]
     var filtering := "filter_nearest_mipmap"
-    var alpha := ""
-    var billboard := ""
     if base != null:
         options[0] = ["cull_back", "cull_front", "cull_disabled"][base.cull_mode]
         if base.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED:
@@ -197,26 +202,5 @@ func _surface_code(base: BaseMaterial3D) -> String:
             options.append("depth_test_disabled")
         if base.texture_filter in [BaseMaterial3D.TEXTURE_FILTER_LINEAR, BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS, BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC]:
             filtering = "filter_linear_mipmap"
-        match base.transparency:
-            BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR:
-                alpha = "ALPHA = surface.a; ALPHA_SCISSOR_THRESHOLD = %s;" % base.alpha_scissor_threshold
-            BaseMaterial3D.TRANSPARENCY_ALPHA_HASH:
-                alpha = "ALPHA = surface.a; ALPHA_HASH_SCALE = %s;" % base.alpha_hash_scale
-            BaseMaterial3D.TRANSPARENCY_ALPHA_DEPTH_PRE_PASS:
-                options.append("depth_prepass_alpha")
-                alpha = "ALPHA = surface.a;"
-            BaseMaterial3D.TRANSPARENCY_ALPHA:
-                alpha = "ALPHA = surface.a;"
-        if base.billboard_mode != BaseMaterial3D.BILLBOARD_DISABLED:
-            billboard = """
-    mat4 billboard_model = mat4(INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1], INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
-    SCALE
-    MODELVIEW_MATRIX = VIEW_MATRIX * billboard_model;
-    MODELVIEW_NORMAL_MATRIX = mat3(MODELVIEW_MATRIX);
-""".replace("SCALE", """
-    billboard_model[0].xyz *= length(MODEL_MATRIX[0].xyz);
-    billboard_model[1].xyz *= length(MODEL_MATRIX[1].xyz);
-    billboard_model[2].xyz *= length(MODEL_MATRIX[2].xyz);
-""" if base.billboard_keep_scale else "")
     return SURFACE_SHADER.replace("OPTIONS", ", ".join(options)).replace("FILTERING", filtering) \
-        .replace("BILLBOARD", billboard).replace("JITTER", JITTER_VERTEX).replace("ALPHA_MODE", alpha)
+        .replace("JITTER", JITTER_VERTEX)
