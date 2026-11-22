@@ -35,10 +35,10 @@ const IMPACT_SOUNDS := {
 }
 # Loudness at impact, reference distance and pitch by surface.
 const IMPACT_MIX := {
-    &"soil": Vector3(-12.0, 5.0, 0.92),
-    &"wood": Vector3(-8.0, 8.0, 1.0),
-    &"metal": Vector3(-7.0, 12.0, 1.05),
-    &"solid": Vector3(-9.0, 8.0, 1.0),
+    &"soil": Vector3(-18.0, 1.5, 0.92),
+    &"wood": Vector3(-14.0, 2.0, 1.0),
+    &"metal": Vector3(-13.0, 2.8, 1.05),
+    &"solid": Vector3(-15.0, 2.0, 1.0),
 }
 var cylinder: MeshInstance3D
 var weapon_hand: Node3D
@@ -257,6 +257,7 @@ func _surface_feedback(hit: Dictionary, intensity := 1.0) -> void:
     sound.bus = &"Effects"
     sound.stream = IMPACT_SOUNDS.get(surface, IMPACT_SOUNDS[&"solid"])
     sound.unit_size = mix.y
+    sound.max_distance = 30.0
     sound.volume_db = mix.x + 2.5 * clampf(intensity, 0.0, 2.0)
     sound.pitch_scale = mix.z * randf_range(0.94, 1.08)
     mark.add_child(sound)
