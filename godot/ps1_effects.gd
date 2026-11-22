@@ -1,0 +1,222 @@
+extends Node
+## Optional screen-grid effects for the Compatibility renderer.
+
+const PIXEL_SHADER := preload("res://ps1_pixels.gdshader")
+const JITTER_VERTEX := """
+    vec4 clip = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
+    if (clip.w > 0.0001) {
+        vec2 grid = vec2(144.0, 108.0);
+        clip.xy = floor(clip.xy / clip.w * grid + 0.5) / grid * clip.w;
+    }
+    POSITION = clip;
+"""
+const SURFACE_SHADER := """
+shader_type spatial;
+render_mode OPTIONS;
+uniform vec4 base_color : source_color = vec4(1.0);
+uniform sampler2D base_texture : source_color, FILTERING, repeat_enable;
+uniform bool textured = false;
+uniform bool vertex_color = false;
+uniform vec2 uv_scale = vec2(1.0);
+uniform vec2 uv_offset = vec2(0.0);
+uniform float roughness = 1.0;
+uniform float metallic = 0.0;
+uniform vec3 emission : source_color;
+void vertex() {
+    BILLBOARD
+    JITTER
+}
+void fragment() {
+    vec4 surface = base_color;
+    if (textured) {
+        surface *= texture(base_texture, UV * uv_scale + uv_offset);
+    }
+    if (vertex_color) {
+        surface *= COLOR;
+    }
+    ALBEDO = surface.rgb;
+    ROUGHNESS = roughness;
+    METALLIC = metallic;
+    EMISSION = emission;
+    ALPHA_MODE
+}
+"""
+var pixels_enabled := false
+var jitter_enabled := false
+var _pixel_layer: CanvasLayer
+var _originals: Dictionary = {}
+var _materials: Dictionary = {}
+var _shaders: Dictionary = {}
+
+
+func _ready() -> void:
+    _pixel_layer = CanvasLayer.new()
+    _pixel_layer.layer = 80
+    _pixel_layer.hide()
+    add_child(_pixel_layer)
+    var capture := BackBufferCopy.new()
+    capture.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
+    _pixel_layer.add_child(capture)
+    var screen := ColorRect.new()
+    screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    var material := ShaderMaterial.new()
+    material.shader = PIXEL_SHADER
+    screen.material = material
+    _pixel_layer.add_child(screen)
+    get_tree().node_added.connect(_on_node_added)
+    get_tree().node_removed.connect(_on_node_removed)
+
+
+func set_pixels(value: bool) -> void:
+    pixels_enabled = value
+    _pixel_layer.visible = value
+
+
+func set_jitter(value: bool) -> void:
+    if value == jitter_enabled:
+        return
+    jitter_enabled = value
+    if value:
+        for node in get_parent().find_children("*", "GeometryInstance3D", true, false):
+            _apply_jitter(node)
+        return
+    for instance_id in _originals.keys():
+        _restore(instance_from_id(instance_id) as GeometryInstance3D, instance_id)
+    _materials.clear()
+
+
+func _on_node_added(node: Node) -> void:
+    if jitter_enabled and node is GeometryInstance3D:
+        _apply_jitter.call_deferred(node, false)
+
+
+func _on_node_removed(node: Node) -> void:
+    if node is GeometryInstance3D:
+        _restore(node, node.get_instance_id())
+
+
+func _restore(node: GeometryInstance3D, id: int) -> void:
+    var original: Variant = _originals.get(id)
+    if original == null:
+        return
+    _originals.erase(id)
+    if node == null:
+        return
+    node.material_override = original["override"]
+    if node is MeshInstance3D:
+        for surface in original["surfaces"]:
+            if surface < node.get_surface_override_material_count():
+                node.set_surface_override_material(surface, original["surfaces"][surface])
+
+
+func _apply_jitter(node: GeometryInstance3D, cache_material := true) -> void:
+    if not jitter_enabled or not is_instance_valid(node) or not get_parent().is_ancestor_of(node):
+        return
+    var id := node.get_instance_id()
+    if _originals.has(id):
+        return
+    var surfaces := {}
+    var override := node.material_override
+    if override != null:
+        var replacement := _jitter_material(override, cache_material)
+        if replacement != override:
+            node.material_override = replacement
+    elif node is MeshInstance3D and node.mesh != null:
+        for surface in node.get_surface_override_material_count():
+            var source: Material = node.get_active_material(surface)
+            var replacement := _jitter_material(source, cache_material)
+            if replacement != source:
+                surfaces[surface] = node.get_surface_override_material(surface)
+                node.set_surface_override_material(surface, replacement)
+    elif node is MultiMeshInstance3D and node.multimesh != null:
+        _apply_single_surface(node, node.multimesh.mesh, cache_material)
+    elif node is CPUParticles3D:
+        _apply_single_surface(node, node.mesh, cache_material)
+    if node.material_override != override or not surfaces.is_empty():
+        _originals[id] = {"override": override, "surfaces": surfaces}
+
+
+func _apply_single_surface(node: GeometryInstance3D, mesh: Mesh, cache_material: bool) -> void:
+    if mesh != null and mesh.get_surface_count() == 1:
+        node.material_override = _jitter_material(mesh.surface_get_material(0), cache_material)
+
+
+func _jitter_material(source: Material, cache_material: bool) -> Material:
+    if _materials.has(source):
+        return _materials[source]
+    var shader: Shader
+    var converted := ShaderMaterial.new()
+    if source is ShaderMaterial:
+        shader = source.shader
+        if shader == null or shader.resource_path != "res://cabin_wood.gdshader":
+            return source
+        var wood_code := shader.code.replace("local_normal = NORMAL;", "local_normal = NORMAL;\n" + JITTER_VERTEX)
+        converted.shader = _cached_shader(wood_code)
+    elif source == null or source is BaseMaterial3D:
+        var base: BaseMaterial3D = source
+        converted.shader = _cached_shader(_surface_code(base))
+        if base != null:
+            converted.render_priority = base.render_priority
+            converted.set_shader_parameter("base_color", base.albedo_color)
+            converted.set_shader_parameter("base_texture", base.albedo_texture)
+            converted.set_shader_parameter("textured", base.albedo_texture != null)
+            converted.set_shader_parameter("vertex_color", base.vertex_color_use_as_albedo)
+            converted.set_shader_parameter("uv_scale", Vector2(base.uv1_scale.x, base.uv1_scale.y))
+            converted.set_shader_parameter("uv_offset", Vector2(base.uv1_offset.x, base.uv1_offset.y))
+            converted.set_shader_parameter("roughness", base.roughness)
+            converted.set_shader_parameter("metallic", base.metallic)
+            if base.emission_enabled:
+                var color := base.emission * base.emission_energy_multiplier
+                converted.set_shader_parameter("emission", Vector3(color.r, color.g, color.b))
+    else:
+        return source
+    if cache_material:
+        _materials[source] = converted
+    return converted
+
+
+func _cached_shader(code: String) -> Shader:
+    if not _shaders.has(code):
+        var shader := Shader.new()
+        shader.code = code
+        _shaders[code] = shader
+    return _shaders[code]
+
+
+func _surface_code(base: BaseMaterial3D) -> String:
+    var options := ["cull_back"]
+    var filtering := "filter_nearest_mipmap"
+    var alpha := ""
+    var billboard := ""
+    if base != null:
+        options[0] = ["cull_back", "cull_front", "cull_disabled"][base.cull_mode]
+        if base.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED:
+            options.append("unshaded")
+        if base.no_depth_test:
+            options.append("depth_test_disabled")
+        if base.texture_filter in [BaseMaterial3D.TEXTURE_FILTER_LINEAR, BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS, BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC]:
+            filtering = "filter_linear_mipmap"
+        match base.transparency:
+            BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR:
+                alpha = "ALPHA = surface.a; ALPHA_SCISSOR_THRESHOLD = %s;" % base.alpha_scissor_threshold
+            BaseMaterial3D.TRANSPARENCY_ALPHA_HASH:
+                alpha = "ALPHA = surface.a; ALPHA_HASH_SCALE = %s;" % base.alpha_hash_scale
+            BaseMaterial3D.TRANSPARENCY_ALPHA_DEPTH_PRE_PASS:
+                options.append("depth_prepass_alpha")
+                alpha = "ALPHA = surface.a;"
+            BaseMaterial3D.TRANSPARENCY_ALPHA:
+                alpha = "ALPHA = surface.a;"
+        if base.billboard_mode != BaseMaterial3D.BILLBOARD_DISABLED:
+            billboard = """
+    mat4 billboard_model = mat4(INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1], INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
+    SCALE
+    MODELVIEW_MATRIX = VIEW_MATRIX * billboard_model;
+    MODELVIEW_NORMAL_MATRIX = mat3(MODELVIEW_MATRIX);
+""".replace("SCALE", """
+    billboard_model[0].xyz *= length(MODEL_MATRIX[0].xyz);
+    billboard_model[1].xyz *= length(MODEL_MATRIX[1].xyz);
+    billboard_model[2].xyz *= length(MODEL_MATRIX[2].xyz);
+""" if base.billboard_keep_scale else "")
+    return SURFACE_SHADER.replace("OPTIONS", ", ".join(options)).replace("FILTERING", filtering) \
+        .replace("BILLBOARD", billboard).replace("JITTER", JITTER_VERTEX).replace("ALPHA_MODE", alpha)

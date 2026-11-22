@@ -50,9 +50,9 @@ func _build_ui() -> void:
     card.anchor_right = 0.5
     card.anchor_bottom = 0.5
     card.offset_left = -246
-    card.offset_top = -215
+    card.offset_top = -255
     card.offset_right = 246
-    card.offset_bottom = 215
+    card.offset_bottom = 255
     var border := StyleBoxFlat.new()
     border.bg_color = Color("#171d1b")
     border.border_color = Color("#716655")
@@ -101,10 +101,28 @@ func _build_ui() -> void:
     _add_volume_row(items, &"Effects", "ГРОМКОСТЬ ЗВУКОВ")
     _add_volume_row(items, &"Music", "ГРОМКОСТЬ МУЗЫКИ")
 
+    var graphics := player.get_parent().get_node_or_null("PS1Effects")
+    if graphics != null:
+        var effects := HBoxContainer.new()
+        items.add_child(effects)
+        _add_graphics_toggle(effects, "PS1 Jitter", "PS1Jitter", graphics.set_jitter, graphics.jitter_enabled)
+        _add_graphics_toggle(effects, "PS1 Пиксели", "PS1Pixels", graphics.set_pixels, graphics.pixels_enabled)
+
     items.add_child(_make_label("WASD — идти    SHIFT — бег    C — тихий шаг    МЫШЬ — осмотр", 13, MUTED))
     items.add_child(_make_label("E — взаимодействие    J — журнал    M — карта", 13, MUTED))
     items.add_child(_make_label("ESC — вернуться к игре", 13, ACCENT))
     backdrop.visible = false
+
+
+func _add_graphics_toggle(row: HBoxContainer, label: String, node_name: String,
+        apply: Callable, enabled: bool) -> void:
+    var toggle := CheckButton.new()
+    toggle.name = node_name
+    toggle.text = label
+    toggle.button_pressed = enabled
+    toggle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    toggle.toggled.connect(apply)
+    row.add_child(toggle)
 
 
 func _add_volume_row(items: VBoxContainer, bus: StringName, title: String) -> void:

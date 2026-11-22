@@ -252,6 +252,18 @@ jobs:
           godot --headless --path godot --script res://pause_regression.gd 2>&1 | tee /tmp/pause-regression.log
           grep -q "PAUSE_REGRESSION_OK: freeze=true resume=true sensitivity=1.5x persistent_in_session=true" /tmp/pause-regression.log
 
+      - name: Verify independent PS1 options
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner=(godot --headless)
+          if command -v xvfb-run >/dev/null; then
+            runner=(xvfb-run -a godot --rendering-method gl_compatibility --audio-driver Dummy)
+          fi
+          timeout 45s "${runner[@]}" --path godot --script res://ps1_effects_regression.gd 2>&1 | tee /tmp/ps1-effects.log
+          grep -q 'PS1_EFFECTS_REGRESSION_OK' /tmp/ps1-effects.log
+          if grep -E 'SHADER ERROR|Shader compilation failed' /tmp/ps1-effects.log; then exit 1; fi
+
       - name: Smoke-test actual scene startup
         shell: bash
         run: |
