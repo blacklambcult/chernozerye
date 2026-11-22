@@ -700,13 +700,36 @@
         }
     </style>
 <style>
-#library-workspace { padding: 8px; }
-#library-workspace select { width:100%; color:inherit; background:#17181b; }
-#weapon-fit summary { cursor:pointer; margin:6px 0; }
-#weapon-fit .fit-row { display:grid; grid-template-columns:minmax(120px,1fr) repeat(3,minmax(40px,68px)); gap:4px; align-items:center; margin-top:4px; }
-#weapon-fit input { width:100%; color:inherit; background:#191b20; border:1px solid #424651; }
-#weapon-fit button { margin-top:8px; }
+:root { --fit-width: clamp(270px, 24vw, 350px); --preview-bottom: 0px; }
+body.ui-hidden { --fit-width: 0px; --preview-bottom: 0px; }
+#viewport, #vhs-overlay, #hud { left:var(--fit-width); bottom:var(--preview-bottom); width:auto; height:auto; }
+#fps-crosshair { left:calc(50% + var(--fit-width) / 2); top:calc((100% - var(--preview-bottom)) / 2); }
+#library-workspace {
+    position:fixed; z-index:11; inset:0 auto 0 0; width:var(--fit-width);
+    display:flex; flex-direction:column; overflow:hidden; background:#17181b;
+    border:0; border-right:1px solid #343640; border-radius:0;
+}
+body.ui-hidden #library-workspace { display:none; }
+.fit-header, .fit-footer { padding:10px; background:#1b1c20; }
+.fit-header { border-bottom:1px solid #343640; }
+.fit-footer { border-top:1px solid #343640; }
+#library-workspace select { width:100%; margin-top:5px; padding:5px; color:inherit; background:#17181b; }
+#weapon-fit { flex:1; min-height:0; overflow:auto; padding:4px 10px 10px; scrollbar-color:#6a6060 #1b1c20; }
+#library-workspace [hidden] { display:none !important; }
+.fit-group { margin:6px 0 10px; padding:4px 0 0; border:0; border-top:1px solid #343640; }
+.fit-group legend { padding-right:7px; font-weight:bold; }
+.fit-axis { display:grid; grid-template-columns:16px minmax(0,1fr) 65px; gap:7px; align-items:center; margin:3px 0; }
+.fit-axis input { width:100%; }
+.fit-axis input[type="range"] { accent-color:#f36c24; }
+.fit-axis input[type="number"] { color:inherit; background:#191b20; border:1px solid #424651; }
+#save-weapon-fit { width:100%; margin-bottom:6px; }
+.fit-footer a { color:#f4ab79; }
 #fit-status { margin:4px 0 0; min-height:1em; }
+@media (max-width: 680px) {
+    :root { --fit-width:0px; --preview-bottom:46%; }
+    #library-workspace { inset:auto 0 0; width:100%; height:46%; border-right:0; border-top:1px solid #343640; }
+    .bottom-stack { padding-bottom:0; }
+}
 </style>
 </head>
 <body>
@@ -733,6 +756,19 @@
     <!-- Non-blocking Toast -->
     <div id="toast"></div>
 
+    <aside class="panel" id="library-workspace" aria-label="Подгонка оружия и рук">
+        <div class="fit-header">
+            <label for="arms-weapon">Образец из библиотеки</label>
+            <select id="arms-weapon"><option value="">Эталонное оружие</option></select>
+            <p id="fit-status" role="status"></p>
+        </div>
+        <div id="weapon-fit" hidden><div id="fit-fields"></div></div>
+        <div class="fit-footer" id="fit-footer" hidden>
+            <button type="button" class="btn-godot" id="save-weapon-fit" disabled>Сохранить для этого образца</button>
+            <a href="../?forge=local" target="_blank" rel="noopener">Игра с моими образцами ↗</a>
+        </div>
+    </aside>
+
     <!-- HUD Overlay -->
     <div id="hud">
         <!-- Top Bar + 3 Grip Modes Selector -->
@@ -746,22 +782,12 @@
                     <div class="game-title">FEARLESS KNIGHTS OF THE CORDON</div>
                 </div>
                 <div class="header-actions">
-                    <button type="button" id="btn-cam-toggle" class="btn-cam-mode" data-action="toggle-cam-mode" title="Переключить ракурс камеры">🎥 Осмотр 3/4</button>
+                    <button type="button" id="frame-weapon" class="btn-icon" hidden title="Показать образец целиком">В кадр</button>
+                    <button type="button" id="btn-cam-toggle" class="btn-cam-mode" data-action="toggle-cam-mode" title="Переключить между видом из игры и осмотром 3/4">🎥 Осмотр 3/4</button>
                     <button type="button" class="btn-icon" data-action="hide-ui" title="Скрыть интерфейс">👁</button>
                 </div>
             </div>
 
-            <section class="panel" id="library-workspace">
-                <label for="arms-weapon">Образец из библиотеки</label>
-                <select id="arms-weapon"><option value="">Эталонное оружие</option></select>
-                <details id="weapon-fit" hidden>
-                    <summary>Положение, поворот и масштаб</summary>
-                    <div id="fit-fields"></div>
-                    <a href="../?forge=local" target="_blank" rel="noopener">Игра с моими образцами ↗</a>
-                    <button type="button" class="btn-godot" id="save-weapon-fit" disabled>Сохранить для этого образца</button>
-                </details>
-                <p id="fit-status" role="status"></p>
-            </section>
             <div class="panel grip-selector">
                 <button type="button" class="btn-grip active" data-grip="1h_pistol">1. Одноручный<br>пистолетный</button>
                 <button type="button" class="btn-grip" data-grip="2h_pistol">2. Двуручный<br>пистолетный</button>
@@ -984,53 +1010,73 @@
             const fitPanel = document.getElementById("weapon-fit");
             const fitFields = document.getElementById("fit-fields");
             const fitInputs = {};
+            const wristInputs = {};
+            const fitFooter = document.getElementById("fit-footer");
+            const frameWeapon = document.getElementById("frame-weapon");
             let weaponRecord = null;
             let weaponPose = null;
             let setLibraryWeapon = function () {};
 
-            for (const [key, [label, min, max, step]] of Object.entries(fields)) {
+            function fitGroup(title) {
+                const group = document.createElement("fieldset");
+                group.className = "fit-group";
+                const legend = document.createElement("legend");
+                legend.textContent = title;
+                group.append(legend);
+                fitFields.append(group);
+                return group;
+            }
+
+            function fitControl(group, label, axis, min, max, step, apply) {
                 const row = document.createElement("div");
-                row.className = "fit-row";
+                row.className = "fit-axis";
                 const caption = document.createElement("span");
-                caption.textContent = label;
-                row.append(caption);
-                fitInputs[key] = Array.from({length: key === "scale" ? 1 : 3}, (_, index) => {
-                    const input = document.createElement("input");
-                    Object.assign(input, {type:"number", min, max, step});
-                    input.setAttribute("aria-label", label + (key === "scale" ? "" : " " + "XYZ"[index]));
-                    input.addEventListener("input", () => {
-                        const value = input.valueAsNumber;
-                        if (!Number.isFinite(value) || value < min || value > max) return;
+                caption.textContent = axis || "×";
+                const range = document.createElement("input");
+                const number = document.createElement("input");
+                const accessible = label + (axis ? " " + axis : "");
+                Object.assign(range, {type:"range", min, max, step});
+                Object.assign(number, {type:"number", min, max, step:"any"});
+                range.setAttribute("aria-label", accessible + " (ползунок)");
+                number.setAttribute("aria-label", accessible);
+                row.append(caption, range, number);
+                group.append(row);
+                function set(value) { range.value = number.value = value; }
+                range.addEventListener("input", () => {
+                    number.value = range.value;
+                    apply(range.valueAsNumber);
+                });
+                number.addEventListener("input", () => {
+                    const value = number.valueAsNumber;
+                    if (!Number.isFinite(value) || value < min || value > max) return;
+                    range.value = value;
+                    apply(value);
+                });
+                number.addEventListener("change", () => {
+                    if (!number.value || !number.validity.valid) number.value = range.value;
+                });
+                return {set, number};
+            }
+
+            for (const [key, [label, min, max, step]] of Object.entries(fields)) {
+                const group = fitGroup(label);
+                fitInputs[key] = Array.from(key === "scale" ? [""] : "XYZ", (axis, index) =>
+                    fitControl(group, label, axis, min, max, step, value => {
                         if (key === "scale") weaponPose.scale = value;
                         else weaponPose[key][index] = value;
                         applyLibraryPose();
-                    });
-                    row.append(input);
-                    return input;
-                });
-                fitFields.append(row);
+                    }));
             }
             for (const [side, label] of [["right", "Правая кисть, м"], ["left", "Левая кисть, м"]]) {
-                const row = document.createElement("div");
-                row.className = "fit-row";
-                const caption = document.createElement("span");
-                caption.textContent = label;
-                row.append(caption);
+                const group = fitGroup(label);
                 for (const axis of "XYZ") {
                     const key = side + "Offset" + axis;
-                    const input = document.createElement("input");
-                    Object.assign(input, {type:"number", min:-0.4, max:0.4, step:.005, value:0});
-                    input.setAttribute("aria-label", label + " " + axis);
-                    input.dataset.wristOffset = key;
-                    input.addEventListener("input", () => {
-                        const value = input.valueAsNumber;
-                        if (!Number.isFinite(value) || Math.abs(value) > 0.4) return;
+                    wristInputs[key] = fitControl(group, label, axis, -0.4, 0.4, .005, value => {
                         state[key] = value;
                         rebuildArms();
                     });
-                    row.append(input);
+                    wristInputs[key].number.dataset.wristOffset = key;
                 }
-                fitFields.append(row);
             }
             async function refreshArmLibrary() {
                 const records = await library.models();
@@ -1410,9 +1456,9 @@
 
                 function clampOrbit() {
                     orbit.desiredPhi = Math.max(0.14, Math.min(Math.PI - 0.14, orbit.desiredPhi));
-                    orbit.desiredRadius = Math.max(0.14, Math.min(2.6, orbit.desiredRadius));
+                    orbit.desiredRadius = Math.max(0.14, Math.min(12, orbit.desiredRadius));
                     orbit.phi = Math.max(0.14, Math.min(Math.PI - 0.14, orbit.phi));
-                    orbit.radius = Math.max(0.14, Math.min(2.6, orbit.radius));
+                    orbit.radius = Math.max(0.14, Math.min(12, orbit.radius));
                 }
 
                 function updateCameraTransform() {
@@ -1446,6 +1492,18 @@
                         orbit.desiredPhi = 1.32;
                         orbit.desiredRadius = 0.62;
                         orbit.desiredTarget.set(0.0, -0.02, -0.06);
+                        if (loadedWeapon) {
+                            libraryWeaponRoot.updateMatrixWorld(true);
+                            const bounds = new THREE.Box3().setFromObject(loadedWeapon);
+                            if (!bounds.isEmpty()) {
+                                const sphere = bounds.getBoundingSphere(new THREE.Sphere());
+                                const vertical = THREE.MathUtils.degToRad(camera.fov / 2);
+                                const horizontal = Math.atan(Math.tan(vertical) * camera.aspect);
+                                orbit.desiredTarget.copy(sphere.center);
+                                orbit.desiredRadius = Math.max(0.62, 1.22 * sphere.radius / Math.sin(Math.min(vertical, horizontal)));
+                                orbit.desiredTheta = -1.38;
+                            }
+                        }
                     }
                     orbit.theta = orbit.desiredTheta;
                     orbit.phi = orbit.desiredPhi;
@@ -1453,6 +1511,12 @@
                     orbit.target.copy(orbit.desiredTarget);
                     updateCameraTransform();
                 };
+
+                frameWeapon.addEventListener("click", () => {
+                    state.camMode = "side";
+                    syncUI();
+                    applyCamMode();
+                });
 
                 // Mouse LMB rotate, RMB pan, Wheel zoom
                 canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
@@ -2882,7 +2946,7 @@
                 setLibraryWeapon = async function (id) {
                     const request = ++selection;
                     saveFit.disabled = true;
-                    fitPanel.hidden = true;
+                    fitPanel.hidden = fitFooter.hidden = frameWeapon.hidden = true;
                     picker.disabled = true;
                     fitStatus.textContent = id ? "Загрузка образца…" : "";
                     if (loadedWeapon) {
@@ -2919,12 +2983,11 @@
                             for (const key of armKeys)
                                 if (typeof settings[key] === typeof armDefaults[key]) state[key] = settings[key];
                             for (const [key, inputs] of Object.entries(fitInputs))
-                                inputs.forEach((input, i) => { input.value = key === "scale" ? weaponPose.scale : weaponPose[key][i]; });
-                            for (const input of fitFields.querySelectorAll("[data-wrist-offset]"))
-                                input.value = state[input.dataset.wristOffset];
-                            fitPanel.hidden = false;
-                            fitPanel.open = true;
-                            state.camMode = "fps";
+                                inputs.forEach((input, i) => input.set(key === "scale" ? weaponPose.scale : weaponPose[key][i]));
+                            for (const [key, input] of Object.entries(wristInputs)) input.set(state[key]);
+                            fitPanel.hidden = fitFooter.hidden = frameWeapon.hidden = false;
+                            fitPanel.scrollTop = 0;
+                            state.camMode = "side";
                             applyLibraryPose();
                         }
                         fitStatus.textContent = "";
@@ -3067,8 +3130,8 @@
                    5.12 PS1 VIEW SETTINGS (ALL OFF BY DEFAULT) & RESIZE
                    --------------------------------------------------------- */
                 function handleResize() {
-                    const w = Math.max(1, window.innerWidth);
-                    const h = Math.max(1, window.innerHeight);
+                    const w = Math.max(1, canvas.clientWidth || window.innerWidth);
+                    const h = Math.max(1, canvas.clientHeight || window.innerHeight);
                     camera.aspect = w / h;
                     camera.updateProjectionMatrix();
 
@@ -3231,7 +3294,7 @@
                     requestAnimationFrame(animate);
                     const dt = Math.min(clock.getDelta(), 0.08);
 
-                    const cw = window.innerWidth, ch = window.innerHeight;
+                    const cw = canvas.clientWidth, ch = canvas.clientHeight;
                     if (cw > 0 && ch > 0 && (cw !== lastW || ch !== lastH)) {
                         lastW = cw;
                         lastH = ch;
