@@ -238,12 +238,12 @@ jobs:
           godot --headless --path godot --script res://forge_pistol_regression.gd 2>&1 | tee /tmp/forge-pistol-regression.log
           grep -q "FORGE_PISTOL_REGRESSION_OK: uploaded_glb=true anchors=3 parts>=10 capacity=7 one_click=true reload=true original_revolver=true hands=2 fp_profile=true" /tmp/forge-pistol-regression.log
 
-      - name: Regression-test two-click revolver cycle
+      - name: Regression-test wheel-cocked revolver cycle
         shell: bash
         run: |
           set -euo pipefail
           godot --headless --path godot --script res://revolver_cycle_regression.gd 2>&1 | tee /tmp/revolver-cycle-regression.log
-          grep -q "REVOLVER_CYCLE_REGRESSION_OK: clicks=12 shots=6 reload=true sfx=true" /tmp/revolver-cycle-regression.log
+          grep -q "REVOLVER_CYCLE_REGRESSION_OK: cocks=6 clicks=6 shots=6 reload=true sfx=true" /tmp/revolver-cycle-regression.log
 
       - name: Regression-test pause and mouse sensitivity
         shell: bash
