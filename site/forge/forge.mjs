@@ -1113,9 +1113,9 @@ function readWeaponProfile() {
 
 const forgeAssignments = new Map();
 const soundFields = {fire:"Выстрел", cock:"Взвод", reload:"Перезарядка", empty:"Попытка выстрела без патронов"};
-const revolverPreview = {
-  fire:"revolver_shot.ogg", cock:"revolver_cock.ogg",
-  reload:"revolver_cylinder.ogg", empty:"revolver_empty.ogg"
+const defaultSoundPreview = {
+  revolver: {fire:"revolver_shot.ogg", cock:"revolver_cock.ogg", reload:"revolver_cylinder.ogg", empty:"revolver_empty.ogg"},
+  pistol: {fire:"pistol_shot.ogg", cock:"pistol_cock.ogg", reload:"pistol_reload.ogg", empty:"pistol_empty.ogg"}
 };
 const soundPanel = $("weapon-audio");
 const soundPreview = new Audio();
@@ -1136,7 +1136,7 @@ function renderWeaponSounds() {
   for (const action of Object.keys(soundFields)) {
     const sound = transferred?.sounds[action];
     $("sound-name-" + action).textContent = sound?.name ?? "Звук по умолчанию";
-    $("sound-play-" + action).disabled = !sound && !(transferred && $("game-class").value === "revolver");
+    $("sound-play-" + action).disabled = !sound && !(transferred && defaultSoundPreview[$("game-class").value]?.[action]);
     $("sound-clear-" + action).disabled = !sound;
   }
 }
@@ -1164,10 +1164,10 @@ for (const [action, title] of Object.entries(soundFields)) {
   });
   $("sound-play-" + action).addEventListener("click", () => {
     const sound = transferred?.sounds[action];
-    if (!sound && !(transferred && $("game-class").value === "revolver")) return;
+    if (!sound && !(transferred && defaultSoundPreview[$("game-class").value]?.[action])) return;
     stopSoundPreview();
     if (sound) soundPreviewUrl = URL.createObjectURL(sound.blob);
-    soundPreview.src = soundPreviewUrl ?? new URL("./audio/" + revolverPreview[action], import.meta.url).href;
+    soundPreview.src = soundPreviewUrl ?? new URL("./audio/" + defaultSoundPreview[$("game-class").value][action], import.meta.url).href;
     soundPreview.play().catch(() => { feedback.textContent = "Браузер не смог воспроизвести этот файл."; });
   });
   $("sound-clear-" + action).addEventListener("click", () => {

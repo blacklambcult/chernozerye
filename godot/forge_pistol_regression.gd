@@ -296,6 +296,27 @@ func _run() -> void:
                 if action_player.playing or weapon.get("pending"):
                     _fail("empty revolver clicked again without recocking")
                     return
+        if classes[index] == "pistol":
+            var report := weapon.get("report") as AudioStreamPlayer
+            var action_player := weapon.get("action_audio") as AudioStreamPlayer
+            if report.stream.resource_path != "res://audio/pistol_shot.ogg":
+                _fail("pistol must have its own shot")
+                return
+            weapon.call("_physics_process", 1.0)
+            weapon.set("rounds", 0)
+            weapon.call("request_shot")
+            if action_player.stream.resource_path != "res://audio/pistol_empty.ogg" or weapon.get("pending"):
+                _fail("empty pistol must click without firing")
+                return
+            weapon.call("reload")
+            if action_player.stream.resource_path != "res://audio/pistol_reload.ogg":
+                _fail("pistol magazine change must have its own sound")
+                return
+            weapon.call("_physics_process", 2.0)
+            weapon.call("cock")
+            if action_player.stream.resource_path != "res://audio/pistol_cock.ogg":
+                _fail("pistol slide action must have its own sound")
+                return
         if classes[index] == "boltrifle":
             weapon.call("_physics_process", 1.0)
             var rifle := weapon.get("imported_model") as Node3D
