@@ -199,12 +199,15 @@ func _draw_slots(view_width: float, view_height: float) -> void:
     if selected_slot == 1 and player != null and not test_loadout:
         var gun: Node3D = player.get("revolver")
         var status := "ПЕРЕЗАРЯДКА" if float(gun.get("reload_left")) > 0 else "%d / 6" % int(gun.get("rounds"))
-        var action := "ЛКМ — ВЫСТРЕЛ" if bool(gun.get("cocked")) else "ЛКМ — ВЗВЕСТИ"
+        var action := "КОЛЕСО ВНИЗ — ВЗВЕСТИ"
+        if bool(gun.get("cocked")):
+            action = "ЛКМ — ЩЕЛЧОК" if int(gun.get("rounds")) == 0 else "ЛКМ — ВЫСТРЕЛ"
         _write(x0, y + 72, status + "    " + action + "    R — ЗАРЯДИТЬ", 11, GOLD)
     elif forge_slots.has(selected_slot) and pistol != null:
         var rounds := int(pistol.get("rounds"))
         var status := "%d / %d" % [rounds, int(pistol.get("capacity"))]
-        var action := "ЛКМ — ВЫСТРЕЛ"
+        var hammer: bool = pistol.get("cocking_clip") == &"CockHammer"
+        var action := "ЛКМ — ЩЕЛЧОК" if hammer and rounds == 0 else "ЛКМ — ВЫСТРЕЛ"
         if float(pistol.get("reload_left")) > 0.0:
             action = "ПЕРЕЗАРЯДКА"
         elif float(pistol.get("cocking_left")) > 0.0:
@@ -213,7 +216,7 @@ func _draw_slots(view_width: float, view_height: float) -> void:
             action = "КОЛЕСО ВВЕРХ — ВСТАВИТЬ"
         elif int(pistol.get("break_stage")) == 2:
             action = "R — ЗАКРЫТЬ"
-        elif not bool(pistol.get("cocked")) and (rounds > 0 or int(pistol.get("spent_cases")) > 0):
+        elif not bool(pistol.get("cocked")) and (hammer or rounds > 0 or int(pistol.get("spent_cases")) > 0):
             action = "КОЛЕСО ВНИЗ — ВЗВЕСТИ"
         var title: String = pistol.get("test_label")
         var prefix := title + "   ·   " if not title.is_empty() else ""

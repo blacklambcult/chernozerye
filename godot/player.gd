@@ -309,6 +309,10 @@ func _input(event: InputEvent) -> void:
             else:
                 forge_pistol.insert_shells()
             get_viewport().set_input_as_handled()
+        elif Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and revolver.visible \
+                and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+            revolver.cock()
+            get_viewport().set_input_as_handled()
         return
     if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
         # GUI buttons need the click; never capture mouse before their pressed event.
@@ -320,8 +324,6 @@ func _input(event: InputEvent) -> void:
         last_event = "mouse click"
         if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
             Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-        # The first click counts as the hammer pull even when focus is captured.
-        # Otherwise the six-round cycle would silently require 13 clicks.
         if revolver.visible:
             revolver.request_shot()
         elif forge_pistol.visible:

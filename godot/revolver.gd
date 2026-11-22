@@ -127,22 +127,24 @@ func equip(value: bool) -> void:
         flash.visible = false
         last_action = "holstered"
 
-func request_shot() -> void:
-    if not visible or cooldown > 0.0 or reload_left > 0.0:
+func cock() -> void:
+    if not visible or cocked or pending or cooldown > 0.0 or reload_left > 0.0:
         return
+    cocked = true
+    last_action = "cock"
+    cock_audio.pitch_scale = randf_range(0.98, 1.02)
+    cock_audio.play()
+
+func request_shot() -> void:
+    if not visible or not cocked or cooldown > 0.0 or reload_left > 0.0:
+        return
+    cocked = false
     if rounds <= 0:
+        last_action = "dry_fire"
         empty_audio.play()
         return
-    if not cocked:
-        # Alternating game inputs: first click raises the hammer, second fires.
-        cocked = true
-        last_action = "cock"
-        cock_audio.pitch_scale = randf_range(0.98, 1.02)
-        cock_audio.play()
-    else:
-        cocked = false
-        last_action = "fire"
-        pending = true
+    last_action = "fire"
+    pending = true
 
 func reload() -> void:
     if visible and rounds < CAPACITY and reload_left <= 0:

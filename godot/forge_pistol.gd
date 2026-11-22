@@ -587,7 +587,7 @@ func _play_action_sound(action: String) -> void:
         action_audio.play()
 
 func cock() -> void:
-    if not visible or cocking_clip == &"" or cocked or (rounds <= 0 and spent_cases == 0) \
+    if not visible or cocking_clip == &"" or cocked or (rounds <= 0 and spent_cases == 0 and cocking_clip != &"CockHammer") \
             or reload_left > 0.0 or cooldown > 0.0 or cocking_left > 0.0:
         return
     trigger_held = false
@@ -603,8 +603,17 @@ func cock() -> void:
 func request_shot() -> void:
     if not visible or break_stage != 0 or reload_left > 0.0 or cooldown > 0.0:
         return
+    if cocking_clip == &"CockHammer" and not cocked:
+        trigger_held = false
+        return
     if rounds <= 0:
         trigger_held = false
+        if cocking_clip == &"CockHammer":
+            cocked = false
+            last_action = "dry_fire"
+            if model_animation != null and model_animation.assigned_animation == cocking_clip:
+                model_animation.seek(0.0, true)
+                model_animation.pause()
         _play_action_sound("empty")
         return
     if not cocked:

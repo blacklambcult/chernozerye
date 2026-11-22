@@ -272,11 +272,30 @@ func _run() -> void:
                 return
             weapon.call("_physics_process", 1.0)
             weapon.set("rounds", 0)
-            weapon.call("request_shot")
+            weapon.set("spent_cases", 0)
             var action_player := weapon.get("action_audio") as AudioStreamPlayer
-            if action_player.stream.resource_path != "res://audio/revolver_empty.ogg" or weapon.get("pending"):
-                _fail("empty revolver must play the dry click without firing")
+            action_player.stop()
+            weapon.call("request_shot")
+            if action_player.playing or weapon.get("pending"):
+                _fail("uncocked empty revolver responded to fire input")
                 return
+            for cycle in range(2):
+                weapon.call("cock")
+                weapon.call("request_shot")
+                if action_player.stream.resource_path != "res://audio/revolver_cock.ogg" or weapon.get("pending"):
+                    _fail("empty revolver must cock and ignore clicks during the animation")
+                    return
+                weapon.call("_physics_process", 1.0)
+                weapon.call("request_shot")
+                if action_player.stream.resource_path != "res://audio/revolver_empty.ogg" \
+                        or weapon.get("pending") or weapon.get("cocked") or weapon.get("rounds") != 0:
+                    _fail("cocked empty revolver must click and release the hammer")
+                    return
+                action_player.stop()
+                weapon.call("request_shot")
+                if action_player.playing or weapon.get("pending"):
+                    _fail("empty revolver clicked again without recocking")
+                    return
         if classes[index] == "boltrifle":
             weapon.call("_physics_process", 1.0)
             var rifle := weapon.get("imported_model") as Node3D

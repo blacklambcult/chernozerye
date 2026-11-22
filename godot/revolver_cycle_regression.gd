@@ -1,5 +1,5 @@
 extends SceneTree
-# Fictional game input regression: two presses per shot, six per cylinder.
+# Fictional game input regression: one cock action and one click per shot.
 
 func _fail(why: String) -> void:
     push_error("REVOLVER_CYCLE_REGRESSION_FAILED: " + why)
@@ -23,13 +23,13 @@ func _run() -> void:
         return
     for index in range(6):
         gun.set("cooldown", 0.0)
-        gun.call("request_shot")
+        gun.call("cock")
         if not bool(gun.get("cocked")) or bool(gun.get("pending")) or int(gun.get("rounds")) != 6 - index:
-            _fail("click %d should cock only" % (index * 2 + 1))
+            _fail("wheel action %d should cock only" % (index + 1))
             return
         gun.call("request_shot")
         if bool(gun.get("cocked")) or not bool(gun.get("pending")):
-            _fail("click %d should queue shot" % (index * 2 + 2))
+            _fail("click %d should queue shot" % (index + 1))
             return
         gun.call("_shoot")
         if int(gun.get("rounds")) != 5 - index or bool(gun.get("pending")):
@@ -40,6 +40,11 @@ func _run() -> void:
     if int(gun.get("rounds")) != 0 or bool(gun.get("pending")) or bool(gun.get("cocked")):
         _fail("empty cylinder accepted another click")
         return
+    gun.call("cock")
+    gun.call("request_shot")
+    if str(gun.get("last_action")) != "dry_fire" or gun.get("pending") or gun.get("cocked"):
+        _fail("cocked empty revolver must click once")
+        return
     gun.call("reload")
     if float(gun.get("reload_left")) <= 0.0 or bool(gun.get("cocked")) or str(gun.get("last_action")) != "reload":
         _fail("reload did not reset hammer or start audio")
@@ -48,5 +53,5 @@ func _run() -> void:
     if int(gun.get("rounds")) != 6:
         _fail("reload did not refill the game cylinder")
         return
-    print("REVOLVER_CYCLE_REGRESSION_OK: clicks=12 shots=6 reload=true sfx=true")
+    print("REVOLVER_CYCLE_REGRESSION_OK: cocks=6 clicks=6 shots=6 reload=true sfx=true")
     quit(0)
