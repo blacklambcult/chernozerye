@@ -249,6 +249,13 @@ func _run() -> void:
         if hud.get("selected_slot") != slot or test_actor.get("forge_pistol") != weapon or not weapon.visible:
             _fail("number key did not equip test weapon: " + classes[index])
             return
+        if classes[index] == "revolver":
+            var defaults: Dictionary = weapon.get("action_sounds")
+            for action in ["fire", "cock", "reload", "empty"]:
+                if not defaults.get(action) is AudioStreamOggVorbis:
+                    _fail("missing bundled revolver sound: " + action)
+                    return
+            weapon.set("indoors", true)
         weapon.call("cock")
         weapon.call("_physics_process", 1.0)
         var rounds_before: int = weapon.get("rounds")
@@ -258,6 +265,18 @@ func _run() -> void:
         if weapon.get("rounds") != rounds_before - 1 or haze == null or not haze.visible:
             _fail("test weapon did not fire with Bodycam: " + classes[index])
             return
+        if classes[index] == "revolver":
+            var report := weapon.get("report") as AudioStreamPlayer
+            if report.stream.resource_path != "res://audio/revolver_shot_room.ogg":
+                _fail("indoor revolver shot must use room reflections")
+                return
+            weapon.call("_physics_process", 1.0)
+            weapon.set("rounds", 0)
+            weapon.call("request_shot")
+            var action_player := weapon.get("action_audio") as AudioStreamPlayer
+            if action_player.stream.resource_path != "res://audio/revolver_empty.ogg" or weapon.get("pending"):
+                _fail("empty revolver must play the dry click without firing")
+                return
         if classes[index] == "boltrifle":
             weapon.call("_physics_process", 1.0)
             var rifle := weapon.get("imported_model") as Node3D

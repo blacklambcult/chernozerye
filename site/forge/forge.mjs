@@ -1113,6 +1113,10 @@ function readWeaponProfile() {
 
 const forgeAssignments = new Map();
 const soundFields = {fire:"Выстрел", cock:"Взвод", reload:"Перезарядка", empty:"Попытка выстрела без патронов"};
+const revolverPreview = {
+  fire:"revolver_shot.ogg", cock:"revolver_cock.ogg",
+  reload:"revolver_cylinder.ogg", empty:"revolver_empty.ogg"
+};
 const soundPanel = $("weapon-audio");
 const soundPreview = new Audio();
 let soundPreviewUrl;
@@ -1123,11 +1127,16 @@ function stopSoundPreview() {
   soundPreviewUrl = null;
 }
 
+$("game-class").addEventListener("change", () => {
+  stopSoundPreview();
+  renderWeaponSounds();
+});
+
 function renderWeaponSounds() {
   for (const action of Object.keys(soundFields)) {
     const sound = transferred?.sounds[action];
     $("sound-name-" + action).textContent = sound?.name ?? "Звук по умолчанию";
-    $("sound-play-" + action).disabled = !sound;
+    $("sound-play-" + action).disabled = !sound && !(transferred && $("game-class").value === "revolver");
     $("sound-clear-" + action).disabled = !sound;
   }
 }
@@ -1155,10 +1164,10 @@ for (const [action, title] of Object.entries(soundFields)) {
   });
   $("sound-play-" + action).addEventListener("click", () => {
     const sound = transferred?.sounds[action];
-    if (!sound) return;
+    if (!sound && !(transferred && $("game-class").value === "revolver")) return;
     stopSoundPreview();
-    soundPreviewUrl = URL.createObjectURL(sound.blob);
-    soundPreview.src = soundPreviewUrl;
+    if (sound) soundPreviewUrl = URL.createObjectURL(sound.blob);
+    soundPreview.src = soundPreviewUrl ?? new URL("./audio/" + revolverPreview[action], import.meta.url).href;
     soundPreview.play().catch(() => { feedback.textContent = "Браузер не смог воспроизвести этот файл."; });
   });
   $("sound-clear-" + action).addEventListener("click", () => {
@@ -1226,7 +1235,6 @@ async function openCatalogWeapon(id) {
     });
     transferred = {record, sounds:{...record.sounds}, scene:gltf.scene, clips:gltf.animations, mixer:new THREE.AnimationMixer(gltf.scene)};
     soundPanel.disabled = false;
-    renderWeaponSounds();
     gltf.animations.forEach((clip, index) => clipPicker.add(new Option(clip.name, String(index))));
     clipPicker.disabled = gltf.animations.length === 0;
     $("transferred-name").value = record.name;
@@ -1234,6 +1242,7 @@ async function openCatalogWeapon(id) {
     if (!fpPreviewActive) toggleFpPreview();
     else { updateFpPreview(); renderFpInspector(); }
     fillWeaponProfile(record);
+    renderWeaponSounds();
     for (const button of profileButtons) $(button).disabled = false;
     feedback.textContent = "";
   } catch (error) {
