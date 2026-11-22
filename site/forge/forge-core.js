@@ -54,7 +54,7 @@
   const DEFAULT_VIEWMODEL = Object.freeze({
     position:Object.freeze([0.285,-0.225,-0.47]),
     rotation:Object.freeze([0,9,0]),
-    scale:0.26,
+    scale:1.36,
     hand_position:Object.freeze([0.025,-0.015,0.035]),
     hand_rotation:Object.freeze([0,0,0])
   });

@@ -238,8 +238,9 @@ func _run() -> void:
         if weapon.get("casing_port") == null or weapon.get("forward_marker") == null \
                 or animation_player == null or not animation_player.has_animation(&"Fire") \
                 or not animation_player.has_animation(action_clips[index]) \
-                or not is_equal_approx(float(weapon.get("bodycam_strength")), 0.8):
-            _fail("test weapon missing sockets, animations or Bodycam: " + classes[index])
+                or not is_equal_approx(float(weapon.get("bodycam_strength")), 0.8) \
+                or not is_equal_approx(float(weapon.get("model_scale")), 1.36):
+            _fail("test weapon missing sockets, animations or default profile: " + classes[index])
             return
         var key := InputEventKey.new()
         key.physical_keycode = KEY_0 if slot == 9 else KEY_1 + slot

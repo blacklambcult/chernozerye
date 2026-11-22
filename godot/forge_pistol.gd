@@ -7,6 +7,7 @@ const VIEWMODEL_PROFILE := "res://assets/forge_pistol.viewmodel.json"
 const DEFAULT_REST := Vector3(0.285, -0.225, -0.47)
 const ASSET_SCENE: PackedScene = preload("res://assets/forge_pistol.glb")
 const SHOT_STREAM: AudioStream = preload("res://revolver_report.wav")
+const DEFAULT_MODEL_SCALE := 1.36
 const DEFAULT_BODYCAM := 0.8
 const MUZZLE_HAZE_SECONDS := 0.20
 # Bodycam response scales: backward shove, muzzle lift, recovery time.
@@ -82,7 +83,7 @@ var magazine_marker: Node3D
 var weapon_hand: Node3D
 var rest_pose := DEFAULT_REST
 var rest_angles := Vector3(0.0, deg_to_rad(9.0), 0.0)
-var model_scale := 0.26
+var model_scale := DEFAULT_MODEL_SCALE
 var hand_position := Vector3(0.025, -0.015, 0.035)
 var hand_angles := Vector3.ZERO
 
@@ -175,8 +176,8 @@ func _read_profile(override: Dictionary = {}) -> void:
     rest_pose = _read_vector(settings.get("position"), DEFAULT_REST).clamp(Vector3.ONE * -2, Vector3.ONE * 2)
     var rot := _read_vector(settings.get("rotation"), Vector3(0.0, 9.0, 0.0))
     rest_angles = Vector3(deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z))
-    var scale_value: float = float(settings.get("scale", 0.26))
-    model_scale = clampf(scale_value if is_finite(scale_value) else 0.26, 0.05, 8.0)
+    var scale_value: float = float(settings.get("scale", DEFAULT_MODEL_SCALE))
+    model_scale = clampf(scale_value if is_finite(scale_value) else DEFAULT_MODEL_SCALE, 0.05, 8.0)
     hand_position = _read_vector(settings.get("hand_position"),
         Vector3(0.025, -0.015, 0.035)).clamp(-Vector3.ONE, Vector3.ONE)
     var hand_rot := _read_vector(settings.get("hand_rotation"), Vector3.ZERO)
