@@ -1,0 +1,3275 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Генератор Рук 1-го лица 3D — Fearless Knights of the Cordon (Godot 4 .GLB)</title>
+    <style>
+        /* =========================================================
+           1. RESET & RETRO TACTICAL DARK PALETTE (#0c0c0d / #f36c24)
+           ========================================================= */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0c0c0d;
+            color: #e2e4e8;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 12px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Fullscreen 3D Viewport */
+        #viewport {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: radial-gradient(circle at 50% 42%, #1b1d22 0%, #0c0c0d 80%);
+            touch-action: none;
+        }
+
+        #gl-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            outline: none;
+            touch-action: none;
+        }
+
+        #gl-canvas.pixelated {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        /* Optional VHS Scanlines & Vignette Overlay (OFF by default) */
+        #vhs-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            background:
+                repeating-linear-gradient(
+                    0deg,
+                    rgba(0, 0, 0, 0.28) 0px,
+                    rgba(0, 0, 0, 0.28) 1px,
+                    transparent 1px,
+                    transparent 3px
+                ),
+                radial-gradient(circle at center, transparent 54%, rgba(0, 0, 0, 0.60) 100%);
+        }
+
+        #vhs-overlay.active {
+            opacity: 1;
+        }
+
+        /* Subtle FPS Crosshair (only visible in FPS view) */
+        #fps-crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 3;
+            pointer-events: none;
+            width: 14px;
+            height: 14px;
+            display: none;
+        }
+
+        #fps-crosshair::before, #fps-crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(243, 108, 36, 0.80);
+        }
+
+        #fps-crosshair::before {
+            top: 6px;
+            left: 0;
+            width: 14px;
+            height: 2px;
+        }
+
+        #fps-crosshair::after {
+            left: 6px;
+            top: 0;
+            width: 2px;
+            height: 14px;
+        }
+
+        /* Engine Loading / Fallback Banner */
+        #engine-banner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 40;
+            max-width: 90%;
+            width: 340px;
+            background: rgba(23, 24, 27, 0.96);
+            border: 1px solid #f36c24;
+            border-radius: 8px;
+            padding: 14px 16px;
+            text-align: center;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.85);
+            display: none;
+        }
+
+        #engine-banner h3 {
+            margin: 0 0 6px 0;
+            color: #f36c24;
+            font-size: 13px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        #engine-banner p {
+            margin: 0;
+            color: #bfc4cc;
+            line-height: 1.45;
+            font-size: 11px;
+        }
+
+        /* =========================================================
+           2. HUD LAYOUT (SAFE MOBILE & TABLET MARGINS)
+           ========================================================= */
+        #hud {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 8px;
+        }
+
+        .panel {
+            pointer-events: auto;
+            background: rgba(23, 24, 27, 0.93);
+            border: 1px solid #2d3038;
+            border-radius: 8px;
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+
+        /* Top Stack */
+        .top-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 100%;
+            max-width: 620px;
+            margin: 0 auto;
+        }
+
+        .header-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            padding: 7px 10px 7px 54px;
+        }
+
+        @media (min-width: 680px) {
+            .header-bar {
+                padding-left: 12px;
+            }
+        }
+
+        .header-titles {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .rec-line {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 9px;
+            letter-spacing: 0.06em;
+            color: #f36c24;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rec-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #e83e2e;
+            flex-shrink: 0;
+        }
+
+        .game-title {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: #f4f5f7;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 1px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-shrink: 0;
+        }
+
+        /* 3 Grip Modes Selector */
+        .grip-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            padding: 5px;
+        }
+
+        /* Bottom Stack */
+        .bottom-stack {
+            width: 100%;
+            max-width: 620px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding-bottom: 52px;
+        }
+
+        @media (min-width: 680px) {
+            .bottom-stack {
+                padding-bottom: 6px;
+            }
+        }
+
+        /* Animation Test Bar */
+        .anim-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            padding: 5px;
+        }
+
+        .anim-bar button {
+            min-height: 30px;
+            padding: 5px 4px;
+            font-size: 10.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Collapsible Bottom Drawer (starts collapsed) */
+        .drawer {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .drawer-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            padding: 6px 8px;
+            background: rgba(15, 16, 19, 0.96);
+            border-bottom: 1px solid #282b32;
+        }
+
+        .drawer.collapsed .drawer-bar {
+            border-bottom: none;
+        }
+
+        .drawer-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .dock-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: #f36c24;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .code-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #0c0c0d;
+            border: 1px solid #343842;
+            color: #d6dae0;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .drawer-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-shrink: 0;
+        }
+
+        .drawer-body {
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            max-height: 44vh;
+            overflow-y: auto;
+        }
+
+        .drawer.collapsed .drawer-body {
+            display: none;
+        }
+
+        /* Tabs */
+        .tabs-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+        }
+
+        .tab-pane {
+            display: none;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .tab-pane.active {
+            display: flex;
+        }
+
+        /* =========================================================
+           3. BUTTONS, SLIDERS & FORM CONTROLS
+           ========================================================= */
+        button {
+            font-family: inherit;
+            font-size: 11px;
+            color: #e2e4e8;
+            background: #1d1f24;
+            border: 1px solid #323640;
+            border-radius: 6px;
+            padding: 6px 8px;
+            cursor: pointer;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            outline: none;
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button:hover {
+            border-color: #505766;
+            background: #252830;
+        }
+
+        .btn-icon {
+            padding: 4px 8px;
+            min-width: 30px;
+            height: 28px;
+        }
+
+        .btn-cam-mode {
+            padding: 4px 9px;
+            height: 28px;
+            font-size: 10px;
+            background: #1a242b;
+            border-color: #3d6475;
+            color: #d9f5fc;
+            font-weight: 700;
+        }
+
+        .btn-cam-mode.fps-active {
+            background: linear-gradient(180deg, #5c2a10 0%, #3d1b0a 100%);
+            border-color: #f36c24;
+            color: #fff4ec;
+        }
+
+        .btn-grip {
+            padding: 6px 4px;
+            font-size: 10px;
+            text-align: center;
+            line-height: 1.25;
+        }
+
+        .btn-grip.active {
+            background: linear-gradient(180deg, #5d2b10 0%, #3d1b0a 100%);
+            border-color: #f36c24;
+            color: #fff7f2;
+            font-weight: 700;
+        }
+
+        .btn-tab.active {
+            background: linear-gradient(180deg, #452310 0%, #2e170a 100%);
+            border-color: #f36c24;
+            color: #ffdbc7;
+            font-weight: 700;
+        }
+
+        .btn-anim-idle {
+            background: linear-gradient(180deg, #1f3327 0%, #15231a 100%);
+            border-color: #418559;
+            color: #e6ffef;
+            font-weight: 700;
+        }
+
+        .btn-anim-sprint {
+            background: linear-gradient(180deg, #3f311a 0%, #2a2011 100%);
+            border-color: #c9943a;
+            color: #fff6e5;
+            font-weight: 700;
+        }
+
+        .btn-anim-recoil {
+            background: linear-gradient(180deg, #612617 0%, #40180e 100%);
+            border-color: #e65b35;
+            color: #fff3ee;
+            font-weight: 700;
+        }
+
+        .btn-anim-reload {
+            background: linear-gradient(180deg, #1f3647 0%, #142430 100%);
+            border-color: #4b89ba;
+            color: #eaf6ff;
+            font-weight: 700;
+        }
+
+        .btn-amber {
+            background: linear-gradient(180deg, #612d11 0%, #401d0b 100%);
+            border-color: #f36c24;
+            color: #fff5ed;
+            font-weight: 700;
+        }
+
+        .btn-godot {
+            background: linear-gradient(180deg, #296b52 0%, #1b4a38 100%);
+            border-color: #44a37f;
+            color: #edfff7;
+            font-weight: 700;
+        }
+
+        .btn-toggle.on {
+            background: linear-gradient(180deg, #542710 0%, #381a0a 100%);
+            border-color: #f36c24;
+            color: #fff3e8;
+        }
+
+        /* Module Selector Rows */
+        .mod-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            background: #101114;
+            border: 1px solid #282b33;
+            border-radius: 6px;
+            padding: 5px 7px;
+        }
+
+        .mod-label {
+            color: #939aa8;
+            font-size: 10.5px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .mod-val {
+            color: #eef0f3;
+            font-size: 11px;
+            text-align: right;
+            flex: 1;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .btn-cycle {
+            padding: 4px 9px;
+            min-width: 30px;
+            height: 26px;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        /* Sliders & Pills */
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #101114;
+            border: 1px solid #282b33;
+            border-radius: 6px;
+            padding: 5px 7px;
+        }
+
+        .slider-row input[type="range"] {
+            flex: 1;
+            accent-color: #f36c24;
+            height: 4px;
+            cursor: pointer;
+        }
+
+        .slider-val {
+            font-size: 10px;
+            color: #f36c24;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        .pill-grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+        }
+
+        .pill-grid-5 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+        }
+
+        @media (min-width: 520px) {
+            .pill-grid-5 {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+
+        .pill {
+            padding: 5px 4px;
+            font-size: 10px;
+            background: #181a1f;
+            border-color: #2f333d;
+            color: #b8bfc9;
+        }
+
+        .pill.active {
+            background: #422211;
+            border-color: #f36c24;
+            color: #fff2e8;
+            font-weight: 700;
+        }
+
+        .section-caption {
+            font-size: 10px;
+            color: #939aa8;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        /* Export Options & Actions */
+        .export-opt-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 2px 2px;
+            font-size: 10.5px;
+            color: #c2c8d1;
+        }
+
+        .check-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        .check-label input[type="checkbox"] {
+            accent-color: #f36c24;
+            width: 15px;
+            height: 15px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .godot-tag {
+            font-size: 10px;
+            color: #7d8594;
+            white-space: nowrap;
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .actions-grid button {
+            padding: 8px 8px;
+            font-size: 11px;
+        }
+
+        /* PS1 View Grid */
+        .ps1-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 5px;
+        }
+
+        @media (min-width: 520px) {
+            .ps1-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* Hide / Restore UI */
+        #restore-ui-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 30;
+            display: none;
+            background: rgba(23, 24, 27, 0.94);
+            border: 1px solid #f36c24;
+            color: #ffd8c2;
+            padding: 7px 10px;
+            border-radius: 6px;
+        }
+
+        body.ui-hidden #hud {
+            display: none;
+        }
+
+        body.ui-hidden #restore-ui-btn {
+            display: inline-flex;
+        }
+
+        /* Non-blocking Toast Message Box */
+        #toast {
+            position: fixed;
+            top: 72px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-8px);
+            z-index: 45;
+            background: rgba(20, 34, 28, 0.96);
+            border: 1px solid #44a37f;
+            color: #e8fff4;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 11px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.72);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            max-width: 90%;
+            text-align: center;
+        }
+
+        #toast.error {
+            background: rgba(46, 20, 20, 0.96);
+            border-color: #e05344;
+            color: #ffe8e6;
+        }
+
+        #toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+<style>
+#library-workspace { padding: 8px; }
+#library-workspace select { width:100%; color:inherit; background:#17181b; }
+#weapon-fit summary { cursor:pointer; margin:6px 0; }
+#weapon-fit .fit-row { display:grid; grid-template-columns:minmax(120px,1fr) repeat(3,minmax(40px,68px)); gap:4px; align-items:center; margin-top:4px; }
+#weapon-fit input { width:100%; color:inherit; background:#191b20; border:1px solid #424651; }
+#weapon-fit button { margin-top:8px; }
+#fit-status { margin:4px 0 0; min-height:1em; }
+</style>
+</head>
+<body>
+    <!-- Fullscreen 3D Canvas -->
+    <div id="viewport">
+        <canvas id="gl-canvas"></canvas>
+    </div>
+
+    <!-- Optional VHS Scanlines Overlay (OFF by default) -->
+    <div id="vhs-overlay"></div>
+
+    <!-- Subtle FPS Crosshair (only visible in FPS view) -->
+    <div id="fps-crosshair"></div>
+
+    <!-- Engine Loading / Fallback Banner -->
+    <div id="engine-banner">
+        <h3 id="banner-title">ЗАГРУЗКА 3D-ДВИЖКА...</h3>
+        <p id="banner-msg">Подключение Three.js r128 и GLTFExporter...</p>
+    </div>
+
+    <!-- Floating Restore UI Button -->
+    <button type="button" id="restore-ui-btn" data-action="show-ui">👁 Показать UI</button>
+
+    <!-- Non-blocking Toast -->
+    <div id="toast"></div>
+
+    <!-- HUD Overlay -->
+    <div id="hud">
+        <!-- Top Bar + 3 Grip Modes Selector -->
+        <div class="top-stack">
+            <div class="panel header-bar">
+                <div class="header-titles">
+                    <div class="rec-line">
+                        <span class="rec-dot"></span>
+                        <span id="status-line">REC // КАССЕТА МК-60 // НОЯБРЬ 2005</span>
+                    </div>
+                    <div class="game-title">FEARLESS KNIGHTS OF THE CORDON</div>
+                </div>
+                <div class="header-actions">
+                    <button type="button" id="btn-cam-toggle" class="btn-cam-mode" data-action="toggle-cam-mode" title="Переключить ракурс камеры">🎥 Осмотр 3/4</button>
+                    <button type="button" class="btn-icon" data-action="hide-ui" title="Скрыть интерфейс">👁</button>
+                </div>
+            </div>
+
+            <section class="panel" id="library-workspace">
+                <label for="arms-weapon">Образец из библиотеки</label>
+                <select id="arms-weapon"><option value="">Эталонное оружие</option></select>
+                <details id="weapon-fit" hidden>
+                    <summary>Положение, поворот и масштаб</summary>
+                    <div id="fit-fields"></div>
+                    <a href="../?forge=local" target="_blank" rel="noopener">Игра с моими образцами ↗</a>
+                    <button type="button" class="btn-godot" id="save-weapon-fit" disabled>Сохранить для этого образца</button>
+                </details>
+                <p id="fit-status" role="status"></p>
+            </section>
+            <div class="panel grip-selector">
+                <button type="button" class="btn-grip active" data-grip="1h_pistol">1. Одноручный<br>пистолетный</button>
+                <button type="button" class="btn-grip" data-grip="2h_pistol">2. Двуручный<br>пистолетный</button>
+                <button type="button" class="btn-grip" data-grip="2h_rifle">3. Двуручный<br>ружейный</button>
+            </div>
+        </div>
+
+        <!-- Bottom Animation Bar + Collapsible Drawer (STARTS COLLAPSED) -->
+        <div class="bottom-stack">
+            <div class="panel anim-bar">
+                <button type="button" class="btn-anim-idle" data-anim="Idle">Стойка</button>
+                <button type="button" class="btn-anim-sprint" data-anim="Sprint">Спринт</button>
+                <button type="button" class="btn-anim-recoil" data-anim="Recoil">Отдача</button>
+                <button type="button" class="btn-anim-reload" data-anim="Inspect_Reload">Перезарядка</button>
+            </div>
+
+            <div id="drawer" class="panel drawer collapsed">
+                <div class="drawer-bar">
+                    <div class="drawer-bar-left">
+                        <span id="dock-title" class="dock-title">ОДНОРУЧНЫЙ ПИСТОЛЕТНЫЙ</span>
+                        <span id="preset-code" class="code-badge">1HP-S1-G1-D1</span>
+                    </div>
+                    <div class="drawer-bar-right">
+                        <button type="button" class="btn-icon btn-amber" data-action="randomize" title="Случайный образ">🎲</button>
+                        <button type="button" class="btn-icon btn-godot" data-action="export-glb" title="Экспорт .GLB">⬇ .GLB</button>
+                        <button type="button" id="btn-toggle-drawer" class="btn-icon" data-action="toggle-drawer">Развернуть ▼</button>
+                    </div>
+                </div>
+
+                <div class="drawer-body">
+                    <!-- Tabs -->
+                    <div class="tabs-row">
+                        <button type="button" class="btn-tab active" data-tab="gear">1. СНАРЯЖЕНИЕ</button>
+                        <button type="button" class="btn-tab" data-tab="weapon">2. ОРУЖИЕ / ХВАТ</button>
+                        <button type="button" class="btn-tab" data-tab="view">3. ВИД / PS1</button>
+                    </div>
+
+                    <!-- TAB 1: СНАРЯЖЕНИЕ -->
+                    <div id="pane-gear" class="tab-pane active">
+                        <div class="mod-row">
+                            <span class="mod-label">Рукава:</span>
+                            <span id="val-sleeve" class="mod-val">1/4 Горка (брезент)</span>
+                            <button type="button" class="btn-cycle" data-cycle="sleeve" title="Следующий">↻</button>
+                        </div>
+                        <div class="mod-row">
+                            <span class="mod-label">Перчатки:</span>
+                            <span id="val-glove" class="mod-val">1/4 Голые руки (шрамы)</span>
+                            <button type="button" class="btn-cycle" data-cycle="glove" title="Следующий">↻</button>
+                        </div>
+                        <div class="mod-row">
+                            <span class="mod-label">Деталь запястья:</span>
+                            <span id="val-detail" class="mod-val">1/4 Без детали</span>
+                            <button type="button" class="btn-cycle" data-cycle="detail" title="Следующий">↻</button>
+                        </div>
+
+                        <div id="row-hide-left" class="export-opt-row">
+                            <label class="check-label">
+                                <input type="checkbox" id="chk-hide-left" checked>
+                                <span>Скрыть левую руку (1H)</span>
+                            </label>
+                            <span id="poly-badge" class="godot-tag">Godot 4 • -Z вперёд</span>
+                        </div>
+
+                        <div class="actions-grid">
+                            <button type="button" class="btn-amber" data-action="randomize">🎲 СЛУЧАЙНЫЙ ОБРАЗ</button>
+                            <button type="button" class="btn-godot" data-action="export-glb">⬇ ЭКСПОРТ .GLB (GODOT)</button>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: ОРУЖИЕ / ХВАТ -->
+                    <div id="pane-weapon" class="tab-pane">
+                        <div class="section-caption">Эталонное оружие (исключается из .GLB):</div>
+                        <div class="pill-grid-5">
+                            <button type="button" class="pill active" data-refweapon="pm">ПМ</button>
+                            <button type="button" class="pill" data-refweapon="revolver">Револьвер</button>
+                            <button type="button" class="pill" data-refweapon="ak74">АК-74</button>
+                            <button type="button" class="pill" data-refweapon="shotgun">Двустволка</button>
+                            <button type="button" class="pill" data-refweapon="none">Скрыть</button>
+                        </div>
+
+                        <div id="forend-controls" class="hidden" style="display: flex; flex-direction: column; gap: 5px;">
+                            <div class="section-caption">Быстрые пресеты ружейного хвата:</div>
+                            <div class="pill-grid-4">
+                                <button type="button" class="pill active" data-fitpreset="ak74">АК-74</button>
+                                <button type="button" class="pill" data-fitpreset="shotgun">Двустволка</button>
+                                <button type="button" class="pill" data-fitpreset="smg">ПП</button>
+                                <button type="button" class="pill" data-fitpreset="rifle">Винтовка</button>
+                            </div>
+                            <div class="slider-row">
+                                <span class="mod-label">Вылет левой руки (Z):</span>
+                                <input type="range" id="rng-left-z" min="-0.280" max="-0.090" step="0.005" value="-0.175">
+                                <span id="lbl-left-z" class="slider-val">-0.175 м</span>
+                            </div>
+                            <div class="slider-row">
+                                <span class="mod-label">Высота левой руки (Y):</span>
+                                <input type="range" id="rng-left-y" min="-0.075" max="0.005" step="0.002" value="-0.036">
+                                <span id="lbl-left-y" class="slider-val">-0.036 м</span>
+                            </div>
+                        </div>
+
+                        <div class="export-opt-row">
+                            <span class="godot-tag">Сокет: WeaponAttachPoint (0, 0, 0)</span>
+                            <span class="godot-tag">4 клипа AnimationPlayer</span>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: ВИД / PS1 -->
+                    <div id="pane-view" class="tab-pane">
+                        <div class="ps1-grid">
+                            <button type="button" id="tog-jitter" class="btn-toggle" data-toggle="jitter">PS1 Jitter: ВЫКЛ</button>
+                            <button type="button" id="tog-pixel" class="btn-toggle" data-toggle="pixel">PS1 Пиксели: ВЫКЛ</button>
+                            <button type="button" id="tog-vhs" class="btn-toggle" data-toggle="vhs">VHS Шум: ВЫКЛ</button>
+                            <button type="button" id="tog-wire" class="btn-toggle" data-toggle="wire">Сетка (Wire): ВЫКЛ</button>
+                            <button type="button" id="tog-fog" class="btn-toggle" data-toggle="nightFog">Ночной туман: ВЫКЛ</button>
+                            <button type="button" id="tog-sockets" class="btn-toggle" data-toggle="showSockets">Сокеты: ВЫКЛ</button>
+                        </div>
+                        <div class="slider-row">
+                            <span class="mod-label">Сила Jitter:</span>
+                            <input type="range" id="rng-jitter" min="64" max="240" step="8" value="144">
+                            <span id="lbl-jitter" class="slider-val">144 px</span>
+                        </div>
+                        <button type="button" data-action="reset-cam" style="width: 100%; padding: 8px;">⌖ Сброс камеры</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../model/model-core.js?v=1"></script>
+    <script src="../forge/forge-core.js?v=6"></script>
+    <script src="../object-library/library.js?v=4"></script>
+    <script>
+        (function () {
+            'use strict';
+
+            /* =========================================================
+               1. APPLICATION STATE & METADATA
+               ========================================================= */
+            const state = {
+                gripMode: '1h_pistol', // '1h_pistol' | '2h_pistol' | '2h_rifle'
+                activeTab: 'gear',     // 'gear' | 'weapon' | 'view'
+                drawerCollapsed: true, // Starts collapsed so 3D viewport is uncluttered
+                camMode: 'side',       // 'side' (Осмотр 3/4) | 'fps' (FPS)
+                hideLeftOn1H: true,
+
+                sleeve: 0, // 0..3
+                glove: 0,  // 0..3
+                detail: 0, // 0..3
+
+                refWeapon: 'pm', // 'pm' | 'revolver' | 'ak74' | 'shotgun' | 'none'
+
+                riflePreset: 'ak74',
+                leftWristZ: -0.175,
+                leftWristY: -0.036,
+                rightWristZ: 0.084,
+                rightWristY: -0.056,
+                leftOffsetX: 0, leftOffsetY: 0, leftOffsetZ: 0,
+                rightOffsetX: 0, rightOffsetY: 0, rightOffsetZ: 0,
+
+                // All PS1 post-FX strictly OFF by default; clean studio lighting ON
+                view: {
+                    jitter: false,
+                    jitterGrid: 144,
+                    pixel: false,
+                    vhs: false,
+                    wire: false,
+                    nightFog: false,
+                    showSockets: false
+                }
+            };
+
+            const META = {
+                grips: {
+                    '1h_pistol': { title: 'ОДНОРУЧНЫЙ ПИСТОЛЕТНЫЙ', root: 'OneHand_Pistol_Root', code: '1hp', badge: '1HP', defaultWep: 'pm' },
+                    '2h_pistol': { title: 'ДВУРУЧНЫЙ ПИСТОЛЕТНЫЙ', root: 'TwoHand_Pistol_Root', code: '2hp', badge: '2HP', defaultWep: 'revolver' },
+                    '2h_rifle':  { title: 'ДВУРУЧНЫЙ РУЖЕЙНЫЙ',     root: 'TwoHand_Rifle_Root',  code: '2hr', badge: '2HR', defaultWep: 'ak74' }
+                },
+                sleeves: [
+                    '1/4 Горка (брезент)',
+                    '2/4 Бушлат «Флора»',
+                    '3/4 Кожанка + свитер',
+                    '4/4 Тельняшка + бинты'
+                ],
+                gloves: [
+                    '1/4 Голые руки (шрамы)',
+                    '2/4 Беспалые кожаные',
+                    '3/4 Беспалые шерстяные',
+                    '4/4 Армейские полные'
+                ],
+                details: [
+                    '1/4 Без детали',
+                    '2/4 Часы «Командирские»',
+                    '3/4 Бинт на предплечье',
+                    '4/4 Чётки и жетон'
+                ],
+                fitPresets: {
+                    ak74:    { wep: 'ak74',    lz: -0.175, ly: -0.036, rz: 0.084, ry: -0.056 },
+                    shotgun: { wep: 'shotgun', lz: -0.165, ly: -0.038, rz: 0.102, ry: -0.048 },
+                    smg:     { wep: 'ak74',    lz: -0.125, ly: -0.034, rz: 0.082, ry: -0.054 },
+                    rifle:   { wep: 'shotgun', lz: -0.220, ly: -0.034, rz: 0.098, ry: -0.050 }
+                }
+            };
+
+            const fields = {
+                position: ["Положение оружия, м", -2, 2, .005],
+                rotation: ["Поворот оружия, °", -180, 180, 1],
+                scale: ["Масштаб оружия", .05, 8, .01],
+                hand_position: ["Смещение рук, м", -1, 1, .005],
+                hand_rotation: ["Поворот рук, °", -180, 180, 1]
+            };
+            const armKeys = ["gripMode", "hideLeftOn1H", "sleeve", "glove", "detail",
+                "riflePreset", "leftWristZ", "leftWristY", "rightWristZ", "rightWristY"];
+            armKeys.push("leftOffsetX", "leftOffsetY", "leftOffsetZ", "rightOffsetX", "rightOffsetY", "rightOffsetZ", "refWeapon");
+            const armDefaults = Object.fromEntries(armKeys.map(key => [key, state[key]]));
+            const library = window.ChernoObjectLibrary;
+            const forge = window.ChernoHellishForge;
+            const picker = document.getElementById("arms-weapon");
+            const saveFit = document.getElementById("save-weapon-fit");
+            const fitStatus = document.getElementById("fit-status");
+            const fitPanel = document.getElementById("weapon-fit");
+            const fitFields = document.getElementById("fit-fields");
+            const fitInputs = {};
+            let weaponRecord = null;
+            let weaponPose = null;
+            let setLibraryWeapon = function () {};
+
+            for (const [key, [label, min, max, step]] of Object.entries(fields)) {
+                const row = document.createElement("div");
+                row.className = "fit-row";
+                const caption = document.createElement("span");
+                caption.textContent = label;
+                row.append(caption);
+                fitInputs[key] = Array.from({length: key === "scale" ? 1 : 3}, (_, index) => {
+                    const input = document.createElement("input");
+                    Object.assign(input, {type:"number", min, max, step});
+                    input.setAttribute("aria-label", label + (key === "scale" ? "" : " " + "XYZ"[index]));
+                    input.addEventListener("input", () => {
+                        const value = input.valueAsNumber;
+                        if (!Number.isFinite(value) || value < min || value > max) return;
+                        if (key === "scale") weaponPose.scale = value;
+                        else weaponPose[key][index] = value;
+                        applyLibraryPose();
+                    });
+                    row.append(input);
+                    return input;
+                });
+                fitFields.append(row);
+            }
+            for (const [side, label] of [["right", "Правая кисть, м"], ["left", "Левая кисть, м"]]) {
+                const row = document.createElement("div");
+                row.className = "fit-row";
+                const caption = document.createElement("span");
+                caption.textContent = label;
+                row.append(caption);
+                for (const axis of "XYZ") {
+                    const key = side + "Offset" + axis;
+                    const input = document.createElement("input");
+                    Object.assign(input, {type:"number", min:-0.4, max:0.4, step:.005, value:0});
+                    input.setAttribute("aria-label", label + " " + axis);
+                    input.dataset.wristOffset = key;
+                    input.addEventListener("input", () => {
+                        const value = input.valueAsNumber;
+                        if (!Number.isFinite(value) || Math.abs(value) > 0.4) return;
+                        state[key] = value;
+                        rebuildArms();
+                    });
+                    row.append(input);
+                }
+                fitFields.append(row);
+            }
+            async function refreshArmLibrary() {
+                const records = await library.models();
+                const selected = picker.value;
+                picker.length = 1;
+                for (const item of records.filter(item => item.kind === "weapon").sort((a,b) => a.name.localeCompare(b.name)))
+                    picker.add(new Option(item.name, item.id));
+                if (Array.from(picker.options).some(option => option.value === selected)) picker.value = selected;
+                return records;
+            }
+            window.refreshArmLibrary = () => refreshArmLibrary().catch(error => { fitStatus.textContent = error.message; });
+            window.addEventListener("focus", window.refreshArmLibrary);
+            let applyLibraryPose = function () {};
+            picker.addEventListener("change", () => setLibraryWeapon(picker.value));
+            saveFit.addEventListener("click", () => exportGLB(true));
+
+            /* =========================================================
+               2. TOAST, STATUS & ENGINE HOOKS
+               ========================================================= */
+            let toastTimer = null;
+            function showToast(msg, isError) {
+                const el = document.getElementById('toast');
+                if (!el) return;
+                el.textContent = msg;
+                el.classList.toggle('error', !!isError);
+                el.classList.add('visible');
+                clearTimeout(toastTimer);
+                toastTimer = setTimeout(function () { el.classList.remove('visible'); }, 2600);
+            }
+
+            function setBanner(visible, title, msg) {
+                const box = document.getElementById('engine-banner');
+                if (!box) return;
+                box.style.display = visible ? 'block' : 'none';
+                if (title) document.getElementById('banner-title').textContent = title;
+                if (msg) document.getElementById('banner-msg').textContent = msg;
+            }
+
+            // Populated after Three.js boots
+            let rebuildArms = function () {};
+            let rebuildRefWeapon = function () {};
+            let applyCamMode = function () {};
+            let applyViewSettings = function () {};
+            let playArmsClip = function () {};
+            let exportGLB = function () { showToast('3D-движок ещё загружается...', true); };
+
+            /* =========================================================
+               3. IMMEDIATE UI SYNC & DOCUMENT DELEGATED LISTENERS
+               ========================================================= */
+            function syncUI() {
+                const g = META.grips[state.gripMode];
+
+                document.querySelectorAll('[data-grip]').forEach(function (btn) {
+                    btn.classList.toggle('active', btn.dataset.grip === state.gripMode);
+                });
+
+                document.getElementById('dock-title').textContent = g.title;
+                document.getElementById('preset-code').textContent =
+                    g.badge + '-S' + (state.sleeve + 1) + '-G' + (state.glove + 1) + '-D' + (state.detail + 1);
+
+                const camBtn = document.getElementById('btn-cam-toggle');
+                const isFps = state.camMode === 'fps';
+                camBtn.textContent = isFps ? '👁 FPS' : '🎥 Осмотр 3/4';
+                camBtn.classList.toggle('fps-active', isFps);
+                document.getElementById('fps-crosshair').style.display = isFps ? 'block' : 'none';
+
+                document.getElementById('drawer').classList.toggle('collapsed', state.drawerCollapsed);
+                document.getElementById('btn-toggle-drawer').textContent = state.drawerCollapsed ? 'Развернуть ▼' : 'Свернуть ▲';
+
+                document.querySelectorAll('[data-tab]').forEach(function (btn) {
+                    btn.classList.toggle('active', btn.dataset.tab === state.activeTab);
+                });
+                document.getElementById('pane-gear').classList.toggle('active', state.activeTab === 'gear');
+                document.getElementById('pane-weapon').classList.toggle('active', state.activeTab === 'weapon');
+                document.getElementById('pane-view').classList.toggle('active', state.activeTab === 'view');
+
+                document.getElementById('val-sleeve').textContent = META.sleeves[state.sleeve];
+                document.getElementById('val-glove').textContent = META.gloves[state.glove];
+                document.getElementById('val-detail').textContent = META.details[state.detail];
+
+                document.getElementById('row-hide-left').classList.toggle('hidden', state.gripMode !== '1h_pistol');
+
+                document.querySelectorAll('[data-refweapon]').forEach(function (btn) {
+                    btn.classList.toggle('active', btn.dataset.refweapon === state.refWeapon);
+                });
+
+                const forendBox = document.getElementById('forend-controls');
+                forendBox.classList.toggle('hidden', state.gripMode !== '2h_rifle');
+                document.querySelectorAll('[data-fitpreset]').forEach(function (b) {
+                    b.classList.toggle('active', b.dataset.fitpreset === state.riflePreset);
+                });
+                document.getElementById('rng-left-z').value = state.leftWristZ;
+                document.getElementById('lbl-left-z').textContent = state.leftWristZ.toFixed(3) + ' м';
+                document.getElementById('rng-left-y').value = state.leftWristY;
+                document.getElementById('lbl-left-y').textContent = state.leftWristY.toFixed(3) + ' м';
+
+                const setTog = function (id, label, on) {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    el.textContent = label + ': ' + (on ? 'ВКЛ' : 'ВЫКЛ');
+                    el.classList.toggle('on', on);
+                };
+                setTog('tog-jitter', 'PS1 Jitter', state.view.jitter);
+                setTog('tog-pixel', 'PS1 Пиксели', state.view.pixel);
+                setTog('tog-vhs', 'VHS Шум', state.view.vhs);
+                setTog('tog-wire', 'Сетка (Wire)', state.view.wire);
+                setTog('tog-fog', 'Ночной туман', state.view.nightFog);
+                setTog('tog-sockets', 'Сокеты', state.view.showSockets);
+                document.getElementById('rng-jitter').value = state.view.jitterGrid;
+                document.getElementById('lbl-jitter').textContent = state.view.jitterGrid + ' px';
+            }
+
+            function applyFitPreset(key) {
+                const p = META.fitPresets[key];
+                if (!p) return;
+                state.riflePreset = key;
+                state.leftWristZ = p.lz;
+                state.leftWristY = p.ly;
+                state.rightWristZ = p.rz;
+                state.rightWristY = p.ry;
+                if (state.refWeapon !== 'none') {
+                    state.refWeapon = p.wep;
+                }
+            }
+
+            function randomizeLook() {
+                state.sleeve = Math.floor(Math.random() * 4);
+                state.glove = Math.floor(Math.random() * 4);
+                state.detail = Math.floor(Math.random() * 4);
+                syncUI();
+                rebuildArms();
+            }
+
+            // Immediate delegated event binding BEFORE WebGL boots
+            document.addEventListener('click', function (e) {
+                const btn = e.target.closest('button');
+                if (!btn) return;
+
+                if (btn.dataset.grip) {
+                    const next = btn.dataset.grip;
+                    if (state.gripMode !== next) {
+                        state.gripMode = next;
+                        if (state.refWeapon !== 'none') {
+                            state.refWeapon = META.grips[next].defaultWep;
+                        }
+                        if (next === '2h_rifle') {
+                            applyFitPreset(state.refWeapon === 'shotgun' ? 'shotgun' : 'ak74');
+                        }
+                        syncUI();
+                        rebuildArms();
+                        rebuildRefWeapon();
+                    }
+                    return;
+                }
+
+                if (btn.dataset.tab) {
+                    state.activeTab = btn.dataset.tab;
+                    syncUI();
+                    return;
+                }
+
+                if (btn.dataset.cycle) {
+                    const k = btn.dataset.cycle;
+                    state[k] = (state[k] + 1) % 4;
+                    syncUI();
+                    rebuildArms();
+                    return;
+                }
+
+                if (btn.dataset.refweapon) {
+                    state.refWeapon = btn.dataset.refweapon;
+                    if (state.gripMode === '2h_rifle' && (state.refWeapon === 'ak74' || state.refWeapon === 'shotgun')) {
+                        applyFitPreset(state.refWeapon);
+                    }
+                    syncUI();
+                    rebuildArms();
+                    rebuildRefWeapon();
+                    return;
+                }
+
+                if (btn.dataset.fitpreset) {
+                    applyFitPreset(btn.dataset.fitpreset);
+                    syncUI();
+                    rebuildArms();
+                    rebuildRefWeapon();
+                    return;
+                }
+
+                if (btn.dataset.toggle) {
+                    const key = btn.dataset.toggle;
+                    state.view[key] = !state.view[key];
+                    syncUI();
+                    applyViewSettings();
+                    return;
+                }
+
+                if (btn.dataset.anim) {
+                    playArmsClip(btn.dataset.anim);
+                    return;
+                }
+
+                const act = btn.dataset.action;
+                if (act === 'hide-ui') {
+                    document.body.classList.add('ui-hidden');
+                } else if (act === 'show-ui') {
+                    document.body.classList.remove('ui-hidden');
+                } else if (act === 'toggle-drawer') {
+                    state.drawerCollapsed = !state.drawerCollapsed;
+                    syncUI();
+                } else if (act === 'toggle-cam-mode') {
+                    state.camMode = state.camMode === 'side' ? 'fps' : 'side';
+                    syncUI();
+                    applyCamMode();
+                } else if (act === 'reset-cam') {
+                    applyCamMode();
+                } else if (act === 'randomize') {
+                    randomizeLook();
+                } else if (act === 'export-glb') {
+                    exportGLB();
+                }
+            });
+
+            document.addEventListener('change', function (e) {
+                if (e.target && e.target.id === 'chk-hide-left') {
+                    state.hideLeftOn1H = !!e.target.checked;
+                    rebuildArms();
+                }
+            });
+
+            document.addEventListener('input', function (e) {
+                if (!e.target) return;
+                if (e.target.id === 'rng-left-z') {
+                    state.leftWristZ = parseFloat(e.target.value);
+                    syncUI();
+                    rebuildArms();
+                } else if (e.target.id === 'rng-left-y') {
+                    state.leftWristY = parseFloat(e.target.value);
+                    syncUI();
+                    rebuildArms();
+                } else if (e.target.id === 'rng-jitter') {
+                    state.view.jitterGrid = parseInt(e.target.value, 10);
+                    syncUI();
+                    applyViewSettings();
+                }
+            });
+
+            syncUI();
+
+            /* =========================================================
+               4. CASCADING UMD CDN LOADER (cdnjs -> jsdelivr -> unpkg)
+               ========================================================= */
+            function loadScript(url) {
+                return new Promise(function (resolve, reject) {
+                    const s = document.createElement('script');
+                    s.src = url;
+                    s.async = true;
+                    s.onload = function () { resolve(); };
+                    s.onerror = function () {
+                        s.remove();
+                        reject(new Error('Failed to load ' + url));
+                    };
+                    document.head.appendChild(s);
+                });
+            }
+
+            async function loadWithFallback(urls) {
+                let lastErr = null;
+                for (let i = 0; i < urls.length; i++) {
+                    try {
+                        await loadScript(urls[i]);
+                        return true;
+                    } catch (err) {
+                        lastErr = err;
+                    }
+                }
+                throw lastErr || new Error('All CDN mirrors failed');
+            }
+
+            async function bootEngine() {
+                setBanner(true, 'ЗАГРУЗКА 3D-ДВИЖКА...', 'Подключение Three.js r128 и GLTFExporter...');
+                try {
+                    if (typeof window.THREE === 'undefined') {
+                        await loadWithFallback([
+                            'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+                            'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js',
+                            'https://unpkg.com/three@0.128.0/build/three.min.js'
+                        ]);
+                    }
+                    if (typeof window.THREE.GLTFExporter === 'undefined') {
+                        await loadWithFallback([
+                            'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js',
+                            'https://unpkg.com/three@0.128.0/examples/js/exporters/GLTFExporter.js',
+                            'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/exporters/GLTFExporter.min.js'
+                        ]).catch(function () {
+                            showToast('GLTFExporter недоступен (превью работает)', true);
+                        });
+                    }
+                    setBanner(false);
+                    init3D();
+                    if (library && forge) {
+                        try {
+                            const records = await refreshArmLibrary();
+                            const requested = new URLSearchParams(location.search).get("weapon");
+                            if (requested && records.some(item => item.kind === "weapon" && item.id === requested)) {
+                                picker.value = requested;
+                                await setLibraryWeapon(requested);
+                            } else if (requested) fitStatus.textContent = "Образец не найден в библиотеке этого браузера.";
+                            else if (picker.length === 1) fitStatus.textContent = "Добавь оружие в библиотеку из Генератора оружия.";
+                        } catch (error) { fitStatus.textContent = error.message; }
+                    }
+                } catch (err) {
+                    setBanner(true, 'ОШИБКА ЗАГРУЗКИ THREE.JS', 'Не удалось загрузить 3D-движок с CDN. Проверьте сеть.');
+                }
+            }
+
+            /* =========================================================
+               5. THREE.JS ENGINE, SEAMLESS HERMITE WRIST & 2-BONE IK
+               ========================================================= */
+            function init3D() {
+                const canvas = document.getElementById('gl-canvas');
+                let renderer;
+                try {
+                    renderer = new THREE.WebGLRenderer({
+                        canvas: canvas,
+                        antialias: true,
+                        alpha: false,
+                        powerPreference: 'high-performance'
+                    });
+                } catch (err) {
+                    setBanner(true, 'WEBGL НЕДОСТУПЕН', err.message);
+                    return;
+                }
+
+                renderer.outputEncoding = THREE.sRGBEncoding;
+                renderer.setClearColor(0x0f1114, 1);
+
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(48, window.innerWidth / Math.max(1, window.innerHeight), 0.02, 30);
+
+                // Clean Studio Lighting ON by default
+                const hemiLight = new THREE.HemisphereLight(0xeef2f4, 0x2c3036, 1.02);
+                scene.add(hemiLight);
+
+                const keyLight = new THREE.DirectionalLight(0xfff4e4, 1.18);
+                keyLight.position.set(-2.0, 3.4, 2.6);
+                scene.add(keyLight);
+
+                const rimLight = new THREE.DirectionalLight(0x7c97ad, 0.60);
+                rimLight.position.set(2.6, 1.9, -2.5);
+                scene.add(rimLight);
+
+                // Socket Marker Overlay (WeaponAttachPoint at 0,0,0)
+                const socketMarker = new THREE.Mesh(
+                    new THREE.OctahedronGeometry(0.014, 0),
+                    new THREE.MeshBasicMaterial({ color: 0x3de8ff })
+                );
+                socketMarker.visible = false;
+                scene.add(socketMarker);
+
+                /* ---------------------------------------------------------
+                   5.1 BUILT-IN SMOOTH ORBITAL CAMERA ("Осмотр 3/4" / "FPS")
+                   --------------------------------------------------------- */
+                const orbit = {
+                    theta: -2.18,
+                    phi: 1.32,
+                    radius: 0.62,
+                    target: new THREE.Vector3(0.0, -0.02, -0.06),
+                    desiredTheta: -2.18,
+                    desiredPhi: 1.32,
+                    desiredRadius: 0.62,
+                    desiredTarget: new THREE.Vector3(0.0, -0.02, -0.06),
+                    mode: 'none',
+                    lastX: 0,
+                    lastY: 0,
+                    pinchDist: 0
+                };
+
+                function clampOrbit() {
+                    orbit.desiredPhi = Math.max(0.14, Math.min(Math.PI - 0.14, orbit.desiredPhi));
+                    orbit.desiredRadius = Math.max(0.14, Math.min(2.6, orbit.desiredRadius));
+                    orbit.phi = Math.max(0.14, Math.min(Math.PI - 0.14, orbit.phi));
+                    orbit.radius = Math.max(0.14, Math.min(2.6, orbit.radius));
+                }
+
+                function updateCameraTransform() {
+                    if (weaponRecord && state.camMode === "fps") {
+                        camera.position.set(0, 0, 0);
+                        camera.quaternion.identity();
+                        return;
+                    }
+                    clampOrbit();
+                    const sinPhi = Math.sin(orbit.phi);
+                    camera.position.set(
+                        orbit.target.x + orbit.radius * sinPhi * Math.sin(orbit.theta),
+                        orbit.target.y + orbit.radius * Math.cos(orbit.phi),
+                        orbit.target.z + orbit.radius * sinPhi * Math.cos(orbit.theta)
+                    );
+                    camera.lookAt(orbit.target);
+                }
+
+                applyCamMode = function () {
+                    if (state.camMode === 'fps') {
+                        camera.fov = weaponRecord ? 75 : 66;
+                        camera.updateProjectionMatrix();
+                        orbit.desiredTheta = 0.02;
+                        orbit.desiredPhi = 1.46;
+                        orbit.desiredRadius = 0.36;
+                        orbit.desiredTarget.set(-0.04, 0.02, -0.14);
+                    } else {
+                        camera.fov = 48;
+                        camera.updateProjectionMatrix();
+                        orbit.desiredTheta = -2.18;
+                        orbit.desiredPhi = 1.32;
+                        orbit.desiredRadius = 0.62;
+                        orbit.desiredTarget.set(0.0, -0.02, -0.06);
+                    }
+                    orbit.theta = orbit.desiredTheta;
+                    orbit.phi = orbit.desiredPhi;
+                    orbit.radius = orbit.desiredRadius;
+                    orbit.target.copy(orbit.desiredTarget);
+                    updateCameraTransform();
+                };
+
+                // Mouse LMB rotate, RMB pan, Wheel zoom
+                canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+                canvas.addEventListener('mousedown', function (e) {
+                    orbit.mode = e.button === 2 ? 'pan' : 'rotate';
+                    orbit.lastX = e.clientX;
+                    orbit.lastY = e.clientY;
+                });
+                window.addEventListener('mousemove', function (e) {
+                    if (orbit.mode === 'none') return;
+                    const dx = e.clientX - orbit.lastX;
+                    const dy = e.clientY - orbit.lastY;
+                    orbit.lastX = e.clientX;
+                    orbit.lastY = e.clientY;
+                    if (orbit.mode === 'rotate') {
+                        orbit.desiredTheta -= dx * 0.009;
+                        orbit.desiredPhi -= dy * 0.009;
+                    } else if (orbit.mode === 'pan') {
+                        const panScale = orbit.radius * 0.0014;
+                        const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+                        const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+                        orbit.desiredTarget.addScaledVector(right, -dx * panScale);
+                        orbit.desiredTarget.addScaledVector(up, dy * panScale);
+                    }
+                });
+                window.addEventListener('mouseup', function () { orbit.mode = 'none'; });
+                canvas.addEventListener('wheel', function (e) {
+                    e.preventDefault();
+                    orbit.desiredRadius += e.deltaY * 0.0012;
+                }, { passive: false });
+
+                // Touch 1-finger rotate, 2-finger pinch zoom
+                canvas.addEventListener('touchstart', function (e) {
+                    if (e.touches.length === 1) {
+                        orbit.mode = 'rotate';
+                        orbit.lastX = e.touches[0].clientX;
+                        orbit.lastY = e.touches[0].clientY;
+                    } else if (e.touches.length === 2) {
+                        orbit.mode = 'pinch';
+                        orbit.pinchDist = Math.hypot(
+                            e.touches[0].clientX - e.touches[1].clientX,
+                            e.touches[0].clientY - e.touches[1].clientY
+                        );
+                    }
+                }, { passive: true });
+                canvas.addEventListener('touchmove', function (e) {
+                    if (e.touches.length === 1 && orbit.mode === 'rotate') {
+                        const dx = e.touches[0].clientX - orbit.lastX;
+                        const dy = e.touches[0].clientY - orbit.lastY;
+                        orbit.lastX = e.touches[0].clientX;
+                        orbit.lastY = e.touches[0].clientY;
+                        orbit.desiredTheta -= dx * 0.010;
+                        orbit.desiredPhi -= dy * 0.010;
+                    } else if (e.touches.length === 2) {
+                        const d = Math.hypot(
+                            e.touches[0].clientX - e.touches[1].clientX,
+                            e.touches[0].clientY - e.touches[1].clientY
+                        );
+                        orbit.desiredRadius += (orbit.pinchDist - d) * 0.003;
+                        orbit.pinchDist = d;
+                    }
+                }, { passive: true });
+                canvas.addEventListener('touchend', function () { orbit.mode = 'none'; });
+
+                /* ---------------------------------------------------------
+                   5.2 PROCEDURAL PIXEL TEXTURES (NearestFilter, embedded in GLB)
+                   --------------------------------------------------------- */
+                function prng(seed) {
+                    let s = seed % 2147483647;
+                    if (s <= 0) s += 2147483646;
+                    return function () {
+                        s = (s * 16807) % 2147483647;
+                        return (s - 1) / 2147483646;
+                    };
+                }
+
+                function makePixelTex(size, drawFn, repX, repY) {
+                    const c = document.createElement('canvas');
+                    c.width = size;
+                    c.height = size;
+                    const ctx = c.getContext('2d');
+                    drawFn(ctx, size, size);
+                    const tex = new THREE.CanvasTexture(c);
+                    tex.magFilter = THREE.NearestFilter;
+                    tex.minFilter = THREE.NearestFilter;
+                    tex.generateMipmaps = false;
+                    tex.wrapS = THREE.RepeatWrapping;
+                    tex.wrapT = THREE.RepeatWrapping;
+                    tex.repeat.set(repX || 1, repY || 1);
+                    tex.encoding = THREE.sRGBEncoding;
+                    return tex;
+                }
+
+                const TEX = {
+                    gorkaKhaki: makePixelTex(64, function (ctx, w, h) {
+                        const r = prng(501);
+                        ctx.fillStyle = '#5c583f';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let i = 0; i < 220; i++) {
+                            ctx.fillStyle = r() > 0.5 ? '#6b6749' : '#4a4732';
+                            ctx.fillRect(Math.floor(r() * w), Math.floor(r() * h), 4, 3);
+                        }
+                        // Dark olive canvas reinforcement panel
+                        ctx.fillStyle = '#3f4332';
+                        ctx.fillRect(0, 14, w, 18);
+                        for (let i = 0; i < 65; i++) {
+                            ctx.fillStyle = r() > 0.5 ? '#4a4f3b' : '#35392a';
+                            ctx.fillRect(Math.floor(r() * w), 14 + Math.floor(r() * 18), 3, 2);
+                        }
+                    }, 1, 1),
+
+                    floraCamo: makePixelTex(64, function (ctx, w, h) {
+                        const r = prng(502);
+                        ctx.fillStyle = '#475436';
+                        ctx.fillRect(0, 0, w, h);
+                        const colors = ['#2a3521', '#656b43', '#362e23', '#52603c'];
+                        for (let i = 0; i < 56; i++) {
+                            ctx.fillStyle = colors[Math.floor(r() * colors.length)];
+                            ctx.fillRect(Math.floor(r() * 54), Math.floor(r() * 54), 10 + Math.floor(r() * 8), 5 + Math.floor(r() * 5));
+                        }
+                    }, 1, 1),
+
+                    leatherJacket: makePixelTex(64, function (ctx, w, h) {
+                        const r = prng(503);
+                        ctx.fillStyle = '#231f1e';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let i = 0; i < 150; i++) {
+                            ctx.fillStyle = r() > 0.5 ? '#302b29' : '#181515';
+                            ctx.fillRect(Math.floor(r() * w), Math.floor(r() * h), 5, 2);
+                        }
+                    }, 1, 1),
+
+                    sweaterKnit: makePixelTex(64, function (ctx, w, h) {
+                        const r = prng(504);
+                        ctx.fillStyle = '#343638';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let x = 0; x < w; x += 4) {
+                            ctx.fillStyle = x % 8 === 0 ? '#424548' : '#282a2c';
+                            ctx.fillRect(x, 0, 2, h);
+                        }
+                        for (let i = 0; i < 36; i++) {
+                            ctx.fillStyle = r() > 0.5 ? '#4c5054' : '#222426';
+                            ctx.fillRect(Math.floor(r() * w), Math.floor(r() * h), 2, 4);
+                        }
+                    }, 2, 1),
+
+                    telnyashka: makePixelTex(64, function (ctx, w, h) {
+                        const r = prng(505);
+                        ctx.fillStyle = '#b4b7af';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let y = 0; y < h; y += 12) {
+                            ctx.fillStyle = '#24486d';
+                            ctx.fillRect(0, y, w, 6);
+                        }
+                        for (let i = 0; i < 42; i++) {
+                            ctx.fillStyle = 'rgba(72, 62, 48, 0.38)';
+                            ctx.fillRect(Math.floor(r() * w), Math.floor(r() * h), 5, 4);
+                        }
+                    }, 1, 2),
+
+                    weatheredSkin: makePixelTex(64, function (ctx, w, h) {
+                        const r = prng(506);
+                        ctx.fillStyle = '#ba8d72';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let i = 0; i < 160; i++) {
+                            const v = r();
+                            ctx.fillStyle = v < 0.4 ? '#a67b61' : (v < 0.8 ? '#c79a7f' : '#8a6450');
+                            ctx.fillRect(Math.floor(r() * w), Math.floor(r() * h), 4, 3);
+                        }
+                        // Veteran scar & weathered knuckle grain
+                        ctx.fillStyle = '#8b564b';
+                        ctx.fillRect(14, 22, 18, 2);
+                        ctx.fillRect(22, 42, 12, 2);
+                    }, 1, 1),
+
+                    woolKnit: makePixelTex(64, function (ctx, w, h) {
+                        const r = prng(507);
+                        ctx.fillStyle = '#3b3f42';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let y = 0; y < h; y += 4) {
+                            for (let x = 0; x < w; x += 4) {
+                                ctx.fillStyle = (x + y) % 8 === 0 ? '#4b4f53' : '#2d3033';
+                                ctx.fillRect(x, y, 3, 3);
+                            }
+                        }
+                        for (let i = 0; i < 28; i++) {
+                            ctx.fillStyle = '#5a5f63';
+                            ctx.fillRect(Math.floor(r() * w), Math.floor(r() * h), 3, 2);
+                        }
+                    }, 1, 1),
+
+                    dirtyBandage: makePixelTex(64, function (ctx, w, h) {
+                        const r = prng(508);
+                        ctx.fillStyle = '#ada391';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let y = 0; y < h; y += 8) {
+                            ctx.fillStyle = '#7e7666';
+                            ctx.fillRect(0, y, w, 1);
+                        }
+                        for (let i = 0; i < 36; i++) {
+                            ctx.fillStyle = r() > 0.72 ? '#6e2a23' : '#7f6d56';
+                            ctx.fillRect(Math.floor(r() * w), Math.floor(r() * h), 5, 4);
+                        }
+                    }, 1, 1),
+
+                    watchDial: makePixelTex(64, function (ctx, w, h) {
+                        ctx.fillStyle = '#16231e';
+                        ctx.fillRect(0, 0, w, h);
+                        ctx.strokeStyle = '#c8d1c4';
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(4, 4, w - 8, h - 8);
+                        ctx.fillStyle = '#5eff9e';
+                        ctx.fillRect(30, 8, 4, 8);
+                        ctx.fillRect(30, 48, 4, 8);
+                        ctx.fillRect(8, 30, 8, 4);
+                        ctx.fillRect(48, 30, 8, 4);
+                        ctx.fillStyle = '#d93829';
+                        ctx.fillRect(29, 18, 6, 6);
+                        ctx.fillStyle = '#eef2eb';
+                        ctx.fillRect(30, 14, 3, 18);
+                        ctx.fillRect(30, 30, 16, 3);
+                    }, 1, 1),
+
+                    gunSteel: makePixelTex(64, function (ctx, w, h) {
+                        const r = prng(509);
+                        ctx.fillStyle = '#3f454b';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let i = 0; i < 120; i++) {
+                            ctx.fillStyle = r() > 0.5 ? '#50575e' : '#30353b';
+                            ctx.fillRect(Math.floor(r() * w), Math.floor(r() * h), 4, 2);
+                        }
+                    }, 1, 1),
+
+                    gunWood: makePixelTex(64, function (ctx, w, h) {
+                        const r = prng(510);
+                        ctx.fillStyle = '#684428';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let y = 0; y < h; y += 3) {
+                            ctx.fillStyle = r() > 0.5 ? '#55361e' : '#7a5232';
+                            ctx.fillRect(0, y, w, 2);
+                        }
+                    }, 1, 1)
+                };
+
+                /* ---------------------------------------------------------
+                   5.3 PS1 MATERIAL FACTORY (with optional Vertex Jitter)
+                   --------------------------------------------------------- */
+                const ps1Uniforms = {
+                    uJitter: { value: 0.0 },
+                    uGrid: { value: new THREE.Vector2(144.0, 108.0) }
+                };
+
+                function makeMat(opts) {
+                    const mat = new THREE.MeshStandardMaterial({
+                        color: opts.color !== undefined ? opts.color : 0xffffff,
+                        map: opts.map || null,
+                        emissive: opts.emissive !== undefined ? opts.emissive : 0x000000,
+                        emissiveIntensity: opts.emissiveIntensity !== undefined ? opts.emissiveIntensity : 0,
+                        roughness: opts.roughness !== undefined ? opts.roughness : 0.84,
+                        metalness: opts.metalness !== undefined ? opts.metalness : 0.08,
+                        wireframe: state.view.wire
+                    });
+
+                    mat.onBeforeCompile = function (shader) {
+                        shader.uniforms.uJitter = ps1Uniforms.uJitter;
+                        shader.uniforms.uGrid = ps1Uniforms.uGrid;
+                        shader.vertexShader = 'uniform float uJitter;\nuniform vec2 uGrid;\n' + shader.vertexShader;
+                        shader.vertexShader = shader.vertexShader.replace(
+                            '#include <project_vertex>',
+                            `
+                            #include <project_vertex>
+                            if (uJitter > 0.5) {
+                                vec4 snapped = gl_Position;
+                                snapped.xyz = gl_Position.xyz / gl_Position.w;
+                                snapped.xy = floor(snapped.xy * uGrid + 0.5) / uGrid;
+                                snapped.xyz *= gl_Position.w;
+                                gl_Position = snapped;
+                            }
+                            `
+                        );
+                    };
+                    return mat;
+                }
+
+                /* ---------------------------------------------------------
+                   5.4 LOFTED GEOMETRY, HERMITE WRIST BRIDGE & PALM BUILDERS
+                   --------------------------------------------------------- */
+                const RADIAL_SEGS = 14; // Unified 14-segment topology for sleeve, wrist bridge, and palm
+
+                function smoothstep(t) {
+                    const c = Math.max(0, Math.min(1, t));
+                    return c * c * (3 - 2 * c);
+                }
+
+                // Multi-ring loft along local -Z from z=0 to z=-length (supports smooth inward-tucking hems)
+                function createLoftedLimbGeometry(length, radialSegs, rings) {
+                    const pos = [];
+                    const uvs = [];
+                    const indices = [];
+                    const ringCount = rings.length;
+                    const cols = radialSegs + 1;
+
+                    for (let r = 0; r < ringCount; r++) {
+                        const ring = rings[r];
+                        const z = -ring.t * length;
+                        const waveAmp = ring.waveAmp || 0;
+                        const waveFreq = ring.waveFreq || 4;
+                        const vCoord = ring.uvV !== undefined ? ring.uvV : ring.t * 2.4;
+                        for (let s = 0; s <= radialSegs; s++) {
+                            const u = s / radialSegs;
+                            const ang = u * Math.PI * 2;
+                            const wrinkle = waveAmp * Math.sin(ang * waveFreq + r * 0.9);
+                            const x = (ring.ox || 0) + Math.cos(ang) * (ring.rx + wrinkle);
+                            const y = (ring.oy || 0) + Math.sin(ang) * (ring.ry + wrinkle * 0.85);
+                            pos.push(x, y, z);
+                            uvs.push(u * 2.0, vCoord);
+                        }
+                    }
+
+                    for (let r = 0; r < ringCount - 1; r++) {
+                        for (let s = 0; s < radialSegs; s++) {
+                            const a = r * cols + s;
+                            const b = a + 1;
+                            const c = (r + 1) * cols + s;
+                            const d = c + 1;
+                            indices.push(a, c, b);
+                            indices.push(b, c, d);
+                        }
+                    }
+
+                    const geo = new THREE.BufferGeometry();
+                    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+                    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+                    geo.setIndex(indices);
+                    geo.computeVertexNormals();
+                    return geo;
+                }
+
+                // Forearm outer radius profile function along t in [0..0.85] so bandage wraps conform tightly (+0.002)
+                function getForearmOuterRadii(t) {
+                    const u = Math.max(0, Math.min(1, t / 0.85));
+                    const rx = 0.043 - 0.007 * u + 0.002 * Math.sin(u * Math.PI);
+                    const ry = 0.041 - 0.011 * u + 0.0015 * Math.sin(u * Math.PI);
+                    return { rx: rx, ry: ry };
+                }
+
+                // CONTINUOUS CUBIC HERMITE WRIST BRIDGE (Forearm local space):
+                // Connects inside the sleeve cuff (t = 0.79, rx=0.028, ry=0.023) smoothly through 8 Hermite rings
+                // directly into HandGroup's exact rear palm cross-section at z = +0.002 (rx=0.036, ry=0.017)
+                // vertex-for-vertex with ZERO gaps, ZERO wedges, and ZERO 180-deg twist.
+                function createWristBridgeGeometry(forearmLen, handLocalQuat) {
+                    const startT = 0.79;
+                    const P0 = new THREE.Vector3(0, 0, -forearmLen * startT);
+                    const T0 = new THREE.Vector3(0, 0, -1);
+                    const U0 = new THREE.Vector3(0, 1, 0);
+
+                    const handPos = new THREE.Vector3(0, 0, -forearmLen);
+                    const P1 = handPos.clone().add(new THREE.Vector3(0, 0, 0.002).applyQuaternion(handLocalQuat));
+                    const T1 = new THREE.Vector3(0, 0, -1).applyQuaternion(handLocalQuat).normalize();
+                    const U1 = new THREE.Vector3(0, 1, 0).applyQuaternion(handLocalQuat).normalize();
+
+                    // Ensure U1 is in the same hemisphere as U0 (dot > 0)
+                    if (U1.dot(U0) < 0) U1.negate();
+
+                    const dist = Math.max(0.012, P0.distanceTo(P1));
+                    const M0 = T0.clone().multiplyScalar(dist * 0.92);
+                    const M1 = T1.clone().multiplyScalar(dist * 0.92);
+
+                    const steps = 8; // 8 smooth segments => 9 rings total
+                    const cols = RADIAL_SEGS + 1;
+                    const pos = [];
+                    const uvs = [];
+                    const indices = [];
+                    const frames = [];
+
+                    let prevUp = U0.clone();
+
+                    for (let i = 0; i <= steps; i++) {
+                        const s = i / steps;
+                        const s2 = s * s;
+                        const s3 = s2 * s;
+
+                        // Cubic Hermite position
+                        const h00 = 2 * s3 - 3 * s2 + 1;
+                        const h10 = s3 - 2 * s2 + s;
+                        const h01 = -2 * s3 + 3 * s2;
+                        const h11 = s3 - s2;
+
+                        const center = new THREE.Vector3()
+                            .addScaledVector(P0, h00)
+                            .addScaledVector(M0, h10)
+                            .addScaledVector(P1, h01)
+                            .addScaledVector(M1, h11);
+
+                        // Cubic Hermite tangent
+                        let tan;
+                        if (i === 0) {
+                            tan = T0.clone();
+                        } else if (i === steps) {
+                            tan = T1.clone();
+                        } else {
+                            const d00 = 6 * s2 - 6 * s;
+                            const d10 = 3 * s2 - 4 * s + 1;
+                            const d01 = -6 * s2 + 6 * s;
+                            const d11 = 3 * s2 - 2 * s;
+                            tan = new THREE.Vector3()
+                                .addScaledVector(P0, d00)
+                                .addScaledVector(M0, d10)
+                                .addScaledVector(P1, d01)
+                                .addScaledVector(M1, d11);
+                            if (tan.lengthSq() < 1e-8) tan.copy(T0).lerp(T1, s);
+                            tan.normalize();
+                        }
+
+                        // Smooth dorsal Up vector with dot > 0 continuity guard (never flips 180 deg)
+                        const w = smoothstep(s);
+                        let up;
+                        if (i === 0) {
+                            up = U0.clone();
+                        } else if (i === steps) {
+                            up = U1.clone();
+                        } else {
+                            up = U0.clone().lerp(U1, w);
+                            if (up.dot(prevUp) < 0) up.negate();
+                            up.addScaledVector(tan, -up.dot(tan));
+                            if (up.lengthSq() < 1e-6) up.copy(prevUp);
+                            up.normalize();
+                            if (up.dot(prevUp) < 0) up.negate();
+                        }
+                        prevUp = up.clone();
+
+                        // Orthonormal lateral Right axis: Up x (-Tan) matches HandGroup +X identically
+                        const negTan = tan.clone().negate();
+                        const right = new THREE.Vector3().crossVectors(up, negTan).normalize();
+                        const orthoUp = new THREE.Vector3().crossVectors(negTan, right).normalize();
+
+                        // Smooth anatomical cross-section from forearm inner wrist (0.028 x 0.023)
+                        // into exact palm rear oval at z = +0.002 (0.036 x 0.017)
+                        const rx = 0.028 + (0.036 - 0.028) * w - 0.0012 * Math.sin(s * Math.PI);
+                        const ry = 0.023 + (0.017 - 0.023) * w - 0.0008 * Math.sin(s * Math.PI);
+
+                        frames.push({ s: s, center: center, right: right, up: orthoUp, tan: tan, rx: rx, ry: ry });
+
+                        for (let seg = 0; seg <= RADIAL_SEGS; seg++) {
+                            const u = seg / RADIAL_SEGS;
+                            const ang = u * Math.PI * 2;
+                            const ca = Math.cos(ang);
+                            const sa = Math.sin(ang);
+
+                            const vx = center.x + right.x * (ca * rx) + orthoUp.x * (sa * ry);
+                            const vy = center.y + right.y * (ca * rx) + orthoUp.y * (sa * ry);
+                            const vz = center.z + right.z * (ca * rx) + orthoUp.z * (sa * ry);
+
+                            pos.push(vx, vy, vz);
+                            uvs.push(u * 1.5, s * 0.85);
+                        }
+                    }
+
+                    for (let r = 0; r < steps; r++) {
+                        for (let seg = 0; seg < RADIAL_SEGS; seg++) {
+                            const a = r * cols + seg;
+                            const b = a + 1;
+                            const c = (r + 1) * cols + seg;
+                            const d = c + 1;
+                            indices.push(a, c, b);
+                            indices.push(b, c, d);
+                        }
+                    }
+
+                    // Internal start cap hidden deep inside sleeve at t = 0.79
+                    const capIdx = pos.length / 3;
+                    pos.push(P0.x, P0.y, P0.z);
+                    uvs.push(0.5, 0.0);
+                    for (let seg = 0; seg < RADIAL_SEGS; seg++) {
+                        indices.push(capIdx, seg, seg + 1);
+                    }
+
+                    const geo = new THREE.BufferGeometry();
+                    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+                    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+                    geo.setIndex(indices);
+                    geo.computeVertexNormals();
+
+                    // Interpolated frame sampler for mounting D2 Watch & D4 Prayer Beads at exact t = 0.88
+                    function sampleFrameAtT(targetT) {
+                        const frac = Math.max(0, Math.min(1, (targetT - startT) / (1.0 - startT)));
+                        const idxF = frac * steps;
+                        const i0 = Math.min(steps - 1, Math.floor(idxF));
+                        const i1 = i0 + 1;
+                        const a = idxF - i0;
+                        const f0 = frames[i0];
+                        const f1 = frames[i1];
+
+                        const center = f0.center.clone().lerp(f1.center, a);
+                        const tan = f0.tan.clone().lerp(f1.tan, a).normalize();
+                        const up = f0.up.clone().lerp(f1.up, a);
+                        up.addScaledVector(tan, -up.dot(tan)).normalize();
+                        const right = new THREE.Vector3().crossVectors(up, tan.clone().negate()).normalize();
+                        return {
+                            center: center,
+                            right: right,
+                            up: up,
+                            tan: tan,
+                            rx: f0.rx + (f1.rx - f0.rx) * a,
+                            ry: f0.ry + (f1.ry - f0.ry) * a
+                        };
+                    }
+
+                    return { geometry: geo, sampleFrameAtT: sampleFrameAtT };
+                }
+
+                // Sculpted Palm in HandGroup local space (14 radial segments):
+                // Ring 0 at z = +0.002 is an EXACT pure ellipse (rx=0.036, ry=0.017) matching
+                // the final ring of createWristBridgeGeometry vertex-for-vertex!
+                function createSculptedPalmGeometry(side) {
+                    const cols = RADIAL_SEGS + 1;
+                    const slices = [
+                        { z:  0.002, wx: 0.036, hy: 0.0170, ox: 0.000,         oy:  0.000, exp: 1.00, ridge: 0.000, arch: 0.000, slant: 0.0 },
+                        { z: -0.014, wx: 0.037, hy: 0.0164, ox: side * 0.002,  oy: -0.001, exp: 0.88, ridge: 0.001, arch: 0.001, slant: 0.25 },
+                        { z: -0.034, wx: 0.037, hy: 0.0156, ox: side * 0.002,  oy:  0.000, exp: 0.78, ridge: 0.002, arch: 0.002, slant: 0.55 },
+                        { z: -0.056, wx: 0.036, hy: 0.0144, ox: 0.000,         oy:  0.000, exp: 0.74, ridge: 0.003, arch: 0.002, slant: 0.82 },
+                        { z: -0.076, wx: 0.034, hy: 0.0124, ox: -side * 0.001, oy:  0.000, exp: 0.74, ridge: 0.002, arch: 0.001, slant: 1.00 }
+                    ];
+
+                    const pos = [];
+                    const uvs = [];
+                    const indices = [];
+
+                    for (let r = 0; r < slices.length; r++) {
+                        const sl = slices[r];
+                        const v = r / (slices.length - 1);
+                        for (let s = 0; s <= RADIAL_SEGS; s++) {
+                            const u = s / RADIAL_SEGS;
+                            const ang = u * Math.PI * 2;
+                            const ca = Math.cos(ang);
+                            const sa = Math.sin(ang);
+
+                            const sx = Math.sign(ca) * Math.pow(Math.abs(ca), sl.exp);
+                            const sy = Math.sign(sa) * Math.pow(Math.abs(sa), sl.exp);
+
+                            const dorsalBump = sa > 0.25 ? sl.ridge * Math.cos(ca * Math.PI * 2) : 0;
+                            const palmarCup = sa < -0.25 ? sl.arch * (1.0 - ca * ca) : 0;
+                            const zSlant = (ca * side) * 0.0038 * sl.slant;
+
+                            const x = sl.ox + sx * sl.wx;
+                            const y = sl.oy + sy * sl.hy + dorsalBump + palmarCup;
+                            const z = sl.z - zSlant;
+
+                            pos.push(x, y, z);
+                            uvs.push(u * 1.5, 0.85 + v * 1.4);
+                        }
+                    }
+
+                    for (let r = 0; r < slices.length - 1; r++) {
+                        for (let s = 0; s < RADIAL_SEGS; s++) {
+                            const a = r * cols + s;
+                            const b = a + 1;
+                            const c = (r + 1) * cols + s;
+                            const d = c + 1;
+                            indices.push(a, c, b);
+                            indices.push(b, c, d);
+                        }
+                    }
+
+                    // Close distal knuckle cap cleanly (rear at z=+0.002 stays open to meet Hermite wrist bridge!)
+                    const knuckleCapIdx = pos.length / 3;
+                    const lastRing = (slices.length - 1) * cols;
+                    pos.push(-side * 0.001, 0, -0.078);
+                    uvs.push(0.5, 2.25);
+                    for (let s = 0; s < RADIAL_SEGS; s++) {
+                        indices.push(knuckleCapIdx, lastRing + s + 1, lastRing + s);
+                    }
+
+                    const geo = new THREE.BufferGeometry();
+                    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+                    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+                    geo.setIndex(indices);
+                    geo.computeVertexNormals();
+                    return geo;
+                }
+
+                // Tapered phalanx segment along local -Z with organic joint swelling
+                function createPhalanxGeometry(rBase, rTip, len, closeTip) {
+                    const rings = [
+                        { t: 0.00, rx: rBase * 0.94, ry: rBase * 0.92 },
+                        { t: 0.24, rx: rBase * 1.03, ry: rBase * 0.98 },
+                        { t: 0.66, rx: (rBase + rTip) * 0.50, ry: (rBase + rTip) * 0.47 },
+                        { t: 0.92, rx: rTip * 0.96, ry: rTip * 0.88 }
+                    ];
+                    if (closeTip) {
+                        rings.push({ t: 0.98, rx: rTip * 0.65, ry: rTip * 0.56 });
+                        rings.push({ t: 1.00, rx: rTip * 0.16, ry: rTip * 0.14 });
+                    } else {
+                        rings.push({ t: 1.00, rx: rTip * 0.86, ry: rTip * 0.82 });
+                    }
+                    return createLoftedLimbGeometry(len, 10, rings);
+                }
+
+                /* ---------------------------------------------------------
+                   5.5 MATH HELPERS: QUATERNION ORIENTATION & 2-BONE IK
+                   --------------------------------------------------------- */
+                function composeHandQuat(yaw, pitch, roll) {
+                    const qY = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+                    const qX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), pitch);
+                    const qZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), roll);
+                    return qY.multiply(qX).multiply(qZ);
+                }
+
+                function solveTwoBoneElbow(shoulder, wrist, L1, L2, poleDir) {
+                    const diff = new THREE.Vector3().subVectors(wrist, shoulder);
+                    const maxReach = (L1 + L2) * 0.988;
+                    const minReach = Math.abs(L1 - L2) + 0.012;
+                    let d = diff.length();
+                    const dir = diff.clone().normalize();
+                    if (d > maxReach) d = maxReach;
+                    if (d < minReach) d = minReach;
+
+                    const cosA = (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d);
+                    const clampedCos = Math.max(-1, Math.min(1, cosA));
+                    const a = d * clampedCos;
+                    const h = Math.sqrt(Math.max(0, L1 * L1 - a * a));
+
+                    const bendDir = poleDir.clone().addScaledVector(dir, -poleDir.dot(dir));
+                    if (bendDir.lengthSq() < 1e-6) bendDir.set(0, -1, 0);
+                    bendDir.normalize();
+
+                    return shoulder.clone().addScaledVector(dir, a).addScaledVector(bendDir, h);
+                }
+
+                // Orients a group at startPos so local -Z points toward endPos and local +Y aligns with projected upHint
+                function orientBoneNegZ(group, startPos, endPos, upHint) {
+                    group.position.copy(startPos);
+                    const zAxis = new THREE.Vector3().subVectors(startPos, endPos);
+                    if (zAxis.lengthSq() < 1e-10) zAxis.set(0, 0, 1);
+                    else zAxis.normalize();
+
+                    const projUp = upHint.clone().addScaledVector(zAxis, -upHint.dot(zAxis));
+                    if (projUp.lengthSq() < 1e-6) {
+                        projUp.set(0, 1, 0).addScaledVector(zAxis, -zAxis.y);
+                        if (projUp.lengthSq() < 1e-6) projUp.set(1, 0, 0);
+                    }
+                    projUp.normalize();
+                    const xAxis = new THREE.Vector3().crossVectors(projUp, zAxis).normalize();
+                    const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+                    const m = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+                    group.quaternion.setFromRotationMatrix(m);
+                }
+
+                /* ---------------------------------------------------------
+                   5.6 EXACT ERGONOMIC GRIP CONFIGURATIONS (3 MODES)
+                   --------------------------------------------------------- */
+                function getGripConfigs() {
+                    const mode = state.gripMode;
+
+                    const rightPistolFingers = {
+                        index:  [-0.18, -0.78, -0.55], // Extended cleanly onto trigger
+                        middle: [-1.28, -1.18, -0.55], // Tight wrap across front & left side of grip
+                        ring:   [-1.28, -1.18, -0.55],
+                        pinky:  [-1.28, -1.18, -0.55]
+                    };
+
+                    const rightPistol = {
+                        shoulder:  new THREE.Vector3(0.25, -0.24, 0.36),
+                        wrist:     new THREE.Vector3(0.027, -0.052, 0.082),
+                        yaw:       0.05,
+                        pitch:     -0.20,
+                        roll:      -1.57,
+                        pole:      new THREE.Vector3(0.50, -0.82, 0.24),
+                        thumbMode: 'right_grip',
+                        fingers:   rightPistolFingers
+                    };
+
+                    if (mode === '1h_pistol') {
+                        return {
+                            right: rightPistol,
+                            left: {
+                                shoulder:  new THREE.Vector3(-0.25, -0.26, 0.36),
+                                wrist:     new THREE.Vector3(-0.19, -0.34, 0.14),
+                                yaw:       -0.14,
+                                pitch:     -0.38,
+                                roll:      1.35,
+                                pole:      new THREE.Vector3(-0.45, -0.88, 0.20),
+                                thumbMode: 'left_relaxed',
+                                fingers: {
+                                    index:  [-0.45, -0.55, -0.35],
+                                    middle: [-0.52, -0.60, -0.38],
+                                    ring:   [-0.58, -0.65, -0.40],
+                                    pinky:  [-0.64, -0.70, -0.42]
+                                }
+                            }
+                        };
+                    }
+
+                    if (mode === '2h_pistol') {
+                        return {
+                            right: rightPistol,
+                            left: {
+                                shoulder:  new THREE.Vector3(-0.25, -0.24, 0.35),
+                                wrist:     new THREE.Vector3(-0.032, -0.058, 0.072),
+                                yaw:       -0.15,
+                                pitch:     -0.18,
+                                roll:      1.57,
+                                pole:      new THREE.Vector3(-0.52, -0.82, 0.24),
+                                thumbMode: 'left_pistol_support',
+                                fingers: {
+                                    index:  [-1.16, -1.16, -0.50],
+                                    middle: [-1.16, -1.16, -0.50],
+                                    ring:   [-1.16, -1.16, -0.50],
+                                    pinky:  [-1.16, -1.16, -0.50]
+                                }
+                            }
+                        };
+                    }
+
+                    // 2h_rifle (TwoHand_Rifle_Root):
+                    // Left shoulder & elbow pole pushed outward (-X) and downward so left forearm clears AK-74 magazine with ZERO clipping
+                    const isShotgun = (state.refWeapon === 'shotgun' || state.riflePreset === 'shotgun' || state.riflePreset === 'rifle');
+                    return {
+                        right: {
+                            shoulder:  new THREE.Vector3(0.25, -0.23, 0.36),
+                            wrist:     new THREE.Vector3(0.027, state.rightWristY, state.rightWristZ),
+                            yaw:       0.05,
+                            pitch:     isShotgun ? -0.16 : -0.22,
+                            roll:      -1.57,
+                            pole:      new THREE.Vector3(0.50, -0.82, 0.24),
+                            thumbMode: 'right_grip',
+                            fingers:   rightPistolFingers
+                        },
+                        left: {
+                            shoulder:  new THREE.Vector3(-0.28, -0.22, 0.24),
+                            wrist:     new THREE.Vector3(-0.032, state.leftWristY, state.leftWristZ),
+                            yaw:       -0.42,
+                            pitch:     0.06,
+                            roll:      2.75, // SUPINATED palm-up directly beneath wooden handguard!
+                            pole:      new THREE.Vector3(-0.74, -0.62, 0.16),
+                            thumbMode: 'left_rifle_handguard',
+                            fingers: {
+                                index:  [-0.96, -1.06, -0.55],
+                                middle: [-0.96, -1.06, -0.55],
+                                ring:   [-0.96, -1.06, -0.55],
+                                pinky:  [-0.96, -1.06, -0.55]
+                            }
+                        }
+                    };
+                }
+
+                /* ---------------------------------------------------------
+                   5.7 ANATOMICAL 3-SEGMENT WAYPOINT THUMB BUILDER
+                   --------------------------------------------------------- */
+                function buildWaypointThumb(handGroup, side, thumbMode, handWorldQuat, mats) {
+                    const thumbRoot = new THREE.Group();
+                    thumbRoot.name = (side === 1 ? 'L_' : 'R_') + 'Thumb';
+                    handGroup.add(thumbRoot);
+
+                    let pts, nailUp;
+                    if (thumbMode === 'right_grip') {
+                        pts = [
+                            new THREE.Vector3(-0.020, -0.008, -0.018),
+                            new THREE.Vector3(-0.028, -0.030, -0.036),
+                            new THREE.Vector3(-0.026, -0.048, -0.064),
+                            new THREE.Vector3(-0.020, -0.046, -0.090)
+                        ];
+                        nailUp = new THREE.Vector3(-0.65, -0.75, 0.08).normalize();
+                    } else if (thumbMode === 'left_pistol_support') {
+                        pts = [
+                            new THREE.Vector3(0.022, -0.008, -0.020),
+                            new THREE.Vector3(0.030, -0.014, -0.052),
+                            new THREE.Vector3(0.032, -0.016, -0.084),
+                            new THREE.Vector3(0.030, -0.018, -0.108)
+                        ];
+                        nailUp = new THREE.Vector3(0.45, 0.88, 0.08).normalize();
+                    } else if (thumbMode === 'left_rifle_handguard') {
+                        // Defined in world offset relative to left wrist so thumb hugs outside of left wooden wall cleanly
+                        const invHandQ = handWorldQuat.clone().invert();
+                        const worldOffsets = [
+                            new THREE.Vector3(0.004, 0.004, -0.022),
+                            new THREE.Vector3(-0.001, 0.014, -0.044),
+                            new THREE.Vector3(0.003, 0.028, -0.070),
+                            new THREE.Vector3(0.005, 0.036, -0.095)
+                        ];
+                        pts = worldOffsets.map(function (v) { return v.clone().applyQuaternion(invHandQ); });
+                        // Outward dorsal nail normal points LEFT (-X) and slightly UP (+Y) in world space
+                        nailUp = new THREE.Vector3(-0.88, 0.45, 0.08).normalize().applyQuaternion(invHandQ).normalize();
+                    } else {
+                        pts = [
+                            new THREE.Vector3(0.022, -0.008, -0.018),
+                            new THREE.Vector3(0.030, -0.020, -0.044),
+                            new THREE.Vector3(0.030, -0.034, -0.068),
+                            new THREE.Vector3(0.026, -0.044, -0.088)
+                        ];
+                        nailUp = new THREE.Vector3(0.50, 0.85, 0.05).normalize();
+                    }
+
+                    // Sculpted thenar muscle pad bridging radial-palmar palm base smoothly into p0..p1
+                    const thenarStart = new THREE.Vector3(side * 0.016, -0.003, -0.008);
+                    const thenarMid = pts[0].clone().lerp(pts[1], 0.42);
+                    const thenarGrp = new THREE.Group();
+                    orientBoneNegZ(thenarGrp, thenarStart, thenarMid, new THREE.Vector3(0, 1, 0));
+                    const thenarLen = Math.max(0.010, thenarStart.distanceTo(thenarMid));
+                    const thenarGeo = createLoftedLimbGeometry(thenarLen, 10, [
+                        { t: 0.00, rx: 0.0145, ry: 0.0115 },
+                        { t: 0.45, rx: 0.0155, ry: 0.0125 },
+                        { t: 1.00, rx: 0.0102, ry: 0.0098 }
+                    ]);
+                    thenarGrp.add(new THREE.Mesh(thenarGeo, mats.palm));
+                    thumbRoot.add(thenarGrp);
+
+                    const baseSphere = new THREE.Mesh(new THREE.SphereGeometry(0.0102, 8, 6), mats.palm);
+                    baseSphere.position.copy(pts[0]);
+                    thumbRoot.add(baseSphere);
+
+                    const radii = [
+                        [0.0102, 0.0088],
+                        [0.0088, 0.0078],
+                        [0.0078, 0.0066]
+                    ];
+                    const segMats = [mats.palm, mats.midFinger, mats.tipFinger];
+
+                    for (let i = 0; i < 3; i++) {
+                        const a = pts[i];
+                        const b = pts[i + 1];
+                        const segLen = Math.max(0.008, a.distanceTo(b));
+                        const segGrp = new THREE.Group();
+                        orientBoneNegZ(segGrp, a, b, nailUp);
+
+                        const geo = createPhalanxGeometry(radii[i][0], radii[i][1], segLen, i === 2);
+                        segGrp.add(new THREE.Mesh(geo, segMats[i]));
+
+                        if (i < 2) {
+                            const jt = new THREE.Mesh(new THREE.SphereGeometry(radii[i][1] * 0.96, 8, 6), segMats[i + 1]);
+                            jt.position.set(0, 0, -segLen);
+                            segGrp.add(jt);
+                        }
+
+                        // Fingerless glove hem ring
+                        if (i === 1 && (state.glove === 1 || state.glove === 2)) {
+                            const hem = new THREE.Mesh(new THREE.TorusGeometry(radii[1][1] * 1.02, 0.0014, 4, 8), mats.knuckle);
+                            hem.position.set(0, 0, -segLen * 0.78);
+                            segGrp.add(hem);
+                        }
+
+                        // Subtle fleshy-pink recessed fingernail on dorsal (+Y) side (hidden on G4 full gloves)
+                        if (i === 2 && state.glove !== 3) {
+                            const nail = new THREE.Mesh(
+                                new THREE.CylinderGeometry(radii[2][1] * 0.72, radii[2][1] * 0.76, segLen * 0.44, 8, 1, false, -0.7, 1.4),
+                                mats.nail
+                            );
+                            nail.rotation.x = Math.PI / 2;
+                            nail.rotation.z = Math.PI / 2;
+                            nail.position.set(0, radii[2][1] * 0.20, -segLen * 0.66);
+                            segGrp.add(nail);
+                        }
+
+                        thumbRoot.add(segGrp);
+                    }
+                }
+
+                /* ---------------------------------------------------------
+                   5.8 SINGLE ARM BUILDER (2-BONE IK + SEAMLESS WRIST BRIDGE)
+                   --------------------------------------------------------- */
+                function buildSingleArm(isLeft, cfg) {
+                    const armGrp = new THREE.Group();
+                    armGrp.name = isLeft ? 'Left_Arm' : 'Right_Arm';
+                    const side = isLeft ? 1 : -1;
+                    const prefix = isLeft ? 'L_' : 'R_';
+
+                    // Materials
+                    const sleeveTextures = [TEX.gorkaKhaki, TEX.floraCamo, TEX.leatherJacket, TEX.telnyashka];
+                    const sleeveMat = makeMat({ map: sleeveTextures[state.sleeve], roughness: state.sleeve === 2 ? 0.56 : 0.90 });
+                    const sweaterMat = makeMat({ map: TEX.sweaterKnit, roughness: 0.95 });
+                    const bandageMat = makeMat({ map: TEX.dirtyBandage, roughness: 0.95 });
+                    const skinMat = makeMat({ map: TEX.weatheredSkin, roughness: 0.78 });
+                    const nailMat = makeMat({ color: 0xc89e8c, roughness: 0.56 });
+
+                    let palmMat = skinMat;
+                    let midFingerMat = skinMat;
+                    let tipFingerMat = skinMat;
+                    let knuckleMat = skinMat;
+                    let wristBridgeMat = skinMat;
+
+                    if (state.glove === 1) {
+                        // G2: Fingerless leather gloves
+                        palmMat = makeMat({ map: TEX.leatherJacket, color: 0x222226, roughness: 0.52 });
+                        midFingerMat = palmMat;
+                        tipFingerMat = skinMat;
+                        knuckleMat = makeMat({ color: 0x161619, roughness: 0.44 });
+                    } else if (state.glove === 2) {
+                        // G3: Fingerless wool knit gloves
+                        palmMat = makeMat({ map: TEX.woolKnit, roughness: 0.95 });
+                        midFingerMat = palmMat;
+                        tipFingerMat = skinMat;
+                        knuckleMat = palmMat;
+                    } else if (state.glove === 3) {
+                        // G4: Full military tactical gloves — wrist bridge uses gloveMat so gauntlet tucks seamlessly inside sleeve cuff!
+                        palmMat = makeMat({ map: TEX.leatherJacket, color: 0x2a241e, roughness: 0.50 });
+                        midFingerMat = palmMat;
+                        tipFingerMat = palmMat;
+                        wristBridgeMat = palmMat;
+                        knuckleMat = makeMat({ color: 0x181716, metalness: 0.25, roughness: 0.42 });
+                    }
+
+                    const handWorldQuat = composeHandQuat(cfg.yaw, cfg.pitch, cfg.roll);
+                    const handDorsalWorldUp = new THREE.Vector3(0, 1, 0).applyQuaternion(handWorldQuat).normalize();
+
+                    // Solve Analytical Two-Bone IK (Shoulder -> Elbow -> Wrist)
+                    const L1 = 0.275;
+                    const L2 = 0.260;
+                    const elbowPos = solveTwoBoneElbow(cfg.shoulder, cfg.wrist, L1, L2, cfg.pole);
+                    const actualL1 = cfg.shoulder.distanceTo(elbowPos);
+                    const actualL2 = elbowPos.distanceTo(cfg.wrist);
+
+                    // 1. UpperArm (14-sided sculpted cloth loft + seamless elbow cap)
+                    const upperArm = new THREE.Group();
+                    upperArm.name = prefix + 'UpperArm';
+                    orientBoneNegZ(upperArm, cfg.shoulder, elbowPos, new THREE.Vector3(0, 1, 0));
+                    armGrp.add(upperArm);
+
+                    const upperGeo = createLoftedLimbGeometry(actualL1 + 0.008, RADIAL_SEGS, [
+                        { t: 0.00, rx: 0.056, ry: 0.060, oy: 0.004, waveAmp: 0.0010, waveFreq: 3 },
+                        { t: 0.30, rx: 0.052, ry: 0.055, oy: 0.002, waveAmp: 0.0018, waveFreq: 4 },
+                        { t: 0.65, rx: 0.047, ry: 0.049, oy: 0.000, waveAmp: 0.0022, waveFreq: 5 },
+                        { t: 0.90, rx: 0.043, ry: 0.044, oy: -0.001, waveAmp: 0.0024, waveFreq: 5 },
+                        { t: 1.00, rx: 0.041, ry: 0.041, oy: 0.000, waveAmp: 0.0008, waveFreq: 4 }
+                    ]);
+                    upperArm.add(new THREE.Mesh(upperGeo, sleeveMat));
+
+                    // Matching sleeve-textured elbow joint cap
+                    const elbowCap = new THREE.Mesh(new THREE.SphereGeometry(0.042, RADIAL_SEGS, 10), sleeveMat);
+                    elbowCap.position.set(0, 0, -actualL1);
+                    upperArm.add(elbowCap);
+
+                    // 2. Forearm with EXACT aligned orthonormal frame (projecting hand dorsal +Y perpendicular to forearm axis)
+                    const forearm = new THREE.Group();
+                    forearm.name = prefix + 'Forearm';
+                    upperArm.updateMatrixWorld(true);
+                    const invUpper = new THREE.Matrix4().copy(upperArm.matrixWorld).invert();
+                    const localWrist = cfg.wrist.clone().applyMatrix4(invUpper);
+                    const localHandUp = handDorsalWorldUp.clone().transformDirection(invUpper);
+                    orientBoneNegZ(forearm, new THREE.Vector3(0, 0, -actualL1), localWrist, localHandUp);
+                    upperArm.add(forearm);
+
+                    // Forearm cloth sleeve loft: ends cleanly at t = 0.85 with a smooth rounded closed-inward fabric hem
+                    // directly inside the lofted mesh (tucking cleanly into inner bare-wrist radius < 0.028/0.023)
+                    if (state.sleeve === 2) {
+                        // S3: Leather jacket outer sleeve (0..0.73 with inward hem) + ribbed dark sweater cuff (0.71..0.85 with inward hem)
+                        const j0 = getForearmOuterRadii(0.00);
+                        const j1 = getForearmOuterRadii(0.28);
+                        const j2 = getForearmOuterRadii(0.58);
+                        const j3 = getForearmOuterRadii(0.73);
+                        const jacketGeo = createLoftedLimbGeometry(actualL2, RADIAL_SEGS, [
+                            { t: 0.000, rx: j0.rx, ry: j0.ry, waveAmp: 0.0012, waveFreq: 4, uvV: 0.0 },
+                            { t: 0.280, rx: j1.rx, ry: j1.ry, waveAmp: 0.0018, waveFreq: 4, uvV: 0.7 },
+                            { t: 0.580, rx: j2.rx, ry: j2.ry, waveAmp: 0.0020, waveFreq: 5, uvV: 1.4 },
+                            { t: 0.720, rx: j3.rx + 0.002, ry: j3.ry + 0.002, waveAmp: 0.0012, waveFreq: 5, uvV: 1.75 },
+                            { t: 0.732, rx: j3.rx + 0.0005, ry: j3.ry + 0.0005, uvV: 1.82 },
+                            { t: 0.724, rx: j3.rx - 0.005, ry: j3.ry - 0.005, uvV: 1.90 }
+                        ]);
+                        forearm.add(new THREE.Mesh(jacketGeo, sleeveMat));
+
+                        const sw0 = getForearmOuterRadii(0.71);
+                        const sw1 = getForearmOuterRadii(0.84);
+                        const sweaterGeo = createLoftedLimbGeometry(actualL2, RADIAL_SEGS, [
+                            { t: 0.700, rx: sw0.rx - 0.003, ry: sw0.ry - 0.003, uvV: 0.0 },
+                            { t: 0.775, rx: sw1.rx - 0.001, ry: sw1.ry - 0.001, uvV: 0.4 },
+                            { t: 0.840, rx: sw1.rx - 0.001, ry: sw1.ry - 0.001, uvV: 0.75 },
+                            { t: 0.850, rx: sw1.rx - 0.0025, ry: sw1.ry - 0.0025, uvV: 0.82 },
+                            { t: 0.846, rx: 0.029, ry: 0.024, uvV: 0.90 },
+                            { t: 0.834, rx: 0.024, ry: 0.019, uvV: 0.98 }
+                        ]);
+                        forearm.add(new THREE.Mesh(sweaterGeo, sweaterMat));
+                    } else if (state.sleeve === 3) {
+                        // S4: Striped Telnyashka (0..0.75 with inward hem) + integrated wrapped forearm bandages (0.72..0.85 with inward hem)
+                        const t0 = getForearmOuterRadii(0.00);
+                        const t1 = getForearmOuterRadii(0.35);
+                        const t2 = getForearmOuterRadii(0.74);
+                        const telGeo = createLoftedLimbGeometry(actualL2, RADIAL_SEGS, [
+                            { t: 0.000, rx: t0.rx, ry: t0.ry, waveAmp: 0.0012, waveFreq: 4, uvV: 0.0 },
+                            { t: 0.350, rx: t1.rx, ry: t1.ry, waveAmp: 0.0018, waveFreq: 4, uvV: 0.9 },
+                            { t: 0.735, rx: t2.rx, ry: t2.ry, waveAmp: 0.0014, waveFreq: 5, uvV: 1.85 },
+                            { t: 0.748, rx: t2.rx - 0.002, ry: t2.ry - 0.002, uvV: 1.92 },
+                            { t: 0.736, rx: t2.rx - 0.006, ry: t2.ry - 0.006, uvV: 2.00 }
+                        ]);
+                        forearm.add(new THREE.Mesh(telGeo, sleeveMat));
+
+                        const b0 = getForearmOuterRadii(0.72);
+                        const b1 = getForearmOuterRadii(0.84);
+                        const wrapCuffGeo = createLoftedLimbGeometry(actualL2, RADIAL_SEGS, [
+                            { t: 0.715, rx: b0.rx - 0.002, ry: b0.ry - 0.002, uvV: 0.0 },
+                            { t: 0.760, rx: b0.rx + 0.001, ry: b0.ry + 0.001, uvV: 0.35 },
+                            { t: 0.805, rx: b1.rx + 0.001, ry: b1.ry + 0.001, uvV: 0.70 },
+                            { t: 0.842, rx: b1.rx, ry: b1.ry, uvV: 0.95 },
+                            { t: 0.850, rx: b1.rx - 0.002, ry: b1.ry - 0.002, uvV: 1.02 },
+                            { t: 0.845, rx: 0.029, ry: 0.024, uvV: 1.10 },
+                            { t: 0.834, rx: 0.024, ry: 0.019, uvV: 1.18 }
+                        ]);
+                        forearm.add(new THREE.Mesh(wrapCuffGeo, bandageMat));
+                    } else {
+                        // S1 (Горка) & S2 (Бушлат Флора): single continuous lofted sleeve ending at t = 0.85 with smooth closed-inward fabric hem
+                        const r0 = getForearmOuterRadii(0.00);
+                        const r1 = getForearmOuterRadii(0.28);
+                        const r2 = getForearmOuterRadii(0.58);
+                        const r3 = getForearmOuterRadii(0.84);
+                        const forearmSleeveGeo = createLoftedLimbGeometry(actualL2, RADIAL_SEGS, [
+                            { t: 0.000, rx: r0.rx, ry: r0.ry, waveAmp: 0.0012, waveFreq: 4, uvV: 0.00 },
+                            { t: 0.280, rx: r1.rx, ry: r1.ry, waveAmp: 0.0018, waveFreq: 4, uvV: 0.70 },
+                            { t: 0.580, rx: r2.rx, ry: r2.ry, waveAmp: 0.0020, waveFreq: 5, uvV: 1.45 },
+                            { t: 0.838, rx: r3.rx, ry: r3.ry, waveAmp: 0.0014, waveFreq: 5, uvV: 2.05 },
+                            { t: 0.850, rx: r3.rx - 0.0018, ry: r3.ry - 0.0018, uvV: 2.12 },
+                            { t: 0.846, rx: 0.030, ry: 0.025, uvV: 2.18 },
+                            { t: 0.834, rx: 0.024, ry: 0.019, uvV: 2.25 }
+                        ]);
+                        forearm.add(new THREE.Mesh(forearmSleeveGeo, sleeveMat));
+                    }
+
+                    // 3. HandGroup attached at forearm tip (0, 0, -actualL2)
+                    const hand = new THREE.Group();
+                    hand.name = prefix + 'Hand';
+                    hand.position.set(0, 0, -actualL2);
+                    forearm.add(hand);
+
+                    armGrp.updateMatrixWorld(true);
+                    const forearmWorldQuat = new THREE.Quaternion().setFromRotationMatrix(forearm.matrixWorld);
+                    hand.quaternion.copy(forearmWorldQuat).invert().multiply(handWorldQuat);
+
+                    // 4. CONTINUOUS LOFTED HERMITE WRIST BRIDGE connecting inside sleeve (t=0.79)
+                    // vertex-for-vertex into HandGroup palm base (z=+0.002)!
+                    const bridge = createWristBridgeGeometry(actualL2, hand.quaternion);
+                    const bridgeMesh = new THREE.Mesh(bridge.geometry, wristBridgeMat);
+                    bridgeMesh.name = prefix + 'WristBridge';
+                    forearm.add(bridgeMesh);
+
+                    // 5. Wrist / Forearm Details (D1..D4) conforming tightly with ZERO protruding wedges
+                    if (state.detail === 1 && isLeft) {
+                        // D2: Часы «Командирские» — mounted ONLY on LEFT wrist at t = 0.88 on aligned wrist bridge frame
+                        const wf = bridge.sampleFrameAtT(0.88);
+                        const watchGrp = new THREE.Group();
+                        watchGrp.name = 'L_Watch_Komandirskie';
+                        watchGrp.position.copy(wf.center);
+                        const bm = new THREE.Matrix4().makeBasis(wf.right, wf.up, wf.tan.clone().negate());
+                        watchGrp.quaternion.setFromRotationMatrix(bm);
+
+                        const strapRx = wf.rx + 0.002;
+                        const strapRy = wf.ry + 0.002;
+                        const strapGeo = createLoftedLimbGeometry(0.015, RADIAL_SEGS, [
+                            { t: -0.5, rx: strapRx, ry: strapRy },
+                            { t:  0.5, rx: strapRx, ry: strapRy }
+                        ]);
+                        const strapMesh = new THREE.Mesh(strapGeo, makeMat({ color: 0x2b1d14, roughness: 0.76 }));
+
+                        const caseMat = makeMat({ color: 0xc5cdd4, metalness: 0.82, roughness: 0.25 });
+                        const wCase = new THREE.Mesh(new THREE.CylinderGeometry(0.0138, 0.0144, 0.0058, 12), caseMat);
+                        wCase.position.set(0, strapRy + 0.0014, 0);
+                        const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.0115, 0.0115, 0.0064, 12), makeMat({ map: TEX.watchDial, roughness: 0.30 }));
+                        dial.position.copy(wCase.position);
+                        const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.0020, 0.0020, 0.0042, 6), caseMat);
+                        crown.rotation.x = Math.PI / 2;
+                        crown.position.set(0, strapRy + 0.0014, -0.0148);
+
+                        watchGrp.add(strapMesh, wCase, dial, crown);
+                        forearm.add(watchGrp);
+                    } else if (state.detail === 2) {
+                        // D3: Бинт на предплечье — 4 tight overlapping wrap rings conforming directly to forearm loft at t = 0.64..0.80 (+0.002 offset)
+                        const wrapTs = [0.64, 0.693, 0.746, 0.80];
+                        for (let i = 0; i < wrapTs.length; i++) {
+                            const tMid = wrapTs[i];
+                            const ra = getForearmOuterRadii(tMid - 0.022);
+                            const rb = getForearmOuterRadii(tMid + 0.022);
+                            const off = 0.002 + (i % 2) * 0.0005;
+                            const ringGeo = createLoftedLimbGeometry(actualL2, RADIAL_SEGS, [
+                                { t: tMid - 0.024, rx: ra.rx + off * 0.7, ry: ra.ry + off * 0.7, uvV: 0.0 },
+                                { t: tMid - 0.018, rx: ra.rx + off,       ry: ra.ry + off,       uvV: 0.2 },
+                                { t: tMid + 0.018, rx: rb.rx + off,       ry: rb.ry + off,       uvV: 0.8 },
+                                { t: tMid + 0.024, rx: rb.rx + off * 0.7, ry: rb.ry + off * 0.7, uvV: 1.0 }
+                            ]);
+                            forearm.add(new THREE.Mesh(ringGeo, bandageMat));
+                        }
+                    } else if (state.detail === 3 && isLeft) {
+                        // D4: Чётки и жетон — snug wooden bead ring hugging LEFT wrist at t = 0.88 + flat metal dogtag hanging naturally along world -Y
+                        const wf = bridge.sampleFrameAtT(0.88);
+                        const beadsGrp = new THREE.Group();
+                        beadsGrp.name = 'L_Beads_Dogtag';
+                        beadsGrp.position.copy(wf.center);
+                        const bm = new THREE.Matrix4().makeBasis(wf.right, wf.up, wf.tan.clone().negate());
+                        beadsGrp.quaternion.setFromRotationMatrix(bm);
+
+                        const beadMat = makeMat({ color: 0x452b18, roughness: 0.64 });
+                        const metalMat = makeMat({ color: 0x9ea7ad, metalness: 0.84, roughness: 0.26 });
+                        const brx = wf.rx + 0.0028;
+                        const bry = wf.ry + 0.0028;
+                        const beadCount = 14;
+                        for (let b = 0; b < beadCount; b++) {
+                            const ang = (b / beadCount) * Math.PI * 2;
+                            const bead = new THREE.Mesh(new THREE.SphereGeometry(0.0029, 6, 5), b % 2 === 0 ? beadMat : metalMat);
+                            bead.position.set(Math.cos(ang) * brx, Math.sin(ang) * bry, 0);
+                            beadsGrp.add(bead);
+                        }
+                        forearm.add(beadsGrp);
+
+                        // Compute world -Y inside forearm local space so dogtag hangs straight down naturally under gravity
+                        const invForearmQ = forearmWorldQuat.clone().invert();
+                        const localDown = new THREE.Vector3(0, -1, 0).applyQuaternion(invForearmQ).normalize();
+                        // Find lowest point on the bead oval along localDown
+                        const dRight = localDown.dot(wf.right);
+                        const dUp = localDown.dot(wf.up);
+                        const lowAng = Math.atan2(dUp, dRight);
+                        const hangAnchor = wf.center.clone()
+                            .addScaledVector(wf.right, Math.cos(lowAng) * brx)
+                            .addScaledVector(wf.up, Math.sin(lowAng) * bry);
+
+                        const tagGrp = new THREE.Group();
+                        orientBoneNegZ(tagGrp, hangAnchor, hangAnchor.clone().addScaledVector(localDown, 0.028), wf.tan);
+                        const loop = new THREE.Mesh(new THREE.TorusGeometry(0.0028, 0.0008, 4, 8), metalMat);
+                        loop.position.set(0, 0, -0.003);
+                        const tag = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.0020, 0.022), metalMat);
+                        tag.position.set(0, 0, -0.015);
+                        tagGrp.add(loop, tag);
+                        forearm.add(tagGrp);
+                    }
+
+                    // 6. Sculpted Palm inside HandGroup (14 radial segments, matching Hermite bridge at z = +0.002)
+                    hand.add(new THREE.Mesh(createSculptedPalmGeometry(side), palmMat));
+
+                    // Molded dorsal knuckle guards on G4 Full Military Gloves
+                    if (state.glove === 3) {
+                        const kxList = [side * 0.025, side * 0.008, side * -0.010, side * -0.027];
+                        for (let k = 0; k < 4; k++) {
+                            const kg = new THREE.Mesh(new THREE.SphereGeometry(0.0074, 7, 6), knuckleMat);
+                            kg.scale.set(0.95, 0.72, 1.15);
+                            kg.position.set(kxList[k], 0.011, -0.072);
+                            hand.add(kg);
+                        }
+                    }
+
+                    // 7. Four Articulated 3-Phalanx Fingers (Index, Middle, Ring, Pinky)
+                    function makeFinger(name, xPos, zPos, curls, lens, rBase) {
+                        const mcp = new THREE.Group();
+                        mcp.name = prefix + name;
+                        mcp.position.set(xPos, 0.000, zPos);
+                        mcp.rotation.x = curls[0]; // NEGATIVE -> curls into palm (-Y)
+                        hand.add(mcp);
+
+                        mcp.add(new THREE.Mesh(new THREE.SphereGeometry(rBase * 0.96, 8, 6), palmMat));
+                        mcp.add(new THREE.Mesh(createPhalanxGeometry(rBase, rBase * 0.88, lens[0], false), palmMat));
+
+                        const pip = new THREE.Group();
+                        pip.position.set(0, 0, -lens[0]);
+                        pip.rotation.x = curls[1];
+                        mcp.add(pip);
+
+                        pip.add(new THREE.Mesh(new THREE.SphereGeometry(rBase * 0.86, 8, 6), midFingerMat));
+                        pip.add(new THREE.Mesh(createPhalanxGeometry(rBase * 0.88, rBase * 0.78, lens[1], false), midFingerMat));
+
+                        if (state.glove === 1 || state.glove === 2) {
+                            const hem = new THREE.Mesh(new THREE.TorusGeometry(rBase * 0.84, 0.0014, 4, 8), knuckleMat);
+                            hem.position.set(0, 0, -lens[1] * 0.78);
+                            pip.add(hem);
+                        }
+
+                        const dip = new THREE.Group();
+                        dip.position.set(0, 0, -lens[1]);
+                        dip.rotation.x = curls[2];
+                        pip.add(dip);
+
+                        dip.add(new THREE.Mesh(new THREE.SphereGeometry(rBase * 0.76, 7, 5), tipFingerMat));
+                        dip.add(new THREE.Mesh(createPhalanxGeometry(rBase * 0.78, rBase * 0.66, lens[2], true), tipFingerMat));
+
+                        // Subtle fleshy-pink recessed fingernail on dorsal (+Y) side (hidden on G4)
+                        if (state.glove !== 3) {
+                            const nail = new THREE.Mesh(
+                                new THREE.CylinderGeometry(rBase * 0.58, rBase * 0.62, lens[2] * 0.46, 8, 1, false, -0.7, 1.4),
+                                nailMat
+                            );
+                            nail.rotation.x = Math.PI / 2;
+                            nail.rotation.z = Math.PI / 2;
+                            nail.position.set(0, rBase * 0.20, -lens[2] * 0.64);
+                            dip.add(nail);
+                        }
+                    }
+
+                    const fc = cfg.fingers;
+                    makeFinger('Index',  side *  0.025, -0.075, fc.index,  [0.030, 0.022, 0.017], 0.0076);
+                    makeFinger('Middle', side *  0.008, -0.077, fc.middle, [0.034, 0.024, 0.018], 0.0080);
+                    makeFinger('Ring',   side * -0.010, -0.075, fc.ring,   [0.031, 0.022, 0.017], 0.0076);
+                    makeFinger('Pinky',  side * -0.027, -0.071, fc.pinky,  [0.024, 0.018, 0.015], 0.0067);
+
+                    // 8. 3-Segment Waypoint Thumb
+                    buildWaypointThumb(hand, side, cfg.thumbMode, handWorldQuat, {
+                        palm: palmMat,
+                        midFinger: midFingerMat,
+                        tipFinger: tipFingerMat,
+                        knuckle: knuckleMat,
+                        nail: nailMat
+                    });
+
+                    return armGrp;
+                }
+
+                /* ---------------------------------------------------------
+                   5.9 REFERENCE WEAPONS (PREVIEW ONLY — EXCLUDED FROM .GLB)
+                   --------------------------------------------------------- */
+                function buildReferenceWeaponMesh(type) {
+                    const grp = new THREE.Group();
+                    grp.name = 'ReferenceWeapon_PreviewOnly';
+                    if (type === 'none') return grp;
+
+                    const steel = makeMat({ map: TEX.gunSteel, metalness: 0.62, roughness: 0.50 });
+                    const accent = makeMat({ map: TEX.gunSteel, color: 0xbcc4cc, metalness: 0.65, roughness: 0.46 });
+                    const dark = makeMat({ color: 0x101214, roughness: 0.95 });
+                    const wood = makeMat({ map: TEX.gunWood, roughness: 0.80 });
+                    const bakelite = makeMat({ color: 0x994222, roughness: 0.52 });
+
+                    if (type === 'pm') {
+                        const slide = new THREE.Mesh(new THREE.BoxGeometry(0.030, 0.034, 0.195), accent);
+                        slide.position.set(0, 0.022, -0.056);
+                        const frame = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.022, 0.190), steel);
+                        frame.position.set(0, -0.004, -0.054);
+                        const tg = new THREE.Mesh(new THREE.TorusGeometry(0.020, 0.004, 4, 8), steel);
+                        tg.rotation.y = Math.PI / 2;
+                        tg.position.set(0, -0.028, -0.022);
+                        const trig = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.020, 0.008), dark);
+                        trig.position.set(0, -0.024, -0.018);
+                        trig.rotation.x = -0.26;
+                        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.106, 0.044), bakelite);
+                        grip.position.set(0, -0.056, 0.026);
+                        grip.rotation.x = -0.24;
+                        const bore = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.005, 6), dark);
+                        bore.rotation.x = Math.PI / 2;
+                        bore.position.set(0, 0.022, -0.154);
+                        grp.add(slide, frame, tg, trig, grip, bore);
+                    } else if (type === 'revolver') {
+                        const shield = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.082, 0.034), steel);
+                        shield.position.set(0, 0.014, 0.010);
+                        const topStrap = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.014, 0.132), steel);
+                        topStrap.position.set(0, 0.058, -0.054);
+                        const botFrame = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.020, 0.136), steel);
+                        botFrame.position.set(0, -0.022, -0.052);
+                        const frontBridge = new THREE.Mesh(new THREE.BoxGeometry(0.030, 0.086, 0.024), steel);
+                        frontBridge.position.set(0, 0.018, -0.116);
+                        const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.096, 8), accent);
+                        cyl.rotation.x = Math.PI / 2;
+                        cyl.position.set(0, 0.018, -0.056);
+                        const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.015, 0.21, 8), steel);
+                        bar.rotation.x = Math.PI / 2;
+                        bar.position.set(0, 0.040, -0.228);
+                        const tg = new THREE.Mesh(new THREE.TorusGeometry(0.020, 0.004, 4, 8), accent);
+                        tg.rotation.y = Math.PI / 2;
+                        tg.position.set(0, -0.038, -0.018);
+                        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.108, 0.042), wood);
+                        grip.position.set(0, -0.060, 0.032);
+                        grip.rotation.x = -0.30;
+                        grp.add(shield, topStrap, botFrame, frontBridge, cyl, bar, tg, grip);
+                    } else if (type === 'ak74') {
+                        const rec = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.056, 0.25), steel);
+                        rec.position.set(0, 0.016, -0.072);
+                        const dust = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.018, 0.23), accent);
+                        dust.position.set(0, 0.048, -0.072);
+                        // Wooden handguard centered at Y = -0.002, Z = -0.245 (bottom = -0.024, width = 0.038)
+                        const hg = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.044, 0.185), wood);
+                        hg.position.set(0, -0.002, -0.245);
+                        const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.011, 0.34, 8), steel);
+                        bar.rotation.x = Math.PI / 2;
+                        bar.position.set(0, 0.024, -0.375);
+                        const gas = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.21, 6), accent);
+                        gas.rotation.x = Math.PI / 2;
+                        gas.position.set(0, 0.042, -0.305);
+                        const fSight = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.034, 0.014), accent);
+                        fSight.position.set(0, 0.042, -0.525);
+                        const tg = new THREE.Mesh(new THREE.TorusGeometry(0.020, 0.004, 4, 8), steel);
+                        tg.rotation.y = Math.PI / 2;
+                        tg.position.set(0, -0.030, -0.020);
+                        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.106, 0.042), bakelite);
+                        grip.position.set(0, -0.060, 0.028);
+                        grip.rotation.x = -0.30;
+                        const stock = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.076, 0.25), wood);
+                        stock.position.set(0, -0.006, 0.168);
+                        stock.rotation.x = -0.14;
+                        // Orange bakelite magazine cleanly behind left handguard grip
+                        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.175, 0.050), bakelite);
+                        mag.position.set(0, -0.095, -0.112);
+                        mag.rotation.x = 0.26;
+                        grp.add(rec, dust, hg, bar, gas, fSight, tg, grip, stock, mag);
+                    } else if (type === 'shotgun') {
+                        const rec = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.048, 0.13), accent);
+                        rec.position.set(0, 0.004, -0.035);
+                        [-0.014, 0.014].forEach(function (bx) {
+                            const b = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.014, 0.54, 8), steel);
+                            b.rotation.x = Math.PI / 2;
+                            b.position.set(bx, 0.018, -0.365);
+                            grp.add(b);
+                        });
+                        const forend = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.030, 0.20), wood);
+                        forend.position.set(0, -0.009, -0.225);
+                        const tg = new THREE.Mesh(new THREE.TorusGeometry(0.020, 0.004, 4, 8), steel);
+                        tg.rotation.y = Math.PI / 2;
+                        tg.position.set(0, -0.032, -0.006);
+                        const neck = new THREE.Mesh(new THREE.BoxGeometry(0.030, 0.046, 0.11), wood);
+                        neck.position.set(0, -0.038, 0.052);
+                        neck.rotation.x = -0.38;
+                        const stock = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.088, 0.26), wood);
+                        stock.position.set(0, -0.046, 0.195);
+                        stock.rotation.x = -0.18;
+                        grp.add(rec, forend, tg, neck, stock);
+                    }
+
+                    return grp;
+                }
+
+                /* ---------------------------------------------------------
+                   5.10 ANIMATION CLIPS (100% QuaternionKeyframeTrack + Vector)
+                   --------------------------------------------------------- */
+                function makeQuatTrack(nodeName, times, eulerList) {
+                    const values = [];
+                    const e = new THREE.Euler(0, 0, 0, 'XYZ');
+                    const q = new THREE.Quaternion();
+                    for (let i = 0; i < eulerList.length; i++) {
+                        e.set(eulerList[i][0], eulerList[i][1], eulerList[i][2], 'XYZ');
+                        q.setFromEuler(e);
+                        values.push(q.x, q.y, q.z, q.w);
+                    }
+                    return new THREE.QuaternionKeyframeTrack(nodeName + '.quaternion', times, values);
+                }
+
+                function buildArmsClips(rigRoot) {
+                    const clips = [];
+                    const lUpper = rigRoot.getObjectByName('L_UpperArm');
+                    const rIndex = rigRoot.getObjectByName('R_Index');
+
+                    const lBaseE = lUpper ? [lUpper.rotation.x, lUpper.rotation.y, lUpper.rotation.z] : [0, 0, 0];
+                    const riBaseE = rIndex ? [rIndex.rotation.x, rIndex.rotation.y, rIndex.rotation.z] : [0, 0, 0];
+
+                    // 1. Idle: smooth breathing sway on Arms_Rig_Root
+                    clips.push(new THREE.AnimationClip('Idle', 2.4, [
+                        new THREE.VectorKeyframeTrack('Arms_Rig_Root.position', [0, 1.2, 2.4], [0, 0, 0,  0, -0.006, 0.004,  0, 0, 0]),
+                        makeQuatTrack('Arms_Rig_Root', [0, 1.2, 2.4], [[0, 0, 0], [-0.012, 0.006, 0], [0, 0, 0]])
+                    ]));
+
+                    // 2. Sprint: tactical lowered carry bobbing
+                    clips.push(new THREE.AnimationClip('Sprint', 0.64, [
+                        new THREE.VectorKeyframeTrack(
+                            'Arms_Rig_Root.position',
+                            [0, 0.16, 0.32, 0.48, 0.64],
+                            [0, 0, 0,  -0.036, -0.032, 0.025,  0, -0.018, 0.012,  0.036, -0.032, 0.025,  0, 0, 0]
+                        ),
+                        makeQuatTrack(
+                            'Arms_Rig_Root',
+                            [0, 0.16, 0.32, 0.48, 0.64],
+                            [
+                                [-0.14, 0.38, 0.16],
+                                [-0.20, 0.44, 0.22],
+                                [-0.15, 0.36, 0.14],
+                                [-0.20, 0.32, 0.10],
+                                [-0.14, 0.38, 0.16]
+                            ]
+                        )
+                    ]));
+
+                    // 3. Recoil: sharp kick + right index trigger pull
+                    clips.push(new THREE.AnimationClip('Recoil', 0.34, [
+                        new THREE.VectorKeyframeTrack(
+                            'Arms_Rig_Root.position',
+                            [0, 0.04, 0.15, 0.34],
+                            [0, 0, 0,  0, 0.014, 0.034,  0, 0.005, 0.010,  0, 0, 0]
+                        ),
+                        makeQuatTrack(
+                            'Arms_Rig_Root',
+                            [0, 0.045, 0.16, 0.34],
+                            [[0, 0, 0], [0.14, 0, 0], [0.04, 0, 0], [0, 0, 0]]
+                        ),
+                        makeQuatTrack(
+                            'R_Index',
+                            [0, 0.03, 0.14, 0.26],
+                            [riBaseE, [riBaseE[0] - 0.38, riBaseE[1], riBaseE[2]], [riBaseE[0] - 0.18, riBaseE[1], riBaseE[2]], riBaseE]
+                        )
+                    ]));
+
+                    // 4. Inspect_Reload: weapon tilt + left arm mag-swap motion
+                    const tReload = [
+                        makeQuatTrack(
+                            'Arms_Rig_Root',
+                            [0, 0.22, 0.96, 1.28],
+                            [[0, 0, 0], [0.14, 0.14, -0.26], [0.12, 0.12, -0.22], [0, 0, 0]]
+                        )
+                    ];
+                    if (lUpper) {
+                        tReload.push(makeQuatTrack(
+                            'L_UpperArm',
+                            [0, 0.24, 0.56, 0.86, 1.12, 1.28],
+                            [
+                                lBaseE,
+                                [lBaseE[0] - 0.40, lBaseE[1] - 0.10, lBaseE[2] + 0.14],
+                                [lBaseE[0] - 0.55, lBaseE[1] - 0.16, lBaseE[2] + 0.22],
+                                [lBaseE[0] - 0.16, lBaseE[1] - 0.04, lBaseE[2] + 0.06],
+                                lBaseE,
+                                lBaseE
+                            ]
+                        ));
+                    }
+                    clips.push(new THREE.AnimationClip('Inspect_Reload', 1.28, tReload));
+
+                    return clips;
+                }
+
+                /* ---------------------------------------------------------
+                   5.11 SCENE REBUILD, POLY COUNTER & GODOT 4 .GLB EXPORT
+                   --------------------------------------------------------- */
+                let currentModeRoot = null;
+                let currentRigRoot = null;
+                let currentRefWeaponMesh = null;
+                const libraryWeaponRoot = new THREE.Group();
+                const libraryHandsRoot = new THREE.Group();
+                scene.add(libraryWeaponRoot, libraryHandsRoot);
+                let loadedWeapon = null;
+                let selection = 0;
+
+                applyLibraryPose = function () {
+                    if (!weaponPose) return;
+                    libraryWeaponRoot.position.fromArray(weaponPose.position);
+                    libraryWeaponRoot.rotation.set(...weaponPose.rotation.map(THREE.MathUtils.degToRad), "YXZ");
+                    libraryHandsRoot.position.copy(libraryWeaponRoot.position)
+                        .add(new THREE.Vector3().fromArray(weaponPose.hand_position).applyQuaternion(libraryWeaponRoot.quaternion));
+                    libraryHandsRoot.rotation.copy(libraryWeaponRoot.rotation);
+                    libraryHandsRoot.quaternion.multiply(new THREE.Quaternion().setFromEuler(
+                        new THREE.Euler(...weaponPose.hand_rotation.map(THREE.MathUtils.degToRad), "YXZ")));
+                    if (loadedWeapon) loadedWeapon.scale.setScalar(weaponPose.scale);
+                };
+
+                setLibraryWeapon = async function (id) {
+                    const request = ++selection;
+                    saveFit.disabled = true;
+                    fitPanel.hidden = true;
+                    picker.disabled = true;
+                    fitStatus.textContent = id ? "Загрузка образца…" : "";
+                    if (loadedWeapon) {
+                        libraryWeaponRoot.remove(loadedWeapon);
+                        disposeTree(loadedWeapon);
+                        loadedWeapon = null;
+                    }
+                    weaponRecord = null;
+                    weaponPose = null;
+                    try {
+                        if (id) {
+                            const item = await library.model(id);
+                            if (!item || item.kind !== "weapon") throw new Error("Образец не найден.");
+                            if (!THREE.GLTFLoader) await loadWithFallback([
+                                "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js",
+                                "https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js"
+                            ]);
+                            const bytes = await item.blob.arrayBuffer();
+                            const gltf = await new Promise((resolve, reject) => new THREE.GLTFLoader().parse(bytes, "", resolve, reject));
+                            if (request !== selection) { disposeTree(gltf.scene); return; }
+                            const incoming = forge.normalizeViewmodel(item.viewmodel ?? {
+                                ...forge.DEFAULT_VIEWMODEL, scale:item.recipe?.gameplay?.scale ?? forge.DEFAULT_VIEWMODEL.scale
+                            });
+                            weaponRecord = item;
+                            weaponPose = incoming;
+                            const grip = gltf.scene.getObjectByName("HF_GRIP_PRIMARY");
+                            if (grip) gltf.scene.position.sub(gltf.scene.worldToLocal(grip.getWorldPosition(new THREE.Vector3())));
+                            loadedWeapon = new THREE.Group();
+                            loadedWeapon.add(gltf.scene);
+                            libraryWeaponRoot.add(loadedWeapon);
+                            const kind = item.gameplay?.class ?? item.recipe?.weaponType;
+                            Object.assign(state, armDefaults, {gripMode:["pistol","revolver"].includes(kind) ? "1h_pistol" : "2h_rifle"});
+                            const settings = item.arms?.settings ?? {};
+                            for (const key of armKeys)
+                                if (typeof settings[key] === typeof armDefaults[key]) state[key] = settings[key];
+                            for (const [key, inputs] of Object.entries(fitInputs))
+                                inputs.forEach((input, i) => { input.value = key === "scale" ? weaponPose.scale : weaponPose[key][i]; });
+                            for (const input of fitFields.querySelectorAll("[data-wrist-offset]"))
+                                input.value = state[input.dataset.wristOffset];
+                            fitPanel.hidden = false;
+                            fitPanel.open = true;
+                            state.camMode = "fps";
+                            applyLibraryPose();
+                        }
+                        fitStatus.textContent = "";
+                    } catch (error) { fitStatus.textContent = error.message; }
+                    finally {
+                        if (request === selection) {
+                            picker.disabled = false;
+                            saveFit.disabled = !weaponRecord || !THREE.GLTFExporter;
+                            rebuildArms();
+                            rebuildRefWeapon();
+                            syncUI();
+                            applyCamMode();
+                        }
+                    }
+                };
+                let mixer = null;
+                let currentClips = [];
+
+                function disposeTree(obj) {
+                    if (!obj) return;
+                    obj.traverse(function (ch) {
+                        if (ch.geometry) ch.geometry.dispose();
+                        if (ch.material) {
+                            if (Array.isArray(ch.material)) ch.material.forEach(function (m) { m.dispose(); });
+                            else ch.material.dispose();
+                        }
+                    });
+                }
+
+                function updatePolyCount(root) {
+                    let tris = 0;
+                    root.traverse(function (o) {
+                        if (o.isMesh && o.geometry) {
+                            if (o.geometry.index) tris += o.geometry.index.count / 3;
+                            else if (o.geometry.attributes.position) tris += o.geometry.attributes.position.count / 3;
+                        }
+                    });
+                    const el = document.getElementById('poly-badge');
+                    if (el) el.textContent = Math.round(tris) + ' tris • Godot 4';
+                }
+
+                function bindMixerFinish() {
+                    if (!mixer) return;
+                    mixer.addEventListener('finished', function () {
+                        const idleClip = currentClips.find(function (c) { return c.name === 'Idle'; });
+                        if (idleClip) {
+                            const act = mixer.clipAction(idleClip);
+                            act.reset().setLoop(THREE.LoopRepeat, Infinity).play();
+                        }
+                    });
+                }
+
+                rebuildArms = function () {
+                    if (mixer) {
+                        mixer.stopAllAction();
+                        mixer = null;
+                    }
+                    if (currentModeRoot) {
+                        currentModeRoot.parent.remove(currentModeRoot);
+                        disposeTree(currentModeRoot);
+                        currentModeRoot = null;
+                        currentRigRoot = null;
+                    }
+
+                    // Strict Godot 4 Hierarchy: <Mode>_Root -> Arms_Rig_Root -> Right_Arm, Left_Arm, WeaponAttachPoint (0,0,0)
+                    const modeRoot = new THREE.Group();
+                    modeRoot.name = META.grips[state.gripMode].root;
+
+                    const rigRoot = new THREE.Group();
+                    rigRoot.name = 'Arms_Rig_Root';
+                    modeRoot.add(rigRoot);
+
+                    const cfgs = getGripConfigs();
+                    for (const side of ["right", "left"]) {
+                        cfgs[side].wrist.add(new THREE.Vector3(
+                            state[side + "OffsetX"], state[side + "OffsetY"], state[side + "OffsetZ"]));
+                    }
+                    rigRoot.add(buildSingleArm(false, cfgs.right));
+
+                    const skipLeft = (state.gripMode === '1h_pistol' && state.hideLeftOn1H);
+                    if (!skipLeft) {
+                        rigRoot.add(buildSingleArm(true, cfgs.left));
+                    }
+
+                    const weaponSocket = new THREE.Object3D();
+                    weaponSocket.name = 'WeaponAttachPoint';
+                    weaponSocket.position.set(0, 0, 0);
+                    rigRoot.add(weaponSocket);
+
+                    currentModeRoot = modeRoot;
+                    currentRigRoot = rigRoot;
+                    (weaponRecord ? libraryHandsRoot : scene).add(currentModeRoot);
+                    updatePolyCount(currentModeRoot);
+
+                    mixer = new THREE.AnimationMixer(currentModeRoot);
+                    currentClips = buildArmsClips(currentRigRoot);
+                    bindMixerFinish();
+
+                    const idleClip = currentClips.find(function (c) { return c.name === 'Idle'; });
+                    if (idleClip && !weaponRecord) {
+                        const act = mixer.clipAction(idleClip);
+                        act.setLoop(THREE.LoopRepeat, Infinity);
+                        act.play();
+                    }
+
+                    applyViewSettings();
+                };
+
+                rebuildRefWeapon = function () {
+                    if (currentRefWeaponMesh) {
+                        scene.remove(currentRefWeaponMesh);
+                        disposeTree(currentRefWeaponMesh);
+                        currentRefWeaponMesh = null;
+                    }
+                    if (weaponRecord) return;
+                    currentRefWeaponMesh = buildReferenceWeaponMesh(state.refWeapon);
+                    scene.add(currentRefWeaponMesh);
+                    applyViewSettings();
+                };
+
+                playArmsClip = function (clipName) {
+                    if (!mixer) return;
+                    const clip = currentClips.find(function (c) { return c.name === clipName; });
+                    if (!clip) return;
+
+                    mixer.stopAllAction();
+                    const act = mixer.clipAction(clip);
+                    act.reset();
+                    if (clipName === 'Idle' || clipName === 'Sprint') {
+                        act.setLoop(THREE.LoopRepeat, Infinity);
+                        act.play();
+                    } else {
+                        act.setLoop(THREE.LoopOnce, 1);
+                        act.clampWhenFinished = false;
+                        act.play();
+                    }
+                };
+
+                /* ---------------------------------------------------------
+                   5.12 PS1 VIEW SETTINGS (ALL OFF BY DEFAULT) & RESIZE
+                   --------------------------------------------------------- */
+                function handleResize() {
+                    const w = Math.max(1, window.innerWidth);
+                    const h = Math.max(1, window.innerHeight);
+                    camera.aspect = w / h;
+                    camera.updateProjectionMatrix();
+
+                    if (state.view.pixel) {
+                        const scale = 0.28;
+                        renderer.setPixelRatio(1);
+                        renderer.setSize(Math.max(160, Math.floor(w * scale)), Math.max(120, Math.floor(h * scale)), false);
+                        canvas.classList.add('pixelated');
+                    } else {
+                        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+                        renderer.setSize(w, h, false);
+                        canvas.classList.remove('pixelated');
+                    }
+                }
+
+                applyViewSettings = function () {
+                    const v = state.view;
+                    ps1Uniforms.uJitter.value = v.jitter ? 1.0 : 0.0;
+                    ps1Uniforms.uGrid.value.set(v.jitterGrid, Math.round(v.jitterGrid * 0.75));
+                    document.getElementById('vhs-overlay').classList.toggle('active', v.vhs);
+                    socketMarker.visible = v.showSockets;
+
+                    scene.traverse(function (o) {
+                        if (o.isMesh && o.material && o !== socketMarker) {
+                            const mats = Array.isArray(o.material) ? o.material : [o.material];
+                            mats.forEach(function (m) { m.wireframe = v.wire; });
+                        }
+                    });
+
+                    if (v.nightFog) {
+                        scene.fog = new THREE.FogExp2(0x070a08, 0.92);
+                        renderer.setClearColor(0x070a08, 1);
+                        hemiLight.intensity = 0.34;
+                        keyLight.intensity = 0.48;
+                        keyLight.color.setHex(0x88a8c2);
+                    } else {
+                        scene.fog = null;
+                        renderer.setClearColor(0x0f1114, 1);
+                        hemiLight.intensity = 1.02;
+                        keyLight.intensity = 1.18;
+                        keyLight.color.setHex(0xfff4e4);
+                    }
+                    handleResize();
+                };
+
+                /* ---------------------------------------------------------
+                   5.13 GODOT 4 BINARY .GLB EXPORT (EXCLUDES REF WEAPON)
+                   --------------------------------------------------------- */
+                exportGLB = function (saveForWeapon = false) {
+                    if (typeof THREE.GLTFExporter === 'undefined') {
+                        showToast('GLTFExporter не загружен', true);
+                        return;
+                    }
+                    if (!currentModeRoot) {
+                        showToast('Нет модели рук для экспорта', true);
+                        return;
+                    }
+
+                    const record = weaponRecord;
+                    const pose = saveForWeapon ? forge.normalizeViewmodel(weaponPose) : null;
+                    const settings = Object.fromEntries(armKeys.map(key => [key, state[key]]));
+                    if (saveForWeapon) {
+                        if (!record) return;
+                        saveFit.disabled = true;
+                        picker.disabled = true;
+                    }
+                    // Reset to clean rest pose before baking export
+                    if (mixer) {
+                        mixer.stopAllAction();
+                        if (currentRigRoot) {
+                            currentRigRoot.position.set(0, 0, 0);
+                            currentRigRoot.quaternion.identity();
+                        }
+                    }
+
+                    const gCode = META.grips[state.gripMode].code;
+                    const fileName =
+                        'arms_' + gCode +
+                        '_s' + (state.sleeve + 1) +
+                        '_g' + (state.glove + 1) +
+                        '_d' + (state.detail + 1) + '.glb';
+
+                    const wasWire = state.view.wire;
+                    if (wasWire) {
+                        currentModeRoot.traverse(function (o) {
+                            if (o.isMesh && o.material) o.material.wireframe = false;
+                        });
+                    }
+
+                    try {
+                        const exporter = new THREE.GLTFExporter();
+                        exporter.parse(
+                            currentModeRoot,
+                            async function (result) {
+                                if (wasWire) {
+                                    currentModeRoot.traverse(function (o) {
+                                        if (o.isMesh && o.material) o.material.wireframe = true;
+                                    });
+                                }
+                                if (!weaponRecord) playArmsClip('Idle');
+
+                                const blob = result instanceof ArrayBuffer
+                                    ? new Blob([result], { type: 'model/gltf-binary' })
+                                    : new Blob([JSON.stringify(result)], { type: 'application/json' });
+                                if (saveForWeapon) {
+                                    try {
+                                        if (blob.type !== "model/gltf-binary" || blob.size > 2_000_000)
+                                            throw new Error("Руки должны экспортироваться в GLB размером до 2 МБ.");
+                                        const glb = await new Promise((resolve, reject) => {
+                                            const reader = new FileReader();
+                                            reader.onload = () => resolve(reader.result.split(",")[1]);
+                                            reader.onerror = () => reject(reader.error);
+                                            reader.readAsDataURL(blob);
+                                        });
+                                        await library.updateModel(record.id, {viewmodel:pose, arms:{glb, settings}});
+                                        fitStatus.textContent = "Сохранено для «" + record.name + "». Для проверки перезапусти игру с этим образцом.";
+                                    } catch (error) { fitStatus.textContent = error.message; }
+                                    finally { saveFit.disabled = false; picker.disabled = false; }
+                                    return;
+                                }
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.style.display = 'none';
+                                a.href = url;
+                                a.download = fileName;
+                                document.body.appendChild(a);
+                                a.click();
+                                setTimeout(function () {
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                }, 300);
+                                showToast('Экспорт Godot 4 (' + currentClips.length + ' клипов): ' + fileName, false);
+                            },
+                            { binary: true, animations: currentClips }
+                        );
+                    } catch (err) {
+                        if (wasWire) {
+                            currentModeRoot.traverse(function (o) {
+                                if (o.isMesh && o.material) o.material.wireframe = true;
+                            });
+                        }
+                        playArmsClip('Idle');
+                        if (saveForWeapon) { saveFit.disabled = false; picker.disabled = false; }
+                        showToast('Ошибка экспорта .GLB: ' + err.message, true);
+                    }
+                };
+
+                /* ---------------------------------------------------------
+                   5.14 INITIAL BUILD & MAIN ANIMATION LOOP
+                   --------------------------------------------------------- */
+                rebuildArms();
+                rebuildRefWeapon();
+                applyCamMode();
+                handleResize();
+
+                const clock = new THREE.Clock();
+                let lastW = 0, lastH = 0;
+
+                function animate() {
+                    requestAnimationFrame(animate);
+                    const dt = Math.min(clock.getDelta(), 0.08);
+
+                    const cw = window.innerWidth, ch = window.innerHeight;
+                    if (cw > 0 && ch > 0 && (cw !== lastW || ch !== lastH)) {
+                        lastW = cw;
+                        lastH = ch;
+                        handleResize();
+                    }
+
+                    if (mixer) mixer.update(dt);
+
+                    // Lock preview-only reference weapon & socket marker strictly to WeaponAttachPoint
+                    if (currentModeRoot) {
+                        currentModeRoot.updateMatrixWorld(true);
+                        const sock = currentModeRoot.getObjectByName('WeaponAttachPoint');
+                        if (sock) {
+                            if (currentRefWeaponMesh && state.refWeapon !== 'none') {
+                                sock.getWorldPosition(currentRefWeaponMesh.position);
+                                sock.getWorldQuaternion(currentRefWeaponMesh.quaternion);
+                            }
+                            if (state.view.showSockets) {
+                                sock.getWorldPosition(socketMarker.position);
+                            }
+                        }
+                    }
+
+                    const damp = 1 - Math.exp(-11 * dt);
+                    orbit.theta += (orbit.desiredTheta - orbit.theta) * damp;
+                    orbit.phi += (orbit.desiredPhi - orbit.phi) * damp;
+                    orbit.radius += (orbit.desiredRadius - orbit.radius) * damp;
+                    orbit.target.lerp(orbit.desiredTarget, damp);
+                    updateCameraTransform();
+
+                    renderer.render(scene, camera);
+                }
+
+                animate();
+            }
+
+            window.addEventListener('load', bootEngine);
+        })();
+    </script>
+</body>
+</html>

@@ -409,7 +409,7 @@ jobs:
           mkdir -p "build/web/${RELEASE_DIR}"
           godot --headless --path godot --export-release "Web" "$(pwd)/build/web/${RELEASE_DIR}/index.html"
           cp -a site/object-library build/web/object-library
-          sed -i '/<head>/a\    <script src="../object-library/library.js?v=3"></script>\n    <script src="../object-library/game.js?v=5"></script>' "build/web/${RELEASE_DIR}/index.html"
+          sed -i '/<head>/a\    <script src="../object-library/library.js?v=4"></script>\n    <script src="../object-library/game.js?v=6"></script>' "build/web/${RELEASE_DIR}/index.html"
           grep -Fq "object-library/game.js" "build/web/${RELEASE_DIR}/index.html"
           test -s "build/web/${RELEASE_DIR}/index.html"
           test -f "build/web/${RELEASE_DIR}/index.wasm"
@@ -533,7 +533,7 @@ jobs:
           node --check site/forge/forge-core.js
           node --check site/forge/forge.mjs
           node --test tests/forge-core.test.cjs
-          grep -q 'forge.mjs?v=17' site/forge/index.html
+          grep -q 'forge.mjs?v=18' site/forge/index.html
           grep -q 'forge-core.js?v=6' site/forge/index.html
           grep -q 'id="fp-preview-toggle"' site/forge/index.html
           grep -q 'id="fp-scale-slider"' site/forge/index.html
@@ -573,6 +573,14 @@ jobs:
           mkdir -p build/web/weapon-generator
           cp -a site/weapon-generator/. build/web/weapon-generator/
           test -s build/web/weapon-generator/index.html
+          mkdir -p build/web/arms
+          cp -a site/arms/. build/web/arms/
+          node - <<'JS'
+          const fs = require("node:fs"), vm = require("node:vm");
+          const page = fs.readFileSync("build/web/arms/index.html", "utf8");
+          for (const script of page.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g))
+            new vm.Script(script[1]);
+          JS
           # Studio embeds all five editors without deleting existing local drafts.
           node --check site/studio/studio-state.js
           node --check site/studio/project-snapshot.js
@@ -581,11 +589,11 @@ jobs:
           node --check site/studio/studio-releases.js
           node --test tests/studio-state.test.cjs
           node --test tests/studio-releases.test.cjs
-          grep -q 'studio-state.js?v=1' site/studio/index.html
+          grep -q 'studio-state.js?v=2' site/studio/index.html
           grep -q 'release-core.js?v=1' site/studio/index.html
           grep -q 'studio-releases.js?v=1' site/studio/index.html
           grep -q 'studio.css?v=4' site/studio/index.html
-          grep -q 'studio.js?v=4' site/studio/index.html
+          grep -q 'studio.js?v=5' site/studio/index.html
           grep -q 'id="release-list"' site/studio/index.html
           grep -q 'id="roadmap-list"' site/studio/index.html
           grep -q 'id="rail-toggle"' site/studio/index.html
@@ -694,6 +702,8 @@ jobs:
               && grep -q 'chernozerye.hellish-forge' /tmp/pages-forge-core.js \
               && curl -fsSL --max-time 20 "${SITE_URL}weapon-generator/index.html" -o /tmp/pages-weapon-generator.html \
               && grep -q 'WEAPON GENERATOR\|Генератор Оружия' /tmp/pages-weapon-generator.html \
+              && curl -fsSL --max-time 20 "${SITE_URL}arms/index.html" -o /tmp/pages-arms.html \
+              && grep -q 'id="arms-weapon"' /tmp/pages-arms.html \
               && curl -fsSL --max-time 20 "${SITE_URL}studio/index.html" -o /tmp/pages-studio.html \
               && grep -q 'CHERNOZERYE' /tmp/pages-studio.html \
               && curl -fsSL --max-time 20 "${SITE_URL}studio/studio.js" -o /tmp/pages-studio.js \

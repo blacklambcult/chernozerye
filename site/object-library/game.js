@@ -7,7 +7,9 @@
     const results = await Promise.allSettled(records.map(async ({blob, sounds, ...record}) => {
       const clips = await Promise.allSettled(Object.entries(sounds ?? {}).map(async ([action, sound]) =>
         [action, {format:sound.format, data:await base64(sound.blob)}]));
-      return {...record, glb:await base64(blob), sounds:Object.fromEntries(clips.flatMap(clip =>
+      const latest = record.modelId ? await library.model(record.modelId).catch(() => null) : null;
+      const pose = latest?.viewmodel ? {viewmodel:latest.viewmodel} : {};
+      return {...record, ...pose, armsGlb:latest?.arms?.glb, glb:await base64(blob), sounds:Object.fromEntries(clips.flatMap(clip =>
         clip.status === "fulfilled" ? [clip.value] : []))};
     }));
     window.chernozeryeForgeSlots = JSON.stringify(results.flatMap(result =>
