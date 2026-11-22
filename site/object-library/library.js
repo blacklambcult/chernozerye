@@ -75,9 +75,25 @@
   }
   window.ChernoObjectLibrary = Object.freeze({
     makeSnapshot, openSnapshot,
+    model: id => access("models", "readonly", store => store.get(id)),
     models: () => access("models", "readonly", store => store.getAll()),
     placements: () => access("placements", "readonly", store => store.getAll()),
     saveModel: record => access("models", "readwrite", store => store.put(record)),
+    updateModel: (id, patch) => {
+      let found = false;
+      return access("models", "readwrite", store => {
+        const read = store.get(id);
+        read.onsuccess = () => {
+          if (!read.result) return;
+          found = true;
+          store.put({...read.result, ...patch, id, updatedAt:new Date().toISOString()});
+        };
+        return read;
+      }).then(original => {
+        if (!found) throw new Error("Образец больше не найден в библиотеке.");
+        return {...original, ...patch, id};
+      });
+    },
     forgeSlots: () => access("forge_slots", "readonly", store => store.getAll()),
     saveForgeSlot: record => access("forge_slots", "readwrite", store => store.put(record)),
     removeForgeSlot: slot => access("forge_slots", "readwrite", store => store.delete(slot)),

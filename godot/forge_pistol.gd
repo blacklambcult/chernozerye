@@ -281,10 +281,17 @@ func _ready() -> void:
     imported_model.position = -grip
     # Hand is attached at the exact same camera-local origin as the author
     # supplied grip marker, instead of floating behind the visual prop.
-    weapon_hand = Node3D.new()
-    weapon_hand.set_script(preload("res://weapon_hand_viewmodel.gd"))
+    var arms_glb: Variant = package.get("armsGlb")
+    if arms_glb is String and not arms_glb.is_empty() and arms_glb.length() <= 2666668:
+        weapon_hand = _make_game_model({"glb": arms_glb})
+        if weapon_hand != null and weapon_hand.find_child("WeaponAttachPoint", true, false) == null:
+            weapon_hand.free()
+            weapon_hand = null
+    if weapon_hand == null:
+        weapon_hand = Node3D.new()
+        weapon_hand.set_script(preload("res://weapon_hand_viewmodel.gd"))
+        weapon_hand.set("grip_local", Vector3.ZERO)
     weapon_hand.name = "WeaponRightHand"
-    weapon_hand.set("grip_local", Vector3.ZERO)
     weapon_hand.position = hand_position
     weapon_hand.rotation = hand_angles
     add_child(weapon_hand)

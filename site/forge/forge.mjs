@@ -1221,6 +1221,7 @@ async function openCatalogWeapon(id) {
   for (const button of profileButtons) $(button).disabled = true;
   if (fpPreviewActive) clearFpPreview();
   transferred = null;
+  $("edit-weapon-arms").hidden = true;
   const record = weapons.get(id);
   if (!record) { feedback.textContent = "Выбери модель или создай её в генераторе."; return; }
   feedback.textContent = "Загрузка модели…";
@@ -1242,6 +1243,8 @@ async function openCatalogWeapon(id) {
     if (!fpPreviewActive) toggleFpPreview();
     else { updateFpPreview(); renderFpInspector(); }
     fillWeaponProfile(record);
+    $("edit-weapon-arms").href = "../arms/?weapon=" + encodeURIComponent(record.id);
+    $("edit-weapon-arms").hidden = false;
     renderWeaponSounds();
     for (const button of profileButtons) $(button).disabled = false;
     feedback.textContent = "";
@@ -1281,13 +1284,15 @@ async function saveCatalogWeapon(sendToGame) {
     const name = $("transferred-name").value.trim();
     if (!name) throw new Error("Введи название варианта.");
     const gameplay = readWeaponProfile();
-    const viewmodel = Forge.normalizeViewmodel(forgeMeta.viewmodel);
+    const current = await window.ChernoObjectLibrary.model(record.id);
+    if (!current) throw new Error("Образец больше не найден в библиотеке.");
+    const viewmodel = Forge.normalizeViewmodel(current.viewmodel ?? forgeMeta.viewmodel);
     const slot = Number($("game-slot").value);
     if (sendToGame && (!Number.isInteger(slot) || slot < 3 || slot > 10))
       throw new Error("Выбери тестовую ячейку. Если все заняты, выбери, какую заменить.");
-    const saved = {...record, name, gameplay, viewmodel, sounds:{...transferred.sounds},
-      slot:slot || record.slot, updatedAt:new Date().toISOString()};
-    await window.ChernoObjectLibrary.saveModel(saved);
+    const changes = {name, gameplay, sounds:{...transferred.sounds}, slot:slot || current.slot};
+    if (!current.viewmodel) changes.viewmodel = viewmodel;
+    const saved = await window.ChernoObjectLibrary.updateModel(record.id, changes);
     weapons.set(saved.id, saved);
     if (transferred?.record.id === saved.id) {
       transferred.record = saved;
@@ -1297,7 +1302,7 @@ async function saveCatalogWeapon(sendToGame) {
     if (sendToGame) {
       if (saved.blob.size > 2 * 1024 * 1024) throw new Error("В библиотеке сохранено. Для отправки в игру требуется GLB до 2 МБ.");
       await window.ChernoObjectLibrary.saveForgeSlot({id:slot, modelId:saved.id, version:1, name, blob:saved.blob, slot,
-        category:gameplay.grip, gameplay, viewmodel, sounds:saved.sounds, weaponType:saved.recipe?.weaponType});
+        category:gameplay.grip, gameplay, viewmodel:saved.viewmodel ?? viewmodel, sounds:saved.sounds, weaponType:saved.recipe?.weaponType});
       await refreshForgeAssignments();
     }
     feedback.textContent = sendToGame ? "Профиль сохранён. Перезапусти игру и нажми " + (slot === 10 ? 0 : slot) + "." : "Профиль сохранён в библиотеке.";

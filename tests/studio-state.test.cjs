@@ -9,7 +9,7 @@ test("three existing editors retain their original browser-storage keys", () => 
     model:"chernozerye.modellab.v1",
     forge:"chernozerye.hellish-forge.v1"
   });
-  assert.deepEqual(state.TOOLS, ["home", "geo", "quest", "model", "forge", "weapon"]);
+  assert.deepEqual(state.TOOLS, ["home", "geo", "quest", "model", "forge", "weapon", "arms"]);
 });
 
 test("the studio routes only known sections and handles shareable hash links", () => {
