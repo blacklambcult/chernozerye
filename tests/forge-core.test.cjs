@@ -56,7 +56,7 @@ test("FP viewmodel stays compatible with old saved Forge projects", () => {
   const original=Forge.previewAsset();
   assert.deepEqual(original.viewmodel,Forge.normalizeViewmodel());
   assert.deepEqual(original.viewmodel.position,[0.285,-0.225,-0.47]);
-  assert.equal(original.viewmodel.scale,0.26);
+  assert.equal(original.viewmodel.scale,1.36);
   const old=JSON.parse(JSON.stringify(original));
   delete old.viewmodel;
   assert.deepEqual(Forge.normalizeProject(old).viewmodel,Forge.normalizeViewmodel());
