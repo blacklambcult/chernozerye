@@ -43,7 +43,7 @@ def test_walk_and_alert_behavior():
 
 
 def test_articulated_glb_and_grounded_gait():
-    generator = (ROOT / "scripts/build_cultist_v06.py").read_text(encoding="utf-8")
+    generator = (ROOT / "scripts/build_cultist_v08.py").read_text(encoding="utf-8")
     viewer = (ROOT / "site/cultist/index.html").read_text(encoding="utf-8")
     for group in ("LeftLeg", "RightLeg", "LeftShin", "RightShin", "LeftFoot", "RightFoot"):
         assert f'"{group}"' in generator
@@ -56,3 +56,15 @@ def test_articulated_glb_and_grounded_gait():
     assert 'function animateFootsteps' in viewer
     assert 'const stanceRatio=.63' in viewer
     assert 'actor.position.y=Math.sin' not in viewer
+
+
+def test_v08_game_export_uses_detailed_model_not_old_preview():
+    workflow = (ROOT / ".github/workflows/web.yml").read_text(encoding="utf-8")
+    source = (ROOT / "scripts/build_cultist_v08.py").read_text(encoding="utf-8")
+    assert 'python scripts/build_cultist_v08.py godot/assets/npc/cultist_modular.glb' in workflow
+    assert 'CULTIST_GAME_V08_OK' in workflow
+    assert 'CULTIST_V08_OK' in source
+    assert 'trimesh.util.concatenate(pieces)' in source
+    assert 'len(counts)==10' in source
+    assert '28000 < triangles < 115000' in source
+    assert 'ModelFacingCorrection' in NPC
