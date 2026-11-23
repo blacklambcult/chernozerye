@@ -40,3 +40,19 @@ def test_walk_and_alert_behavior():
     assert '_parts[limb_name]' in NPC
     assert 'PhysicsRayQueryParameters3D.create' in NPC
     assert 'if desired.length() < 2.1' in NPC
+
+
+def test_articulated_glb_and_grounded_gait():
+    generator = (ROOT / "scripts/build_cultist_v06.py").read_text(encoding="utf-8")
+    viewer = (ROOT / "site/cultist/index.html").read_text(encoding="utf-8")
+    for group in ("LeftLeg", "RightLeg", "LeftShin", "RightShin", "LeftFoot", "RightFoot"):
+        assert f'"{group}"' in generator
+    assert '"leftShin"' in NPC and '"rightShin"' in NPC
+    assert 'shin.reparent(thigh, true)' in NPC
+    assert 'foot.reparent(shin, true)' in NPC
+    assert '_visual.position.y = 0.0' in NPC
+    assert 'sin(_step_clock) * 0.026' not in NPC
+    assert 'function solveTwoBoneIK' in viewer
+    assert 'function animateFootsteps' in viewer
+    assert 'const stanceRatio=.63' in viewer
+    assert 'actor.position.y=Math.sin' not in viewer
