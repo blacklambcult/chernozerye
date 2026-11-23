@@ -103,9 +103,21 @@ func _build_visual() -> void:
     hood.radial_segments = 9
     hood.rings = 5
     _make_piece(_head, "Hood", hood, Vector3(0, 0.08, 0), Color("#0d0d11"))
+    var cavity := SphereMesh.new()
+    cavity.radius = 0.235
+    cavity.height = 0.45
+    cavity.radial_segments = 9
+    cavity.rings = 6
+    var dark_opening := _make_piece(_head, "HoodOpening", cavity, Vector3(0, 0.01, -0.235), Color("#09090b"))
+    dark_opening.scale.z = 0.25
     var face := BoxMesh.new()
-    face.size = Vector3(0.23, 0.26, 0.065)
-    _make_piece(_head, "ShadowFace", face, Vector3(0, 0.015, -0.275), Color("#393536"))
+    face.size = Vector3(0.205, 0.235, 0.06)
+    _make_piece(_head, "WeatheredFace", face, Vector3(0, 0.015, -0.292), Color("#554b46"))
+    var eye_mesh := SphereMesh.new()
+    eye_mesh.radius = 0.022
+    eye_mesh.height = 0.04
+    for side in [-1, 1]:
+        _make_piece(_head, "GlowingEye", eye_mesh, Vector3(side * 0.07, 0.045, -0.331), Color("#9a4939"))
     var beard := CylinderMesh.new()
     beard.top_radius = 0.11
     beard.bottom_radius = 0.01
@@ -125,10 +137,21 @@ func _build_visual() -> void:
     sign.size = Vector3(0.19, 0.055, 0.012)
     _make_piece(_visual, "RedRuneCross", sign, Vector3(0, 1.26, -0.323), Color("#8e2e29"))
     var sleeve := CylinderMesh.new()
-    sleeve.top_radius = 0.15
-    sleeve.bottom_radius = 0.24
-    sleeve.height = 0.82
+    sleeve.top_radius = 0.17
+    sleeve.bottom_radius = 0.32
+    sleeve.height = 0.90
     sleeve.radial_segments = 8
+    # Embroidered crimson sigil and dangling rope belt cords.
+    var rune_stroke := BoxMesh.new()
+    rune_stroke.size = Vector3(0.18, 0.036, 0.014)
+    _make_piece(_visual, "CrimsonRuneBranch", rune_stroke, Vector3(0, 1.18, -0.325), Color("#8d2e2b"))
+    var rope_strand := CylinderMesh.new()
+    rope_strand.top_radius = 0.014
+    rope_strand.bottom_radius = 0.02
+    rope_strand.height = 0.51
+    rope_strand.radial_segments = 5
+    for side in [-1, 1]:
+        _make_piece(_visual, "BeltCord", rope_strand, Vector3(side * 0.14, 0.64, -0.35), Color("#786c43"))
     var boot := BoxMesh.new()
     boot.size = Vector3(0.23, 0.23, 0.40)
     for side in [-1, 1]:
@@ -137,7 +160,7 @@ func _build_visual() -> void:
         limb.position = Vector3(0.42 * side, 1.38, 0)
         limb.rotation.z = -0.21 * side
         _visual.add_child(limb)
-        _make_piece(limb, "Sleeve", sleeve, Vector3(0, -0.34, 0), Color("#202024"))
+        _make_piece(limb, "BellSleeve", sleeve, Vector3(0, -0.36, 0), Color("#202024"))
         _parts["leftArm" if side < 0 else "rightArm"] = limb
         var leg := Node3D.new()
         leg.name = "LeftLeg" if side < 0 else "RightLeg"
