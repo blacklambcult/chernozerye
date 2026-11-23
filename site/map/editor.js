@@ -18,6 +18,8 @@
   const STORAGE_KEY = "chernozerye_manual_geojson_v2";
   const records = [];
   const rendered = new Map();
+  let gameFeatures = [];
+  let gameLayer;
   let selectedId = null;
   let activeTool = null;
   let draftPoints = [];
@@ -28,7 +30,7 @@
   let savedMessage = "";
   let localStorageAvailable = true;
 
-  for (const [name, z] of [["manual-survey", 532], ["manual-handles", 660]]) {
+  for (const [name, z] of [["game-survey", 520], ["manual-survey", 532], ["manual-handles", 660]]) {
     if (!map.getPane(name)) map.createPane(name);
     map.getPane(name).style.zIndex = String(z);
   }
@@ -133,6 +135,62 @@
     return layer;
   }
 
+  function refreshGameLayer() {
+    if (!gameLayer) return;
+    const draftIds = new Set($("editor-visible").checked ? records.map(feature => feature.id) : []);
+    gameLayer.clearLayers();
+    gameLayer.addData(gameFeatures.filter(feature => !draftIds.has(feature.id)));
+  }
+
+  async function loadGameLayer() {
+    try {
+      const response = await fetch("./data/game-map.geojson", { cache: "no-cache" });
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      gameFeatures = core.importCollection(await response.json());
+      gameLayer = L.geoJSON(null, {
+        pane: "game-survey",
+        interactive: false,
+        style: feature => styleFor(feature),
+        pointToLayer: (feature, position) => L.circleMarker(position, {
+          ...styleFor(feature), pane: "game-survey", interactive: false, radius: 5
+        })
+      });
+      refreshGameLayer();
+      if ($("game-map-visible").checked) gameLayer.addTo(map);
+      $("game-map-status").textContent = countLabel(gameFeatures.length) + " из текущей сборки";
+      $("game-map-focus").disabled = $("game-map-copy").disabled = false;
+    } catch (error) {
+      $("game-map-status").textContent = "Игровая разметка недоступна. Обнови страницу.";
+      console.warn("Geo Lab game map", error);
+    }
+  }
+
+  $("game-map-visible").addEventListener("change", event => {
+    if (!gameLayer) return;
+    if (event.target.checked) gameLayer.addTo(map);
+    else gameLayer.remove();
+  });
+
+  $("game-map-focus").addEventListener("click", () => {
+    const bounds = L.latLngBounds(gameFeatures.flatMap(coordsFor));
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 19 });
+  });
+
+  $("game-map-copy").addEventListener("click", () => {
+    const ids = new Set(records.map(feature => feature.id));
+    const additions = gameFeatures.filter(feature => !ids.has(feature.id));
+    if (!additions.length) {
+      message("Все объекты игровой карты уже есть в твоей разметке.");
+      return;
+    }
+    records.push(...structuredClone(additions));
+    $("editor-visible").checked = true;
+    featureGroup.addTo(map);
+    redrawAll();
+    persist();
+    if (localStorageAvailable) message("Добавлено в разметку: " + countLabel(additions.length) + ".");
+  });
+
   function redrawFeature(id) {
     const prev = rendered.get(id);
     if (prev) featureGroup.removeLayer(prev);
@@ -156,6 +214,7 @@
   }
 
   function persist() {
+    refreshGameLayer();
     try {
       const contents = core.collectionFromFeatures(records);
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(contents));
@@ -603,6 +662,7 @@
   });
 
   $("editor-visible").addEventListener("change", (event) => {
+    refreshGameLayer();
     if (event.target.checked) featureGroup.addTo(map);
     else map.removeLayer(featureGroup);
     if (!event.target.checked) {
@@ -710,6 +770,7 @@
   // Warm start without replacing read-only Overture/OSM layers.
   restore();
   redrawAll();
+  void loadGameLayer();
   message(localStorageAvailable && !records.length
     ? "Черновик пуст. Изменения сохраняются в браузере; для передачи скачай GeoJSON."
     : savedMessage || "Конструктор готов.");
