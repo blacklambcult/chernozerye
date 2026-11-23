@@ -36,7 +36,10 @@ const root=new T.Group(),actor=new T.Group();scene.add(root);root.add(actor);let
 const status=document.getElementById('status');const hitRay=new T.Raycaster(),pointer=new T.Vector2();
 const loader=new GLTFLoader();loader.load('./cultist_v06.glb',(gltf)=>{
 const model=gltf.scene;
-// trimesh stores Z as up; glTF loader gives Y-up. Normalize to the desired 1.85m character height.
+// Source GLB is explicitly authored in Z-up, rotate to Three.js Y-up first.
+model.rotation.x=-Math.PI/2;
+model.updateWorldMatrix(true,true);
+// Normalize after axis conversion to the desired 1.85m character height.
 const bounds=new T.Box3().setFromObject(model);const size=bounds.getSize(new T.Vector3());const factor=1.85/size.y;model.scale.setScalar(factor);model.updateWorldMatrix(true,true);
 const box=new T.Box3().setFromObject(model);model.position.y=-box.min.y;model.position.x=-(box.min.x+box.max.x)/2;model.position.z=-(box.min.z+box.max.z)/2;
 actor.add(model);model.traverse((obj)=>{if(obj.isMesh){obj.castShadow=true;obj.receiveShadow=true;meshes.push(obj);if(obj.material){obj.material.side=T.DoubleSide;obj.material.roughness=1;obj.material.metalness=0}}});
