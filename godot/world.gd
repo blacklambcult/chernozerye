@@ -5,14 +5,14 @@ const LOGO_DATA = preload("res://logo_data.gd")
 const MAP_FILE := "res://world_data.json"
 const MANUAL_FILE := "res://manual_layout.json"
 const GAME_TITLE := "Fearless Knights of the Cordon"
-const GAME_STAGE := "Pre-Alpha 0.8.7"
+const GAME_STAGE := "Pre-Alpha 0.8.8"
 # Canonical playable start of the 710-feature Geo Lab village. Keep world
 # placements and the CI spawn-distance regression anchored to this coordinate.
 const MANUAL_VILLAGE_SPAWN := Vector3(-789.7, 0.22, -268.6)
 const MANUAL_CAMERA_NEAR := 0.16
 const MANUAL_CAMERA_FAR := 250.0
 const SEASON := "NOVEMBER"
-const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.8.7 · ЧЕРНОЗЁРЬЕ · 710 ОБЪЕКТОВ"
+const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.8.8 · ЧЕРНОЗЁРЬЕ · 710 ОБЪЕКТОВ"
 var manual_mode := false
 var manual_button: Button
 var _status_label: Label
@@ -36,9 +36,9 @@ func _process(_delta: float) -> void:
 func _ready() -> void:
     _create_ground()
     _create_lighting()
-    _create_retro_grade()
     var ps1 := preload("res://ps1_effects.gd").new()
     ps1.name = "PS1Effects"
+    ps1.grade_material = _create_retro_grade()
     add_child(ps1)
     var forest_features: Array = []
     var road_group := Node3D.new()
@@ -256,7 +256,7 @@ func _create_manual_ground_material() -> StandardMaterial3D:
     mat.uv1_scale = Vector3(520.0, 520.0, 1.0)
     return mat
 
-func _create_retro_grade() -> void:
+func _create_retro_grade() -> ShaderMaterial:
     var layer := CanvasLayer.new()
     layer.name = "RetroGrade"
     layer.layer = 0
@@ -274,6 +274,7 @@ func _create_retro_grade() -> void:
     grade.set_shader_parameter("edge_strength", 0.14)
     screen.material = grade
     layer.add_child(screen)
+    return grade
 
 func _create_lighting() -> void:
     var environment := WorldEnvironment.new()
@@ -571,10 +572,12 @@ func _create_forest_from_osm(features: Array) -> void:
     var trunks := MultiMeshInstance3D.new()
     trunks.multimesh = trunks_mesh
     trunks.material_override = _material(Color("#594537"))
+    trunks.add_to_group(&"ps1_jitter_foliage")
     add_child(trunks)
     var crowns := MultiMeshInstance3D.new()
     crowns.multimesh = crowns_mesh
     crowns.material_override = _material(Color("#253e32"))
+    crowns.add_to_group(&"ps1_jitter_foliage")
     add_child(crowns)
     print("Лес OSM: полигонов ", polygons.size(), ", деревьев ", positions.size())
 

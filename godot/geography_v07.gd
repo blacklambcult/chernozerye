@@ -789,4 +789,5 @@ func _add_tree_instances(mesh: Mesh, transforms: Array[Transform3D], tint: Color
     node.material_override = _mat(tint)
     # Dynamic shadows from thousands of trees are prohibitive in Web/GL.
     node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    node.add_to_group(&"ps1_jitter_foliage")
     add_child(node)

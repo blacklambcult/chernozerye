@@ -654,6 +654,7 @@ func _instanced_tree(mesh: Mesh, transforms: Array[Transform3D], color: Color, l
     # Keep specular reflections and cast shadows disabled to avoid web-rendering artifacts.
     node.material_override = tree_mat
     node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    node.add_to_group(&"ps1_jitter_foliage")
     add_child(node)
 
 func _layer_transforms(source: Array[Transform3D], local_rise: float) -> Array[Transform3D]:
