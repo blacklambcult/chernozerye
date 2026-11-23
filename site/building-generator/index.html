@@ -631,10 +631,8 @@
             display: none !important;
         }
 
-        .library-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+        .library-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; }
         .library-actions input { flex: 1 1 180px; min-width: 0; color: #eee; background: #171b1c; border: 1px solid #746453; padding: 8px; }
-        .library-actions a { color: #ffc080; }
-        .library-actions [hidden] { display: none; }
     </style>
 </head>
 <body>
@@ -695,6 +693,12 @@
                         <button type="button" id="btn-quick-glb" class="btn-icon btn-godot" title="Экспорт .GLB для Godot">⬇ .GLB</button>
                         <button type="button" id="btn-toggle-drawer" class="btn-icon">Свернуть ▲</button>
                     </div>
+                </div>
+
+                <div class="library-actions">
+                    <input id="building-name" type="text" maxlength="80" autocomplete="off" aria-label="Название модели" placeholder="Название модели">
+                    <button type="button" id="btn-save-building" disabled>Сохранить в библиотеку</button>
+                    <button type="button" id="place-building" class="btn-godot" disabled>Разместить в Quest Lab ↗</button>
                 </div>
 
                 <!-- Drawer Body -->
@@ -773,11 +777,6 @@
                         <div class="actions-grid">
                             <button type="button" id="btn-randomize" class="btn-amber">🎲 СЛУЧАЙНАЯ СБОРКА</button>
                             <button type="button" id="btn-export-glb" class="btn-godot">⬇ ЭКСПОРТ .GLB (GODOT)</button>
-                        </div>
-                        <div class="library-actions">
-                            <input id="building-name" type="text" maxlength="80" autocomplete="off" aria-label="Название модели" placeholder="Название модели">
-                            <button type="button" id="btn-save-building" class="btn-godot" disabled>Сохранить в библиотеку</button>
-                            <a id="place-building" hidden>Разместить в Quest Lab ↗</a>
                         </div>
                     </div>
 
@@ -3279,11 +3278,12 @@
                 };
 
                 const saveButton = document.getElementById('btn-save-building');
-                const placeLink = document.getElementById('place-building');
+                const placeButton = document.getElementById('place-building');
                 const buildingNames = { izba: 'Изба', banya: 'Баня', saray: 'Сарай', zabor: 'Забор' };
-                saveButton.disabled = false;
-                saveButton.addEventListener('click', async () => {
-                    saveButton.disabled = true;
+                let lastSaved = null;
+
+                async function saveBuilding(place) {
+                    saveButton.disabled = placeButton.disabled = true;
                     try {
                         const type = state.buildingType;
                         const recipe = {
@@ -3293,24 +3293,39 @@
                         };
                         const name = document.getElementById('building-name').value.trim() ||
                             buildingNames[type] + ' · ' + exportFileName().replace(/\.glb$/, '');
-                        const blob = await exportBuilding(false);
-                        const id = 'building-' + crypto.randomUUID();
-                        await window.ChernoObjectLibrary.saveModel({
-                            id, name, blob, recipe, kind: 'building', source: 'building-generator',
-                            updatedAt: new Date().toISOString()
-                        });
+                        const key = JSON.stringify([name, recipe]);
+                        let id = lastSaved?.key === key ? lastSaved.id : null;
+                        if (!id) {
+                            const blob = await exportBuilding(false);
+                            id = 'building-' + crypto.randomUUID();
+                            await window.ChernoObjectLibrary.saveModel({
+                                id, name, blob, recipe, kind: 'building', source: 'building-generator',
+                                updatedAt: new Date().toISOString()
+                            });
+                            lastSaved = { key, id };
+                        }
+                        if (!place) {
+                            showToast('В библиотеке: ' + name, false);
+                            return;
+                        }
                         const url = new URL('../quest/', location.href);
                         url.searchParams.set('model', id);
-                        placeLink.href = url.href;
-                        placeLink.textContent = 'Разместить «' + name + '» в Quest Lab ↗';
-                        placeLink.hidden = false;
-                        showToast('В библиотеке: ' + name, false);
+                        const link = document.createElement('a');
+                        link.href = url.href;
+                        link.hidden = true;
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
                     } catch (error) {
                         showToast('Не удалось сохранить постройку: ' + error.message, true);
                     } finally {
-                        saveButton.disabled = false;
+                        saveButton.disabled = placeButton.disabled = false;
                     }
-                });
+                }
+
+                saveButton.addEventListener('click', () => saveBuilding(false));
+                placeButton.addEventListener('click', () => saveBuilding(true));
+                saveButton.disabled = placeButton.disabled = false;
 
                 /* =========================================================
                    14. INITIAL BUILD & ANIMATION LOOP

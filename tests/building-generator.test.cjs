@@ -17,6 +17,9 @@ test("building generator stays a standalone UMD editor with four builders", () =
 
 test("Studio routes saved models into the Quest Lab placement picker", () => {
   const page = read("site/building-generator/index.html");
+  assert.match(page, /<button[^>]+id="place-building"[^>]*>Разместить в Quest Lab/);
+  assert.ok(page.indexOf('id="place-building"') < page.indexOf('<div class="drawer-body">'));
+  assert.match(page, /placeButton.addEventListener\('click', \(\) => saveBuilding\(true\)\)/);
   assert.match(page, /await exportBuilding\(false\)/);
   assert.match(page, /await window\.ChernoObjectLibrary\.saveModel/);
   assert.match(page, /url\.searchParams\.set\('model', id\)/);
