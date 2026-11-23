@@ -1,0 +1,1 @@
+NPC branch triggers full Godot Web export validation using web.yml. The Pages deployment steps are skipped for feature branch to protect production. Merge only after CI passes.
