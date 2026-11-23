@@ -81,6 +81,7 @@
             left: 50%;
             transform: translate(-50%, -50%);
             z-index: 50;
+            pointer-events: none;
             max-width: 90%;
             width: 360px;
             background: #1a1d1a;
@@ -1329,14 +1330,15 @@
                         alpha: false,
                         powerPreference: 'high-performance'
                     });
-                } catch (err) {
-                    showWebGLError('WebGL контекст недоступен: ' + err.message);
-                    return;
+                } catch {
+                    showWebGLError('WebGL недоступен. Сборка, сохранение в библиотеку и экспорт GLB работают.');
                 }
 
-                renderer.outputEncoding = THREE.sRGBEncoding;
-                renderer.shadowMap.enabled = false;
-                renderer.setClearColor(0x131613, 1);
+                if (renderer) {
+                    renderer.outputEncoding = THREE.sRGBEncoding;
+                    renderer.shadowMap.enabled = false;
+                    renderer.setClearColor(0x131613, 1);
+                }
 
                 const scene = new THREE.Scene();
                 const camera = new THREE.PerspectiveCamera(44, window.innerWidth / Math.max(1, window.innerHeight), 0.1, 140);
@@ -3138,6 +3140,7 @@
                    12. VIEW / PS1 POST-PROCESSING SETTINGS
                    ========================================================= */
                 function handleResize() {
+                    if (!renderer) return;
                     const w = Math.max(1, window.innerWidth);
                     const h = Math.max(1, window.innerHeight);
                     camera.aspect = w / h;
@@ -3175,13 +3178,13 @@
 
                     // Night Fog vs Studio Lighting
                     if (v.nightFog) {
-                        renderer.setClearColor(0x090c0a, 1);
+                        renderer?.setClearColor(0x090c0a, 1);
                         scene.fog = new THREE.FogExp2(0x0b100d, 0.075);
                         hemiLight.intensity = 0.35;
                         dirLight.intensity = 0.40;
                         dirLight.color.setHex(0x88a2b5);
                     } else {
-                        renderer.setClearColor(0x131613, 1);
+                        renderer?.setClearColor(0x131613, 1);
                         scene.fog = null;
                         hemiLight.intensity = 0.92;
                         dirLight.intensity = 1.05;
@@ -3356,7 +3359,7 @@
                     renderer.render(scene, camera);
                 }
 
-                animate();
+                if (renderer) animate();
             }
 
             // Start 3D after window load
