@@ -37,6 +37,28 @@ func _run() -> void:
         quit(1)
         return
 
+    var model := parts.get("model") as Node3D
+    var checked := 0
+    for child in model.find_children("*", "MeshInstance3D", true, false):
+        var mesh_node := child as MeshInstance3D
+        if not mesh_node.is_in_group(&"ps1_jitter_stable"):
+            push_error("Cultist mesh exposed to PS1 material substitution")
+            quit(1)
+            return
+        for surface in range(mesh_node.mesh.get_surface_count()):
+            var mat := mesh_node.get_active_material(surface) as StandardMaterial3D
+            var arrays := mesh_node.mesh.surface_get_arrays(surface)
+            if mat == null or not mat.vertex_color_use_as_albedo or arrays[Mesh.ARRAY_COLOR] == null:
+                push_error("Cultist vertex colors/material missing: " + mesh_node.name)
+                quit(1)
+                return
+            checked += 1
+    if checked < 10:
+        push_error("Not all cultist surfaces validated")
+        quit(1)
+        return
+    print("CULTIST_MATERIAL_REGRESSION_OK: surfaces=", checked)
+
     print("CULTIST_RIG_REGRESSION_OK: knees=2 ankles=2 arms=2 head=true glb=true")
     npc.queue_free()
     quit(0)
