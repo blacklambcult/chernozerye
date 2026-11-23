@@ -103,11 +103,11 @@ jobs:
           test -s godot/assets/dembel_fp.glb
           python scripts/check_dembel_character.py godot/assets/dembel_full.glb godot/assets/dembel_fp.glb
 
-      - name: Build high-detail cultist v0.8 for the actual Godot game
+      - name: Build high-detail cultist v0.9 for the actual Godot game
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/build_cultist_v08.py godot/assets/npc/cultist_modular.glb
+          python scripts/build_cultist_v09.py godot/assets/npc/cultist_modular.glb
           python - <<'PY'
           from pathlib import Path
           import trimesh
@@ -119,7 +119,7 @@ jobs:
           assert 50000 <= triangles <= 100000, triangles
           assert len(model.geometry) == 10, len(model.geometry)
           assert path.stat().st_size > 500000, path.stat().st_size
-          print('CULTIST_GAME_V08_OK: triangles=', triangles, 'groups=', len(groups), 'bytes=', path.stat().st_size)
+          print('CULTIST_GAME_V09_OK: triangles=', triangles, 'groups=', len(groups), 'bytes=', path.stat().st_size)
           PY
 
       - name: Restore user-exported Hellish Forge pistol GLB
