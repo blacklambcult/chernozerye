@@ -211,6 +211,8 @@ func _shoot() -> void:
     var hit := eye.get_world_3d().direct_space_state.intersect_ray(ray)
     if hit.is_empty():
         return
+    if hit.collider.has_method("apply_damage"):
+        hit.collider.call("apply_damage", 35.0)
     if hit.collider.is_in_group("breakable_pottery"):
         hit.collider.queue_free()
         return
