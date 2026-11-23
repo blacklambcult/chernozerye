@@ -79,6 +79,7 @@ func _ready() -> void:
     # Load the manual 710-object village from the first playable frame.
     # The original sector/preview buttons are no longer part of the player HUD.
     _activate_default_village()
+    _create_first_cultist()
     _create_november_snow()
     _create_note_archive()
     var library := preload("res://local_object_library.gd").new()
@@ -408,6 +409,14 @@ func _add_building(feature: Dictionary) -> void:
     instance.position = Vector3((min_x+max_x)*0.5, height*0.5, (min_z+max_z)*0.5)
     instance.material_override = _material(Color("#786e63"))
     add_child(instance)
+
+func _create_first_cultist() -> void:
+    # Authored starting village: first NPC near the playable road, not legacy OSM origin.
+    var cultist := CharacterBody3D.new()
+    cultist.name = "Cultist_001"
+    cultist.set_script(preload("res://npc_cultist.gd"))
+    cultist.position = MANUAL_VILLAGE_SPAWN + Vector3(6.5, 0.0, -4.0)
+    add_child(cultist)
 
 func _create_player() -> void:
     var player := CharacterBody3D.new()
