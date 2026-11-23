@@ -108,6 +108,16 @@ func _process(delta: float) -> void:
 const STUDIO_VILLAGE := preload("res://generated_village.gd")
 var _studio_village: Node3D
 var _studio_fence_profile := 0
+var _plot_polygons: Array[PackedVector2Array] = []
+var _road_clearance: Array[Rect2] = []
+var _house_approaches: Array[Dictionary] = []
+var _reserved_building_space: Array[PackedVector2Array] = []
+var _reserved_building_bounds: Array[Rect2] = []
+var _fence_cells: Dictionary = {}
+var _yard_objects: Array = []
+var _placed_plots: Array[PackedVector2Array] = []
+var _fence_duplicates := 0
+var _approaches_blocked := 0
 
 func decorate(features: Array) -> void:
     _studio_village = STUDIO_VILLAGE.new()
@@ -127,13 +137,6 @@ func decorate(features: Array) -> void:
         var points := _local_points(item.get("points", []))
         if points.size() < 3:
             continue
-        _building_polygons.append(points)
-        var pmin := Vector2(INF, INF)
-        var pmax := Vector2(-INF, -INF)
-        for p in points:
-            pmin = pmin.min(p)
-            pmax = pmax.max(p)
-        _building_bounds.append(Rect2(pmin, pmax - pmin))
         if kind != "house":
             continue
         var centroid := Vector2.ZERO
@@ -152,29 +155,48 @@ func decorate(features: Array) -> void:
             var road_points := _local_points(item.get("points", []))
             var width := 3.8 if kind == "road" else 1.6
             for i in range(road_points.size() - 1):
-                _roads.append([road_points[i], road_points[i + 1], width])
+                var a := road_points[i]
+                var b := road_points[i + 1]
+                _roads.append([a, b, width])
+                _road_clearance.append(Rect2(a.min(b), (a - b).abs()).grow(width * 0.5 + 0.5))
+        elif kind == "car":
+            var car := _local_points(item.get("points", []))
+            if not car.is_empty():
+                var p := car[0]
+                _track_building(PackedVector2Array([p + Vector2(-1,-2), p + Vector2(1,-2),
+                    p + Vector2(1,2), p + Vector2(-1,2)]))
         elif kind == "plot":
             var plot_points := _local_points(item.get("points", []))
             if plot_points.size() >= 3:
+                _plot_polygons.append(plot_points)
                 for i in range(plot_points.size()):
                     _plot_edges.append([plot_points[i], plot_points[(i + 1) % plot_points.size()]])
-    # Roads and building footprints are known now: reserve safe approaches before
-    # either garden props or fence panels are placed.
-    _build_entrance_routes(features)
+    for item in features:
+        if not item is Dictionary:
+            continue
+        var category: String = str(item.get("type", ""))
+        if category in ["house", "sauna", "shed"]:
+            _place_studio_building(_local_points(item.get("points", [])), category, str(item.get("id", "")))
+    _reserve_placed_entrances()
     for item in features:
         if not item is Dictionary:
             continue
         var category: String = str(item.get("type", ""))
         var polygon := _local_points(item.get("points", []))
         match category:
-            "house", "sauna", "shed":
-                _place_studio_building(polygon, category)
             "plot":
                 _decorate_fence(polygon)
             "road":
                 _decorate_road(polygon)
             "forest":
                 _decorate_forest(polygon)
+    var total_plots := _fence_count
+    for i in _placed_plots.size():
+        _fence_count = i + 1
+        _decorate_plot_props(_placed_plots[i])
+    _fence_count = total_plots
+    print("VILLAGE_ACCESS_READY: homes=", _house_approaches.size(), " segments=", _entrance_routes.size(),
+        " blocked=", _approaches_blocked, " merged_fence_spans=", _fence_duplicates)
     _studio_village.finish()
     _flush_details()
     _build_collision_bodies()
@@ -594,7 +616,7 @@ func _plot_boundary_gap(p: Vector2) -> float:
 
 
 func _fence_point_clear(p: Vector2) -> bool:
-    return _road_surface_gap(p) >= 0.23 and _clear_of_buildings(p, 0.42)
+    return _road_surface_gap(p) >= 0.23 and _clear_of_buildings(p, 0.58)
 
 
 func _fence_span_clear(a: Vector2, b: Vector2,
@@ -971,7 +993,57 @@ func _decorate_wall_module(a: Vector2, b: Vector2, normal: Vector3,
                 0.58, minf(height - 0.18, 1.02 + float(salt % 3) * 0.27), 0.098)
 
 
-func _place_studio_building(points: PackedVector2Array, category: String) -> void:
+func _polygon_bounds(points: PackedVector2Array) -> Rect2:
+    var result := Rect2(points[0], Vector2.ZERO)
+    for point in points:
+        result = result.expand(point)
+    return result
+
+
+func _track_building(points: PackedVector2Array) -> void:
+    _building_polygons.append(points)
+    _building_bounds.append(_polygon_bounds(points))
+
+
+func _segment_gap(a: Vector2, b: Vector2, c: Vector2, d: Vector2) -> float:
+    var closest := Geometry2D.get_closest_points_between_segments(a, b, c, d)
+    return closest[0].distance_to(closest[1])
+
+
+func _clear_building_site(envelope: PackedVector2Array, plot: PackedVector2Array) -> bool:
+    var bounds := _polygon_bounds(envelope)
+    if not plot.is_empty():
+        for point in envelope:
+            if not Geometry2D.is_point_in_polygon(point, plot):
+                return false
+        for i in envelope.size():
+            for j in plot.size():
+                if _segment_gap(envelope[i], envelope[(i + 1) % envelope.size()],
+                        plot[j], plot[(j + 1) % plot.size()]) < 0.32:
+                    return false
+    for i in _building_polygons.size():
+        if bounds.intersects(_building_bounds[i]) and not Geometry2D.intersect_polygons(
+                envelope, _building_polygons[i]).is_empty():
+            return false
+    for i in _reserved_building_space.size():
+        if bounds.intersects(_reserved_building_bounds[i]) and not Geometry2D.intersect_polygons(
+                envelope, _reserved_building_space[i]).is_empty():
+            return false
+    for i in _roads.size():
+        if not bounds.intersects(_road_clearance[i]):
+            continue
+        var road: Array = _roads[i]
+        if Geometry2D.is_point_in_polygon(road[0], envelope) \
+                or Geometry2D.is_point_in_polygon(road[1], envelope):
+            return false
+        for j in envelope.size():
+            if _segment_gap(envelope[j], envelope[(j + 1) % envelope.size()],
+                    road[0], road[1]) < float(road[2]) * 0.5 + 0.5:
+                return false
+    return true
+
+
+func _place_studio_building(points: PackedVector2Array, category: String, feature_id: String) -> void:
     if points.size() < 3:
         return
     _building_count += 1
@@ -979,10 +1051,100 @@ func _place_studio_building(points: PackedVector2Array, category: String) -> voi
     var recipe: Dictionary = IZBA_VARIANTS.recipe(points) if category == "house" else {}
     var floors := int(recipe.get("floor_count", 1))
     var height := (5.09 if floors == 2 else 2.84) if category == "house" else (2.29 if category == "sauna" else 2.27)
-    var footprint: PackedVector2Array = _studio_village.add_building(points, category, front, floors, _building_count)
-    _register_building_collider(footprint, height + 0.025, category != "shed")
+    var center := _polygon_bounds(points).get_center()
+    var plot := PackedVector2Array()
+    for candidate in _plot_polygons:
+        if Geometry2D.is_point_in_polygon(center, candidate):
+            plot = candidate
+            break
+    var placement: Dictionary = _studio_village.add_building(points, category, front, floors,
+        _building_count, _clear_building_site.bind(plot), feature_id)
+    if placement.is_empty():
+        return
+    _track_building(placement.envelope)
+    _register_building_collider(placement.foundation, height * placement.scale + 0.025, category != "shed")
     if category == "house":
-        _decorate_showcase_yard(points, front)
+        _house_approaches.append(placement)
+        _reserved_building_space.append(placement.reserved)
+        _reserved_building_bounds.append(_polygon_bounds(placement.reserved))
+        if center.distance_to(_feature_house_center) < 2.0:
+            # Retain the start-area landmark without adding props in the new corridor.
+            print("MANUAL_SHOWCASE_YARD_READY: ", placement.door)
+
+
+func _reserve_segment(start: Vector2, finish: Vector2) -> void:
+    _entrance_routes.append({"start": start, "end": finish,
+        "bounds": Rect2(start.min(finish), (start - finish).abs()).grow(1.6)})
+
+
+func _passage_clear(start: Vector2, finish: Vector2) -> bool:
+    for i in range(ceili(start.distance_to(finish) / 0.35) + 1):
+        if not _clear_of_buildings(start.move_toward(finish, i * 0.35), 0.68):
+            return false
+    return true
+
+
+func _find_road_detour(start: Vector2) -> PackedVector2Array:
+    # Four-neighbor search is only needed where a straight approach is blocked.
+    var frontier: Array[Vector2i] = [Vector2i.ZERO]
+    var previous := {Vector2i.ZERO: Vector2i.ZERO}
+    var cursor := 0
+    while cursor < frontier.size():
+        var cell := frontier[cursor]
+        cursor += 1
+        var position := start + Vector2(cell)
+        if _road_surface_gap(position) <= 0.4:
+            var route := PackedVector2Array([position])
+            while cell != Vector2i.ZERO:
+                cell = previous[cell]
+                route.append(start + Vector2(cell))
+            route.reverse()
+            return route
+        for axis in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+            var next: Vector2i = cell + axis
+            if previous.has(next) or next.length_squared() > 42 * 42:
+                continue
+            if not _passage_clear(position, start + Vector2(next)):
+                continue
+            previous[next] = cell
+            frontier.append(next)
+    return PackedVector2Array()
+
+
+func _reserve_placed_entrances() -> void:
+    for site in _house_approaches:
+        var start: Vector2 = site.front + site.outward * 0.74
+        _reserve_segment(site.door, start)
+        var candidates: Array[Vector2] = []
+        for road in _roads:
+            var point := Geometry2D.get_closest_point_to_segment(start, road[0], road[1])
+            if point.distance_squared_to(start) < 32.0 ** 2:
+                candidates.append(point)
+        candidates.sort_custom(func(a: Vector2, b: Vector2) -> bool:
+            return start.distance_squared_to(a) < start.distance_squared_to(b)
+        )
+        var found := false
+        for finish in candidates:
+            if (finish - start).dot(site.outward) >= -0.1 and _passage_clear(start, finish):
+                _reserve_segment(start, finish)
+                found = true
+                break
+        if found:
+            continue
+        var detour := _find_road_detour(start)
+        if detour.is_empty():
+            print("VILLAGE_ACCESS_LIMIT: ", start, " road_gap=", _road_surface_gap(start), " start_clear=", _clear_of_buildings(start, 0.68))
+            _approaches_blocked += 1
+            continue
+        var first := 0
+        while first < detour.size() - 1:
+            var last := detour.size() - 1
+            while last > first + 1 and not _passage_clear(detour[first], detour[last]):
+                last -= 1
+            _reserve_segment(detour[first], detour[last])
+            first = last
+    print("VILLAGE_ENTRANCES_READY: reserved=", _entrance_routes.size())
+
 
 func _decorate_modular_entrance(a: Vector2, b: Vector2,
         outward: Vector3, style: int) -> void:
@@ -1475,6 +1637,49 @@ func _fence_fit_span(a: Vector2, b: Vector2, inward: Vector2,
     return []
 
 
+func _distance_to_fence(point: Vector2, radius: float) -> float:
+    var lo := Vector2i(((point - Vector2.ONE * radius) / 4.0).floor())
+    var hi := Vector2i(((point + Vector2.ONE * radius) / 4.0).floor())
+    var distance := INF
+    for x in range(lo.x, hi.x + 1):
+        for y in range(lo.y, hi.y + 1):
+            for span in _fence_cells.get(Vector2i(x, y), []):
+                var closest := Geometry2D.get_closest_point_to_segment(point, span[0], span[1])
+                distance = minf(distance, point.distance_to(closest))
+    return distance
+
+
+func _place_fence_once(a: Vector2, b: Vector2) -> void:
+    var lo := Vector2i(((a.min(b) - Vector2.ONE * 0.55) / 4.0).floor())
+    var hi := Vector2i(((a.max(b) + Vector2.ONE * 0.55) / 4.0).floor())
+    var axis := (b - a).normalized()
+    for x in range(lo.x, hi.x + 1):
+        for y in range(lo.y, hi.y + 1):
+            for existing in _fence_cells.get(Vector2i(x, y), []):
+                var c: Vector2 = existing[0]
+                var d: Vector2 = existing[1]
+                if Geometry2D.segment_intersects_segment(a, b, c, d) != null:
+                    if minf(a.distance_to(c), a.distance_to(d)) > 0.08 \
+                            and minf(b.distance_to(c), b.distance_to(d)) > 0.08:
+                        _fence_duplicates += 1
+                        return
+                if absf(axis.dot((d - c).normalized())) > 0.89:
+                    var start := (c - a).dot(axis)
+                    var finish := (d - a).dot(axis)
+                    var overlap := minf(a.distance_to(b), maxf(start, finish)) - maxf(0.0, minf(start, finish))
+                    if overlap > 0.28 and _segment_gap(a, b, c, d) < 0.54:
+                        _fence_duplicates += 1
+                        return
+    for x in range(lo.x, hi.x + 1):
+        for y in range(lo.y, hi.y + 1):
+            var key := Vector2i(x, y)
+            if not _fence_cells.has(key):
+                _fence_cells[key] = []
+            _fence_cells[key].append([a, b])
+    _studio_village.add_fence(a, b, _studio_fence_profile, _fence_count % 3)
+    _register_fence_collider(a, b)
+
+
 func _fence_bridge_gap(a: Vector2, b: Vector2,
         polygon: PackedVector2Array) -> void:
     # Adjacent setbacks used to create conspicuous discontinuities at each
@@ -1485,8 +1690,7 @@ func _fence_bridge_gap(a: Vector2, b: Vector2,
         return
     if not _fence_span_clear(a, b, polygon):
         return
-    _studio_village.add_fence(a, b, _studio_fence_profile, _fence_count % 3)
-    _register_fence_collider(a, b)
+    _place_fence_once(a, b)
     _fence_joints_joined += 1
 
 
@@ -1496,8 +1700,7 @@ func _fence_draw_span(start: Vector2, finish: Vector2,
         _fence_bridge_gap(_last_fence_endpoint, start, polygon)
     if _first_fence_endpoint == Vector2(INF, INF):
         _first_fence_endpoint = start
-    _studio_village.add_fence(start, finish, _studio_fence_profile, _fence_count % 3)
-    _register_fence_collider(start, finish)
+    _place_fence_once(start, finish)
     _last_fence_endpoint = finish
 
 
@@ -1747,7 +1950,9 @@ func _yard_spot_ok(p: Vector2, polygon: PackedVector2Array,
             polygon[(i + 1) % polygon.size()])
         if p.distance_to(q) < radius + 0.32:
             return false
-    for previous in other:
+    if _distance_to_fence(p, radius + 0.45) < radius + 0.45:
+        return false
+    for previous in _yard_objects if not _yard_objects.is_empty() else other:
         if p.distance_to(previous["center"]) < radius + float(previous["radius"]) + 0.5:
             return false
     return true
@@ -1804,7 +2009,9 @@ func _decorate_plot_props(points: PackedVector2Array) -> void:
         _yard_prop(p, kind, rotation, _fence_count + attempts)
         _yard_counts[kind] += 1
         _plot_props_count += 1
-        placed.append({"center": p, "radius": _yard_radius(kind)})
+        var object := {"center": p, "radius": _yard_radius(kind)}
+        placed.append(object)
+        _yard_objects.append(object)
     # Bounded flower patches: well away from buildings, fences and road surfaces.
     # Remaining November stalks are rare; most abandoned plots have none.
     var flower_goal := 1 if _fence_count % 5 == 0 else 0
@@ -1816,7 +2023,8 @@ func _decorate_plot_props(points: PackedVector2Array) -> void:
             rng.randf_range(low.y, high.y))
         if not Geometry2D.is_point_in_polygon(p, points):
             continue
-        if _road_surface_gap(p) < 0.72 or _plot_boundary_gap(p) < 0.70:
+        if _road_surface_gap(p) < 0.72 or _plot_boundary_gap(p) < 0.70 \
+                or _distance_to_fence(p, 0.75) < 0.75:
             continue
         if _entry_zone_conflict(p, 0.75):
             continue
@@ -1851,7 +2059,7 @@ func _decorate_fence(points: PackedVector2Array) -> void:
         _fence_edge(points[i], points[(i + 1) % points.size()], i == gate_edge, points)
     if _last_fence_endpoint != Vector2(INF, INF) and _first_fence_endpoint != Vector2(INF, INF):
         _fence_bridge_gap(_last_fence_endpoint, _first_fence_endpoint, points)
-    _decorate_plot_props(points)
+    _placed_plots.append(points)
 
 func _decorate_road(points: PackedVector2Array) -> void:
     if points.size() < 2:

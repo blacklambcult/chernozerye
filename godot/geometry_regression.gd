@@ -133,7 +133,7 @@ func _initialize() -> void:
     var village := preload("res://generated_village.gd").new()
     var survey_outline := PackedVector2Array([Vector2(-12, -4), Vector2(12, -4),
         Vector2(12, 4), Vector2(-12, 4)])
-    var foundation := village.add_building(survey_outline, "house", 0, 1, 0)
+    var foundation: PackedVector2Array = village.add_building(survey_outline, "house", 0, 1, 0)["foundation"]
     village.free()
     if not is_equal_approx(foundation[0].distance_to(foundation[1]), 4.8) \
             or not is_equal_approx(foundation[1].distance_to(foundation[2]), 4.2) \

@@ -8,6 +8,11 @@ const BASE_SIZES := {"house": Vector2(4.8, 4.2), "sauna": Vector2(3.4, 3.0), "sh
 var _plots: Array[Dictionary] = []
 var _models: Dictionary = {}
 var _transforms: Dictionary = {}
+var _model_bounds: Dictionary = {}
+var _relocated := 0
+var _tight_sites := 0
+var _reduced := 0
+var _scale_sum := 0.0
 var _counts := [0, 0, 0, 0]
 var _placed := 0
 var _fences := 0
@@ -91,7 +96,7 @@ func plot_profile(points: PackedVector2Array) -> int:
 
 
 func add_building(points: PackedVector2Array, category: String, front: int,
-        floors: int, ordinal: int) -> PackedVector2Array:
+        floors: int, ordinal: int, fits: Callable = Callable(), feature_id := "") -> Dictionary:
     var center := _center(points)
     var a := points[front]
     var b := points[(front + 1) % points.size()]
@@ -114,23 +119,79 @@ func add_building(points: PackedVector2Array, category: String, front: int,
         profile = ordinal % 4
     var prefix: String = {"house": "izba%d" % floors, "sauna": "banya", "shed": "saray"}[category]
     var basis := Basis(Vector3.UP, atan2(outward.x, -outward.y))
-    _queue(prefix + "_" + str(profile), Transform3D(
-        basis, Vector3(center.x, 0.025, -center.y)))
+    var id := prefix + "_" + str(profile)
+    var bounds := _bounds_for_model(id, size)
+    var desired_scale := 1.08 + float(posmod(hash(feature_id), 101)) * 0.0014
+    var scale_factor := 1.0 if not fits.is_valid() else desired_scale
+    var envelope := PackedVector2Array()
+    var reserved := PackedVector2Array()
+    if fits.is_valid():
+        var found := false
+        for shrink in [1.0, 0.94, 0.86, 0.76, 0.65, 0.52]:
+            scale_factor = desired_scale * shrink
+            for radius in [0.0, 0.75, 1.5, 2.5, 4.0, 5.5, 7.0]:
+                for direction in (1 if radius == 0.0 else 16):
+                    var candidate: Vector2 = center + Vector2.from_angle(TAU * direction / 16.0) * radius
+                    envelope = _rectangle(candidate, right, outward, scale_factor, bounds)
+                    var clearance := bounds.grow(0.22 / scale_factor)
+                    if category == "house":
+                        clearance.size.y += 1.4 / scale_factor
+                    reserved = _rectangle(candidate, right, outward, scale_factor, clearance)
+                    if fits.call(reserved):
+                        center = candidate
+                        _relocated += int(radius > 0.0)
+                        _reduced += int(shrink < 1.0)
+                        found = true
+                        break
+                if found:
+                    break
+            if found:
+                break
+        if not found:
+            _tight_sites += 1
+            return {}
+    _queue(id, Transform3D(basis.scaled(Vector3.ONE * scale_factor),
+        Vector3(center.x, 0.025, -center.y)))
     if category == "house" and profile >= 4:
         var light := OmniLight3D.new()
-        var anchor := center + outward * (size.y * 0.5 + 0.6)
+        var anchor := center + outward * (size.y * scale_factor * 0.5 + 0.6)
         light.position = Vector3(anchor.x, 1.9, -anchor.y)
         light.light_color = Color("#ffb46b") if profile == 4 else Color("#63ebaf")
         light.light_energy = 0.32
         light.omni_range = 5.0
         add_child(light)
     _placed += 1
-    var across := right * size.x * 0.5
-    var depth := outward * size.y * 0.5
-    return PackedVector2Array([
-        center - across - depth, center + across - depth,
-        center + across + depth, center - across + depth,
-    ])
+    _scale_sum += scale_factor
+    var foundation := _rectangle(center, right, outward, scale_factor, Rect2(-size * 0.5, size))
+    return {"foundation": foundation, "envelope": envelope, "reserved": reserved, "scale": scale_factor,
+        "door": center + outward * size.y * scale_factor * 0.5,
+        "front": center + outward * bounds.end.y * scale_factor, "outward": outward}
+
+
+func _rectangle(center: Vector2, right: Vector2, outward: Vector2,
+        scale_factor: float, rect: Rect2) -> PackedVector2Array:
+    var result := PackedVector2Array()
+    for point in [rect.position, Vector2(rect.end.x, rect.position.y),
+            rect.end, Vector2(rect.position.x, rect.end.y)]:
+        result.append(center + (right * point.x + outward * point.y) * scale_factor)
+    return result
+
+
+func _bounds_for_model(id: String, size: Vector2) -> Rect2:
+    if _model_bounds.has(id):
+        return _model_bounds[id]
+    var result := Rect2(-size * 0.5, size)
+    if ResourceLoader.exists(MODEL_DIR + id + ".glb"):
+        var packed := load(MODEL_DIR + id + ".glb") as PackedScene
+        var template := packed.instantiate() as Node3D
+        # Studio's bake stores all parts directly under the model root.
+        for part: MeshInstance3D in template.find_children("*", "MeshInstance3D", true, false):
+            var bounds: AABB = part.transform * part.get_aabb()
+            result = result.merge(Rect2(Vector2(bounds.position.x, bounds.position.z),
+                Vector2(bounds.size.x, bounds.size.z)))
+        template.free()
+    _model_bounds[id] = result
+    return result
 
 
 func add_fence(a: Vector2, b: Vector2, profile: int, material_index: int) -> void:
@@ -188,6 +249,8 @@ func finish() -> void:
                 add_child(batch, true)
         template.free()
     _transforms.clear()
+    print("STUDIO_CLEARANCE_READY: relocated=", _relocated, " no_safe_fit=", _tight_sites,
+        " reduced=", _reduced, " average_scale=", _scale_sum / maxf(_placed, 1.0))
     print("STUDIO_VILLAGE_READY: buildings=", _placed, " fence_sections=", _fences,
         " abandoned=", _counts[0], " warm=", _counts[1], " eerie=", _counts[2],
         " cultist=", _counts[3], " cultist_center=", _cultist_point, " missing_models=", missing)

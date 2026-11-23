@@ -342,6 +342,13 @@ jobs:
           assert buildings == 397 and fences > 1000 and abandoned + warm + eerie + cultist == 209, village.groups()
           assert (warm, eerie, cultist) == (7, 2, 1) and int(village[9]) == 0, village.groups()
           assert -660 < east <= -320 and 50 <= north <= 730, (east, north)
+          clearance = re.search(
+              r'STUDIO_CLEARANCE_READY: relocated=(\d+) no_safe_fit=(\d+) reduced=(\d+) average_scale=([\d.]+)', log)
+          access = re.search(
+              r'VILLAGE_ACCESS_READY: homes=(\d+) segments=(\d+) blocked=(\d+) merged_fence_spans=(\d+)', log)
+          assert clearance and access, "Missing village placement and access diagnostics"
+          assert int(clearance[2]) == 0 and 1.08 <= float(clearance[4]) <= 1.22, clearance.groups()
+          assert int(access[1]) == 232 and int(access[3]) == 0 and int(access[4]) > 0, access.groups()
           yards = re.search(r'VILLAGE_YARDS_READY:.* collapsed_gate=(\d+)', log)
           assert yards and int(yards.group(1)) > 0, 'Broken gates missing from yards'
           flowers = re.search(r'MANUAL_UTILITY_READY:.*flower_patches=(\d+)', log)
