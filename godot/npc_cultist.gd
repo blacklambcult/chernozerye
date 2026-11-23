@@ -41,6 +41,8 @@ func _ready() -> void:
     add_child(collider)
     _visual = Node3D.new()
     _visual.name = "Visual"
+    # Retro screen grading remains active; do not replace NPC vertex-color materials with the generic jitter shader.
+    _visual.add_to_group(&"ps1_jitter_stable")
     add_child(_visual)
     _build_visual()
     # Character collider is for locomotion, while dedicated hitboxes receive rays.
@@ -346,6 +348,7 @@ func _setup_cloth(model: Node3D) -> void:
         var mesh_node := child as MeshInstance3D
         if mesh_node.mesh == null:
             continue
+        mesh_node.add_to_group(&"ps1_jitter_stable")
         mesh_node.material_override = null
         for surface in range(mesh_node.mesh.get_surface_count()):
             var material := StandardMaterial3D.new()
