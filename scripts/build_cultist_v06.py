@@ -11,7 +11,7 @@ import trimesh
 
 random.seed(614)
 scene = trimesh.Scene()
-groups = ["Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"]
+groups = ["Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg", "LeftShin", "RightShin", "LeftFoot", "RightFoot"]
 counter = {k: 0 for k in groups}
 
 def add(name, mesh, color, group="Torso"):
@@ -58,11 +58,16 @@ def cloth(name,levels,color,group="Torso",segments=32,folds=8,phase=1):
     scene.add_geometry(mesh,geom_name="%s_%s_%d"%(group,name,counter[group]),parent_node_name=group)
     counter[group]+=1
 
-# Boot groups remain independent for future hitzone/animation mapping.
+# Articulated parts: thigh, shin and boot retain independent nodes in the GLB.
+# Naming mirrors the game body's hit zones and the browser's three-joint gait rig.
 for side,part in [(-1,"LeftLeg"),(1,"RightLeg")]:
     x=side*.195
-    sphere("worn_boot", [x,-.14,.11],[.14,.20,.115],[52,51,47,255],part)
-    cloth("dark_trouser",[(.24,.13,.12,x,0),(.77,.14,.13,x,0)],[39,40,42,255],part,segments=14,folds=5)
+    shin=part.replace("Leg","Shin")
+    foot=part.replace("Leg","Foot")
+    cloth("upper_trouser",[(.44,.14,.12,x,0),(.79,.145,.13,x,0)],[42,43,45,255],part,segments=14,folds=5)
+    cloth("lower_trouser",[(.18,.13,.12,x,0),(.47,.145,.12,x,0)],[39,40,43,255],shin,segments=14,folds=5)
+    sphere("worn_boot", [x,-.14,.11],[.14,.20,.115],[52,51,47,255],foot)
+    sphere("worn_heel", [x,.025,.065],[.115,.10,.06],[37,37,35,255],foot,detail=1)
 
 # Outer robe: narrow shoulders, heavy folds, asymmetric damp hem.
 cloth("dirty_cassock",[(.24,.44,.28,0,0),(.4,.51,.32,0,0),(.65,.45,.28,0,0),(.95,.36,.24,0,0),(1.25,.29,.21,0,0),(1.65,.28,.2,0,0),(2.07,.30,.18,0,0)],[48,49,50,255],segments=48,folds=11,phase=.6)
