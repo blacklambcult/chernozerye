@@ -101,8 +101,24 @@ jobs:
           test -s godot/assets/dembel_fp.glb
           python scripts/check_dembel_character.py godot/assets/dembel_full.glb godot/assets/dembel_fp.glb
 
-      - name: Build cultist model v0.6
-        run: python scripts/build_cultist_v06.py godot/assets/npc/cultist_modular.glb
+      - name: Build high-detail cultist v0.8 for the actual Godot game
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/build_cultist_v08.py godot/assets/npc/cultist_modular.glb
+          python - <<'PY'
+          from pathlib import Path
+          import trimesh
+          path = Path('godot/assets/npc/cultist_modular.glb')
+          model = trimesh.load(path, force='scene')
+          groups = {'Head','Torso','LeftArm','RightArm','LeftLeg','RightLeg','LeftShin','RightShin','LeftFoot','RightFoot'}
+          assert groups.issubset(set(model.graph.nodes)), set(model.graph.nodes)
+          triangles = sum(len(g.faces) for g in model.geometry.values())
+          assert 50000 <= triangles <= 100000, triangles
+          assert len(model.geometry) == 10, len(model.geometry)
+          assert path.stat().st_size > 500000, path.stat().st_size
+          print('CULTIST_GAME_V08_OK: triangles=', triangles, 'groups=', len(groups), 'bytes=', path.stat().st_size)
+          PY
 
       - name: Restore user-exported Hellish Forge pistol GLB
         shell: bash
