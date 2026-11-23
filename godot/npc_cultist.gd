@@ -73,11 +73,18 @@ func _build_visual() -> void:
             var model := packed.instantiate() as Node3D
             if model != null:
                 model.name = "CultistModel"
-                # The source sculpt is 2.6 m tall; align its head with 1.8 m NPC hitbox.
+                # The authored v0.8 mesh is 2.68 m in source Z-up units.
+                # At 0.69 scale it stands ~1.85 m, matching the NPC collider.
                 model.scale = Vector3.ONE * 0.69
-                # Procedurally authored Trimesh GLB uses Z-up; Godot is Y-up.
+                # Trimesh source is Z-up with the face pointing toward -Y.
+                # First convert Z-up to Godot Y-up; then turn the front toward
+                # the controller's -Z forward axis (without flipping the feet).
                 model.rotation.x = -PI * 0.5
-                _visual.add_child(model)
+                var facing := Node3D.new()
+                facing.name = "ModelFacingCorrection"
+                facing.rotation.y = PI
+                _visual.add_child(facing)
+                facing.add_child(model)
                 # Build a parented pose rig over the authored GLB groups:
                 # thigh -> shin -> foot, plus arms and head.
                 # Parent pivots are placed in original Z-up model coordinates.
