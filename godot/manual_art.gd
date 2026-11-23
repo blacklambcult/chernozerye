@@ -36,7 +36,6 @@ var _fence_short_spans_recovered := 0
 var _fence_joints_joined := 0
 var _last_fence_endpoint := Vector2(INF, INF)
 var _first_fence_endpoint := Vector2(INF, INF)
-var _last_fence_post := Vector2(INF, INF)
 var _yard_positions_rejected := 0
 var _roof_joints_sealed := 0
 var _detail_batches: Dictionary = {}
@@ -59,10 +58,6 @@ var _anomaly_clock := 0.0
 var _street_lights := 0
 var _street_lamp_heads := 0
 var _balcony_count := 0
-var _fence_posts: PackedVector3Array = PackedVector3Array()
-var _fence_rails: PackedVector3Array = PackedVector3Array()
-var _fence_wire_mesh: PackedVector3Array = PackedVector3Array()
-var _fence_slats: PackedVector3Array = PackedVector3Array()
 var _yard_details: PackedVector3Array = PackedVector3Array()
 var _road_ruts: PackedVector3Array = PackedVector3Array()
 var _overhead_wires: PackedVector3Array = PackedVector3Array()
@@ -110,7 +105,15 @@ func _process(delta: float) -> void:
             lamp.light_energy = 0.39 + wave * 0.08
 
 
+const STUDIO_VILLAGE := preload("res://generated_village.gd")
+var _studio_village: Node3D
+var _studio_fence_profile := 0
+
 func decorate(features: Array) -> void:
+    _studio_village = STUDIO_VILLAGE.new()
+    _studio_village.name = "StudioVillage"
+    add_child(_studio_village)
+    _studio_village.prepare(features)
     _rng.seed = 19960918
     # Choose one real, hand-surveyed building nearest the documented village spawn.
     # This is a visual showcase, not an invented new geographic footprint.
@@ -165,30 +168,20 @@ func decorate(features: Array) -> void:
         var polygon := _local_points(item.get("points", []))
         match category:
             "house", "sauna", "shed":
-                _decorate_building(polygon, category)
+                _place_studio_building(polygon, category)
             "plot":
                 _decorate_fence(polygon)
             "road":
                 _decorate_road(polygon)
             "forest":
                 _decorate_forest(polygon)
+    _studio_village.finish()
     _flush_details()
     _build_collision_bodies()
-    _create_solid_mesh(_fence_posts, Color("#423b35"), "Забор / столбы")
-    _create_solid_mesh(_fence_rails, Color("#48433d"), "Забор / рейки")
-    _create_solid_mesh(_fence_wire_mesh, Color("#4c6759"), "Старая зелёная рабица")
-    _create_solid_mesh(_fence_slats, Color("#3a3b35"), "Забор / обветшавший штакетник")
     _create_solid_mesh(_yard_details, Color("#48443b"), "Старый деревенский быт / ящики и дрова")
     _create_solid_mesh(_road_ruts, RUT_COLOR, "Дорога / земляные колеи")
     _create_solid_mesh(_overhead_wires, Color("#242d2d"), "Старые кабели / провисшие линии")
     _create_chimney_smoke()
-    print("ABANDONED_VILLAGE_LIGHTS_READY: houses=", _house_ordinal,
-        " dark=", _dark_houses, " warm_houses=", _warm_houses,
-        " anomalous_houses=", _anomalous_houses,
-        " warm_windows=", _warm_windows,
-        " otherworldly_windows=", _otherworldly_windows)
-    print("ABANDONMENT_FACADE_READY: boarded_windows=", _new_boarded_windows,
-        " sealed_entries=", _sealed_entries, " anomaly_motes=", _eerie_motes)
     print("MANUAL_UTILITY_READY: poles=", _utility_pole_count,
         " lamp_heads=", _street_lamp_heads, " warm_lights=", _street_lights,
         " balconies=", _balcony_count,
@@ -203,14 +196,6 @@ func decorate(features: Array) -> void:
         " plots=", _fence_count, " roads=", _road_count, " lamps=", _lights_placed)
     print("MANUAL_VILLAGE_DETAIL_READY: canopies=", _canopy_count,
         " plot_props=", _plot_props_count, " crooked_fences=", _fence_count)
-    print("MANUAL_FACADE_READY: lean_tos=", _lean_to_count,
-        " roof_patches=", _roof_patch_count, " rotten_shutters=", _shutter_count)
-    print("IZBA_GENERATOR_READY: floor_counts=", _floor_counts,
-        " body=", _body_counts, " roof=", _roof_counts,
-        " windows=", _window_counts, " entrances=", _entrance_counts)
-    print("IZBA_DETAIL_READY: log_courses=", _log_courses_count,
-        " roof_eaves=", _eaves_count, " carved=", _carved_count,
-        " clipped_segments=", _clipped_log_segments)
     print("VILLAGE_YARDS_READY: wells=", _yard_counts[0],
         " beds=", _yard_counts[1], " greenhouses=", _yard_counts[2],
         " firewood=", _yard_counts[3], " scrap=", _yard_counts[4],
@@ -986,139 +971,18 @@ func _decorate_wall_module(a: Vector2, b: Vector2, normal: Vector3,
                 0.58, minf(height - 0.18, 1.02 + float(salt % 3) * 0.27), 0.098)
 
 
-func _decorate_building(points: PackedVector2Array, category: String) -> void:
+func _place_studio_building(points: PackedVector2Array, category: String) -> void:
     if points.size() < 3:
         return
     _building_count += 1
-    var index := _building_count
-    # Exactly two anomalous houses and ~7 sparsely occupied houses in the
-    # 232-home Geo Lab survey; all others have no interior illumination.
-    _current_house_light_kind = ""
-    _house_light_claimed = false
+    var front := _building_front_edge(points)
+    var recipe: Dictionary = IZBA_VARIANTS.recipe(points) if category == "house" else {}
+    var floors := int(recipe.get("floor_count", 1))
+    var height := (4.95 if floors == 2 else 2.76) if category == "house" else 2.3
+    _register_building_collider(points, height, category != "shed")
+    _studio_village.add_building(points, category, front, floors, _building_count)
     if category == "house":
-        _house_ordinal += 1
-        if _house_ordinal == 19 or _house_ordinal == 62:
-            _current_house_light_kind = "eerie"
-            _anomalous_houses += 1
-        elif _house_ordinal % 13 == 5:
-            _current_house_light_kind = "warm"
-            _warm_houses += 1
-        else:
-            _dark_houses += 1
-    var recipe: Dictionary = IZBA_VARIANTS.recipe(points) if category == "house" else {
-        "floor_count": 1, "body": 0, "roof": 0, "window": 0, "entrance": 0
-    }
-    var floors: int = int(recipe["floor_count"])
-    var body_style: int = int(recipe["body"])
-    var roof_style: int = int(recipe["roof"])
-    var window_style: int = int(recipe["window"])
-    var entrance_style: int = int(recipe["entrance"])
-    if category == "house":
-        _floor_counts[floors - 1] += 1
-        _body_counts[body_style] += 1
-        _roof_counts[roof_style] += 1
-        _window_counts[window_style] += 1
-        _entrance_counts[entrance_style] += 1
-    var walls_height := (6.52 if floors == 2 else 3.78) if category == "house" else (2.7 if category == "sauna" else 2.35)
-    _register_building_collider(points, walls_height, body_style in [0, 1, 4])
-    var wall_style := body_style if category == "house" else (1 if category == "sauna" else 0)
-    # From the supplied Russian village photographs: dark logs, faded paint,
-    # mint-green fences, dull blue gables, rusty metal and pale limewash.
-    var tones := ["#545047", "#594735", "#6e736d", "#5b4940", "#4b5652"]
-    var painted_tones := ["#50453c", "#486260", "#62665d", "#675044", "#596878", "#706544"]
-    var color_index := (index * 7 + body_style * 3) % painted_tones.size()
-    var tone := Color(painted_tones[color_index]) if category == "house" else Color("#39382f" if category == "sauna" else "#47413b")
-    if category == "house" and body_style == 1:
-        tone = Color(tones[1]) # Exposed logs, no paint on the timber crests.
-    _active_trim_key = ["trim_blue", "trim_green", "trim_red", "trim_cream"][(index + body_style) % 4]
-    var roof_tones := ["#3b4244", "#5c4237", "#34312e", "#3e4548", "#474640"]
-    var wall_tex := _pixel_texture(tone, 8021 + body_style * 11 + index % 3, false, wall_style)
-    var roof_tex := _pixel_texture(Color(roof_tones[roof_style]), 9121 + roof_style * 13, true, roof_style)
-    var wall_verts := PackedVector3Array()
-    var wall_uvs := PackedVector2Array()
-    var signed := _signed_area(points)
-    var front_index := _building_front_edge(points)
-    for i in range(points.size()):
-        var a := points[i]
-        var b := points[(i + 1) % points.size()]
-        var side := b - a
-        var length := side.length()
-        if length < 0.1:
-            continue
-        var outward_2d := Vector2(side.y, -side.x).normalized()
-        if signed < 0.0:
-            outward_2d *= -1.0
-        var normal := Vector3(outward_2d.x, 0, -outward_2d.y)
-        # Shared polygon corners instead of separate normal offsets: no split walls.
-        _quad(wall_verts, wall_uvs, _pt(a, 0.12), _pt(b, 0.12),
-            _pt(b, walls_height), _pt(a, walls_height))
-        if category == "house":
-            _decorate_wall_module(a, b, normal, walls_height, body_style,
-                index + i, i == front_index, floors)
-        if i == front_index and length > 3.3:
-            var door_half := 0.55 / length
-            _wall_panel("frame", a, b, normal, 0.5 - door_half - 0.02,
-                0.5 + door_half + 0.02, 0.1, 2.23)
-            _wall_panel("door", a, b, normal, 0.5 - door_half,
-                0.5 + door_half, 0.12, 2.13, 0.15)
-            # Some deserted houses were sealed long ago. These are facade
-            # decorations only, not colliders or changes to surveyed entrances.
-            if category == "house" and _current_house_light_kind == "" and index % 4 == 1:
-                for plank in range(3):
-                    var bottom := 0.50 + float(plank) * 0.50
-                    _wall_panel("rotted_plank", a, b, normal,
-                        0.5 - door_half * 1.10, 0.5 + door_half * 1.10,
-                        bottom, bottom + 0.19, 0.215)
-                _sealed_entries += 1
-            if category == "house" and length > 7.0:
-                _make_window(a, b, normal, 0.19, length, index % 5 != 1,
-                    index % 11 == 0, index + i, window_style)
-                _make_window(a, b, normal, 0.81, length, index % 4 != 1,
-                    index % 10 == 0, index + i + 3, window_style)
-            if category == "house" and floors == 2 and length > 5.0:
-                _make_window(a, b, normal, 0.3, length, index % 3 != 0, false,
-                    index + i + 1, window_style, 1)
-                _make_window(a, b, normal, 0.7, length, index % 4 != 0, false,
-                    index + i + 4, window_style, 1)
-        elif category == "house" and length > 5.0:
-            _make_window(a, b, normal, 0.5, length, (index + i) % 3 != 0,
-                (index + i) % 11 == 0, index + i, window_style)
-            if floors == 2:
-                _make_window(a, b, normal, 0.5, length, (index + i) % 4 != 0, false,
-                    index + i + 8, window_style, 1)
-    if category == "house":
-        for corner in points:
-            _batch_box("corner_timber", _pt(corner, walls_height * 0.5 + 0.04),
-                Vector3(0.26, walls_height - 0.08, 0.26))
-    _make_textured_mesh(wall_verts, wall_uvs, _material(Color.WHITE, wall_tex),
-        category + " / modular body " + str(body_style))
-    _decorate_roof(points, category, walls_height, roof_tex, index, roof_style)
-    if category == "house" and points.size() == 4 and index % 7 == 3:
-        var rear_index := (front_index + 2) % 4
-        var rear_a: Vector2 = points[rear_index]
-        var rear_b: Vector2 = points[(rear_index + 1) % 4]
-        if rear_a.distance_to(rear_b) > 5.0 and _nearest_road_distance((rear_a + rear_b) * 0.5) > 3.5:
-            var rear_side := rear_b - rear_a
-            var rear_out := Vector2(rear_side.y, -rear_side.x).normalized()
-            if signed < 0.0:
-                rear_out *= -1.0
-            _decorate_lean_to(rear_a, rear_b, Vector3(rear_out.x, 0.0, -rear_out.y))
-    if category == "house":
-        var front_a: Vector2 = points[front_index]
-        var front_b: Vector2 = points[(front_index + 1) % points.size()]
-        if front_a.distance_to(front_b) > 3.3:
-            var front_side := front_b - front_a
-            var out2d := Vector2(front_side.y, -front_side.x).normalized()
-            if signed < 0.0:
-                out2d *= -1.0
-            var front_normal := Vector3(out2d.x, 0, -out2d.y)
-            _decorate_modular_entrance(front_a, front_b, front_normal, entrance_style)
-            if floors == 2 and front_a.distance_to(front_b) > 6.8 and index % 2 == 0:
-                _decorate_balcony(front_a, front_b, front_normal)
-            # Not every home has a paved approach: retain the village's dirt yards.
-            if index % 3 == 0:
-                _decorate_house_walk(front_a, front_b, front_normal)
-        _decorate_showcase_yard(points, front_index)
+        _decorate_showcase_yard(points, front)
 
 func _decorate_modular_entrance(a: Vector2, b: Vector2,
         outward: Vector3, style: int) -> void:
@@ -1600,38 +1464,6 @@ func _batch_box(key: String, center: Vector3, size: Vector3) -> void:
 func _append_box_to(verts: PackedVector3Array, center: Vector3, size: Vector3) -> void:
     _box_faces(verts, center, size)
 
-func _append_crooked_post(verts: PackedVector3Array, p: Vector2,
-        height: float, tilt: Vector2) -> void:
-    # Eight vertices make the whole post lean, rather than sliding an upright box.
-    var foot := _pt(p, 0.12)
-    var head := _pt(p + tilt, 0.12 + height)
-    var xx := Vector3(0.085, 0.0, 0.0)
-    var zz := Vector3(0.0, 0.0, 0.085)
-    var corners := [
-        foot - xx - zz, foot + xx - zz, foot + xx + zz, foot - xx + zz,
-        head - xx - zz, head + xx - zz, head + xx + zz, head - xx + zz
-    ]
-    for face in [[0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6],
-            [3, 0, 4, 7], [4, 5, 6, 7], [3, 2, 1, 0]]:
-        _push_tri(verts, corners[face[0]], corners[face[1]], corners[face[2]])
-        _push_tri(verts, corners[face[0]], corners[face[2]], corners[face[3]])
-
-func _fence_wire(a: Vector3, b: Vector3) -> void:
-    var thickness := Vector3.UP * 0.012
-    _push_tri(_fence_wire_mesh, a - thickness, a + thickness, b + thickness)
-    _push_tri(_fence_wire_mesh, a - thickness, b + thickness, b - thickness)
-
-
-func _fence_chainlink(a: Vector2, b: Vector2) -> void:
-    # A few green diamond-mesh sections break up the repeated post-and-rail silhouette.
-    # Batched into one Web-friendly mesh and clipped by the same road/building tests.
-    for i in range(4):
-        var p := a.lerp(b, float(i) / 4.0)
-        var q := a.lerp(b, float(i + 1) / 4.0)
-        _fence_wire(_pt(p, 0.37), _pt(q, 1.24))
-        _fence_wire(_pt(p, 1.24), _pt(q, 0.37))
-
-
 func _fence_fit_span(a: Vector2, b: Vector2, inward: Vector2,
         polygon: PackedVector2Array) -> Array:
     # Find the smallest safe setback for a section, retaining surveyed plot lines.
@@ -1653,67 +1485,24 @@ func _fence_bridge_gap(a: Vector2, b: Vector2,
         return
     if not _fence_span_clear(a, b, polygon):
         return
-    var tangent := (b - a).normalized()
-    var sideways := Vector3(-tangent.y, 0.0, -tangent.x) * 0.04
-    var half_thickness := Vector3.UP * 0.085
-    for height in [0.50, 1.06]:
-        var v0 := _pt(a, float(height)) + sideways
-        var v1 := _pt(b, float(height)) + sideways
-        _push_tri(_fence_rails, v0 - half_thickness,
-            v1 - half_thickness, v1 + half_thickness)
-        _push_tri(_fence_rails, v0 - half_thickness,
-            v1 + half_thickness, v0 + half_thickness)
-    if gap > 1.55:
-        _append_crooked_post(_fence_posts, (a + b) * 0.5, 1.24, Vector2(0.04, -0.02))
-    _fence_chainlink(a, b)
+    _studio_village.add_fence(a, b, _studio_fence_profile, _fence_count % 3)
     _register_fence_collider(a, b)
     _fence_joints_joined += 1
 
 
-func _fence_draw_span(start: Vector2, finish: Vector2, ordinal: int,
+func _fence_draw_span(start: Vector2, finish: Vector2,
         polygon: PackedVector2Array) -> void:
     if _last_fence_endpoint != Vector2(INF, INF):
         _fence_bridge_gap(_last_fence_endpoint, start, polygon)
     if _first_fence_endpoint == Vector2(INF, INF):
         _first_fence_endpoint = start
-    # Adjacent panels use shared posts instead of flickering doubled geometry.
-    for endpoint in range(2):
-        var p: Vector2 = start if endpoint == 0 else finish
-        if p.distance_to(_last_fence_post) < 0.08:
-            continue
-        var height := 1.35 + 0.22 * sin(float(ordinal * 13 + endpoint * 7 + _fence_count))
-        var tilt := Vector2(0.10 * sin(float(ordinal * 17 + endpoint)),
-            0.09 * cos(float(ordinal * 11 + _fence_count)))
-        _append_crooked_post(_fence_posts, p, height, tilt)
-        _last_fence_post = p
-    if _fence_count % 3 == 0:
-        _fence_chainlink(start, finish)
-    elif _fence_count % 3 == 1:
-        var slats := maxi(1, int(ceil(start.distance_to(finish) / 0.47)))
-        for j in range(slats):
-            if (ordinal * 7 + j * 13 + _fence_count) % 19 == 0:
-                continue
-            var p := start.lerp(finish, (float(j) + 0.5) / float(slats))
-            var height := 1.05 + 0.27 * sin(float(ordinal * 19 + j * 17))
-            _append_box_to(_fence_slats, _pt(p, height * 0.5 + 0.12),
-                Vector3(0.125, height, 0.125))
-    var tangent := (finish - start).normalized()
-    var outward3 := Vector3(-tangent.y, 0, -tangent.x) * 0.04
-    var half_thickness := Vector3.UP * 0.085
-    for height in [0.50, 1.06]:
-        var v0 := _pt(start, float(height)) + outward3
-        var v1 := _pt(finish, float(height)) + outward3
-        _push_tri(_fence_rails, v0 - half_thickness,
-            v1 - half_thickness, v1 + half_thickness)
-        _push_tri(_fence_rails, v0 - half_thickness,
-            v1 + half_thickness, v0 + half_thickness)
+    _studio_village.add_fence(start, finish, _studio_fence_profile, _fence_count % 3)
     _register_fence_collider(start, finish)
     _last_fence_endpoint = finish
 
 
 func _fence_break() -> void:
     _last_fence_endpoint = Vector2(INF, INF)
-    _last_fence_post = Vector2(INF, INF)
 
 
 func _fence_edge(a: Vector2, b: Vector2, gate_center: bool,
@@ -1747,7 +1536,7 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool,
             continue
         var fit := _fence_fit_span(raw_start, raw_finish, inward, polygon)
         if not fit.is_empty():
-            _fence_draw_span(fit[0], fit[1], i, polygon)
+            _fence_draw_span(fit[0], fit[1], polygon)
             if float(fit[2]) >= 0.45:
                 _fence_panels_relocated += 1
             continue
@@ -1762,7 +1551,7 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool,
             if short_fit.is_empty():
                 _fence_break()
                 continue
-            _fence_draw_span(short_fit[0], short_fit[1], i * 2 + half, polygon)
+            _fence_draw_span(short_fit[0], short_fit[1], polygon)
             if float(short_fit[2]) >= 0.45:
                 _fence_panels_relocated += 1
             recovered += 1
@@ -2048,6 +1837,7 @@ func _decorate_fence(points: PackedVector2Array) -> void:
     if points.size() < 3:
         return
     _fence_count += 1
+    _studio_fence_profile = _studio_village.plot_profile(points)
     _first_fence_endpoint = Vector2(INF, INF)
     _fence_break()
     var gate_edge := 0

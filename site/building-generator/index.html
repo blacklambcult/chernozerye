@@ -2932,6 +2932,7 @@
                     const matIdx = state.zabor.mat; // 0=picket, 1=solid planks, 2=corrugated/rust tin
                     const formIdx = state.zabor.form; // 0=straight 4m, 1=with gate, 2=corner 90deg
                     const cond = state.conditions.fence;
+                    const span = state.zabor.span || 4.0;
 
                     const isMetal = (matIdx === 2);
                     const fenceH = matIdx === 0 ? 1.35 : 1.78;
@@ -2948,7 +2949,8 @@
                         parent.add(seg);
 
                         // Posts at ends
-                        [0, length].forEach((px, idx) => {
+                        const inset = span < 4.0 ? 0.08 : 0;
+                        [inset, length - inset].forEach((px, idx) => {
                             const post = new THREE.Mesh(
                                 isMetal ? new THREE.CylinderGeometry(0.05, 0.05, fenceH + 0.08, 6) : new THREE.BoxGeometry(0.12, fenceH + 0.08, 0.12),
                                 postMat
@@ -3018,7 +3020,7 @@
 
                     if (formIdx === 0) {
                         // Straight 4m section
-                        buildSegment(fenceGrp, 4.0, -2.0, 0, 0, true);
+                        buildSegment(fenceGrp, span, -span / 2, 0, 0, true);
                     } else if (formIdx === 1) {
                         // Section with separate Fence_Gate child node
                         buildSegment(fenceGrp, 1.45, -2.0, 0, 0, false);
@@ -3055,6 +3057,7 @@
                     if (cond === 'cultist') {
                         const decoGrp = new THREE.Group();
                         decoGrp.name = 'Cultist_Decor';
+                        if (formIdx === 0) decoGrp.scale.x = span / 4;
                         root.add(decoGrp);
 
                         addBarbedCoil(decoGrp, -1.1, fenceH + 0.08, 0.04, 0.22);

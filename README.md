@@ -1,5 +1,14 @@
 # Fearless Knights of the Cordon
 
+Для локальной сборки игровой деревни перед импортом проекта в Godot сгенерируйте модели Студии:
+
+```sh
+npm install --prefix /tmp/studio-village --no-save three@0.128.0 @napi-rs/canvas@0.1.80
+NODE_PATH=/tmp/studio-village/node_modules node scripts/build_village_models.cjs
+godot --headless --path godot --editor --import
+```
+
+
 ### PRE-ALPHA 0.7.2 — fix village-start world items (2026-11-20)
 
 - Fixed a real production bug: the first three authored world pickups were placed near the legacy OSM world position (130,-82), while `_activate_default_village()` teleports the actual player to the surveyed Geo Lab village at (-789.7,-268.6). The distance (~936m) exceeded both the 27m beacon and 42m HUD finder ranges.

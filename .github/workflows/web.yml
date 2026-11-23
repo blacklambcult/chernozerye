@@ -149,6 +149,12 @@ jobs:
           cp -a /tmp/godot-templates/templates/. "$HOME/.local/share/godot/export_templates/${VERSION}.stable/"
           godot --version
 
+      - name: Bake Studio building and fence models
+        run: |
+          npm install --prefix /tmp/studio-village --no-save --no-audit --no-fund three@0.128.0 @napi-rs/canvas@0.1.80
+          NODE_PATH=/tmp/studio-village/node_modules node scripts/build_village_models.cjs
+          test "$(find godot/generated_village -name '*.glb' | wc -l)" -eq 37
+
       - name: Import project
         run: godot --headless --path godot --editor --quit
 
@@ -286,7 +292,6 @@ jobs:
           grep -q "NOVEMBER_SNOW_READY: cpu=true amount=340 follow_player=true" /tmp/world-smoke.log
           grep -q "NOVEMBER_MUD_READY: patches=" /tmp/world-smoke.log
           grep -q "NOVEMBER_SMOKE_READY: active=" /tmp/world-smoke.log
-          grep -q "ABANDONED_VILLAGE_LIGHTS_READY:" /tmp/world-smoke.log
           grep -q "VILLAGE_COLLISION_READY:" /tmp/world-smoke.log
           grep -q "FOREST_COLLISION_READY:" /tmp/world-smoke.log
           grep -q "CAMERA_CLIP_GUARD_READY:" /tmp/world-smoke.log
@@ -314,7 +319,6 @@ jobs:
           assert buildings >= 397 and fences >= 100 and yard > 0 and trunks > 0, (buildings, fences, yard, trunks)
           print("VILLAGE_PHYSICS_AUDIT_OK:", buildings, fences, yard, trunks)
           PY
-          grep -q "ABANDONMENT_FACADE_READY:" /tmp/world-smoke.log
           grep -q 'weather_label.name = "NovemberWeatherLabel"' godot/world.gd
           python - <<'PY'
           import re
@@ -328,39 +332,26 @@ jobs:
           assert smoke, 'No active chimney smoke diagnostic'
           active, candidates = map(int, smoke.groups())
           assert 0 <= active <= 1 and candidates >= active, ('Abandoned village has too many smoke plumes', active, candidates)
-          houses = re.search(
-              r'ABANDONED_VILLAGE_LIGHTS_READY: houses=(\d+) dark=(\d+)'
-              r' warm_houses=(\d+) anomalous_houses=(\d+)'
-              r' warm_windows=(\d+) otherworldly_windows=(\d+)', log)
-          assert houses, 'Missing abandoned village illumination audit'
-          total, dark, warm, eerie, warm_windows, eerie_windows = map(int, houses.groups())
-          assert total == 232, ('Unexpected surveyed house count', total)
-          assert dark >= 205 and warm <= 22 and eerie == 2, ('Village too inhabited', houses.groups())
-          assert 7 <= warm_windows <= 22, ('Warm window distribution invalid', warm_windows)
-          assert 1 <= eerie_windows <= 2, ('Unnatural light missing', eerie_windows)
-          facade = re.search(
-              r'ABANDONMENT_FACADE_READY: boarded_windows=(\d+)'
-              r' sealed_entries=(\d+) anomaly_motes=(\d+)', log)
-          assert facade, 'Missing decay facade counters'
-          boarded, sealed, motes = map(int, facade.groups())
-          assert boarded >= 15 and sealed >= 8, ('Abandoned houses look too intact', facade.groups())
-          assert motes == 2, ('Only the two anomalous houses should emit dust', motes)
+          village = re.search(
+              r'STUDIO_VILLAGE_READY: buildings=(\d+) fence_sections=(\d+)'
+              r' abandoned=(\d+) warm=(\d+) eerie=(\d+) cultist=(\d+)'
+              r' cultist_center=\(([-\d.]+), ([-\d.]+)\) missing_models=(\d+)', log)
+          assert village, "Studio village diagnostics missing"
+          buildings, fences, abandoned, warm, eerie, cultist = map(int, village.groups()[:6])
+          east, north = map(float, village.groups()[6:8])
+          assert buildings == 397 and fences > 1000 and abandoned + warm + eerie + cultist == 209, village.groups()
+          assert (warm, eerie, cultist) == (7, 2, 1) and int(village[9]) == 0, village.groups()
+          assert -660 < east <= -320 and 50 <= north <= 730, (east, north)
           yards = re.search(r'VILLAGE_YARDS_READY:.* collapsed_gate=(\d+)', log)
           assert yards and int(yards.group(1)) > 0, 'Broken gates missing from yards'
           flowers = re.search(r'MANUAL_UTILITY_READY:.*flower_patches=(\d+)', log)
           assert flowers and int(flowers.group(1)) < 40, 'Too many live garden flowers'
-          print('ABANDONED_VILLAGE_AUDIT_OK:', dark, warm_windows, eerie_windows,
-                'smoking=', active, 'boarded=', boarded, 'sealed=', sealed,
-                'anomalies=', motes, 'collapsed_gates=', int(yards.group(1)))
           print('NOVEMBER_WEATHER_AUDIT_OK: mud=', mud, 'puddles=', puddles, 'smoke=', active)
           PY
           grep -q '^    _activate_default_village()' godot/world.gd
           grep -q 'config/name="Fearless Knights of the Cordon"' godot/project.godot
           grep -q "MANUAL_ART_READY: buildings=397 plots=209 roads=20" /tmp/world-smoke.log
           grep -q "MANUAL_VILLAGE_DETAIL_READY: canopies=" /tmp/world-smoke.log
-          grep -q "MANUAL_FACADE_READY: lean_tos=" /tmp/world-smoke.log
-          grep -q "IZBA_GENERATOR_READY: floor_counts=" /tmp/world-smoke.log
-          grep -q "IZBA_DETAIL_READY: log_courses=" /tmp/world-smoke.log
           grep -q "VILLAGE_YARDS_READY: wells=" /tmp/world-smoke.log
           grep -q "VILLAGE_ENTRANCES_READY: reserved=" /tmp/world-smoke.log
           grep -q "MANUAL_STREETSCAPE_READY:" /tmp/world-smoke.log
@@ -392,7 +383,6 @@ jobs:
           assert attempted > 0, 'No fence panels attempted'
           assert missing / attempted < 0.55, ('Most fence sections were lost', missing, attempted)
           assert relocated > 20, ('No roadside fence correction performed', relocated)
-          assert sealed == 232, ('Unexpected house roof count', sealed)
           print('VILLAGE_GEOMETRY_AUDIT_OK:', missing, attempted, relocated, sealed)
           PY
           # Manual village mode is enabled by default during scene startup.
