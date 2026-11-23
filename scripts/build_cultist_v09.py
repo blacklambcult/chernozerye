@@ -258,14 +258,16 @@ for side in (-1,1):
 ellipsoid('thick_knot',(0,-.31,1.23),(.075,.045,.06),(85,79,58),'Torso',2)
 
 # ---------------- Head: hood, shadow face, grey beard ----------------
+# Keep the dark recess behind the visible facial surface, rather than occluding it.
+# Brighter warm skin and grey beard preserve readability in the night environment.
 # Back hood has organic folds (front opening is made of a separate rim, not a perfect oval).
 ellipsoid('hood_mass',(0,.048,2.31),(.286,.258,.325),(25,26,27),'Head',subdivisions=4)
-ellipsoid('hood_brow',(0,-.085,2.49),(.276,.252,.19),(34,34,35),'Head',subdivisions=3)
-ellipsoid('shadow_recess',(0,-.216,2.305),(.190,.075,.235),(10,11,13),'Head',subdivisions=3)
-ellipsoid('weathered_angular_face',(0,-.236,2.290),(.092,.038,.156),(76,68,60),'Head',subdivisions=4)
-ellipsoid('long_nose',(0,-.256,2.281),(.03,.05,.065),(69,63,59),'Head',subdivisions=2)
-ellipsoid('cheek_left',(-.087,-.263,2.293),(.028,.033,.065),(61,58,55),'Head',2)
-ellipsoid('cheek_right',(.087,-.263,2.293),(.028,.033,.065),(58,54,51),'Head',2)
+ellipsoid('hood_brow',(0,-.035,2.52),(.276,.205,.16),(34,34,35),'Head',subdivisions=3)
+ellipsoid('shadow_recess',(0,-.165,2.305),(.190,.057,.235),(10,11,13),'Head',subdivisions=3)
+ellipsoid('weathered_angular_face',(0,-.282,2.305),(.108,.048,.155),(151,132,113),'Head',subdivisions=4)
+ellipsoid('long_nose',(0,-.316,2.303),(.029,.047,.061),(159,139,121),'Head',subdivisions=2)
+ellipsoid('cheek_left',(-.080,-.299,2.31),(.036,.026,.061),(137,119,105),'Head',2)
+ellipsoid('cheek_right',(.080,-.299,2.31),(.036,.026,.061),(130,113,101),'Head',2)
 # Hood opening edge follows eyebrow and cheek, thick enough to cast a shadow.
 hood_rim=[(-.185,-.259,2.14),(-.237,-.255,2.29),(-.232,-.256,2.405),
           (-.19,-.252,2.53),(-.11,-.247,2.573),(0,-.248,2.589),
@@ -275,11 +277,11 @@ polyline_tube('torn_hood_brim',hood_rim,.034,(41,39,38),'Head',sides=9)
 for side in [-1,1]:
     polyline_tube('hood_seam',[(side*.23,-.10,2.48),(side*.29,.02,2.40),
         (side*.31,.12,2.23),(side*.27,.16,2.15)],.011,(51,50,49),'Head',sides=7)
-    ellipsoid('sunken_eye',(side*.066,-.295,2.347),(.039,.011,.020),(22,22,22),'Head',2)
-    ellipsoid('dull_eye',(side*.066,-.306,2.347),(.009,.008,.009),(62,48,46),'Head',2)
-    polyline_tube('heavy_eyebrow',[(side*.024,-.295,2.385),(side*.097,-.288,2.393)],.015,(47,46,44),'Head')
+    ellipsoid('sunken_eye',(side*.057,-.326,2.365),(.032,.012,.017),(48,43,39),'Head',2)
+    ellipsoid('dull_eye',(side*.057,-.339,2.365),(.008,.006,.008),(91,83,71),'Head',2)
+    polyline_tube('heavy_eyebrow',[(side*.023,-.328,2.393),(side*.090,-.309,2.396)],.012,(84,76,66),'Head')
 # Shaggy three-dimensional beard beard; strips, not 1 cone.
-ellipsoid('beard_thickness',(0,-.278,2.16),(.131,.09,.167),(53,51,48),'Head',3)
+ellipsoid('beard_thickness',(0,-.278,2.16),(.122,.068,.157),(94,90,84),'Head',3)
 for j in range(64):
     t=(j+0.5)/64
     x=(t-.5)*.263
@@ -289,7 +291,7 @@ for j in range(64):
     edge=.008+fullness*.004
     polyline_tube('beard_wisp',[(x,-.322,ztop),(x*.96,-.335,ztop-.07),
         (x*.9+rng.uniform(-.008,.008),-.339,zend)],edge,
-        (47+int(rng.integers(0,18)),48+int(rng.integers(0,14)),47+int(rng.integers(0,13))),'Head',sides=5)
+        (83+int(rng.integers(0,24)),81+int(rng.integers(0,21)),76+int(rng.integers(0,20))),'Head',sides=5)
 for side in [-1,1]:
     for j in range(8):
         x=side*(.036+j*.009)
