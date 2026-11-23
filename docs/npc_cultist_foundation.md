@@ -1,22 +1,30 @@
-# Cultist NPC foundation (Godot)
+# Cultist NPC v0.7 — articulated gait
 
-Experimental branch, not yet merged to main.
+Development branch only: `feature/cultist-npc-foundation`. Changes are **not merged to main**.
 
-- `npc_cultist.gd`: NPC with patrol, detection, approach, hit reaction and knockdown.
-- `npc_hitbox.gd`: named zone colliders forwarding `apply_damage(amount)` to the controller. Works with existing `revolver.gd` and `forge_pistol.gd` ray hits without editing their firing logic.
-- `world.gd`: spawns Cultist_001 6.5 m from the authored manual village spawn.
-- If `res://assets/npc/cultist_modular.glb` exists, it is loaded as the NPC visual; otherwise a simple low-poly procedural robed silhouette is displayed.
-- The grouped `cultist_modular.glb` is available separately in `chernozerye_cultist_asset_pack.zip`. Unzip it to the repository root to place `godot/assets/npc/cultist_modular.glb`. The binary file is **not** committed with this branch. The grouped source was generated from the first cultist prototype using the included Python script.
-- The supplied GLB is unrigged: there is no skeleton or skeletal animation; the visual is translated/bobbed for a temporary walk cycle.
-- The GLB uses named groups `Head`, `Torso`, `LeftArm`, `RightArm`, `LeftLeg`, `RightLeg`; the NPC maps sleeve groups for non-graphic detachment. There are no skeletal animations or anatomically graphic visuals.
-- Scene collision is deliberately conservative; a proper navigation mesh, line-of-sight checks and animations are follow-up work.
+## What works
 
-## Manual QA (Godot 4.x)
-1. Run the normal village project entrypoint.
-2. At the canonical village start, look around ~8 m from spawn for a robed NPC.
-3. Approach the NPC and verify it approaches without attacking. Move away and verify it returns to patrol.
-4. With the Apostol equipped, test normal hit reactions and knockdown via the existing `apply_damage` hook.
-5. Ensure original village entry, map and pickups continue to function.
+- NPC behavior in `godot/npc_cultist.gd`: patrol, player observation with line-of-sight, approach with stopping distance, and non-graphic hit feedback.
+- Hit zones use `godot/npc_hitbox.gd` and stay independent of visual joint pivots.
+- The first NPC is spawned by `godot/world.gd` near the authored village.
+- The free procedural asset is built before Godot import using `scripts/build_cultist_v06.py` into `godot/assets/npc/cultist_modular.glb`.
+- The GLB contains ten named groups: `Head`, `Torso`, `LeftArm`, `RightArm`, `LeftLeg`, `RightLeg`, `LeftShin`, `RightShin`, `LeftFoot`, `RightFoot`.
+- Godot creates runtime pivots so each thigh owns its shin and foot; stepping is distance-driven, with no vertical hopping of the entire model.
+- Browser viewer: `site/cultist/index.html`. The preview animates the knee and ankle via simple two-bone inverse kinematics, plants the support foot in world space, and eases patrol turns and stops.
+- Browser build and GLB structure are checked by `scripts/build_cultist_preview.sh`.
+- Godot regression `godot/cultist_regression.gd` checks imported GLB groups and joint hierarchy.
 
-## Limits
-This branch has not been executed inside the Godot editor or validated in a deployed web build. It should be smoke-tested before merging.
+## Important limitations
+
+- This is an **articulated node hierarchy**, not a deforming `Skeleton3D` with bone weights. The robe is a static mesh, and cloth deformation has not been implemented.
+- The browser preview uses stance foot locking. The Godot controller currently uses articulated procedural swing; the same inverse kinematics have not been ported to its engine.
+- No claim that the Godot web export or headless rig test has passed until a GitHub Actions job explicitly reports success.
+- The production/main game is unchanged.
+
+## How to check
+
+1. Open the separate Vercel browser preview and select **Patrol**.
+2. Compare the support foot with the ground: the entire NPC should not bounce vertically.
+3. Inspect both knees, ankles, and boot positions during the turning pause.
+4. In CI, check for `CULTIST_V07_OK` for preview and `CULTIST_RIG_REGRESSION_OK` for the Godot headless script.
+5. Keep the NPC branch unmerged until the authored village level and collision regression are verified.
