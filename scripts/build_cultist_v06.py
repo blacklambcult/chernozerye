@@ -17,9 +17,9 @@ counter = {k: 0 for k in groups}
 def add(name, mesh, color, group="Torso"):
     # Muted randomized face colours simulate dirty nonuniform rough textiles.
     base = np.asarray(color[:3], dtype=float)
-    shades = np.clip(np.random.default_rng(counter[group] + 340).normal(0.84, 0.10, len(mesh.faces)), 0.48, 1)
+    shades = np.clip(np.random.default_rng(counter[group] + 340).normal(0.84, 0.10, len(mesh.vertices)), 0.48, 1)
     col = np.column_stack((np.clip(base[None,:]*shades[:,None],0,255),np.full((len(shades),1),255))).astype("uint8")
-    mesh.visual.face_colors = col
+    mesh.visual.vertex_colors = col
     scene.add_geometry(mesh, geom_name="%s_%s_%d" % (group,name,counter[group]), parent_node_name=group)
     counter[group] += 1
 
@@ -54,7 +54,7 @@ def cloth(name,levels,color,group="Torso",segments=32,folds=8,phase=1):
             value=dirt*(.8+.15*math.sin(j*math.tau*folds/segments+phase))
             colors.extend([[*np.clip(np.array(color[:3])*value,0,255).astype("uint8"),255]]*2)
     mesh=trimesh.Trimesh(vertices=vertices,faces=faces,process=False)
-    mesh.visual.face_colors=np.asarray(colors,dtype="uint8")
+    mesh.visual.vertex_colors=np.asarray([ [*np.clip(np.asarray(color[:3],dtype=float)*(.59 if i//segments==0 else (.73 if i//segments==1 else .88)),0,255).astype("uint8"),255] for i in range(len(vertices)) ],dtype="uint8")
     scene.add_geometry(mesh,geom_name="%s_%s_%d"%(group,name,counter[group]),parent_node_name=group)
     counter[group]+=1
 
