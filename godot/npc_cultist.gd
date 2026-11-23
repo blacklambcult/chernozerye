@@ -24,8 +24,6 @@ var _base_position: Dictionary = {}
 var _has_joint_rig := false
 var _animation_time := 0.0
 var _gait_blend := 0.0
-var _cloth_material: ShaderMaterial
-var _cloth_mesh: MeshInstance3D
 
 func _ready() -> void:
     name = "CultistNPC"
@@ -341,18 +339,28 @@ func _physics_process(delta: float) -> void:
     _animate_character(delta, Vector2(displacement.x, displacement.z).length())
 
 func _setup_cloth(model: Node3D) -> void:
-    var torso := model.find_child("Torso", true, false) as Node3D
-    if torso == null:
-        return
-    for child in torso.find_children("*", "MeshInstance3D", true, false):
+    # Web compatibility: explicitly enable imported vertex colors on every
+    # surface. Keep standard Godot materials instead of replacing them with
+    # a custom shader, which can fail on mobile WebGL.
+    for child in model.find_children("*", "MeshInstance3D", true, false):
         var mesh_node := child as MeshInstance3D
         if mesh_node.mesh == null:
             continue
-        _cloth_mesh = mesh_node
-        _cloth_material = ShaderMaterial.new()
-        _cloth_material.shader = preload("res://cultist_cloth.gdshader")
-        mesh_node.material_override = _cloth_material
-        break
+        mesh_node.material_override = null
+        for surface in range(mesh_node.mesh.get_surface_count()):
+            var material := StandardMaterial3D.new()
+            material.vertex_color_use_as_albedo = true
+            material.albedo_color = Color.WHITE
+            material.roughness = 0.96
+            material.metallic = 0.0
+            material.metallic_specular = 0.18
+            material.cull_mode = BaseMaterial3D.CULL_DISABLED
+            var arrays := mesh_node.mesh.surface_get_arrays(surface)
+            var colors: PackedColorArray = arrays[Mesh.ARRAY_COLOR] if arrays[Mesh.ARRAY_COLOR] != null else PackedColorArray()
+            if colors.is_empty():
+                material.albedo_color = Color("#33312e")
+                push_warning("Cultist surface missing vertex colors: " + mesh_node.name)
+            mesh_node.set_surface_override_material(surface, material)
 
 func _animate_character(delta: float, distance: float) -> void:
     _animation_time += delta
@@ -384,7 +392,3 @@ func _animate_character(delta: float, distance: float) -> void:
         elif limb_name.ends_with("Foot"):
             bend = (-sin(phase) * 0.28 - maxf(0.0, -sin(phase)) * 0.36) * _gait_blend
         limb.rotation.x = lerpf(limb.rotation.x, base.x + bend, ease)
-    if _cloth_material != null:
-        _cloth_material.set_shader_parameter("motion_phase", _step_clock)
-        _cloth_material.set_shader_parameter("walk_blend", _gait_blend)
-        _cloth_material.set_shader_parameter("breath_time", _animation_time)
