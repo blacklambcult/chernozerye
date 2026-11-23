@@ -261,22 +261,44 @@ ellipsoid('thick_knot',(0,-.31,1.23),(.075,.045,.06),(85,79,58),'Torso',2)
 # Keep the dark recess behind the visible facial surface, rather than occluding it.
 # Brighter warm skin and grey beard preserve readability in the night environment.
 # Back hood has organic folds (front opening is made of a separate rim, not a perfect oval).
-ellipsoid('hood_mass',(0,.048,2.31),(.286,.258,.325),(25,26,27),'Head',subdivisions=4)
-ellipsoid('hood_brow',(0,-.035,2.52),(.276,.205,.16),(34,34,35),'Head',subdivisions=3)
-ellipsoid('shadow_recess',(0,-.165,2.305),(.190,.057,.235),(10,11,13),'Head',subdivisions=3)
+# Open cloth hood: loft from a pointed facial arch toward a tapered rear seam.
+# A single continuous fabric surface, with no spherical shell or solid face plug.
+hood_keys = [(-.235,-.245,2.055),(-.177,-.320,2.22),
+             (-.151,-.349,2.40),(-.106,-.354,2.52),
+             (0.0,-.344,2.615),(.109,-.350,2.525),
+             (.155,-.342,2.40),(.180,-.314,2.22),(.228,-.238,2.055)]
+hood_rows, hood_cols = 32, 64
+hood_v, hood_f = [], []
+for j in range(hood_rows+1):
+    t=j/hood_rows
+    for i in range(hood_cols+1):
+        u=i/hood_cols
+        x,y,z=interpolate(hood_keys,u)
+        # Narrow rear profile with longitudinal folds converging at the seam.
+        gather=math.sin(math.pi*t)
+        fold=(.012*math.sin(u*math.tau*5+t*2)+.007*math.cos(u*math.tau*9-t*3))*gather
+        rear_z=2.08+.27*math.sin(math.pi*u)**1.4
+        hood_v.append((x*(1-t)**.75 + fold,
+                       y*(1-t)+(.16+.035*math.sin(math.pi*u))*t+fold*.6,
+                       z*(1-t)+rear_z*t+fold))
+for j in range(hood_rows):
+    for i in range(hood_cols):
+        a0=j*(hood_cols+1)+i
+        b0=a0+1
+        c0=a0+hood_cols+1
+        d0=c0+1
+        hood_f.extend(((a0,c0,b0),(b0,c0,d0)))
+hood_mesh=trimesh.Trimesh(vertices=hood_v,faces=hood_f,process=False)
+append(hood_mesh,'folded_open_cloth_hood',(37,36,34),'Head',grain=.14)
+# A fine folded selvage follows the opening, rather than a thick helmet rim.
+hood_edge=[interpolate(hood_keys,u) for u in np.linspace(0,1,65)]
+polyline_tube('hood_fabric_edge',hood_edge,.008,(50,47,43),'Head',sides=6)
 ellipsoid('weathered_angular_face',(0,-.282,2.305),(.108,.048,.155),(151,132,113),'Head',subdivisions=4)
 ellipsoid('long_nose',(0,-.316,2.303),(.029,.047,.061),(159,139,121),'Head',subdivisions=2)
 ellipsoid('cheek_left',(-.080,-.299,2.31),(.036,.026,.061),(137,119,105),'Head',2)
 ellipsoid('cheek_right',(.080,-.299,2.31),(.036,.026,.061),(130,113,101),'Head',2)
-# Hood opening edge follows eyebrow and cheek, thick enough to cast a shadow.
-hood_rim=[(-.185,-.259,2.14),(-.237,-.255,2.29),(-.232,-.256,2.405),
-          (-.19,-.252,2.53),(-.11,-.247,2.573),(0,-.248,2.589),
-          (.112,-.246,2.573),(.196,-.253,2.52),(.233,-.254,2.39),(.224,-.256,2.26),(.18,-.258,2.13)]
-polyline_tube('torn_hood_brim',hood_rim,.034,(41,39,38),'Head',sides=9)
-# Layered textile bands to make the side of the hood look sewn, not round.
+# Preserve facial features inside the open hood.
 for side in [-1,1]:
-    polyline_tube('hood_seam',[(side*.23,-.10,2.48),(side*.29,.02,2.40),
-        (side*.31,.12,2.23),(side*.27,.16,2.15)],.011,(51,50,49),'Head',sides=7)
     ellipsoid('sunken_eye',(side*.057,-.326,2.365),(.032,.012,.017),(48,43,39),'Head',2)
     ellipsoid('dull_eye',(side*.057,-.339,2.365),(.008,.006,.008),(91,83,71),'Head',2)
     polyline_tube('heavy_eyebrow',[(side*.023,-.328,2.393),(side*.090,-.309,2.396)],.012,(84,76,66),'Head')
@@ -339,8 +361,7 @@ for side,name in ((-1,'Left'),(1,'Right')):
     for k in range(4):
         z=.115+k*.026
         polyline_tube('boot_crease',[(x-.10,-.20,z),(x,-.245,z+.008),(x+.10,-.20,z)],.003,(58,53,46),name+'Foot',sides=5)
-for side in (-1,1):
-    polyline_tube('hood_stitch',[(side*.17,-.277,2.16),(side*.225,-.273,2.34),(side*.19,-.27,2.49)],.005,(54,49,43),'Head',sides=6)
+
 
 # Export: collapse same-node geometry to keep draw calls low in real Godot game.
 scene=trimesh.Scene()
