@@ -5,14 +5,14 @@ const LOGO_DATA = preload("res://logo_data.gd")
 const MAP_FILE := "res://world_data.json"
 const MANUAL_FILE := "res://manual_layout.json"
 const GAME_TITLE := "Fearless Knights of the Cordon"
-const GAME_STAGE := "Pre-Alpha 0.8.15"
+const GAME_STAGE := "Pre-Alpha 0.8.16"
 # Canonical playable start of the 710-feature Geo Lab village. Keep world
 # placements and the CI spawn-distance regression anchored to this coordinate.
 const MANUAL_VILLAGE_SPAWN := Vector3(-789.7, 0.22, -268.6)
 const MANUAL_CAMERA_NEAR := 0.16
 const MANUAL_CAMERA_FAR := 250.0
 const SEASON := "NOVEMBER"
-const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.8.15 · ЧЕРНОЗЁРЬЕ · 710 ОБЪЕКТОВ"
+const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.8.16 · ЧЕРНОЗЁРЬЕ · 710 ОБЪЕКТОВ"
 var manual_mode := false
 var manual_button: Button
 var _status_label: Label
@@ -83,8 +83,6 @@ func _ready() -> void:
     _create_note_archive()
     var library := preload("res://local_object_library.gd").new()
     var snapshot := preload("res://studio_snapshot.gd").read()
-    if snapshot.is_empty():
-        _create_world_document()
     library.snapshot = snapshot
     add_child(library)
     if not snapshot.is_empty():
@@ -415,7 +413,9 @@ func _create_player() -> void:
     var player := CharacterBody3D.new()
     player.name = "Player"
     player.set_script(PLAYER_SCRIPT)
-    player.set("test_loadout", true)
+    var forge_preview: bool = OS.has_feature("web") and JavaScriptBridge.eval(
+        "new URLSearchParams(location.search).get('forge') === 'local'", true) == true
+    player.set("shrine_loadout", not forge_preview)
     # Spawn on the existing OSM village road, rather than 74 m away in an empty clearing.
     player.position = Vector3(130, 0.2, -82)
     player.rotation.y = deg_to_rad(-125.0)
@@ -440,7 +440,7 @@ func _create_label() -> void:
     layer.add_child(label)
     var weather_label := Label.new()
     weather_label.name = "NovemberWeatherLabel"
-    weather_label.text = "ЧЕРНОЗЁРЬЕ  /  НОЯБРЬ  /  ПОЗДНИЙ ВЕЧЕР  /  МОКРЫЙ СНЕГ  |  E: ОСМОТР  J: ЖУРНАЛ  V: ЖЕСТ"
+    weather_label.text = "ЧЕРНОЗЁРЬЕ  /  НОЯБРЬ  /  ПОЗДНИЙ ВЕЧЕР  /  МОКРЫЙ СНЕГ  |  E: ОСМОТР  V: ЖЕСТ"
     weather_label.position = Vector2(16, 38)
     weather_label.add_theme_color_override("font_color", Color("#aeb9bc"))
     weather_label.add_theme_font_size_override("font_size", 11)

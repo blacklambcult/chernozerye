@@ -156,7 +156,7 @@ jobs:
           npm install --prefix /tmp/studio-village --no-save --no-audit --no-fund three@0.128.0 @napi-rs/canvas@0.1.80
           NODE_PATH=/tmp/studio-village/node_modules node scripts/build_village_models.cjs
           NODE_PATH=/tmp/studio-village/node_modules node scripts/build_forest_models.cjs
-          test "$(find godot/generated_forest -name '*.glb' | wc -l)" -eq 25
+          test "$(find godot/generated_forest -name '*.glb' | wc -l)" -eq 28
           test "$(find godot/generated_village -name '*.glb' | wc -l)" -eq 37
 
       - name: Import project
@@ -169,6 +169,8 @@ jobs:
           grep -q FOREST_SHRINE_REGRESSION_OK /tmp/forest-shrine.log
           timeout 30s godot --headless --path godot --script res://forest_floor_regression.gd | tee /tmp/forest-floor.log
           grep -q FOREST_FLOOR_REGRESSION_OK /tmp/forest-floor.log
+          timeout 70s godot --headless --path godot --script res://shrine_campaign_regression.gd | tee /tmp/shrine-campaign.log
+          grep -q SHRINE_CAMPAIGN_OK /tmp/shrine-campaign.log
 
       - name: Validate GDScript sources
         shell: bash
@@ -294,7 +296,8 @@ jobs:
           # Boot must already be in the manually surveyed village, without
           # a click on any preview/legacy map button.
           grep -q "FEARLESS_KNIGHTS_STARTUP_READY:" /tmp/world-smoke.log
-          grep -q "WORLD_ITEM_SPAWN_GUARD_READY: within_27m=3" /tmp/world-smoke.log
+          grep -q "SHRINE_QUEST_READY: targets=5" /tmp/world-smoke.log
+          grep -Eq "YARD_VEGETATION_READY: clusters=[1-9][0-9]*" /tmp/world-smoke.log
           grep -q "FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2" /tmp/world-smoke.log
           grep -q "MODELED_CHARACTER_READY: fps_body=disabled full_body=f4_only fps_arms=independent" /tmp/world-smoke.log
           grep -q "CHARACTER_SEQUENCE_READY: cosmetic=true selected_slot_required=true duration=120 states=8" /tmp/world-smoke.log

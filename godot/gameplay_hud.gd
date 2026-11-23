@@ -27,7 +27,7 @@ func _ready() -> void:
     print("SURVIVAL_HUD_READY: compass=center hp=100 hotbar=10 cigarette_pack=slot1")
 
 func choose_slot(n: int) -> void:
-    if n < 0 or n >= SLOT_COUNT:
+    if n < 0 or n >= _slot_count():
         return
     selected_slot = n
     queue_redraw()
@@ -114,20 +114,20 @@ func _draw_quest_bearing(center: float, top: float, heading: float) -> void:
         else:
             return
     else:
-        var finds := get_parent().get_parent().get_node_or_null("WorldDocument")
-        if finds == null:
+        var village := get_parent().get_parent().get_node_or_null("ManualSurvey")
+        if village == null:
             return
-        var quest: Dictionary = finds.call("quest_summary")
-        var title := "Сектор А / Собрать записки: %d/%d" % [quest["collected"], quest["total"]]
-        if quest["target"] == null:
-            title = "Сектор А / Все записки собраны"
+        var quest: Dictionary = village.call("shrine_objective")
+        if not quest.ready:
+            return
+        var title := "Сектор А / Разрушить святилища: %d/5" % int(quest.cleared)
+        if quest.target == null:
+            title = "Сектор А / Все святилища разрушены"
         draw_string(ThemeDB.fallback_font, Vector2(12, 23), title,
             HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8d2b0"))
-        draw_string(ThemeDB.fallback_font, Vector2(12, 43), "J / Журнал",
-            HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#e8d2b0"))
-        if quest["target"] == null:
+        if quest.target == null:
             return
-        target = quest["target"]
+        target = quest.target
     var direction := target - player.global_position
     if Vector2(direction.x, direction.z).length() < 1.5:
         return
@@ -154,8 +154,12 @@ func _draw_health(view_height: float) -> void:
         201 * clampf(current_health / maxf(1.0, max_health), 0.0, 1.0),
         8), HEALTH)
 
+func _slot_count() -> int:
+    return 2 if player != null and player.get("shrine_loadout") == true else SLOT_COUNT
+
+
 func _draw_slots(view_width: float, view_height: float) -> void:
-    var width := SLOT_COUNT * 62.0
+    var width := maxf(330.0, _slot_count() * 62.0)
     var zoom := clampf((view_width - 32.0) / width, 0.05, 1.0)
     draw_set_transform(Vector2(view_width - width * zoom - 18.0, view_height - 84.0 * zoom), 0.0, Vector2.ONE * zoom)
     var x0 := 0.0
@@ -165,7 +169,7 @@ func _draw_slots(view_width: float, view_height: float) -> void:
     var test_loadout := player != null and bool(player.get("test_loadout"))
     draw_rect(Rect2(x0 - 8.0, y - 28.0, width + 15.0, 106.0), FRAME)
     _write(x0, y - 9.0, "ТЕСТ ОРУЖИЯ   ·   BODYCAM" if test_loadout else "БЫСТРЫЕ ПРЕДМЕТЫ", 12, MUTED)
-    for index in range(SLOT_COUNT):
+    for index in range(_slot_count()):
         var x := x0 + float(index) * 62.0
         var chosen := index == selected_slot
         draw_rect(Rect2(x, y, 56, 56),
@@ -196,7 +200,7 @@ func _draw_slots(view_width: float, view_height: float) -> void:
         else:
             draw_line(Vector2(x + 20, y + 31),
                 Vector2(x + 37, y + 31), Color("#565850"), 1.0)
-    if selected_slot == 1 and player != null and not test_loadout:
+    if selected_slot == 1 and player != null and not test_loadout and _slot_count() > 2:
         var gun: Node3D = player.get("revolver")
         var status := "ПЕРЕЗАРЯДКА" if float(gun.get("reload_left")) > 0 else "%d / 6" % int(gun.get("rounds"))
         var action := "КОЛЕСО ВНИЗ — ВЗВЕСТИ"
@@ -222,7 +226,8 @@ func _draw_slots(view_width: float, view_height: float) -> void:
         var prefix := title + "   ·   " if not title.is_empty() else ""
         _write(x0, y + 72, prefix + status + "   " + action + "   R — ПЕРЕЗАРЯДКА", 11, GOLD)
     else:
-        _write(x0, y + 72, "1–0 — ВЫБОР ЯЧЕЙКИ   ·   V — ПАЧКА", 11, MUTED)
+        var controls := "1 — ПАЧКА · 2 — АПОСТОЛ" if _slot_count() == 2 else "1–0 — ВЫБОР ЯЧЕЙКИ   ·   V — ПАЧКА"
+        _write(x0, y + 72, controls, 11, MUTED)
     draw_set_transform(Vector2.ZERO)
 
 func _draw_reticle() -> void:
