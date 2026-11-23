@@ -24,6 +24,9 @@ var _base_position: Dictionary = {}
 var _has_joint_rig := false
 var _animation_time := 0.0
 var _gait_blend := 0.0
+var _robe_pivot: Node3D
+var _robe_rest := Vector3.ZERO
+var _cloth_sway := 0.0
 
 func _ready() -> void:
     name = "CultistNPC"
@@ -341,6 +344,16 @@ func _physics_process(delta: float) -> void:
     _animate_character(delta, Vector2(displacement.x, displacement.z).length())
 
 func _setup_cloth(model: Node3D) -> void:
+    # The torso is one grouped mesh; use a subtle chest-centred pivot
+    # to preserve its imported material and avoid custom WebGL shaders.
+    var torso := model.find_child("Torso", true, false) as Node3D
+    if torso != null:
+        _robe_pivot = Node3D.new()
+        _robe_pivot.name = "ClothMotionPivot"
+        _robe_pivot.position = Vector3(0.0, 0.0, 1.72)
+        model.add_child(_robe_pivot)
+        torso.reparent(_robe_pivot, true)
+        _robe_rest = _robe_pivot.rotation
     # Web compatibility: explicitly enable imported vertex colors on every
     # surface. Keep standard Godot materials instead of replacing them with
     # a custom shader, which can fail on mobile WebGL.
@@ -372,6 +385,10 @@ func _animate_character(delta: float, distance: float) -> void:
     _step_clock = fmod(_step_clock + distance * 9.5, TAU)
     _visual.position.y = 0.0
     var ease := 1.0 - exp(-delta * 9.0)
+    _cloth_sway = lerpf(_cloth_sway, sin(_step_clock - 0.65) * 0.019 * _gait_blend, 1.0 - exp(-delta * 3.6))
+    if is_instance_valid(_robe_pivot):
+        _robe_pivot.rotation.y = _robe_rest.y + _cloth_sway
+        _robe_pivot.rotation.x = _robe_rest.x + sin(_animation_time * 1.7) * 0.004 + cos(_step_clock * 2.0 - 0.5) * 0.008 * _gait_blend
     if _head != null and _head != _parts.get("model"):
         var scan := sin(_animation_time * 0.73) * 0.19 * (1.0 - _gait_blend)
         if _has_joint_rig:
@@ -387,7 +404,8 @@ func _animate_character(delta: float, distance: float) -> void:
         var base: Vector3 = _base_pose.get(limb_name, Vector3.ZERO)
         var bend := 0.0
         if limb_name.ends_with("Arm"):
-            bend = -sin(phase) * 0.17 * _gait_blend + sin(_animation_time * 1.6) * 0.014
+            bend = -sin(phase - 0.32) * 0.17 * _gait_blend + sin(_animation_time * 1.6) * 0.014
+            limb.rotation.y = lerpf(limb.rotation.y, base.y + cos(phase - 0.45) * 0.025 * _gait_blend, ease)
         elif limb_name.ends_with("Leg"):
             bend = sin(phase) * 0.28 * _gait_blend
         elif limb_name.ends_with("Shin"):
