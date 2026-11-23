@@ -5,14 +5,14 @@ const LOGO_DATA = preload("res://logo_data.gd")
 const MAP_FILE := "res://world_data.json"
 const MANUAL_FILE := "res://manual_layout.json"
 const GAME_TITLE := "Fearless Knights of the Cordon"
-const GAME_STAGE := "Pre-Alpha 0.8.16"
+const GAME_STAGE := "Pre-Alpha 0.8.17"
 # Canonical playable start of the 710-feature Geo Lab village. Keep world
 # placements and the CI spawn-distance regression anchored to this coordinate.
 const MANUAL_VILLAGE_SPAWN := Vector3(-789.7, 0.22, -268.6)
 const MANUAL_CAMERA_NEAR := 0.16
 const MANUAL_CAMERA_FAR := 250.0
 const SEASON := "NOVEMBER"
-const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.8.16 · ЧЕРНОЗЁРЬЕ · 710 ОБЪЕКТОВ"
+const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.8.17 · ЧЕРНОЗЁРЬЕ · 710 ОБЪЕКТОВ"
 var manual_mode := false
 var manual_button: Button
 var _status_label: Label
@@ -413,8 +413,7 @@ func _create_player() -> void:
     var player := CharacterBody3D.new()
     player.name = "Player"
     player.set_script(PLAYER_SCRIPT)
-    var forge_preview: bool = OS.has_feature("web") and JavaScriptBridge.eval(
-        "new URLSearchParams(location.search).get('forge') === 'local'", true) == true
+    var forge_preview := "--forge-local" in OS.get_cmdline_user_args()
     player.set("shrine_loadout", not forge_preview)
     # Spawn on the existing OSM village road, rather than 74 m away in an empty clearing.
     player.position = Vector3(130, 0.2, -82)

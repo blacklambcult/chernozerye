@@ -21,6 +21,8 @@ func _check() -> void:
             break
     assert(found)
     var player := world.get_node("Player")
+    assert(player.camera == root.get_camera_3d())
+    assert(world.get_node("GameplayHUD/SurvivalHUD").player == player)
     assert(player.forge_weapons.keys() == [1])
     var shrine_ids := ["shrine_0", "shrine_1", "shrine_2", "shrine_3", "crimson_totem"]
     map.get_node("crimson_totem").apply_damage(1000)
