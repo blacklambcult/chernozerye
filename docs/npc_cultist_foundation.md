@@ -6,9 +6,9 @@ Experimental branch, not yet merged to main.
 - `npc_hitbox.gd`: named zone colliders forwarding `apply_damage(amount)` to the controller. Works with existing `revolver.gd` and `forge_pistol.gd` ray hits without editing their firing logic.
 - `world.gd`: spawns Cultist_001 6.5 m from the authored manual village spawn.
 - If `res://assets/npc/cultist_modular.glb` exists, it is loaded as the NPC visual; otherwise a simple low-poly procedural robed silhouette is displayed.
-- The existing prototype `cultist_modular.glb` must be copied into `godot/assets/npc/` to see the referenced model. It is **not** committed with this branch.
+- The grouped `cultist_modular.glb` is available separately in `chernozerye_cultist_asset_pack.zip`. Unzip it to the repository root to place `godot/assets/npc/cultist_modular.glb`. The binary file is **not** committed with this branch. The grouped source was generated from the first cultist prototype using the included Python script.
 - The supplied GLB is unrigged: there is no skeleton or skeletal animation; the visual is translated/bobbed for a temporary walk cycle.
-- The optional sleeve detachment in this branch is a non-graphic costume effect and currently applies only to the fallback silhouette. The imported GLB remains intact until its named nodes are properly mapped.
+- The GLB uses named groups `Head`, `Torso`, `LeftArm`, `RightArm`, `LeftLeg`, `RightLeg`; the NPC maps sleeve groups for non-graphic detachment. There are no skeletal animations or anatomically graphic visuals.
 - Scene collision is deliberately conservative; a proper navigation mesh, line-of-sight checks and animations are follow-up work.
 
 ## Manual QA (Godot 4.x)
