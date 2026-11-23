@@ -163,7 +163,7 @@ func _mat(color: Color) -> StandardMaterial3D:
     return m
 
 func _mesh_from_triangles(vertices: PackedVector3Array, color: Color, label: String,
-        soil: bool = false) -> void:
+        soil: bool = false, jitter_group: StringName = &"") -> void:
     if vertices.is_empty():
         return
     var arrays := []
@@ -184,6 +184,8 @@ func _mesh_from_triangles(vertices: PackedVector3Array, color: Color, label: Str
     mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
     var instance := MeshInstance3D.new()
     instance.name = label
+    if jitter_group != &"":
+        instance.add_to_group(jitter_group)
     instance.mesh = mesh
     instance.material_override = material
     instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -203,7 +205,8 @@ func _add_area(points: PackedVector2Array, y: float, tint: Color, label: String)
     for k in range(0, triangles.size(), 3):
         _put_triangle(verts, _pos(points[triangles[k]], y),
             _pos(points[triangles[k + 1]], y), _pos(points[triangles[k + 2]], y))
-    _mesh_from_triangles(verts, tint, label)
+    var jitter_group := &"ps1_jitter_foliage" if label in ["Лес", "Водоём"] else &""
+    _mesh_from_triangles(verts, tint, label, false, jitter_group)
 
 func _clean_road_points(points: PackedVector2Array) -> PackedVector2Array:
     # Exported hand-drawn lines occasionally contain repeated consecutive points.
@@ -261,7 +264,8 @@ func _add_strip(raw: Array, width: float, height: float, tint: Color, label: Str
         return
     var surface := PackedVector3Array()
     _append_joined_ribbon(surface, points, width, 0.0, height)
-    _mesh_from_triangles(surface, tint, label, true)
+    var jitter_group := &"ps1_jitter_road" if label in ["road", "path"] else &""
+    _mesh_from_triangles(surface, tint, label, true, jitter_group)
     if label == "road":
         _add_november_mud(points, height)
         _add_road_wear(points, height + 0.035)
@@ -330,9 +334,9 @@ func _add_november_mud(points: PackedVector2Array, height: float) -> void:
                     _append_mud_patch(mud, center, tangent, wide, half_long,
                         half_wide, height + 0.018, i * 61 + j)
                 _mud_patches += 1
-    _mesh_from_triangles(mud, Color("#40352e"), "Ноябрь / влажный грунт", true)
-    _mesh_from_triangles(dark_mud, Color("#332c28"), "Ноябрь / грязевые пятна", true)
-    _mesh_from_triangles(puddles, Color("#3e4445"), "Ноябрь / неглубокие лужи")
+    _mesh_from_triangles(mud, Color("#40352e"), "Ноябрь / влажный грунт", true, &"ps1_jitter_road")
+    _mesh_from_triangles(dark_mud, Color("#332c28"), "Ноябрь / грязевые пятна", true, &"ps1_jitter_road")
+    _mesh_from_triangles(puddles, Color("#3e4445"), "Ноябрь / неглубокие лужи", false, &"ps1_jitter_road")
 
 
 func _near_junction(point: Vector2, margin: float = 0.0) -> bool:
@@ -379,8 +383,8 @@ func _add_road_wear(points: PackedVector2Array, height: float) -> void:
             if (j + i) % 4 == 1 and not _near_junction(mid, 4.0):
                 var center := PackedVector2Array([p0, p1])
                 _append_joined_ribbon(grass, center, 0.13, 0.0, height + 0.010)
-    _mesh_from_triangles(tracks, Color("#3b342e"), "Дорога / мягкие прерывистые колеи", true)
-    _mesh_from_triangles(grass, Color("#49473c"), "Дорога / редкая центральная трава")
+    _mesh_from_triangles(tracks, Color("#3b342e"), "Дорога / мягкие прерывистые колеи", true, &"ps1_jitter_road")
+    _mesh_from_triangles(grass, Color("#49473c"), "Дорога / редкая центральная трава", false, &"ps1_jitter_road")
 
 
 func _add_village_roadside(points: PackedVector2Array, width: float, height: float) -> void:
@@ -451,10 +455,10 @@ func _add_village_roadside(points: PackedVector2Array, width: float, height: flo
                     var plane_y := height + 0.052
                     _put_triangle(stones, _pos(t - dx, plane_y),
                         _pos(t + dy, plane_y), _pos(t + dx, plane_y))
-    _mesh_from_triangles(shoulders, Color("#3e3830"), "Дорога / сырые земляные обочины", true)
-    _mesh_from_triangles(stones, Color("#544d43"), "Дорога / мокрый гравий и выбоины", true)
-    _mesh_from_triangles(weeds, Color("#3f4439"), "Обочина / пожухлая ноябрьская трава")
-    _mesh_from_triangles(dried, Color("#605444"), "Обочина / сухие стебли")
+    _mesh_from_triangles(shoulders, Color("#3e3830"), "Дорога / сырые земляные обочины", true, &"ps1_jitter_road")
+    _mesh_from_triangles(stones, Color("#544d43"), "Дорога / мокрый гравий и выбоины", true, &"ps1_jitter_road")
+    _mesh_from_triangles(weeds, Color("#3f4439"), "Обочина / пожухлая ноябрьская трава", false, &"ps1_jitter_foliage")
+    _mesh_from_triangles(dried, Color("#605444"), "Обочина / сухие стебли", false, &"ps1_jitter_foliage")
 
 
 func _register_road_junction(point: Vector2, radius: float) -> void:

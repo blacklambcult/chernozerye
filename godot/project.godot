@@ -27,3 +27,10 @@ anti_aliasing/quality/msaa_3d=1
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/default_filters/use_nearest_mipmap_filter=true
+
+[shader_globals]
+
+ps1_jitter_strength={
+"type": "float",
+"value": 0.35
+}
