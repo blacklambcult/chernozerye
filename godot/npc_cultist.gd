@@ -286,12 +286,15 @@ func _physics_process(delta: float) -> void:
     desired.y = 0.0
     var speed := walk_speed * (1.25 if _state == "alert" else 1.0)
     if desired.length() > 0.35:
-        var flat := desired.normalized() * speed
+        var near_factor := clampf(desired.length() / 1.4, 0.25, 1.0)
+        var flat := desired.normalized() * speed * near_factor
         velocity.x = move_toward(velocity.x, flat.x, 2.5 * delta)
         velocity.z = move_toward(velocity.z, flat.z, 2.5 * delta)
         _visual.rotation.y = lerp_angle(_visual.rotation.y, atan2(-flat.x, -flat.z), delta * 4.0)
-        _step_clock += delta * speed * 7.0
-        _visual.position.y = sin(_step_clock) * 0.026
+        # Keep feet grounded: the old vertical sine made the entire cultist hop.
+        # Tie gait phase to actual horizontal travel, not to elapsed time.
+        _step_clock += delta * Vector2(velocity.x, velocity.z).length() * 7.0
+        _visual.position.y = 0.0
         if _head != null and _head != _parts.get("model"):
             _head.rotation.y = sin(_step_clock * 0.33) * 0.07
         for limb_name in ["leftArm", "rightArm", "leftLeg", "rightLeg"]:
@@ -305,7 +308,7 @@ func _physics_process(delta: float) -> void:
     else:
         velocity.x = move_toward(velocity.x, 0.0, 2.5 * delta)
         velocity.z = move_toward(velocity.z, 0.0, 2.5 * delta)
-        _visual.position.y = lerpf(_visual.position.y, 0.0, delta * 5.0)
+        _visual.position.y = 0.0
         for limb_name in ["leftArm", "rightArm", "leftLeg", "rightLeg"]:
             if _parts.has(limb_name) and is_instance_valid(_parts[limb_name]):
                 var node := _parts[limb_name] as Node3D
