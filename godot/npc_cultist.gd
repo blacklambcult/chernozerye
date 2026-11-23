@@ -37,6 +37,10 @@ func _ready() -> void:
     _visual.name = "Visual"
     add_child(_visual)
     _build_visual()
+    # Character collider is for locomotion, while dedicated hitboxes receive rays.
+    # Raycast should never pick the whole capsule instead of a named body zone.
+    collision_layer = 0
+    collision_mask = 1
     _build_hit_zones()
     _choose_target()
 
@@ -73,39 +77,68 @@ func _build_visual() -> void:
                 _parts["model"] = model
                 _head = model
                 return
+    # Self-contained fallback: crafted in Godot, no external paid model or manual import.
     var robe := CylinderMesh.new()
-    robe.top_radius = 0.3
-    robe.bottom_radius = 0.63
-    robe.height = 1.38
-    _make_piece(_visual, "Robe", robe, Vector3(0, 0.75, 0), Color("#19191b"))
-    var hood := SphereMesh.new()
-    hood.radius = 0.27
-    hood.height = 0.55
+    robe.top_radius = 0.31
+    robe.bottom_radius = 0.60
+    robe.height = 1.48
+    robe.radial_segments = 9
+    _make_piece(_visual, "Robe", robe, Vector3(0, 0.76, 0), Color("#171719"))
+    var shoulders := BoxMesh.new()
+    shoulders.size = Vector3(0.72, 0.26, 0.32)
+    _make_piece(_visual, "Shoulders", shoulders, Vector3(0, 1.46, 0), Color("#1b1b1e"))
     _head = Node3D.new()
     _head.name = "HeadPivot"
-    _head.position.y = 1.76
+    _head.position.y = 1.66
     _visual.add_child(_head)
-    _make_piece(_head, "Hood", hood, Vector3.ZERO, Color("#101014"))
+    var hood := SphereMesh.new()
+    hood.radius = 0.31
+    hood.height = 0.62
+    hood.radial_segments = 9
+    hood.rings = 5
+    _make_piece(_head, "Hood", hood, Vector3(0, 0.08, 0), Color("#0d0d11"))
     var face := BoxMesh.new()
-    face.size = Vector3(0.22, 0.25, 0.06)
-    _make_piece(_head, "Face", face, Vector3(0, -0.03, -0.24), Color("#554d47"))
+    face.size = Vector3(0.23, 0.26, 0.065)
+    _make_piece(_head, "ShadowFace", face, Vector3(0, 0.015, -0.275), Color("#393536"))
+    var beard := CylinderMesh.new()
+    beard.top_radius = 0.11
+    beard.bottom_radius = 0.01
+    beard.height = 0.24
+    beard.radial_segments = 7
+    _make_piece(_head, "Beard", beard, Vector3(0, -0.19, -0.28), Color("#272321"))
     var belt := CylinderMesh.new()
-    belt.top_radius = 0.32
-    belt.bottom_radius = 0.32
-    belt.height = 0.055
-    _make_piece(_visual, "Belt", belt, Vector3(0, 0.92, 0), Color("#776d42"))
+    belt.top_radius = 0.33
+    belt.bottom_radius = 0.33
+    belt.height = 0.045
+    belt.radial_segments = 9
+    _make_piece(_visual, "RopeBelt", belt, Vector3(0, 0.90, 0), Color("#655c42"))
+    var sign := BoxMesh.new()
+    sign.size = Vector3(0.075, 0.21, 0.012)
+    _make_piece(_visual, "RedRuneVertical", sign, Vector3(0, 1.22, -0.315), Color("#8e2e29"))
+    sign = BoxMesh.new()
+    sign.size = Vector3(0.19, 0.055, 0.012)
+    _make_piece(_visual, "RedRuneCross", sign, Vector3(0, 1.26, -0.323), Color("#8e2e29"))
     var sleeve := CylinderMesh.new()
-    sleeve.top_radius = 0.13
+    sleeve.top_radius = 0.15
     sleeve.bottom_radius = 0.24
-    sleeve.height = 0.86
+    sleeve.height = 0.82
+    sleeve.radial_segments = 8
+    var boot := BoxMesh.new()
+    boot.size = Vector3(0.23, 0.23, 0.40)
     for side in [-1, 1]:
         var limb := Node3D.new()
-        limb.name = "SleeveL" if side < 0 else "SleeveR"
-        limb.position = Vector3(0.42 * side, 1.34, 0)
-        limb.rotation.z = -0.22 * side
+        limb.name = "LeftArm" if side < 0 else "RightArm"
+        limb.position = Vector3(0.42 * side, 1.38, 0)
+        limb.rotation.z = -0.21 * side
         _visual.add_child(limb)
-        _make_piece(limb, "Cloth", sleeve, Vector3(0, -0.35, 0), Color("#252528"))
+        _make_piece(limb, "Sleeve", sleeve, Vector3(0, -0.34, 0), Color("#202024"))
         _parts["leftArm" if side < 0 else "rightArm"] = limb
+        var leg := Node3D.new()
+        leg.name = "LeftLeg" if side < 0 else "RightLeg"
+        leg.position = Vector3(0.20 * side, 0.14, -0.10)
+        _visual.add_child(leg)
+        _make_piece(leg, "Boot", boot, Vector3(0, 0, -0.07), Color("#24201e"))
+        _parts["leftLeg" if side < 0 else "rightLeg"] = leg
 
 func _build_hit_zones() -> void:
     var zone_specs := {
@@ -154,15 +187,16 @@ func apply_damage(amount: float, zone: String = "torso") -> void:
 func _detach_costume_part(part: Node3D) -> void:
     if not is_instance_valid(part):
         return
+    var old_transform := part.global_transform
     var dropped := part.duplicate()
     get_parent().add_child(dropped)
-    dropped.global_transform = part.global_transform
+    dropped.global_transform = old_transform
     part.visible = false
     var tween := create_tween()
     tween.tween_property(dropped, "global_position", dropped.global_position + Vector3(0.35, -0.8, 0.25), 0.5)
     tween.parallel().tween_property(dropped, "rotation:z", 1.0, 0.5)
     tween.tween_interval(12.0)
-    tween.tween_callback(dropped.queue_free)
+    tween.tween_callback(Callable(dropped, "queue_free"))
 
 func _choose_target() -> void:
     _target = _home + Vector3(randf_range(-patrol_radius, patrol_radius), 0, randf_range(-patrol_radius, patrol_radius))
@@ -207,8 +241,18 @@ func _physics_process(delta: float) -> void:
         _visual.rotation.y = lerp_angle(_visual.rotation.y, atan2(-flat.x, -flat.z), delta * 4.0)
         _step_clock += delta * speed * 7.0
         _visual.position.y = sin(_step_clock) * 0.026
+        if _head != null and _head != _parts.get("model"):
+            _head.rotation.y = sin(_step_clock * 0.33) * 0.07
+        for hand in ["leftArm", "rightArm"]:
+            if _parts.has(hand) and is_instance_valid(_parts[hand]):
+                var axis := 1.0 if hand == "leftArm" else -1.0
+                (_parts[hand] as Node3D).rotation.x = sin(_step_clock) * 0.22 * axis
     else:
         velocity.x = move_toward(velocity.x, 0.0, 2.5 * delta)
         velocity.z = move_toward(velocity.z, 0.0, 2.5 * delta)
         _visual.position.y = lerpf(_visual.position.y, 0.0, delta * 5.0)
+        for hand in ["leftArm", "rightArm"]:
+            if _parts.has(hand) and is_instance_valid(_parts[hand]):
+                var node := _parts[hand] as Node3D
+                node.rotation.x = lerpf(node.rotation.x, 0.0, delta * 5.0)
     move_and_slide()
