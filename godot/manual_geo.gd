@@ -18,8 +18,10 @@ const COLORS := {
 var _soil_faces := PackedVector3Array()
 var object_count: int = 0
 const FOREST_MODELS := "res://generated_forest/"
+const FOREST_FLOOR := preload("res://forest_floor.gd")
 const SHRINE := preload("res://forest_shrine.gd")
 var forest_positions: Array[Transform3D] = []
+var _forest_floor: Node3D
 var _forest_sites: Array[Vector2] = []
 var _forest_cells: Dictionary = {}
 var _forest_models: Dictionary = {}
@@ -105,7 +107,6 @@ func _build_manual() -> void:
                     # The actual wooden/mesh fence now marks the plot boundary.
                     pass
                 "forest":
-                    _add_area(points, 0.058, COLORS[category], "Лес")
                     _scatter_forest(points)
                 "water":
                     _add_area(points, 0.067, COLORS[category], "Водоём")
@@ -130,6 +131,11 @@ func _build_manual() -> void:
         road_body.add_child(road_collider)
         add_child(road_body)
         _soil_faces.clear()
+    _forest_floor = FOREST_FLOOR.new()
+    _forest_floor.name = "ForestFloor"
+    add_child(_forest_floor)
+    _forest_floor.prepare(features, manual_roads, _forest_sites)
+    _forest_floor.build()
     _build_forest_instances()
     # Separate, reversible decorative layer; manual survey coordinates remain untouched.
     var art := Node3D.new()
@@ -623,7 +629,7 @@ func _scatter_forest(points: PackedVector2Array) -> void:
         twice_area += p.x * q.y - q.x * p.y
     var area_m2 := absf(twice_area) * 0.5
     # Batching keeps large forest polygons viable on Web without thousands of nodes.
-    var desired := mini(950, int(area_m2 / 210.0))
+    var desired := mini(950, int(area_m2 / 145.0))
     var rng := RandomNumberGenerator.new()
     rng.seed = 20261118 + points.size() * 103 + int(absf(min_p.x) * 10.0)
     var count := 0
@@ -708,6 +714,8 @@ func _place_forest_shrines() -> void:
         var selected := Vector2.INF
         var distance := INF
         for point in _forest_sites:
+            if _forest_floor.is_wet(point) or _forest_floor.is_on_trail(point):
+                continue
             var spread := true
             for other in _shrine_sites:
                 if point.distance_squared_to(other) < 85.0 ** 2:
@@ -726,7 +734,7 @@ func _place_forest_shrines() -> void:
         _shrine_sites.append(selected)
         var shrine := SHRINE.new()
         shrine.name = "ForestShrine%d" % (i + 1)
-        shrine.position = _pos(selected, 0.03)
+        shrine.position = _pos(selected, _forest_floor.sample_height(selected) + 0.03)
         add_child(shrine)
         shrine.install(model, ruined, colors[i])
 
@@ -739,8 +747,8 @@ func _build_trunk_collision() -> void:
     for transform in tree_trunks:
         var scale := transform.basis.get_scale().x
         var at := transform.origin
-        var floor_y := 0.02
-        var top_y := maxf(1.1, 5.5 * scale)
+        var floor_y := at.y - 0.035
+        var top_y := at.y + 5.5 * scale
         for side in range(sides):
             var angle0 := float(side) * TAU / float(sides)
             var angle1 := float(side + 1) * TAU / float(sides)
@@ -769,6 +777,7 @@ func _build_forest_instances() -> void:
     var batches := {}
     var undergrowth := 0
     var ground_details := 0
+    var snow: Array[Vector2] = []
     for i in forest_positions.size():
         var pose := forest_positions[i]
         var p := _forest_sites[i]
@@ -777,24 +786,59 @@ func _build_forest_instances() -> void:
             if p.distance_squared_to(site) < 5.5 ** 2:
                 clearing = true
                 break
-        if clearing:
+        if clearing or _forest_floor.is_wet(p) or _forest_floor.is_on_trail(p):
             continue
+        pose.origin.y = _forest_floor.sample_height(p) - 0.06
         var id := "birch" if i % 17 == 0 else ("pine_%d" % (i % 5))
         var height_scale := 1.85 if id != "birch" else 1.0
         var tree_pose := Transform3D(pose.basis.scaled_local(Vector3(1.0, height_scale, 1.0)), pose.origin)
         _queue_forest_asset(batches, id, tree_pose)
         tree_trunks.append(pose)
-        if i % 3 != 0:
+        if i % 4 == 0:
+            var drift := p + Vector2.from_angle(float(i) * 2.13) * 2.2
+            if _forest_floor.sample_height(drift) > 0.24 and not _forest_floor.is_wet(drift) \
+                    and not _forest_floor.is_on_trail(drift):
+                snow.append(drift)
+        if i % 2 != 0:
             continue
         var detail := p + Vector2.from_angle(float(i) * 2.39996) * 1.8
-        if _nearest_road(detail) < 13.0 or _near_building(detail, 6.5):
+        if _nearest_road(detail) < 13.0 or _near_building(detail, 6.5) or _forest_floor.is_wet(detail) \
+                or _forest_floor.is_on_trail(detail):
             continue
         var kind := "ground" if i % 4 == 0 else "understory"
-        _queue_forest_asset(batches, "%s_%d" % [kind, (i / 3) % 4],
-            Transform3D(pose.basis, _pos(detail, 0.03)))
+        _queue_forest_asset(batches, "%s_%d" % [kind, (i / 2) % 4],
+            Transform3D(pose.basis, _pos(detail, _forest_floor.sample_height(detail) + 0.015)))
         ground_details += int(kind == "ground")
         undergrowth += int(kind == "understory")
+    _add_forest_ponds(batches)
+    _forest_floor.add_snow(snow)
     _render_forest_batches(batches)
     _build_trunk_collision()
     print("MANUAL_FOREST_READY: trees=", tree_trunks.size(), " clearance=roads13/buildings6.5",
-        " bushes=", undergrowth, " ground_details=", ground_details, " shrines=", _shrine_sites.size())
+        " bushes=", undergrowth, " ground_details=", ground_details, " shrines=", _shrine_sites.size(), " snow=", snow.size())
+
+func _add_forest_ponds(batches: Dictionary) -> void:
+    var count := 0
+    for pond: Dictionary in _forest_floor.ponds:
+        var model := _forest_model("pond_water" if pond.radius.x > 8.0 else "bog_water")
+        if model == null:
+            continue
+        var template := model.instantiate() as Node3D
+        var water := template.find_child("WaterSurface", true, false) as MeshInstance3D
+        if water != null:
+            count += 1
+            var material := water.mesh.surface_get_material(0) as BaseMaterial3D
+            material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
+            material.metallic = 0.0
+            material.roughness = 0.68
+            _forest_floor.add_water(pond, material)
+            for i in 16:
+                if (i + count) % 4 == 0:
+                    continue
+                var angle := TAU * i / 16.0
+                var p: Vector2 = pond.center + Vector2.from_angle(angle) * pond.radius * 1.05
+                var y: float = _forest_floor.sample_height(p)
+                _queue_forest_asset(batches, "bog_reeds",
+                    Transform3D(Basis(Vector3.UP, angle), _pos(p, maxf(y, pond.water - 0.12))))
+        template.free()
+    print("FOREST_WATER_READY: surfaces=", count)
