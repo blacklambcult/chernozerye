@@ -27,6 +27,7 @@ var _gait_blend := 0.0
 var _robe_pivot: Node3D
 var _robe_rest := Vector3.ZERO
 var _cloth_sway := 0.0
+var _ambience: Node3D
 
 func _ready() -> void:
     name = "CultistNPC"
@@ -48,6 +49,9 @@ func _ready() -> void:
     _visual.add_to_group(&"ps1_jitter_stable")
     add_child(_visual)
     _build_visual()
+    _ambience = preload("res://cultist_ambience.gd").new()
+    _ambience.name = "CultistAmbience"
+    add_child(_ambience)
     # Character collider is for locomotion, while dedicated hitboxes receive rays.
     # Raycast should never pick the whole capsule instead of a named body zone.
     collision_layer = 0
@@ -341,7 +345,10 @@ func _physics_process(delta: float) -> void:
     var previous := global_position
     move_and_slide()
     var displacement := global_position - previous
+    var travelled := Vector2(displacement.x, displacement.z).length()
     _animate_character(delta, Vector2(displacement.x, displacement.z).length())
+    if is_instance_valid(_ambience):
+        _ambience.call("update_motion", delta, travelled, is_on_floor())
 
 func _setup_cloth(model: Node3D) -> void:
     # The torso is one grouped mesh; use a subtle chest-centred pivot
