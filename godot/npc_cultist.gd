@@ -1,0 +1,206 @@
+extends CharacterBody3D
+## Чернозёрье: first reusable NPC controller. Non-graphic hit reactions and detachable costume props.
+## Optional model: res://assets/npc/cultist_modular.glb (falls back to procedural silhouette).
+
+@export var patrol_radius := 4.0
+@export var walk_speed := 0.85
+@export var notice_distance := 13.0
+@export var hit_points := 100.0
+
+var _home := Vector3.ZERO
+var _target := Vector3.ZERO
+var _player: Node3D
+var _visual: Node3D
+var _head: Node3D
+var _parts: Dictionary = {}
+var _zone_health := {"head": 35.0, "torso": 100.0, "leftArm": 35.0, "rightArm": 35.0, "leftLeg": 45.0, "rightLeg": 45.0}
+var _state := "idle"
+var _state_timer := 0.0
+var _step_clock := 0.0
+var _stagger_time := 0.0
+
+func _ready() -> void:
+    name = "CultistNPC"
+    add_to_group("chernozerye_npc")
+    _home = global_position
+    _player = get_tree().get_first_node_in_group("player") as Node3D
+    if _player == null:
+        _player = get_parent().get_node_or_null("Player") as Node3D
+    var collider := CollisionShape3D.new()
+    var shape := CapsuleShape3D.new()
+    shape.radius = 0.33
+    shape.height = 1.7
+    collider.shape = shape
+    collider.position.y = 0.9
+    add_child(collider)
+    _visual = Node3D.new()
+    _visual.name = "Visual"
+    add_child(_visual)
+    _build_visual()
+    _build_hit_zones()
+    _choose_target()
+
+func _make_piece(parent: Node3D, part_name: String, mesh: Mesh, pos: Vector3, color: Color) -> MeshInstance3D:
+    var part := MeshInstance3D.new()
+    part.name = part_name
+    part.mesh = mesh
+    part.position = pos
+    var mat := StandardMaterial3D.new()
+    mat.albedo_color = color
+    mat.roughness = 1.0
+    part.material_override = mat
+    parent.add_child(part)
+    return part
+
+func _build_visual() -> void:
+    var model_path := "res://assets/npc/cultist_modular.glb"
+    if ResourceLoader.exists(model_path):
+        var packed := load(model_path) as PackedScene
+        if packed != null:
+            var model := packed.instantiate() as Node3D
+            if model != null:
+                model.name = "CultistModel"
+                _visual.add_child(model)
+                # glTF import in Godot already converts the coordinate system.
+                _parts["model"] = model
+                _head = model
+                return
+    var robe := CylinderMesh.new()
+    robe.top_radius = 0.3
+    robe.bottom_radius = 0.63
+    robe.height = 1.38
+    _make_piece(_visual, "Robe", robe, Vector3(0, 0.75, 0), Color("#19191b"))
+    var hood := SphereMesh.new()
+    hood.radius = 0.27
+    hood.height = 0.55
+    _head = Node3D.new()
+    _head.name = "HeadPivot"
+    _head.position.y = 1.76
+    _visual.add_child(_head)
+    _make_piece(_head, "Hood", hood, Vector3.ZERO, Color("#101014"))
+    var face := BoxMesh.new()
+    face.size = Vector3(0.22, 0.25, 0.06)
+    _make_piece(_head, "Face", face, Vector3(0, -0.03, -0.24), Color("#554d47"))
+    var belt := CylinderMesh.new()
+    belt.top_radius = 0.32
+    belt.bottom_radius = 0.32
+    belt.height = 0.055
+    _make_piece(_visual, "Belt", belt, Vector3(0, 0.92, 0), Color("#776d42"))
+    var sleeve := CylinderMesh.new()
+    sleeve.top_radius = 0.13
+    sleeve.bottom_radius = 0.24
+    sleeve.height = 0.86
+    for side in [-1, 1]:
+        var limb := Node3D.new()
+        limb.name = "SleeveL" if side < 0 else "SleeveR"
+        limb.position = Vector3(0.42 * side, 1.34, 0)
+        limb.rotation.z = -0.22 * side
+        _visual.add_child(limb)
+        _make_piece(limb, "Cloth", sleeve, Vector3(0, -0.35, 0), Color("#252528"))
+        _parts["leftArm" if side < 0 else "rightArm"] = limb
+
+func _build_hit_zones() -> void:
+    var zone_specs := {
+        "head": [Vector3(0, 1.78, 0), 0.29],
+        "leftArm": [Vector3(-0.49, 1.13, 0), 0.25],
+        "rightArm": [Vector3(0.49, 1.13, 0), 0.25],
+        "leftLeg": [Vector3(-0.2, 0.42, 0), 0.22],
+        "rightLeg": [Vector3(0.2, 0.42, 0), 0.22]
+    }
+    for zone in zone_specs:
+        var spec: Array = zone_specs[zone]
+        var hitbox := StaticBody3D.new()
+        hitbox.name = "Hit_" + zone
+        hitbox.set_script(preload("res://npc_hitbox.gd"))
+        hitbox.set("zone", zone)
+        hitbox.set("controller", self)
+        hitbox.collision_layer = 1
+        hitbox.collision_mask = 0
+        var shape_node := CollisionShape3D.new()
+        var sphere := SphereShape3D.new()
+        sphere.radius = float(spec[1])
+        shape_node.shape = sphere
+        shape_node.position = spec[0]
+        hitbox.add_child(shape_node)
+        add_child(hitbox)
+
+func apply_damage(amount: float, zone: String = "torso") -> void:
+    if _state == "down":
+        return
+    var key := zone if _zone_health.has(zone) else "torso"
+    _zone_health[key] = maxf(0.0, float(_zone_health[key]) - amount)
+    hit_points = maxf(0.0, hit_points - amount)
+    _stagger_time = 0.45
+    _state = "alert"
+    _state_timer = 1.6
+    if key in ["leftArm", "rightArm"] and float(_zone_health[key]) <= 0.0 and _parts.has(key):
+        # Non-graphic clothing loss: loose sleeve detaches, never body geometry.
+        _detach_costume_part(_parts[key])
+        _parts.erase(key)
+    if hit_points <= 0.0:
+        _state = "down"
+        velocity = Vector3.ZERO
+        var tween := create_tween()
+        tween.tween_property(_visual, "rotation:z", 1.05, 0.55)
+
+func _detach_costume_part(part: Node3D) -> void:
+    if not is_instance_valid(part):
+        return
+    var dropped := part.duplicate()
+    get_parent().add_child(dropped)
+    dropped.global_transform = part.global_transform
+    part.visible = false
+    var tween := create_tween()
+    tween.tween_property(dropped, "global_position", dropped.global_position + Vector3(0.35, -0.8, 0.25), 0.5)
+    tween.parallel().tween_property(dropped, "rotation:z", 1.0, 0.5)
+    tween.tween_interval(12.0)
+    tween.tween_callback(dropped.queue_free)
+
+func _choose_target() -> void:
+    _target = _home + Vector3(randf_range(-patrol_radius, patrol_radius), 0, randf_range(-patrol_radius, patrol_radius))
+    _state = "patrol"
+    _state_timer = randf_range(2.0, 4.5)
+
+func _physics_process(delta: float) -> void:
+    if _state == "down":
+        return
+    if _player == null or not is_instance_valid(_player):
+        _player = get_parent().get_node_or_null("Player") as Node3D
+    if not is_on_floor():
+        velocity.y -= 15.0 * delta
+    if _stagger_time > 0.0:
+        _stagger_time -= delta
+        velocity.x = move_toward(velocity.x, 0.0, delta * 8.0)
+        velocity.z = move_toward(velocity.z, 0.0, delta * 8.0)
+        move_and_slide()
+        return
+    var desired := Vector3.ZERO
+    if _player != null and global_position.distance_to(_player.global_position) < notice_distance:
+        _state = "alert"
+        _state_timer = 2.5
+        desired = _player.global_position - global_position
+        # Patrol guard observes and approaches but does not attack yet.
+    elif _state == "alert":
+        _state_timer -= delta
+        if _state_timer <= 0.0:
+            _choose_target()
+    else:
+        desired = _target - global_position
+        _state_timer -= delta
+        if desired.length() < 0.9 or _state_timer <= 0.0:
+            _choose_target()
+            desired = Vector3.ZERO
+    desired.y = 0.0
+    var speed := walk_speed * (1.25 if _state == "alert" else 1.0)
+    if desired.length() > 0.35:
+        var flat := desired.normalized() * speed
+        velocity.x = move_toward(velocity.x, flat.x, 2.5 * delta)
+        velocity.z = move_toward(velocity.z, flat.z, 2.5 * delta)
+        _visual.rotation.y = lerp_angle(_visual.rotation.y, atan2(-flat.x, -flat.z), delta * 4.0)
+        _step_clock += delta * speed * 7.0
+        _visual.position.y = sin(_step_clock) * 0.026
+    else:
+        velocity.x = move_toward(velocity.x, 0.0, 2.5 * delta)
+        velocity.z = move_toward(velocity.z, 0.0, 2.5 * delta)
+        _visual.position.y = lerpf(_visual.position.y, 0.0, delta * 5.0)
+    move_and_slide()
