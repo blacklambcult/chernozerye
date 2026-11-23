@@ -32,5 +32,5 @@ textures/default_filters/use_nearest_mipmap_filter=true
 
 ps1_jitter_strength={
 "type": "float",
-"value": 0.35
+"value": 0.5
 }

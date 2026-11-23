@@ -65,14 +65,16 @@ func _run() -> void:
     var pixels := pause.find_child("PS1Pixels", true, false) as CheckButton
     var strength := pause.find_child("PS1PixelStrength", true, false) as HSlider
     assert(jitter != null and pixels != null and strength != null)
-    assert(strength.value == 55.0)
+    assert(strength.value == 80.0)
+    assert(grade.get_shader_parameter("ps1_pixel_strength") == 0.8)
+    assert(jitter.button_pressed and pixels.button_pressed)
+    assert(grade.get_shader_parameter("ps1_pixels_enabled"))
+    pixels.button_pressed = false
     strength.value = 0
     assert(fx.pixel_strength == 0.0)
     assert(grade.get_shader_parameter("ps1_pixel_strength") == 0.0)
     strength.value = 100
     assert(grade.get_shader_parameter("ps1_pixel_strength") == 1.0)
-    assert(not jitter.button_pressed and not pixels.button_pressed)
-    jitter.button_pressed = true
     assert(fx.jitter_enabled and not fx.pixels_enabled)
     pixels.button_pressed = true
     assert(fx.pixels_enabled and grade.get_shader_parameter("ps1_pixels_enabled"))
@@ -88,14 +90,18 @@ func _run() -> void:
     var objects := pause.find_child("JitterTarget_objects", true, false) as CheckBox
     var viewmodel := pause.find_child("JitterTarget_viewmodel", true, false) as CheckBox
     var nature := pause.find_child("JitterTarget_nature", true, false) as CheckBox
-    assert(jitter_strength.value == 35.0)
-    assert(nature.button_pressed and not road.button_pressed and not objects.button_pressed and not viewmodel.button_pressed)
+    assert(jitter_strength.value == 50.0)
+    assert(nature.button_pressed and not road.button_pressed and objects.button_pressed and viewmodel.button_pressed)
     road.button_pressed = true
     assert(meshes[4].material_override is ShaderMaterial)
     assert(meshes[4].material_override.get_shader_parameter("jitter_axes") == Vector2(0.22, 0.0))
+    assert(meshes[5].material_override is ShaderMaterial)
+    objects.button_pressed = false
     assert(meshes[5].material_override is StandardMaterial3D)
     objects.button_pressed = true
     assert(meshes[5].material_override is ShaderMaterial)
+    assert(meshes[6].material_override is ShaderMaterial)
+    viewmodel.button_pressed = false
     assert(meshes[6].material_override is StandardMaterial3D)
     viewmodel.button_pressed = true
     assert(meshes[6].material_override is ShaderMaterial)
