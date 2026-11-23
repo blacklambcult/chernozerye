@@ -235,9 +235,11 @@ func _draw_flat_polygon(coords: PackedVector2Array, tint: Color, height: float) 
     var node := MeshInstance3D.new()
     node.mesh = mesh
     node.material_override = _mat(tint)
+    node.add_to_group(&"ps1_jitter_foliage")
     add_child(node)
 
-func _draw_strip(path: PackedVector2Array, width: float, tint: Color, height: float) -> void:
+func _draw_strip(path: PackedVector2Array, width: float, tint: Color, height: float,
+        jitter_group: StringName = &"ps1_jitter_road") -> void:
     var vertices := PackedVector3Array()
     for i in range(path.size() - 1):
         var a := path[i]
@@ -258,6 +260,7 @@ func _draw_strip(path: PackedVector2Array, width: float, tint: Color, height: fl
     var node := MeshInstance3D.new()
     node.mesh = mesh
     node.material_override = _mat(tint)
+    node.add_to_group(jitter_group)
     add_child(node)
 
 func _draw_meadow() -> void:
@@ -296,10 +299,11 @@ func _draw_field_scrub() -> void:
     var node := MultiMeshInstance3D.new()
     node.multimesh = multi
     node.material_override = _mat(Color("#46583d"))
+    node.add_to_group(&"ps1_jitter_foliage")
     add_child(node)
 
 func _draw_river() -> void:
-    _draw_strip(river_path, 32.0, Color("#273f46"), 0.045)
+    _draw_strip(river_path, 32.0, Color("#273f46"), 0.045, &"ps1_jitter_foliage")
 
 func _build_lake_outline() -> void:
     # An asymmetrical stylized lake. Not a surveyed shoreline.
@@ -612,6 +616,7 @@ func _draw_undergrowth() -> void:
     bushes.multimesh = multimesh
     bushes.material_override = _mat(Color("#485842"))
     bushes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    bushes.add_to_group(&"ps1_jitter_foliage")
     add_child(bushes)
 
 func _seed_forest_edges(positions: Array[Vector3]) -> int:
@@ -688,6 +693,7 @@ func _draw_grass_tufts() -> void:
     clumps.multimesh = multi
     clumps.material_override = _mat(Color("#677459"))
     clumps.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    clumps.add_to_group(&"ps1_jitter_foliage")
     add_child(clumps)
 
 func _draw_forests() -> void:

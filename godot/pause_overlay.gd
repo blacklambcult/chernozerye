@@ -46,13 +46,11 @@ func _build_ui() -> void:
     var card := PanelContainer.new()
     card.name = "PauseCard"
     card.anchor_left = 0.5
-    card.anchor_top = 0.5
+    card.anchor_top = 0.05
     card.anchor_right = 0.5
-    card.anchor_bottom = 0.5
+    card.anchor_bottom = 0.95
     card.offset_left = -246
-    card.offset_top = -255
     card.offset_right = 246
-    card.offset_bottom = 255
     var border := StyleBoxFlat.new()
     border.bg_color = Color("#171d1b")
     border.border_color = Color("#716655")
@@ -67,11 +65,16 @@ func _build_ui() -> void:
     margin.add_theme_constant_override("margin_bottom", 24)
     card.add_child(margin)
 
+    var scroll := ScrollContainer.new()
+    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    margin.add_child(scroll)
+
     var items := VBoxContainer.new()
-    items.add_theme_constant_override("separation", 12)
-    margin.add_child(items)
+    items.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    items.add_theme_constant_override("separation", 8)
+    scroll.add_child(items)
     items.add_child(_make_label("ЧЕРНОЗЁРЬЕ", 27, INK))
-    items.add_child(_make_label("FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.7.1", 11, MUTED))
+    items.add_child(_make_label("FEARLESS KNIGHTS OF THE CORDON", 11, MUTED))
     items.add_child(_make_label("ПАУЗА", 18, ACCENT))
 
     var resume := Button.new()
@@ -105,32 +108,54 @@ func _build_ui() -> void:
     if graphics != null:
         var effects := HBoxContainer.new()
         items.add_child(effects)
-        _add_graphics_toggle(effects, "PS1 Jitter (растительность)", "PS1Jitter", graphics.set_jitter, graphics.jitter_enabled)
+        _add_graphics_toggle(effects, "PS1 Jitter", "PS1Jitter", graphics.set_jitter, graphics.jitter_enabled)
         _add_graphics_toggle(effects, "PS1 Пиксели", "PS1Pixels", graphics.set_pixels, graphics.pixels_enabled)
-        var pixel_row := HBoxContainer.new()
-        items.add_child(pixel_row)
-        pixel_row.add_child(_make_label("СИЛА ПИКСЕЛИЗАЦИИ", 13, INK))
-        var pixel_slider := HSlider.new()
-        pixel_slider.name = "PS1PixelStrength"
-        pixel_slider.max_value = 100.0
-        pixel_slider.step = 1.0
-        pixel_slider.value = graphics.pixel_strength
-        pixel_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        pixel_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-        pixel_row.add_child(pixel_slider)
-        var pixel_readout := _make_label("%d%%" % int(pixel_slider.value), 14, ACCENT)
-        pixel_readout.custom_minimum_size.x = 45
-        pixel_readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-        pixel_row.add_child(pixel_readout)
-        pixel_slider.value_changed.connect(func(value: float) -> void:
-            graphics.set_pixel_strength(value)
-            pixel_readout.text = "%d%%" % int(value)
-        )
+        _add_strength_row(items, "СИЛА ПИКСЕЛИЗАЦИИ", "PS1PixelStrength", graphics.pixel_strength, graphics.set_pixel_strength)
+        _add_strength_row(items, "СИЛА JITTER", "PS1JitterStrength", graphics.jitter_strength, graphics.set_jitter_strength)
+
+        var targets := GridContainer.new()
+        targets.columns = 2
+        items.add_child(targets)
+        for target: StringName in graphics.JITTER_CONTROLS:
+            var toggle := CheckBox.new()
+            toggle.name = "JitterTarget_" + String(target)
+            toggle.text = graphics.JITTER_CONTROLS[target]
+            toggle.button_pressed = graphics.jitter_targets[target]
+            toggle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+            toggle.toggled.connect(func(enabled: bool) -> void:
+                graphics.set_jitter_target(target, enabled)
+            )
+            targets.add_child(toggle)
 
     items.add_child(_make_label("WASD — идти    SHIFT — бег    C — тихий шаг    МЫШЬ — осмотр", 13, MUTED))
     items.add_child(_make_label("E — взаимодействие    J — журнал    M — карта", 13, MUTED))
     items.add_child(_make_label("ESC — вернуться к игре", 13, ACCENT))
     backdrop.visible = false
+
+
+func _add_strength_row(items: VBoxContainer, title: String, node_name: String,
+        value: float, apply: Callable) -> void:
+    var row := HBoxContainer.new()
+    items.add_child(row)
+    var label := _make_label(title, 13, INK)
+    label.custom_minimum_size.x = 175
+    row.add_child(label)
+    var slider := HSlider.new()
+    slider.name = node_name
+    slider.max_value = 100.0
+    slider.step = 1.0
+    slider.value = value
+    slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+    row.add_child(slider)
+    var readout := _make_label("%d%%" % int(value), 14, ACCENT)
+    readout.custom_minimum_size.x = 45
+    readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+    row.add_child(readout)
+    slider.value_changed.connect(func(strength: float) -> void:
+        apply.call(strength)
+        readout.text = "%d%%" % int(strength)
+    )
 
 
 func _add_graphics_toggle(row: HBoxContainer, label: String, node_name: String,

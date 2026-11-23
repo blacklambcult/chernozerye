@@ -5,14 +5,14 @@ const LOGO_DATA = preload("res://logo_data.gd")
 const MAP_FILE := "res://world_data.json"
 const MANUAL_FILE := "res://manual_layout.json"
 const GAME_TITLE := "Fearless Knights of the Cordon"
-const GAME_STAGE := "Pre-Alpha 0.8.8"
+const GAME_STAGE := "Pre-Alpha 0.8.9"
 # Canonical playable start of the 710-feature Geo Lab village. Keep world
 # placements and the CI spawn-distance regression anchored to this coordinate.
 const MANUAL_VILLAGE_SPAWN := Vector3(-789.7, 0.22, -268.6)
 const MANUAL_CAMERA_NEAR := 0.16
 const MANUAL_CAMERA_FAR := 250.0
 const SEASON := "NOVEMBER"
-const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.8.8 · ЧЕРНОЗЁРЬЕ · 710 ОБЪЕКТОВ"
+const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.8.9 · ЧЕРНОЗЁРЬЕ · 710 ОБЪЕКТОВ"
 var manual_mode := false
 var manual_button: Button
 var _status_label: Label
@@ -43,6 +43,7 @@ func _ready() -> void:
     var forest_features: Array = []
     var road_group := Node3D.new()
     road_group.name = "OSMRoadMeshes"
+    road_group.add_to_group(&"ps1_jitter_road")
     add_child(road_group)
     if FileAccess.file_exists(MAP_FILE):
         var data = JSON.parse_string(FileAccess.get_file_as_string(MAP_FILE))
@@ -195,6 +196,7 @@ func _create_ground() -> void:
     var instance := MeshInstance3D.new()
     instance.mesh = mesh
     instance.name = "BaseGround"
+    instance.add_to_group(&"ps1_jitter_stable")
     instance.material_override = _create_ground_material()
     _day_ground_material = instance.material_override
     add_child(instance)
