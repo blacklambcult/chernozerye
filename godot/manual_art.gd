@@ -62,9 +62,6 @@ var _yard_details: PackedVector3Array = PackedVector3Array()
 var _road_ruts: PackedVector3Array = PackedVector3Array()
 var _overhead_wires: PackedVector3Array = PackedVector3Array()
 var _utility_pole_count := 0
-var _bush_positions: Array[Transform3D] = []
-var _aspen_positions: Array[Transform3D] = []
-var _aspen_trunks: Array[Transform3D] = []
 var _building_count := 0
 var _fence_count := 0
 var _road_count := 0
@@ -188,8 +185,6 @@ func decorate(features: Array) -> void:
                 _decorate_fence(polygon)
             "road":
                 _decorate_road(polygon)
-            "forest":
-                _decorate_forest(polygon)
     var total_plots := _fence_count
     for i in _placed_plots.size():
         _fence_count = i + 1
@@ -209,7 +204,6 @@ func decorate(features: Array) -> void:
         " balconies=", _balcony_count,
         " flower_patches=", _flower_patches, " walks=", _front_walkways,
         " chimney_smoke=", _chimneys_smoking)
-    _create_forest_assets()
     print("VILLAGE_COLLISION_READY: buildings=", _collision_building_count,
         " fence_spans=", _collision_fence_span_count,
         " large_yard_props=", _collision_yard_count,
@@ -2140,74 +2134,3 @@ func _decorate_utility_poles(points: PackedVector2Array) -> void:
                     _wire_segment(middle, to_pos)
             previous = p
             _utility_pole_count += 1
-
-func _decorate_forest(points: PackedVector2Array) -> void:
-    if points.size() < 3:
-        return
-    var lo := Vector2(INF, INF)
-    var hi := Vector2(-INF, -INF)
-    var area := 0.0
-    for i in range(points.size()):
-        lo = lo.min(points[i])
-        hi = hi.max(points[i])
-        var q: Vector2 = points[(i + 1) % points.size()]
-        area += points[i].x * q.y - q.x * points[i].y
-    var amount := mini(80, int(absf(area) / 2700.0))
-    var rng := RandomNumberGenerator.new()
-    rng.seed = 99221 + int(absf(lo.x * 13.0 + lo.y * 7.0))
-    var placed := 0
-    for _trial in range(amount * 25):
-        if placed >= amount:
-            break
-        var p := Vector2(rng.randf_range(lo.x, hi.x), rng.randf_range(lo.y, hi.y))
-        if not Geometry2D.is_point_in_polygon(p, points):
-            continue
-        if _nearest_road_distance(p) < 13.0:
-            continue
-        var scale := rng.randf_range(0.7, 1.07)
-        var basis := Basis().rotated(Vector3.UP, rng.randf_range(-PI, PI)).scaled(Vector3.ONE * scale)
-        if placed % 3 == 0:
-            _aspen_positions.append(Transform3D(basis, _pt(p, 4.25 * scale)))
-            _aspen_trunks.append(Transform3D(basis, _pt(p, 1.75 * scale)))
-        else:
-            _bush_positions.append(Transform3D(basis, _pt(p, 0.85 * scale)))
-        placed += 1
-
-func _add_instanced(mesh: Mesh, instances: Array[Transform3D], tint: Color, name: String) -> void:
-    if instances.is_empty():
-        return
-    var multi := MultiMesh.new()
-    multi.transform_format = MultiMesh.TRANSFORM_3D
-    multi.mesh = mesh
-    multi.instance_count = instances.size()
-    for i in range(instances.size()):
-        multi.set_instance_transform(i, instances[i])
-    var node := MultiMeshInstance3D.new()
-    node.name = name
-    node.multimesh = multi
-    var foliage_material := _material(tint)
-    # The unshaded foliage stayed saturated/bright in fog; use soft diffuse instead.
-    node.material_override = foliage_material
-    node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-    node.add_to_group(&"ps1_jitter_foliage")
-    add_child(node)
-
-func _create_forest_assets() -> void:
-    var canopy := SphereMesh.new()
-    canopy.radius = 1.20
-    canopy.height = 2.6
-    canopy.radial_segments = 5
-    canopy.rings = 3
-    _add_instanced(canopy, _aspen_positions, Color("#4b463d"), "Осинник / ломаные кроны")
-    var aspen_trunk := CylinderMesh.new()
-    aspen_trunk.top_radius = 0.13
-    aspen_trunk.bottom_radius = 0.27
-    aspen_trunk.height = 3.5
-    aspen_trunk.radial_segments = 5
-    _add_instanced(aspen_trunk, _aspen_trunks, Color("#33352f"), "Осинник / стволы")
-    var bush := SphereMesh.new()
-    bush.radius = 0.85
-    bush.height = 1.6
-    bush.radial_segments = 5
-    bush.rings = 2
-    _add_instanced(bush, _bush_positions, Color("#414136"), "Подлесок / репейник")

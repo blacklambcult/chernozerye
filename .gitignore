@@ -8,3 +8,5 @@ build/
 export/
 
 /godot/generated_village/
+
+/godot/generated_forest/

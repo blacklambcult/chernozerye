@@ -17,8 +17,13 @@ const COLORS := {
 }
 var _soil_faces := PackedVector3Array()
 var object_count: int = 0
+const FOREST_MODELS := "res://generated_forest/"
+const SHRINE := preload("res://forest_shrine.gd")
 var forest_positions: Array[Transform3D] = []
-var broad_canopies: Array[Transform3D] = []
+var _forest_sites: Array[Vector2] = []
+var _forest_cells: Dictionary = {}
+var _forest_models: Dictionary = {}
+var _shrine_sites: Array[Vector2] = []
 var tree_trunks: Array[Transform3D] = []
 var _tree_collision_total := 0
 var manual_roads: Array = []
@@ -618,7 +623,7 @@ func _scatter_forest(points: PackedVector2Array) -> void:
         twice_area += p.x * q.y - q.x * p.y
     var area_m2 := absf(twice_area) * 0.5
     # Batching keeps large forest polygons viable on Web without thousands of nodes.
-    var desired := mini(950, int(area_m2 / 115.0))
+    var desired := mini(950, int(area_m2 / 210.0))
     var rng := RandomNumberGenerator.new()
     rng.seed = 20261118 + points.size() * 103 + int(absf(min_p.x) * 10.0)
     var count := 0
@@ -630,43 +635,101 @@ func _scatter_forest(points: PackedVector2Array) -> void:
             continue
         if _nearest_road(p) < 13.0 or _near_building(p, 6.5):
             continue
-        var scale := rng.randf_range(0.72, 1.05)
+        var cell := Vector2i((p / 4.0).floor())
+        var nearby := false
+        for x in range(cell.x - 1, cell.x + 2):
+            for y in range(cell.y - 1, cell.y + 2):
+                for neighbor: Vector2 in _forest_cells.get(Vector2i(x, y), []):
+                    if p.distance_squared_to(neighbor) < 13.0:
+                        nearby = true
+        if nearby:
+            continue
+        if not _forest_cells.has(cell):
+            _forest_cells[cell] = []
+        _forest_cells[cell].append(p)
+        _forest_sites.append(p)
+        var scale := rng.randf_range(0.88, 1.42)
         var rotation := rng.randf_range(-PI, PI)
         var basis := Basis().rotated(Vector3.UP, rotation).scaled(Vector3.ONE * scale)
-        if count % 4 == 0:
-            broad_canopies.append(Transform3D(basis, _pos(p, 4.4 * scale)))
-        else:
-            forest_positions.append(Transform3D(basis, _pos(p, 5.0 * scale)))
-        tree_trunks.append(Transform3D(basis, _pos(p, 1.65 * scale)))
+        forest_positions.append(Transform3D(basis, _pos(p, 0.0)))
         count += 1
 
-func _instanced_tree(mesh: Mesh, transforms: Array[Transform3D], color: Color, label: String) -> void:
-    if transforms.is_empty():
-        return
-    var multi := MultiMesh.new()
-    multi.transform_format = MultiMesh.TRANSFORM_3D
-    multi.mesh = mesh
-    multi.instance_count = transforms.size()
-    for i in range(transforms.size()):
-        multi.set_instance_transform(i, transforms[i])
-    var node := MultiMeshInstance3D.new()
-    node.name = label
-    node.multimesh = multi
-    var tree_mat := _mat(color)
-    tree_mat.specular = 0.0
-    # Diffuse lighting restores the faceted PS1 look; unshaded green stood out against the dusk fog.
-    # Keep specular reflections and cast shadows disabled to avoid web-rendering artifacts.
-    node.material_override = tree_mat
-    node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-    node.add_to_group(&"ps1_jitter_foliage")
-    add_child(node)
 
-func _layer_transforms(source: Array[Transform3D], local_rise: float) -> Array[Transform3D]:
-    var layers: Array[Transform3D] = []
-    for t in source:
-        # A basis-scaled offset keeps foliage aligned with tree size.
-        layers.append(Transform3D(t.basis, t.origin + t.basis * Vector3(0.0, local_rise, 0.0)))
-    return layers
+func _forest_model(id: String) -> PackedScene:
+    if not _forest_models.has(id):
+        var path := FOREST_MODELS + id + ".glb"
+        if ResourceLoader.exists(path):
+            _forest_models[id] = load(path)
+    return _forest_models.get(id) as PackedScene
+
+
+func _queue_forest_asset(batches: Dictionary, id: String, pose: Transform3D) -> void:
+    var cell := Vector2i((Vector2(pose.origin.x, pose.origin.z) / 145.0).floor())
+    if not batches.has(id):
+        batches[id] = {}
+    var cells: Dictionary = batches[id]
+    if not cells.has(cell):
+        cells[cell] = []
+    cells[cell].append(pose)
+
+
+func _render_forest_batches(batches: Dictionary) -> void:
+    for id in batches:
+        var packed := _forest_model(id)
+        if packed == null:
+            continue
+        var template := packed.instantiate() as Node3D
+        for part: MeshInstance3D in template.find_children("*", "MeshInstance3D", true, false):
+            var mesh := part.mesh
+            for surface in mesh.get_surface_count():
+                var material := mesh.surface_get_material(surface) as BaseMaterial3D
+                if material != null:
+                    material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
+            for poses: Array in batches[id].values():
+                var multi := MultiMesh.new()
+                multi.transform_format = MultiMesh.TRANSFORM_3D
+                multi.mesh = mesh
+                multi.instance_count = poses.size()
+                for i in poses.size():
+                    multi.set_instance_transform(i, poses[i] * part.transform)
+                var batch := MultiMeshInstance3D.new()
+                batch.multimesh = multi
+                batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+                batch.add_to_group(&"ps1_jitter_foliage")
+                add_child(batch)
+        template.free()
+
+
+func _place_forest_shrines() -> void:
+    var anchors := [Vector2(-850, 420), Vector2(-660, 555),
+        Vector2(-460, 420), Vector2(-625, 185)]
+    var colors := [Color("#74e2be"), Color("#ca86ed"), Color("#e09f69"), Color("#86bdf1")]
+    for i in anchors.size():
+        var selected := Vector2.INF
+        var distance := INF
+        for point in _forest_sites:
+            var spread := true
+            for other in _shrine_sites:
+                if point.distance_squared_to(other) < 85.0 ** 2:
+                    spread = false
+                    break
+            var score := point.distance_squared_to(anchors[i])
+            if spread and score < distance:
+                distance = score
+                selected = point
+        if selected == Vector2.INF:
+            continue
+        var model := _forest_model("shrine_%d_active" % i)
+        var ruined := _forest_model("shrine_%d_broken" % i)
+        if model == null or ruined == null:
+            continue
+        _shrine_sites.append(selected)
+        var shrine := SHRINE.new()
+        shrine.name = "ForestShrine%d" % (i + 1)
+        shrine.position = _pos(selected, 0.03)
+        add_child(shrine)
+        shrine.install(model, ruined, colors[i])
+
 
 func _build_trunk_collision() -> void:
     # One batched trimesh for the entire instanced forest (not thousands of
@@ -676,12 +739,12 @@ func _build_trunk_collision() -> void:
     for transform in tree_trunks:
         var scale := transform.basis.get_scale().x
         var at := transform.origin
-        var floor_y := 0.09
-        var top_y := maxf(1.1, 3.20 * scale)
+        var floor_y := 0.02
+        var top_y := maxf(1.1, 5.5 * scale)
         for side in range(sides):
             var angle0 := float(side) * TAU / float(sides)
             var angle1 := float(side + 1) * TAU / float(sides)
-            var radius := 0.33 * scale
+            var radius := 0.23 * scale
             var p0 := Vector3(at.x + cos(angle0) * radius, floor_y, at.z + sin(angle0) * radius)
             var p1 := Vector3(at.x + cos(angle1) * radius, floor_y, at.z + sin(angle1) * radius)
             _put_triangle(faces, p0, p1, Vector3(p1.x, top_y, p1.z))
@@ -702,51 +765,36 @@ func _build_trunk_collision() -> void:
 
 
 func _build_forest_instances() -> void:
-    # Three staggered bough layers read as old pines instead of a single giant cone.
-    # All layers reuse the original surveyed forest point positions.
-    var lowest := CylinderMesh.new()
-    lowest.top_radius = 0.32
-    lowest.bottom_radius = 2.0
-    lowest.height = 3.5
-    lowest.radial_segments = 6
-    _instanced_tree(lowest, _layer_transforms(forest_positions, -1.4),
-        Color("#2c3632"), "Ели / нижние лапы")
-
-    var middle := CylinderMesh.new()
-    middle.top_radius = 0.22
-    middle.bottom_radius = 1.55
-    middle.height = 2.9
-    middle.radial_segments = 6
-    _instanced_tree(middle, _layer_transforms(forest_positions, 0.65),
-        Color("#333d36"), "Ели / средние лапы")
-
-    var top := CylinderMesh.new()
-    top.top_radius = 0.0
-    top.bottom_radius = 1.12
-    top.height = 2.5
-    top.radial_segments = 5
-    _instanced_tree(top, _layer_transforms(forest_positions, 2.3),
-        Color("#39443b"), "Ели / кроны")
-
-    # Aspen canopy is irregular, compact, and visually distinct from conifers.
-    var broad := SphereMesh.new()
-    broad.radius = 1.12
-    broad.height = 2.50
-    broad.radial_segments = 6
-    broad.rings = 3
-    _instanced_tree(broad, broad_canopies, Color("#454039"), "Осинник / кроны")
-    var smaller := SphereMesh.new()
-    smaller.radius = 1.1
-    smaller.height = 2.1
-    smaller.radial_segments = 5
-    smaller.rings = 2
-    _instanced_tree(smaller, _layer_transforms(broad_canopies, 1.3),
-        Color("#4e473e"), "Осинник / верхушки")
-    var trunk := CylinderMesh.new()
-    trunk.top_radius = 0.25
-    trunk.bottom_radius = 0.40
-    trunk.height = 3.3
-    trunk.radial_segments = 5
-    _instanced_tree(trunk, tree_trunks, Color("#3b3b34"), "Лес / стволы")
+    _place_forest_shrines()
+    var batches := {}
+    var undergrowth := 0
+    var ground_details := 0
+    for i in forest_positions.size():
+        var pose := forest_positions[i]
+        var p := _forest_sites[i]
+        var clearing := false
+        for site in _shrine_sites:
+            if p.distance_squared_to(site) < 5.5 ** 2:
+                clearing = true
+                break
+        if clearing:
+            continue
+        var id := "birch" if i % 17 == 0 else ("pine_%d" % (i % 5))
+        var height_scale := 1.85 if id != "birch" else 1.0
+        var tree_pose := Transform3D(pose.basis.scaled_local(Vector3(1.0, height_scale, 1.0)), pose.origin)
+        _queue_forest_asset(batches, id, tree_pose)
+        tree_trunks.append(pose)
+        if i % 3 != 0:
+            continue
+        var detail := p + Vector2.from_angle(float(i) * 2.39996) * 1.8
+        if _nearest_road(detail) < 13.0 or _near_building(detail, 6.5):
+            continue
+        var kind := "ground" if i % 4 == 0 else "understory"
+        _queue_forest_asset(batches, "%s_%d" % [kind, (i / 3) % 4],
+            Transform3D(pose.basis, _pos(detail, 0.03)))
+        ground_details += int(kind == "ground")
+        undergrowth += int(kind == "understory")
+    _render_forest_batches(batches)
     _build_trunk_collision()
-    print("MANUAL_FOREST_READY: trees=", tree_trunks.size(), " clearance=roads13/buildings6.5")
+    print("MANUAL_FOREST_READY: trees=", tree_trunks.size(), " clearance=roads13/buildings6.5",
+        " bushes=", undergrowth, " ground_details=", ground_details, " shrines=", _shrine_sites.size())
