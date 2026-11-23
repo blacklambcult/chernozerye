@@ -101,6 +101,9 @@ jobs:
           test -s godot/assets/dembel_fp.glb
           python scripts/check_dembel_character.py godot/assets/dembel_full.glb godot/assets/dembel_fp.glb
 
+      - name: Build cultist model v0.6
+        run: python scripts/build_cultist_v06.py godot/assets/npc/cultist_modular.glb
+
       - name: Restore user-exported Hellish Forge pistol GLB
         shell: bash
         run: |
