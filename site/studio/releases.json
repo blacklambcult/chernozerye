@@ -2,15 +2,27 @@
   "schema": "chernozerye.studio.release-notes",
   "formatVersion": 1,
   "current": {
-    "studio": "0.6.0",
+    "studio": "0.6.1",
     "game": "pre-alpha 0.8.9",
     "date": "2026-11-23",
     "channel": "PRE-ALPHA",
-    "headline": "Jitter по категориям",
-    "description": "Выбери силу Jitter и отдельно включи его для нужных частей сцены.",
+    "headline": "Генератор построек",
+    "description": "Собирай избы, бани, сараи и заборы, сохраняй модели в библиотеку и размещай их в Quest Lab.",
     "project": "Fearless Knights of the Cordon"
   },
   "releases": [
+    {
+      "id": "studio-061-building-generator",
+      "version": "0.6.1",
+      "area": "studio",
+      "date": "2026-11-23",
+      "title": "Генератор построек",
+      "commits": [],
+      "changes": [
+        "Добавлена мастерская для избы, бани, сарая и забора с исходными модулями и состояниями генератора.",
+        "Модели сохраняются в локальную библиотеку без подложки и открываются для размещения в Quest Lab."
+      ]
+    },
     {
       "id": "studio-060-weapon-generator",
       "version": "0.6.0",

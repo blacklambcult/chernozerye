@@ -11,7 +11,8 @@
   const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (char) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
   let project;
-  let library = "quest";
+  let requestedModel = new URLSearchParams(location.search).get("model");
+  let library = requestedModel ? "item" : "quest";
   const objects = window.ChernoObjectLibrary;
   let localMarkers;
   const placementMarkers = new Map();
@@ -285,13 +286,14 @@
       localModels = models;
       localPlacements = placements;
       const picker = $("local-model");
-      const selected = picker.value;
+      const selected = requestedModel || picker.value;
+      requestedModel = null;
       picker.replaceChildren(...models.map(model => new Option(model.name, model.id)));
       if (models.some(model => model.id === selected)) picker.value = selected;
       $("place-local-model").disabled = !models.length;
       $("local-model-status").textContent = models.length ?
         "Размещения доступны в игре в этом профиле браузера." :
-        "Сохрани модель в библиотеку из Model Lab.";
+        "Сохрани модель в библиотеку из Model Lab или Генератора построек.";
       const names = new Map(models.map(model => [model.id, model.name]));
       $("local-placements").replaceChildren();
       localMarkers?.clearLayers();
