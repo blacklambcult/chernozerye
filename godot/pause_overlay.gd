@@ -105,8 +105,27 @@ func _build_ui() -> void:
     if graphics != null:
         var effects := HBoxContainer.new()
         items.add_child(effects)
-        _add_graphics_toggle(effects, "PS1 Jitter", "PS1Jitter", graphics.set_jitter, graphics.jitter_enabled)
+        _add_graphics_toggle(effects, "PS1 Jitter (растительность)", "PS1Jitter", graphics.set_jitter, graphics.jitter_enabled)
         _add_graphics_toggle(effects, "PS1 Пиксели", "PS1Pixels", graphics.set_pixels, graphics.pixels_enabled)
+        var pixel_row := HBoxContainer.new()
+        items.add_child(pixel_row)
+        pixel_row.add_child(_make_label("СИЛА ПИКСЕЛИЗАЦИИ", 13, INK))
+        var pixel_slider := HSlider.new()
+        pixel_slider.name = "PS1PixelStrength"
+        pixel_slider.max_value = 100.0
+        pixel_slider.step = 1.0
+        pixel_slider.value = graphics.pixel_strength
+        pixel_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        pixel_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+        pixel_row.add_child(pixel_slider)
+        var pixel_readout := _make_label("%d%%" % int(pixel_slider.value), 14, ACCENT)
+        pixel_readout.custom_minimum_size.x = 45
+        pixel_readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+        pixel_row.add_child(pixel_readout)
+        pixel_slider.value_changed.connect(func(value: float) -> void:
+            graphics.set_pixel_strength(value)
+            pixel_readout.text = "%d%%" % int(value)
+        )
 
     items.add_child(_make_label("WASD — идти    SHIFT — бег    C — тихий шаг    МЫШЬ — осмотр", 13, MUTED))
     items.add_child(_make_label("E — взаимодействие    J — журнал    M — карта", 13, MUTED))

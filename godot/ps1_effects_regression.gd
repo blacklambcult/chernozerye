@@ -16,9 +16,12 @@ func _run() -> void:
     world.add_child(sun)
     var fx: Node = load("res://ps1_effects.gd").new()
     fx.name = "PS1Effects"
+    var grade := ShaderMaterial.new()
+    grade.shader = preload("res://retro_grade.gdshader")
+    fx.grade_material = grade
     world.add_child(fx)
     var meshes: Array[MeshInstance3D] = []
-    for i in 4:
+    for i in 5:
         var mesh := MeshInstance3D.new()
         mesh.mesh = BoxMesh.new()
         var material := StandardMaterial3D.new()
@@ -36,6 +39,11 @@ func _run() -> void:
             wood.shader = load("res://cabin_wood.gdshader")
             mesh.material_override = wood
         mesh.position = Vector3((i - 1.5) * 1.1, 0, 0)
+        if i < 4:
+            mesh.add_to_group(&"ps1_jitter_foliage")
+        else:
+            mesh.name = "Road"
+            mesh.scale = Vector3(4, 0.01, 12)
         world.add_child(mesh)
         meshes.append(mesh)
     var player := CharacterBody3D.new()
@@ -44,20 +52,29 @@ func _run() -> void:
     player.add_child(pause)
     var jitter := pause.find_child("PS1Jitter", true, false) as CheckButton
     var pixels := pause.find_child("PS1Pixels", true, false) as CheckButton
-    assert(jitter != null and pixels != null)
+    var strength := pause.find_child("PS1PixelStrength", true, false) as HSlider
+    assert(jitter != null and pixels != null and strength != null)
+    assert(strength.value == 55.0)
+    strength.value = 0
+    assert(fx.pixel_strength == 0.0)
+    assert(grade.get_shader_parameter("ps1_pixel_strength") == 0.0)
+    strength.value = 100
+    assert(grade.get_shader_parameter("ps1_pixel_strength") == 1.0)
     assert(not jitter.button_pressed and not pixels.button_pressed)
     jitter.button_pressed = true
     assert(fx.jitter_enabled and not fx.pixels_enabled)
     pixels.button_pressed = true
-    assert(fx.pixels_enabled)
+    assert(fx.pixels_enabled and grade.get_shader_parameter("ps1_pixels_enabled"))
     await process_frame
     await process_frame
     assert(meshes[0].material_override is ShaderMaterial)
     assert(meshes[1].material_override is StandardMaterial3D)
     assert(meshes[2].material_override is StandardMaterial3D)
     assert(meshes[3].material_override is ShaderMaterial)
+    assert(meshes[4].material_override is StandardMaterial3D)
     var late_mesh := MeshInstance3D.new()
     late_mesh.mesh = BoxMesh.new()
+    late_mesh.add_to_group(&"ps1_jitter_foliage")
     world.add_child(late_mesh)
     await process_frame
     await process_frame

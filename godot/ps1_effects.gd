@@ -1,14 +1,14 @@
 extends Node
 ## Optional screen-grid effects for the Compatibility renderer.
 
-const PIXEL_SHADER := preload("res://ps1_pixels.gdshader")
+const JITTER_GROUP := &"ps1_jitter_foliage"
 const JITTER_VERTEX := """
     vec4 clip = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
     if (clip.w > 0.75) {
-        vec2 grid = max(VIEWPORT_SIZE / 4.0, vec2(144.0, 108.0));
+        vec2 grid = max(VIEWPORT_SIZE * 0.5, vec2(1.0));
         vec2 ndc = clip.xy / clip.w;
         vec2 snapped = floor(ndc * grid + 0.5) / grid;
-        clip.xy += (snapped - ndc) * clip.w * 0.65 * smoothstep(0.75, 2.5, clip.w);
+        clip.xy += (snapped - ndc) * clip.w * 0.65 * smoothstep(0.75, 3.0, clip.w) * (1.0 - smoothstep(30.0, 80.0, clip.w));
     }
     POSITION = clip;
 """
@@ -43,34 +43,28 @@ void fragment() {
 """
 var pixels_enabled := false
 var jitter_enabled := false
-var _pixel_layer: CanvasLayer
+var pixel_strength := 55.0
+var grade_material: ShaderMaterial
 var _originals: Dictionary = {}
 var _materials: Dictionary = {}
 var _shaders: Dictionary = {}
 
 
 func _ready() -> void:
-    _pixel_layer = CanvasLayer.new()
-    _pixel_layer.layer = 80
-    _pixel_layer.hide()
-    add_child(_pixel_layer)
-    var capture := BackBufferCopy.new()
-    capture.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
-    _pixel_layer.add_child(capture)
-    var screen := ColorRect.new()
-    screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    var material := ShaderMaterial.new()
-    material.shader = PIXEL_SHADER
-    screen.material = material
-    _pixel_layer.add_child(screen)
     get_tree().node_added.connect(_on_node_added)
     get_tree().node_removed.connect(_on_node_removed)
 
 
 func set_pixels(value: bool) -> void:
     pixels_enabled = value
-    _pixel_layer.visible = value
+    if grade_material != null:
+        grade_material.set_shader_parameter("ps1_pixels_enabled", value)
+
+
+func set_pixel_strength(value: float) -> void:
+    pixel_strength = clampf(value, 0.0, 100.0)
+    if grade_material != null:
+        grade_material.set_shader_parameter("ps1_pixel_strength", pixel_strength / 100.0)
 
 
 func set_jitter(value: bool) -> void:
@@ -78,7 +72,7 @@ func set_jitter(value: bool) -> void:
         return
     jitter_enabled = value
     if value:
-        for node in get_parent().find_children("*", "GeometryInstance3D", true, false):
+        for node in get_tree().get_nodes_in_group(JITTER_GROUP):
             _apply_jitter(node)
         return
     for instance_id in _originals.keys():
@@ -87,7 +81,7 @@ func set_jitter(value: bool) -> void:
 
 
 func _on_node_added(node: Node) -> void:
-    if jitter_enabled and node is GeometryInstance3D:
+    if jitter_enabled and node is GeometryInstance3D and node.is_in_group(JITTER_GROUP):
         _apply_jitter.call_deferred(node, false)
 
 
@@ -111,7 +105,8 @@ func _restore(node: GeometryInstance3D, id: int) -> void:
 
 
 func _apply_jitter(node: GeometryInstance3D, cache_material := true) -> void:
-    if not jitter_enabled or not is_instance_valid(node) or not get_parent().is_ancestor_of(node):
+    if not jitter_enabled or not is_instance_valid(node) or not get_parent().is_ancestor_of(node) \
+            or not node.is_in_group(JITTER_GROUP):
         return
     # Camera-attached viewmodels use finely layered meshes and authored materials.
     var ancestor := node.get_parent()

@@ -2191,6 +2191,7 @@ func _add_instanced(mesh: Mesh, instances: Array[Transform3D], tint: Color, name
     # The unshaded foliage stayed saturated/bright in fog; use soft diffuse instead.
     node.material_override = foliage_material
     node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    node.add_to_group(&"ps1_jitter_foliage")
     add_child(node)
 
 func _create_forest_assets() -> void:
