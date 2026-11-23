@@ -74,4 +74,6 @@ def test_animation_pass():
     assert 'func _animate_character' in NPC
     assert '_gait_blend' in NPC
     assert 'Vector2(displacement.x, displacement.z).length()' in NPC
-    assert 'res://cultist_cloth.gdshader' in NPC
+    assert 'material.vertex_color_use_as_albedo = true' in NPC
+    assert 'mesh_node.set_surface_override_material(surface, material)' in NPC
+    assert 'res://cultist_cloth.gdshader' not in NPC
