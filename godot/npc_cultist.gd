@@ -22,6 +22,10 @@ var _notice_cooldown := 0.0
 var _base_pose: Dictionary = {}
 var _base_position: Dictionary = {}
 var _has_joint_rig := false
+var _animation_time := 0.0
+var _gait_blend := 0.0
+var _cloth_material: ShaderMaterial
+var _cloth_mesh: MeshInstance3D
 
 func _ready() -> void:
     name = "CultistNPC"
@@ -117,6 +121,7 @@ func _build_visual() -> void:
                         var foot := _parts[side + "Foot"] as Node3D
                         shin.reparent(thigh, true)
                         foot.reparent(shin, true)
+                _setup_cloth(model)
                 _parts["model"] = model
                 _has_joint_rig = _parts.has("leftShin") and _parts.has("rightShin")
                 _head = _parts.get("head", model) as Node3D
@@ -327,38 +332,59 @@ func _physics_process(delta: float) -> void:
         velocity.x = move_toward(velocity.x, flat.x, 2.5 * delta)
         velocity.z = move_toward(velocity.z, flat.z, 2.5 * delta)
         _visual.rotation.y = lerp_angle(_visual.rotation.y, atan2(-flat.x, -flat.z), delta * 4.0)
-        # Keep feet grounded: the old vertical sine made the entire cultist hop.
-        # Tie gait phase to actual horizontal travel, not to elapsed time.
-        _step_clock += delta * Vector2(velocity.x, velocity.z).length() * 7.0
-        _visual.position.y = 0.0
-        if _head != null and _head != _parts.get("model"):
-            if _has_joint_rig:
-                _head.rotation.z = sin(_step_clock * 0.33) * 0.045
-            else:
-                _head.rotation.y = sin(_step_clock * 0.33) * 0.07
-        for limb_name in ["leftArm", "rightArm", "leftLeg", "rightLeg", "leftShin", "rightShin", "leftFoot", "rightFoot"]:
-            if not _parts.has(limb_name) or not is_instance_valid(_parts[limb_name]):
-                continue
-            var limb := _parts[limb_name] as Node3D
-            var phase := _step_clock + (PI if limb_name.begins_with("right") else 0.0)
-            var base: Vector3 = _base_pose.get(limb_name, Vector3.ZERO)
-            var bend := 0.0
-            if limb_name.ends_with("Arm"):
-                bend = -sin(phase) * 0.20
-            elif limb_name.ends_with("Leg"):
-                bend = sin(phase) * 0.25
-            elif limb_name.ends_with("Shin"):
-                bend = maxf(0.0, -sin(phase)) * 0.30
-            elif limb_name.ends_with("Foot"):
-                bend = -sin(phase) * 0.25 - maxf(0.0, -sin(phase)) * 0.30
-            limb.rotation.x = lerpf(limb.rotation.x, base.x + bend, minf(1.0, delta * 10.0))
     else:
         velocity.x = move_toward(velocity.x, 0.0, 2.5 * delta)
         velocity.z = move_toward(velocity.z, 0.0, 2.5 * delta)
-        _visual.position.y = 0.0
-        for limb_name in ["leftArm", "rightArm", "leftLeg", "rightLeg", "leftShin", "rightShin", "leftFoot", "rightFoot"]:
-            if _parts.has(limb_name) and is_instance_valid(_parts[limb_name]):
-                var node := _parts[limb_name] as Node3D
-                var base: Vector3 = _base_pose.get(limb_name, Vector3.ZERO)
-                node.rotation.x = lerpf(node.rotation.x, base.x, minf(1.0, delta * 5.0))
+    var previous := global_position
     move_and_slide()
+    var displacement := global_position - previous
+    _animate_character(delta, Vector2(displacement.x, displacement.z).length())
+
+func _setup_cloth(model: Node3D) -> void:
+    var torso := model.find_child("Torso", true, false) as Node3D
+    if torso == null:
+        return
+    for child in torso.find_children("*", "MeshInstance3D", true, false):
+        var mesh_node := child as MeshInstance3D
+        if mesh_node.mesh == null:
+            continue
+        _cloth_mesh = mesh_node
+        _cloth_material = ShaderMaterial.new()
+        _cloth_material.shader = preload("res://cultist_cloth.gdshader")
+        mesh_node.material_override = _cloth_material
+        break
+
+func _animate_character(delta: float, distance: float) -> void:
+    _animation_time += delta
+    var speed_now := distance / maxf(delta, 0.0001)
+    _gait_blend = lerpf(_gait_blend, clampf(speed_now / 0.65, 0.0, 1.0), 1.0 - exp(-delta * 5.0))
+    _step_clock = fmod(_step_clock + distance * 9.5, TAU)
+    _visual.position.y = 0.0
+    var ease := 1.0 - exp(-delta * 9.0)
+    if _head != null and _head != _parts.get("model"):
+        var scan := sin(_animation_time * 0.73) * 0.19 * (1.0 - _gait_blend)
+        if _has_joint_rig:
+            _head.rotation.z = lerp_angle(_head.rotation.z, scan, ease)
+            _head.rotation.x = lerpf(_head.rotation.x, 0.035 + sin(_animation_time * 1.7) * 0.018, ease)
+        else:
+            _head.rotation.y = lerp_angle(_head.rotation.y, scan, ease)
+    for limb_name in ["leftArm", "rightArm", "leftLeg", "rightLeg", "leftShin", "rightShin", "leftFoot", "rightFoot"]:
+        if not _parts.has(limb_name) or not is_instance_valid(_parts[limb_name]):
+            continue
+        var limb := _parts[limb_name] as Node3D
+        var phase := _step_clock + (PI if limb_name.begins_with("right") else 0.0)
+        var base: Vector3 = _base_pose.get(limb_name, Vector3.ZERO)
+        var bend := 0.0
+        if limb_name.ends_with("Arm"):
+            bend = -sin(phase) * 0.17 * _gait_blend + sin(_animation_time * 1.6) * 0.014
+        elif limb_name.ends_with("Leg"):
+            bend = sin(phase) * 0.28 * _gait_blend
+        elif limb_name.ends_with("Shin"):
+            bend = maxf(0.0, -sin(phase)) * 0.36 * _gait_blend
+        elif limb_name.ends_with("Foot"):
+            bend = (-sin(phase) * 0.28 - maxf(0.0, -sin(phase)) * 0.36) * _gait_blend
+        limb.rotation.x = lerpf(limb.rotation.x, base.x + bend, ease)
+    if _cloth_material != null:
+        _cloth_material.set_shader_parameter("motion_phase", _step_clock)
+        _cloth_material.set_shader_parameter("walk_blend", _gait_blend)
+        _cloth_material.set_shader_parameter("breath_time", _animation_time)
