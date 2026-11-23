@@ -19,6 +19,8 @@ jobs:
     outputs:
       release_dir: ${{ steps.game_export.outputs.release_dir }}
     runs-on: ubuntu-latest
+    env:
+      GAME_SURVEY: data/manual_survey_2026-11-19.geojson
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,7 +35,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check 'pyproj>=3.6,<4'
-          python scripts/convert_editor_geojson.py data/manual_survey_2026-11-19.geojson --output godot/manual_layout.json
+          python scripts/convert_editor_geojson.py "$GAME_SURVEY" --output godot/manual_layout.json
           python - <<'PY'
           import json
           d = json.load(open('godot/manual_layout.json', encoding='utf-8'))
@@ -646,11 +648,20 @@ jobs:
           test -s build/web/studio/build-meta.json
           grep -q 'QuestGeoOverlayRefresh' build/web/studio/studio.js
           grep -q 'data-target="forge"' site/studio/index.html
-          grep -q 'editor.js?v=20' site/map/index.html
+          grep -q 'editor.js?v=21' site/map/index.html
           grep -q 'editor-core.js?v=20' site/map/index.html
           mkdir -p build/web/map
           cp -a site/map/. build/web/map/
           python scripts/build_geo_viewer.py
+          cp "$GAME_SURVEY" build/web/map/data/game-map.geojson
+          node - <<'JS'
+          const fs = require("node:fs");
+          const assert = require("node:assert/strict");
+          const editor = require("./site/map/editor-core.js");
+          const game = JSON.parse(fs.readFileSync("godot/manual_layout.json"));
+          const layer = editor.importCollection(JSON.parse(fs.readFileSync("build/web/map/data/game-map.geojson")));
+          assert.deepEqual(layer.map(feature => feature.id), game.features.map(feature => feature.id));
+          JS
           test -s build/web/map/index.html
           test -s build/web/map/data/overture.geojson
           test -s build/web/map/data/roads.geojson

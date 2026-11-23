@@ -64,6 +64,12 @@
             <button type="button" id="draw-cancel" class="editor-action">Отмена <span class="shortcut">Esc</span></button>
           </div>
           <div class="editor-section-divider"></div>
+          <label class="editor-check"><input id="game-map-visible" type="checkbox" checked>Актуальная карта игры</label>
+          <p id="game-map-status" class="helper" role="status">Загрузка игровой разметки…</p>
+          <div class="editor-file-actions">
+            <button id="game-map-focus" type="button" class="editor-action" disabled>Показать целиком</button>
+            <button id="game-map-copy" type="button" class="editor-action" disabled>Добавить в мою разметку</button>
+          </div>
           <label class="editor-check"><input id="editor-visible" type="checkbox" checked>Показывать мою разметку</label>
           <div id="editor-objects" class="editor-object-list" aria-live="polite"><p class="editor-empty">Объектов пока нет.</p></div>
           <div id="editor-selected" class="editor-inspector" hidden>
@@ -192,6 +198,6 @@
   <script src="https://unpkg.com/esri-leaflet@3.0.14/dist/esri-leaflet.js"></script>
   <script src="./app.js?v=20"></script>
   <script src="./editor-core.js?v=20"></script>
-  <script src="./editor.js?v=20"></script>
+  <script src="./editor.js?v=21"></script>
 </body>
 </html>
