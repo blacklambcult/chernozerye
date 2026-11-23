@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Чернозёрье — Служитель Живицы v0.6.1</title>
+<title>Чернозёрье — Служитель Живицы v0.7</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#101416;color:#d8d0c4;overflow:hidden;font-family:ui-monospace,monospace}
 canvas{display:block}#hud{position:fixed;z-index:4;top:12px;left:12px;max-width:335px;background:#0b1011e9;border:1px solid #685443;padding:16px;line-height:1.45;box-shadow:0 12px 32px #0005}
@@ -12,8 +12,8 @@ h1{color:#d69a6a;font-size:17px;letter-spacing:1.2px;margin:0 0 10px}button{font
 </head>
 <body>
 <div id="hud">
-<h1>СЛУЖИТЕЛЬ ЧЁРНОЙ ЖИВИЦЫ</h1><small>ЧЕРНОЗЁРЬЕ / GAIT FIX v0.6.1</small>
-<p>Исправлена походка: без подпрыгиваний, с раздельным движением ног и плавным разгоном.</p>
+<h1>СЛУЖИТЕЛЬ ЧЁРНОЙ ЖИВИЦЫ</h1><small>ЧЕРНОЗЁРЬЕ / FOOT PLANT v0.7</small>
+<p>Новая походка: отдельные бёдра, голени и ботинки, опорная стопа, сгиб колена и плавный перенос веса.</p>
 <button id="idle">Ожидание</button><button id="patrol">Патруль</button><button id="alert">Тревога</button><button id="reset">Сброс</button>
 <p id="status">Загрузка GLB…</p>
 <small>ЛКМ — попадание, ПКМ / свайп — осмотр, колесо / щипок — масштаб. Отдельная сцена, не Godot-сборка.</small>
@@ -34,9 +34,91 @@ let seed=7382;function rand(){seed=(seed*1664525+1013904223)>>>0;return seed/429
 for(let i=0;i<95;i++){const x=(rand()-.5)*75,z=(rand()-.5)*75;if(Math.hypot(x,z)<7)continue;const h=4+rand()*3;const trunk=new T.Mesh(new T.CylinderGeometry(.09,.16,h,5),new T.MeshStandardMaterial({color:0x292a28}));trunk.position.set(x,h/2,z);scene.add(trunk);const crown=new T.Mesh(new T.ConeGeometry(1.15,h*.63,6),new T.MeshStandardMaterial({color:0x25342f,roughness:1}));crown.position.set(x,h*.72,z);scene.add(crown)}
 const root=new T.Group(),actor=new T.Group();scene.add(root);root.add(actor);let meshes=[],pose='idle',pace=0,clockTime=0,hits=0,flash=[],fallen=false;
 const rig={};const velocity=new T.Vector3();const patrolPoints=[new T.Vector3(-1.45,0,-.6),new T.Vector3(1.45,0,.6)];let patrolIndex=0,restTime=0;
-const neutralJoints={Head:[0,0,2.23],LeftArm:[-.42,0,1.94],RightArm:[.42,0,1.94],LeftLeg:[-.195,0,.76],RightLeg:[.195,0,.76]};
-function makePivot(model,name,position){const limb=model.getObjectByName(name);if(!limb)return false;model.updateMatrixWorld(true);const pivot=new T.Group();pivot.name=name+'GaitPivot';pivot.position.set(...position);model.add(pivot);pivot.attach(limb);rig[name]={pivot,baseZ:position[2]};return true}
-function resetJoints(){for(const [name,joint] of Object.entries(rig)){joint.pivot.rotation.set(0,0,0);joint.pivot.position.z=joint.baseZ}}
+let modelRef=null,strideMeters=0;
+const feet={Left:{x:-.195,anchor:null,start:null,end:null,swing:false},Right:{x:.195,anchor:null,start:null,end:null,swing:false}};
+const neutralJoints={Head:[0,0,2.23],LeftArm:[-.42,0,1.94],RightArm:[.42,0,1.94],LeftLeg:[-.195,0,.78],RightLeg:[.195,0,.78],LeftShin:[-.195,0,.46],RightShin:[.195,0,.46],LeftFoot:[-.195,0,.16],RightFoot:[.195,0,.16]};
+function makePivot(model,name,position){
+  const part=model.getObjectByName(name);if(!part)return false;
+  model.updateMatrixWorld(true);const pivot=new T.Group();pivot.name=name+'GaitPivot';
+  pivot.position.set(...position);model.add(pivot);pivot.attach(part);
+  rig[name]={pivot,rest:pivot.position.clone()};return true
+}
+function connectBones(){
+  for(const side of ['Left','Right']){
+    if(!rig[side+'Leg']||!rig[side+'Shin']||!rig[side+'Foot'])continue;
+    // An actual articulated hierarchy, not just a bouncing whole-body mesh.
+    rig[side+'Leg'].pivot.attach(rig[side+'Shin'].pivot);
+    rig[side+'Shin'].pivot.attach(rig[side+'Foot'].pivot);
+  }
+  for(const joint of Object.values(rig))joint.rest.copy(joint.pivot.position);
+}
+function resetJoints(){
+  for(const joint of Object.values(rig)){
+    joint.pivot.rotation.set(0,0,0);
+    joint.pivot.position.copy(joint.rest);
+  }
+}
+function resetFeet(){
+  if(!modelRef)return;
+  resetJoints();modelRef.updateMatrixWorld(true);
+  for(const side of ['Left','Right']){
+    const state=feet[side],bone=rig[side+'Foot'];
+    if(!bone)continue;
+    state.anchor=bone.pivot.getWorldPosition(new T.Vector3());
+    state.start=state.anchor.clone();state.end=state.anchor.clone();state.swing=false;
+  }
+}
+function solveTwoBoneIK(side,targetWorld,dt){
+  if(!modelRef)return;
+  const upper=rig[side+'Leg'],lower=rig[side+'Shin'],boot=rig[side+'Foot'];
+  if(!upper||!lower||!boot)return;
+  const foot=modelRef.worldToLocal(targetWorld.clone());
+  // 2D sagittal IK in the source model's Z-up coordinate system.
+  const hipZ=.78,upperLength=.32,lowerLength=.32;
+  let dy=foot.y, dz=foot.z-hipZ;
+  const raw=Math.max(.0001,Math.hypot(dy,dz));
+  const d=T.MathUtils.clamp(raw,.05,upperLength+lowerLength-.012);
+  dy*=d/raw; dz*=d/raw;
+  const along=(upperLength*upperLength-lowerLength*lowerLength+d*d)/(2*d);
+  const bend=Math.sqrt(Math.max(0,upperLength*upperLength-along*along));
+  const kneeY=dy*along/d-(-dz/d)*bend;
+  const kneeZ=hipZ+dz*along/d-(dy/d)*bend;
+  const hipAngle=Math.atan2(kneeY,hipZ-kneeZ);
+  const lowerAngle=Math.atan2(dy-kneeY,kneeZ-(hipZ+dz));
+  const alpha=1-Math.exp(-dt*12);
+  upper.pivot.rotation.x+= (hipAngle-upper.pivot.rotation.x)*alpha;
+  lower.pivot.rotation.x+= (lowerAngle-hipAngle-lower.pivot.rotation.x)*alpha;
+  boot.pivot.rotation.x+= (-lowerAngle-boot.pivot.rotation.x)*alpha;
+}
+function animateFootsteps(dt,travelled,moving){
+  if(!modelRef)return;
+  modelRef.updateMatrixWorld(true);
+  // The next footfall is based on actual distance travelled, not frame count.
+  strideMeters+=travelled;
+  const stanceRatio=.63,cycleDistance=.60;
+  for(const side of ['Left','Right']){
+    const st=feet[side];if(!st.anchor)continue;
+    const offset=side==='Left'?0:Math.PI;
+    const phase=((strideMeters/cycleDistance*Math.PI*2+offset)%(2*Math.PI))/(2*Math.PI);
+    let target=st.anchor.clone();
+    if(phase<stanceRatio){
+      if(st.swing){st.anchor.copy(st.end);st.swing=false}
+      target.copy(st.anchor);
+    }else{
+      if(!st.swing){
+        st.swing=true;st.start.copy(st.anchor);
+        // Plant the next foot ahead of the character, with slight side separation.
+        st.end.copy(modelRef.localToWorld(new T.Vector3(st.x,-.25,.16)));
+        st.end.y=st.anchor.y;
+      }
+      const t=(phase-stanceRatio)/(1-stanceRatio);
+      const ease=t*t*(3-2*t);
+      target.lerpVectors(st.start,st.end,ease);
+      target.y+=Math.sin(Math.PI*t)*.09*Math.min(1,moving*2);
+    }
+    solveTwoBoneIK(side,target,dt);
+  }
+}
 const status=document.getElementById('status');const hitRay=new T.Raycaster(),pointer=new T.Vector2();
 const loader=new GLTFLoader();loader.load('./cultist_v06.glb',(gltf)=>{
 const model=gltf.scene;
@@ -47,19 +129,21 @@ model.updateWorldMatrix(true,true);
 const bounds=new T.Box3().setFromObject(model);const size=bounds.getSize(new T.Vector3());const factor=1.85/size.y;model.scale.setScalar(factor);model.updateWorldMatrix(true,true);
 const box=new T.Box3().setFromObject(model);model.position.y=-box.min.y;model.position.x=-(box.min.x+box.max.x)/2;model.position.z=-(box.min.z+box.max.z)/2;
 actor.add(model);
+modelRef=model;
 for(const [name,position] of Object.entries(neutralJoints))makePivot(model,name,position);
+connectBones();resetFeet();
 model.traverse((obj)=>{if(obj.isMesh){obj.castShadow=true;obj.receiveShadow=true;meshes.push(obj);if(obj.material){obj.material.side=T.DoubleSide;obj.material.roughness=1;obj.material.metalness=0}}});
-status.textContent='Походка v0.6.1: '+Object.keys(rig).length+'/5 суставов модели подключено.';
+status.textContent='Новая походка: '+Object.keys(rig).length+'/9 подвижных узлов, включая голени и стопы.';
 },undefined,(error)=>{status.textContent='GLB не загрузился: проверь сборку';console.error(error)});
-function mode(s){if(fallen)return;pose=s;restTime=0;status.textContent=s==='patrol'?'ПАТРУЛЬ — шаги вместо прыжков':s==='alert'?'ТРЕВОГА — плавный разгон':'ОЖИДАНИЕ — без подпрыгивания'}
+function mode(s){if(fallen)return;pose=s;restTime=0;status.textContent=s==='patrol'?'ПАТРУЛЬ — опорные стопы':s==='alert'?'ТРЕВОГА — ускорение и шаг':'ОЖИДАНИЕ — без прыжков'}
 document.getElementById('idle').onclick=()=>mode('idle');
 document.getElementById('patrol').onclick=()=>mode('patrol');
 document.getElementById('alert').onclick=()=>mode('alert');
-document.getElementById('reset').onclick=()=>{fallen=false;pose='idle';hits=0;pace=0;clockTime=0;patrolIndex=0;restTime=0;velocity.set(0,0,0);root.position.set(0,0,0);actor.position.set(0,0,0);actor.rotation.set(0,0,0);resetJoints();status.textContent='Сброс: модель готова';};
+document.getElementById('reset').onclick=()=>{fallen=false;pose='idle';hits=0;pace=0;clockTime=0;strideMeters=0;patrolIndex=0;restTime=0;velocity.set(0,0,0);root.position.set(0,0,0);actor.position.set(0,0,0);actor.rotation.set(0,0,0);resetFeet();status.textContent='Сброс: модель готова';};
 renderer.domElement.addEventListener('pointerdown',(event)=>{
 if(event.button!==0||!meshes.length)return;
 const rect=renderer.domElement.getBoundingClientRect();pointer.set((event.clientX-rect.left)/rect.width*2-1,1-(event.clientY-rect.top)/rect.height*2);hitRay.setFromCamera(pointer,camera);const hit=hitRay.intersectObjects(meshes,false)[0];if(!hit){status.textContent='Промах';return}hits++;
-let parent=hit.object,zone='Туловище';while(parent&&parent!==actor){if(['Head','Torso','LeftArm','RightArm','LeftLeg','RightLeg'].includes(parent.name)){zone=parent.name;break}parent=parent.parent}
+let parent=hit.object,zone='Туловище';while(parent&&parent!==actor){if(['Head','Torso','LeftArm','RightArm','LeftLeg','RightLeg','LeftShin','RightShin','LeftFoot','RightFoot'].includes(parent.name)){zone=parent.name.replace('Shin','Leg').replace('Foot','Leg');break}parent=parent.parent}
 status.textContent='Попадание: '+zone+' ('+hits+')';const obj=hit.object,original=obj.material;const glow=original.clone();glow.emissive=new T.Color(0x8b4b32);glow.emissiveIntensity=.6;obj.material=glow;flash.push({obj,original,t:.18});
 if(hits>=7){fallen=true;status.textContent='Персонаж повержен. Нажми «Сброс»'}
 });
@@ -95,22 +179,23 @@ if(!fallen){
     const angle=Math.atan2(Math.sin(targetYaw-actor.rotation.y),Math.cos(targetYaw-actor.rotation.y));
     actor.rotation.y+=angle*(1-Math.exp(-dt*2.8));
   }
-  pace+=travelled*8;
-  const a=Math.sin(pace);
-  const b=Math.sin(pace+Math.PI);
-  for(const [name,joint] of Object.entries(rig)){
-    const left=name.startsWith('Left');
-    const stride=left?a:b;
-    const targetSwing=name.endsWith('Leg')?stride*.28*moving:-stride*.22*moving;
-    if(name==='Head'){
-      joint.pivot.rotation.x=T.MathUtils.damp(joint.pivot.rotation.x,.025+Math.sin(clockTime*.72)*.02,3,dt);
-      joint.pivot.rotation.z=T.MathUtils.damp(joint.pivot.rotation.z,Math.sin(clockTime*.47)*.035,3,dt);
-    }else{
-      joint.pivot.rotation.x=T.MathUtils.damp(joint.pivot.rotation.x,targetSwing,10,dt);
-      if(name.endsWith('Leg')){
-        const toeLift=Math.max(0,stride)*.042*moving;
-        joint.pivot.position.z=T.MathUtils.damp(joint.pivot.position.z,joint.baseZ+toeLift,10,dt);
-      }
+  const stepPhase=strideMeters/.6*Math.PI*2;
+  const a=Math.sin(stepPhase),b=Math.sin(stepPhase+Math.PI);
+  for(const side of ['Left','Right']){
+    const arm=rig[side+'Arm'];if(!arm)continue;
+    const swing=side==='Left'?b:a;
+    arm.pivot.rotation.x=T.MathUtils.damp(arm.pivot.rotation.x,swing*.17*moving,7,dt);
+  }
+  if(rig.Head){
+    const head=rig.Head.pivot;
+    head.rotation.x=T.MathUtils.damp(head.rotation.x,.025+Math.sin(clockTime*.65)*.015,3,dt);
+    head.rotation.z=T.MathUtils.damp(head.rotation.z,Math.sin(clockTime*.4)*.025,3,dt);
+  }
+  if(travelled>.00001)animateFootsteps(dt,travelled,moving);
+  else if(modelRef && velocity.length()<.02){
+    // Keep planted feet stationary at a patrol pause, not repeatedly resetting gait.
+    for(const side of ['Left','Right']){
+      const st=feet[side];if(st.anchor)solveTwoBoneIK(side,st.anchor,dt);
     }
   }
 }else{
