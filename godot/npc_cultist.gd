@@ -155,7 +155,8 @@ func _build_hit_zones() -> void:
         hitbox.set_script(preload("res://npc_hitbox.gd"))
         hitbox.set("zone", zone)
         hitbox.set("controller", self)
-        hitbox.collision_layer = 1
+        # Hits use a dedicated layer so the NPC locomotion body cannot collide with its own hitboxes.
+        hitbox.collision_layer = 2
         hitbox.collision_mask = 0
         var shape_node := CollisionShape3D.new()
         var sphere := SphereShape3D.new()
