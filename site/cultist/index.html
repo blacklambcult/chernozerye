@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Чернозёрье — Служитель Живицы v0.6</title>
+<title>Чернозёрье — Служитель Живицы v0.6.1</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#101416;color:#d8d0c4;overflow:hidden;font-family:ui-monospace,monospace}
 canvas{display:block}#hud{position:fixed;z-index:4;top:12px;left:12px;max-width:335px;background:#0b1011e9;border:1px solid #685443;padding:16px;line-height:1.45;box-shadow:0 12px 32px #0005}
@@ -12,8 +12,8 @@ h1{color:#d69a6a;font-size:17px;letter-spacing:1.2px;margin:0 0 10px}button{font
 </head>
 <body>
 <div id="hud">
-<h1>СЛУЖИТЕЛЬ ЧЁРНОЙ ЖИВИЦЫ</h1><small>ЧЕРНОЗЁРЬЕ / VISUAL TEST v0.6</small>
-<p>Настоящая модель GLB: неровная ткань, тёмный капюшон, борода и состаренная ряса.</p>
+<h1>СЛУЖИТЕЛЬ ЧЁРНОЙ ЖИВИЦЫ</h1><small>ЧЕРНОЗЁРЬЕ / GAIT FIX v0.6.1</small>
+<p>Исправлена походка: без подпрыгиваний, с раздельным движением ног и плавным разгоном.</p>
 <button id="idle">Ожидание</button><button id="patrol">Патруль</button><button id="alert">Тревога</button><button id="reset">Сброс</button>
 <p id="status">Загрузка GLB…</p>
 <small>ЛКМ — попадание, ПКМ / свайп — осмотр, колесо / щипок — масштаб. Отдельная сцена, не Godot-сборка.</small>
@@ -33,6 +33,10 @@ const floor=new T.Mesh(new T.PlaneGeometry(150,150),new T.MeshStandardMaterial({
 let seed=7382;function rand(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
 for(let i=0;i<95;i++){const x=(rand()-.5)*75,z=(rand()-.5)*75;if(Math.hypot(x,z)<7)continue;const h=4+rand()*3;const trunk=new T.Mesh(new T.CylinderGeometry(.09,.16,h,5),new T.MeshStandardMaterial({color:0x292a28}));trunk.position.set(x,h/2,z);scene.add(trunk);const crown=new T.Mesh(new T.ConeGeometry(1.15,h*.63,6),new T.MeshStandardMaterial({color:0x25342f,roughness:1}));crown.position.set(x,h*.72,z);scene.add(crown)}
 const root=new T.Group(),actor=new T.Group();scene.add(root);root.add(actor);let meshes=[],pose='idle',pace=0,clockTime=0,hits=0,flash=[],fallen=false;
+const rig={};const velocity=new T.Vector3();const patrolPoints=[new T.Vector3(-1.45,0,-.6),new T.Vector3(1.45,0,.6)];let patrolIndex=0,restTime=0;
+const neutralJoints={Head:[0,0,2.23],LeftArm:[-.42,0,1.94],RightArm:[.42,0,1.94],LeftLeg:[-.195,0,.76],RightLeg:[.195,0,.76]};
+function makePivot(model,name,position){const limb=model.getObjectByName(name);if(!limb)return false;model.updateMatrixWorld(true);const pivot=new T.Group();pivot.name=name+'GaitPivot';pivot.position.set(...position);model.add(pivot);pivot.attach(limb);rig[name]={pivot,baseZ:position[2]};return true}
+function resetJoints(){for(const [name,joint] of Object.entries(rig)){joint.pivot.rotation.set(0,0,0);joint.pivot.position.z=joint.baseZ}}
 const status=document.getElementById('status');const hitRay=new T.Raycaster(),pointer=new T.Vector2();
 const loader=new GLTFLoader();loader.load('./cultist_v06.glb',(gltf)=>{
 const model=gltf.scene;
@@ -42,14 +46,16 @@ model.updateWorldMatrix(true,true);
 // Normalize after axis conversion to the desired 1.85m character height.
 const bounds=new T.Box3().setFromObject(model);const size=bounds.getSize(new T.Vector3());const factor=1.85/size.y;model.scale.setScalar(factor);model.updateWorldMatrix(true,true);
 const box=new T.Box3().setFromObject(model);model.position.y=-box.min.y;model.position.x=-(box.min.x+box.max.x)/2;model.position.z=-(box.min.z+box.max.z)/2;
-actor.add(model);model.traverse((obj)=>{if(obj.isMesh){obj.castShadow=true;obj.receiveShadow=true;meshes.push(obj);if(obj.material){obj.material.side=T.DoubleSide;obj.material.roughness=1;obj.material.metalness=0}}});
-status.textContent='Модель v0.6 готова. Осмотри её со всех сторон.';
+actor.add(model);
+for(const [name,position] of Object.entries(neutralJoints))makePivot(model,name,position);
+model.traverse((obj)=>{if(obj.isMesh){obj.castShadow=true;obj.receiveShadow=true;meshes.push(obj);if(obj.material){obj.material.side=T.DoubleSide;obj.material.roughness=1;obj.material.metalness=0}}});
+status.textContent='Походка v0.6.1: '+Object.keys(rig).length+'/5 суставов модели подключено.';
 },undefined,(error)=>{status.textContent='GLB не загрузился: проверь сборку';console.error(error)});
-function mode(s){if(fallen)return;pose=s;status.textContent=s==='patrol'?'ПАТРУЛЬ — медленное движение':s==='alert'?'ТРЕВОГА — ускоряется':'ОЖИДАНИЕ — осматривается'}
+function mode(s){if(fallen)return;pose=s;restTime=0;status.textContent=s==='patrol'?'ПАТРУЛЬ — шаги вместо прыжков':s==='alert'?'ТРЕВОГА — плавный разгон':'ОЖИДАНИЕ — без подпрыгивания'}
 document.getElementById('idle').onclick=()=>mode('idle');
 document.getElementById('patrol').onclick=()=>mode('patrol');
 document.getElementById('alert').onclick=()=>mode('alert');
-document.getElementById('reset').onclick=()=>{fallen=false;pose='idle';hits=0;root.position.set(0,0,0);actor.position.set(0,0,0);actor.rotation.set(0,0,0);status.textContent='Сброс: модель готова';};
+document.getElementById('reset').onclick=()=>{fallen=false;pose='idle';hits=0;pace=0;clockTime=0;patrolIndex=0;restTime=0;velocity.set(0,0,0);root.position.set(0,0,0);actor.position.set(0,0,0);actor.rotation.set(0,0,0);resetJoints();status.textContent='Сброс: модель готова';};
 renderer.domElement.addEventListener('pointerdown',(event)=>{
 if(event.button!==0||!meshes.length)return;
 const rect=renderer.domElement.getBoundingClientRect();pointer.set((event.clientX-rect.left)/rect.width*2-1,1-(event.clientY-rect.top)/rect.height*2);hitRay.setFromCamera(pointer,camera);const hit=hitRay.intersectObjects(meshes,false)[0];if(!hit){status.textContent='Промах';return}hits++;
@@ -57,11 +63,62 @@ let parent=hit.object,zone='Туловище';while(parent&&parent!==actor){if([
 status.textContent='Попадание: '+zone+' ('+hits+')';const obj=hit.object,original=obj.material;const glow=original.clone();glow.emissive=new T.Color(0x8b4b32);glow.emissiveIntensity=.6;obj.material=glow;flash.push({obj,original,t:.18});
 if(hits>=7){fallen=true;status.textContent='Персонаж повержен. Нажми «Сброс»'}
 });
-const clock=new T.Clock();function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);clockTime+=dt;
-if(fallen){actor.rotation.z=T.MathUtils.damp(actor.rotation.z,1.2,3,dt)}
-else {actor.rotation.z=T.MathUtils.damp(actor.rotation.z,0,4,dt);
-if(pose==='patrol'||pose==='alert'){const speed=pose==='alert'?1.1:.7;pace+=dt*speed*6;const target=new T.Vector3(Math.floor(clockTime/5)%2===0?-1.5:1.5,0,0);const direction=target.sub(root.position);if(direction.length()>.2)root.position.addScaledVector(direction.normalize(),dt*speed);actor.position.y=Math.sin(pace*2)*.02;actor.rotation.y=T.MathUtils.damp(actor.rotation.y,Math.sin(clockTime*.35)*.45,2,dt)}
-else{actor.position.y=T.MathUtils.damp(actor.position.y,0,4,dt);actor.rotation.y=Math.sin(clockTime*.38)*.08}}
+const clock=new T.Clock();
+function animate(){
+requestAnimationFrame(animate);
+const dt=Math.min(clock.getDelta(),.05);clockTime+=dt;
+const wanted=new T.Vector3();
+if(!fallen && (pose==='patrol'||pose==='alert')){
+  if(pose==='patrol' && restTime>0){restTime=Math.max(0,restTime-dt)}
+  else{
+    const destination=pose==='patrol'?patrolPoints[patrolIndex]:new T.Vector3(1.75,0,1.15);
+    const heading=destination.clone().sub(root.position);heading.y=0;
+    const distance=heading.length();
+    if(pose==='patrol' && distance<.12){restTime=.85;patrolIndex=(patrolIndex+1)%patrolPoints.length}
+    else if(distance>.15){
+      const nominal=pose==='alert'?.92:.62;
+      const eased=nominal*Math.min(1,distance/.65);
+      wanted.copy(heading).normalize().multiplyScalar(eased);
+    }
+  }
+}
+velocity.lerp(wanted,1-Math.exp(-dt*4));
+const travelled=velocity.length()*dt;
+root.position.addScaledVector(velocity,dt);
+root.position.y=0;
+const moving=Math.min(1,velocity.length()/.5);
+if(!fallen){
+  actor.position.y=0; // No up/down sine-wave jumps: the feet do the work.
+  actor.rotation.z=T.MathUtils.damp(actor.rotation.z,0,6,dt);
+  if(velocity.length()>.045){
+    const targetYaw=Math.atan2(velocity.x,velocity.z);
+    const angle=Math.atan2(Math.sin(targetYaw-actor.rotation.y),Math.cos(targetYaw-actor.rotation.y));
+    actor.rotation.y+=angle*(1-Math.exp(-dt*2.8));
+  }
+  pace+=travelled*8;
+  const a=Math.sin(pace);
+  const b=Math.sin(pace+Math.PI);
+  for(const [name,joint] of Object.entries(rig)){
+    const left=name.startsWith('Left');
+    const stride=left?a:b;
+    const targetSwing=name.endsWith('Leg')?stride*.28*moving:-stride*.22*moving;
+    if(name==='Head'){
+      joint.pivot.rotation.x=T.MathUtils.damp(joint.pivot.rotation.x,.025+Math.sin(clockTime*.72)*.02,3,dt);
+      joint.pivot.rotation.z=T.MathUtils.damp(joint.pivot.rotation.z,Math.sin(clockTime*.47)*.035,3,dt);
+    }else{
+      joint.pivot.rotation.x=T.MathUtils.damp(joint.pivot.rotation.x,targetSwing,10,dt);
+      if(name.endsWith('Leg')){
+        const toeLift=Math.max(0,stride)*.042*moving;
+        joint.pivot.position.z=T.MathUtils.damp(joint.pivot.position.z,joint.baseZ+toeLift,10,dt);
+      }
+    }
+  }
+}else{
+ velocity.multiplyScalar(Math.exp(-dt*9));
+ actor.position.y=0;
+ actor.rotation.z=T.MathUtils.damp(actor.rotation.z,1.18,3,dt);
+ resetJoints();
+}
 for(let i=flash.length-1;i>=0;i--){const f=flash[i];f.t-=dt;if(f.t<=0){f.obj.material=f.original;flash.splice(i,1)}}
 orbit.update();renderer.render(scene,camera)}animate();
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
