@@ -178,6 +178,13 @@ jobs:
       - name: Test NPC source integration
         run: python -m pytest -q tests/test_npc_cultist_foundation.py
 
+      - name: Regression-test imported cultist skeleton and boot hierarchy
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 40s godot --headless --path godot --script res://cultist_regression.gd 2>&1 | tee /tmp/cultist-rig.log
+          grep -q CULTIST_RIG_REGRESSION_OK /tmp/cultist-rig.log
+
       - name: Validate GDScript sources
         shell: bash
         run: |
