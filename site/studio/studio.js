@@ -9,6 +9,7 @@
     quest: {kicker:"MISSION WORKSPACE / 02", name:"QUEST LAB · РЕДАКТОР КВЕСТОВ", url:"../quest/", file:"../quest/?studio=1"},
     model: {kicker:"ASSET WORKSPACE / 03", name:"MODEL LAB · 3D-КОНСТРУКТОР", url:"../model/", file:"../model/?studio=1"},
     forge: {kicker:"ARMORY ASSET WORKSPACE / 04", name:"HELLISH FORGE · ИГРОВЫЕ МОДЕЛИ", url:"../forge/", file:"../forge/?studio=1"},
+    buildings: {kicker:"ARCHITECTURE / 07", name:"ГЕНЕРАТОР ПОСТРОЕК", url:"../building-generator/", file:"../building-generator/?studio=1"},
     arms: {kicker:"FIRST PERSON / 06", name:"РУКИ ОТ ПЕРВОГО ЛИЦА", url:"../arms/", file:"../arms/?studio=1"},
     weapon: {kicker:"PROCEDURAL ARMORY / 05", name:"ГЕНЕРАТОР ОРУЖИЯ · 8 КЛАССОВ", url:"../weapon-generator/", file:"../weapon-generator/?studio=1"}
   });
@@ -71,15 +72,15 @@
         let url;
         try { url = new URL(link.href, frame.contentWindow.location.href); } catch { return; }
         if (url.origin !== window.location.origin) return;
-        const match = url.pathname.match(/\/chernozerye\/(map|quest|model|forge|weapon-generator|arms|studio)\/?$/);
+        const match = url.pathname.match(/\/chernozerye\/(map|quest|model|forge|weapon-generator|building-generator|arms|studio)\/?$/);
         if (!match) return;
         event.preventDefault();
         show(match[1] === "map" ? "geo" : match[1] === "studio" ? "home" :
-          match[1] === "weapon-generator" ? "weapon" : match[1], true, url);
+          match[1] === "weapon-generator" ? "weapon" : match[1] === "building-generator" ? "buildings" : match[1], true, url);
       }, {capture: true});
       doc.addEventListener("keydown", (event) => {
         if (!event.altKey || event.ctrlKey || event.metaKey) return;
-        const next = { Digit0:"home", Digit1:"geo", Digit2:"quest", Digit3:"model", Digit4:"forge", Digit5:"weapon", Digit6:"arms" }[event.code];
+        const next = { Digit0:"home", Digit1:"geo", Digit2:"quest", Digit3:"model", Digit4:"forge", Digit5:"weapon", Digit6:"arms", Digit7:"buildings" }[event.code];
         if (next) { event.preventDefault(); event.stopImmediatePropagation(); show(next); }
       }, {capture: true});
     } catch (error) {
@@ -152,8 +153,8 @@
     for (const [key, value] of cached.entries()) value.frame.hidden = key !== id;
     if (!isHome) {
       const entry = createFrame(id);
-      if (id === "arms" && editorUrl) $("external-editor").href = editorUrl.href;
-      if (editorUrl && id === "arms") {
+      if (editorUrl && (id === "arms" || (id === "quest" && editorUrl.searchParams.has("model")))) {
+        $("external-editor").href = editorUrl.href;
         editorUrl.searchParams.set("studio", "1");
         if (entry.frame.src !== editorUrl.href) {
           entry.ready = false;
@@ -199,7 +200,7 @@
       return;
     }
     if (!evt.altKey || evt.ctrlKey || evt.metaKey) return;
-    const id = {Digit0:"home",Digit1:"geo",Digit2:"quest",Digit3:"model",Digit4:"forge",Digit5:"weapon", Digit6:"arms"}[evt.code];
+    const id = {Digit0:"home",Digit1:"geo",Digit2:"quest",Digit3:"model",Digit4:"forge",Digit5:"weapon", Digit6:"arms", Digit7:"buildings"}[evt.code];
     if (id) { evt.preventDefault(); show(id); }
   });
   setRailCollapsed(railCollapsed);

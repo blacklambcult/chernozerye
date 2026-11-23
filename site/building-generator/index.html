@@ -1,0 +1,3367 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Генератор Построек 3D — Fearless Knights of the Cordon (Godot 4 .GLB)</title>
+    <style>
+        /* =========================================================
+           1. BASE RESET & RETRO INDUSTRIAL VHS PALETTE
+           ========================================================= */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #111311;
+            color: #d8ddd4;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 12px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Fullscreen 3D Canvas */
+        #viewport {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: radial-gradient(circle at 50% 42%, #1d221d 0%, #111311 75%);
+            touch-action: none;
+        }
+
+        #gl-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            outline: none;
+            touch-action: none;
+        }
+
+        #gl-canvas.pixelated {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        /* Optional VHS Scanlines & Noise Overlay (OFF by default) */
+        #vhs-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            background:
+                repeating-linear-gradient(
+                    0deg,
+                    rgba(0, 0, 0, 0.22) 0px,
+                    rgba(0, 0, 0, 0.22) 1px,
+                    transparent 1px,
+                    transparent 3px
+                ),
+                radial-gradient(circle at center, transparent 58%, rgba(0, 0, 0, 0.52) 100%);
+        }
+
+        #vhs-overlay.active {
+            opacity: 1;
+        }
+
+        /* WebGL Error Fallback Banner */
+        #webgl-error {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 50;
+            max-width: 90%;
+            width: 360px;
+            background: #1a1d1a;
+            border: 1px solid #d97736;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.75);
+            display: none;
+        }
+
+        #webgl-error h2 {
+            margin: 0 0 8px 0;
+            color: #d97736;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        #webgl-error p {
+            margin: 0;
+            color: #b7beb3;
+            line-height: 1.45;
+        }
+
+        /* =========================================================
+           2. HUD LAYOUT (TOP BAR + BOTTOM COLLAPSIBLE DRAWER)
+           ========================================================= */
+        #hud {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 8px;
+        }
+
+        .panel {
+            pointer-events: auto;
+            background: rgba(26, 29, 26, 0.92);
+            border: 1px solid #303730;
+            border-radius: 8px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+
+        /* Top Stack */
+        .top-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 100%;
+            max-width: 560px;
+            margin: 0 auto;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .header-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 7px 10px 7px 56px; /* Mobile safe margin for close button */
+        }
+
+        @media (min-width: 640px) {
+            .header-bar {
+                padding-left: 12px;
+            }
+        }
+
+        .header-titles {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .rec-line {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 9px;
+            letter-spacing: 0.06em;
+            color: #d97736;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rec-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #d94a36;
+            flex-shrink: 0;
+        }
+
+        .game-title {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: #eef2eb;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 1px;
+        }
+
+        /* Building Selector: 2x2 on mobile, 4 columns on desktop */
+        .building-selector {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 5px;
+            padding: 5px;
+        }
+
+        @media (min-width: 640px) {
+            .building-selector {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        /* Bottom Drawer */
+        .bottom-stack {
+            width: 100%;
+            max-width: 560px;
+            margin: 0 auto;
+            padding-bottom: 56px; /* Mobile safe space above system nav/button */
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        @media (min-width: 640px) {
+            .bottom-stack {
+                padding-bottom: 6px;
+            }
+        }
+
+        .drawer {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .drawer-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            padding: 7px 8px;
+            background: rgba(21, 24, 21, 0.96);
+            border-bottom: 1px solid #2b312b;
+        }
+
+        .drawer.collapsed .drawer-bar {
+            border-bottom: none;
+        }
+
+        .drawer-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .dock-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: #d97736;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .code-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #111311;
+            border: 1px solid #353d35;
+            color: #cfd6cb;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .drawer-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-shrink: 0;
+        }
+
+        .drawer-body {
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 46vh;
+            overflow-y: auto;
+        }
+
+        .drawer.collapsed .drawer-body {
+            display: none;
+        }
+
+        /* Tabs */
+        .tabs-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+        }
+
+        .tab-pane {
+            display: none;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .tab-pane.active {
+            display: flex;
+        }
+
+        /* =========================================================
+           3. BUTTONS, ROWS & FORM CONTROLS
+           ========================================================= */
+        button {
+            font-family: inherit;
+            font-size: 11px;
+            color: #d8ddd4;
+            background: #222622;
+            border: 1px solid #384038;
+            border-radius: 6px;
+            padding: 6px 8px;
+            cursor: pointer;
+            transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            outline: none;
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button:hover {
+            border-color: #535f53;
+            background: #292f29;
+        }
+
+        .btn-icon {
+            padding: 5px 8px;
+            min-width: 32px;
+            height: 28px;
+        }
+
+        .btn-type.active {
+            background: linear-gradient(180deg, #4b2b18 0%, #341d10 100%);
+            border-color: #d97736;
+            color: #fff6ee;
+            font-weight: 700;
+        }
+
+        .btn-tab.active {
+            background: linear-gradient(180deg, #3a2618 0%, #2a1b11 100%);
+            border-color: #d97736;
+            color: #ffd7ba;
+            font-weight: 700;
+        }
+
+        .btn-amber {
+            background: linear-gradient(180deg, #522e19 0%, #3a2011 100%);
+            border-color: #d97736;
+            color: #fff4eb;
+            font-weight: 700;
+        }
+
+        .btn-amber:hover {
+            background: linear-gradient(180deg, #64391f 0%, #482815 100%);
+        }
+
+        .btn-godot {
+            background: linear-gradient(180deg, #2e6f56 0%, #1f4f3d 100%);
+            border-color: #46a37f;
+            color: #edfff7;
+            font-weight: 700;
+        }
+
+        .btn-godot:hover {
+            background: linear-gradient(180deg, #378366 0%, #265f4a 100%);
+        }
+
+        .btn-toggle.on {
+            background: linear-gradient(180deg, #4b2b18 0%, #331d10 100%);
+            border-color: #d97736;
+            color: #fff2e6;
+        }
+
+        /* Module Rows */
+        .mod-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            background: #151815;
+            border: 1px solid #2b312b;
+            border-radius: 6px;
+            padding: 5px 7px;
+        }
+
+        .mod-label {
+            color: #8f998a;
+            font-size: 11px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .mod-val {
+            color: #e4e9e0;
+            font-size: 11px;
+            text-align: right;
+            flex: 1;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .btn-cycle {
+            padding: 4px 9px;
+            min-width: 30px;
+            height: 26px;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        /* Pill Grids */
+        .pill-grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 5px;
+            flex: 1;
+            max-width: 210px;
+        }
+
+        .pill-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+        }
+
+        .pill-grid-5 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+        }
+
+        @media (min-width: 520px) {
+            .pill-grid-5 {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+
+        .pill {
+            padding: 5px 6px;
+            font-size: 10px;
+            background: #1d211d;
+            border-color: #323932;
+            color: #b7c0b3;
+        }
+
+        .pill.active-norm {
+            background: #243328;
+            border-color: #4b8f64;
+            color: #e2ffec;
+            font-weight: 700;
+        }
+
+        .pill.active-ruin {
+            background: #3b2d1b;
+            border-color: #c9863a;
+            color: #fff0db;
+            font-weight: 700;
+        }
+
+        .pill.active-cult {
+            background: #3d1d1f;
+            border-color: #c94646;
+            color: #ffe3e3;
+            font-weight: 700;
+        }
+
+        .pill.active-floor {
+            background: linear-gradient(180deg, #4b2b18 0%, #341d10 100%);
+            border-color: #d97736;
+            color: #fff6ee;
+            font-weight: 700;
+        }
+
+        .pill.active-win {
+            background: #27313d;
+            border-color: #5b93c9;
+            color: #e8f4ff;
+            font-weight: 700;
+        }
+
+        /* State Section */
+        .section-caption {
+            font-size: 10px;
+            color: #939d8e;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .state-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            background: #151815;
+            border: 1px solid #2b312b;
+            border-radius: 6px;
+            padding: 5px 7px;
+        }
+
+        .state-row .pill-grid-3 {
+            flex: 1;
+            max-width: 245px;
+        }
+
+        /* Checkbox Row & Action Buttons */
+        .export-opt-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 2px 2px;
+            font-size: 11px;
+            color: #bfc7bb;
+        }
+
+        .check-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            cursor: pointer;
+        }
+
+        .check-label input[type="checkbox"] {
+            accent-color: #d97736;
+            width: 15px;
+            height: 15px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .godot-tag {
+            font-size: 10px;
+            color: #7d8979;
+            white-space: nowrap;
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .actions-grid button {
+            padding: 9px 8px;
+            font-size: 11px;
+        }
+
+        /* View / PS1 Grid */
+        .ps1-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+        }
+
+        @media (min-width: 520px) {
+            .ps1-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* Hide UI Floating Restore Button */
+        #restore-ui-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 30;
+            display: none;
+            background: rgba(26, 29, 26, 0.92);
+            border: 1px solid #d97736;
+            color: #ffd8bc;
+            padding: 7px 10px;
+            border-radius: 6px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+        }
+
+        body.ui-hidden #hud {
+            display: none;
+        }
+
+        body.ui-hidden #restore-ui-btn {
+            display: inline-flex;
+        }
+
+        /* Non-blocking Toast Message */
+        #toast {
+            position: fixed;
+            top: 72px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-8px);
+            z-index: 40;
+            background: rgba(24, 34, 28, 0.96);
+            border: 1px solid #46a37f;
+            color: #e8fff4;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 11px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            max-width: 90%;
+            text-align: center;
+        }
+
+        #toast.error {
+            background: rgba(45, 22, 22, 0.96);
+            border-color: #d95546;
+            color: #ffe8e6;
+        }
+
+        #toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .library-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+        .library-actions input { flex: 1 1 180px; min-width: 0; color: #eee; background: #171b1c; border: 1px solid #746453; padding: 8px; }
+        .library-actions a { color: #ffc080; }
+        .library-actions [hidden] { display: none; }
+    </style>
+</head>
+<body>
+    <!-- Fullscreen 3D Viewport -->
+    <div id="viewport">
+        <canvas id="gl-canvas"></canvas>
+    </div>
+
+    <!-- Optional VHS Scanlines Overlay (OFF by default) -->
+    <div id="vhs-overlay"></div>
+
+    <!-- WebGL Error Fallback Banner -->
+    <div id="webgl-error">
+        <h2>Ошибка инициализации WebGL</h2>
+        <p id="webgl-error-msg">Не удалось запустить 3D-рендерер. Проверьте поддержку WebGL в браузере.</p>
+    </div>
+
+    <!-- Floating Restore UI Button -->
+    <button type="button" id="restore-ui-btn" title="Показать интерфейс">👁 Показать UI</button>
+
+    <!-- Non-blocking Toast -->
+    <div id="toast"></div>
+
+    <!-- Minimal HUD Overlay -->
+    <div id="hud">
+        <!-- Top Header & Building Type Selector -->
+        <div class="top-stack">
+            <div class="panel header-bar">
+                <div class="header-titles">
+                    <div class="rec-line">
+                        <span class="rec-dot"></span>
+                        <span>КАССЕТА МК-60 // НОЯБРЬ 2005</span>
+                    </div>
+                    <div class="game-title">FEARLESS KNIGHTS OF THE CORDON</div>
+                </div>
+                <button type="button" id="btn-hide-ui" class="btn-icon" title="Скрыть интерфейс">👁</button>
+            </div>
+
+            <div class="panel building-selector">
+                <button type="button" data-building="izba" class="btn-type active">1. Изба</button>
+                <button type="button" data-building="banya" class="btn-type">2. Баня</button>
+                <button type="button" data-building="saray" class="btn-type">3. Сарай</button>
+                <button type="button" data-building="zabor" class="btn-type">4. Забор</button>
+            </div>
+        </div>
+
+        <!-- Bottom Collapsible Drawer -->
+        <div class="bottom-stack">
+            <div id="drawer" class="panel drawer">
+                <!-- Compact Always-Visible Drawer Header -->
+                <div class="drawer-bar">
+                    <div class="drawer-bar-left">
+                        <span id="dock-title" class="dock-title">ИЗБА (1 ЭТАЖ)</span>
+                        <span id="preset-code" class="code-badge">1F-W1N-R1N-E1N</span>
+                    </div>
+                    <div class="drawer-bar-right">
+                        <button type="button" id="btn-quick-rand" class="btn-icon btn-amber" title="Случайная сборка">🎲</button>
+                        <button type="button" id="btn-quick-glb" class="btn-icon btn-godot" title="Экспорт .GLB для Godot">⬇ .GLB</button>
+                        <button type="button" id="btn-toggle-drawer" class="btn-icon">Свернуть ▲</button>
+                    </div>
+                </div>
+
+                <!-- Drawer Body -->
+                <div class="drawer-body">
+                    <!-- Tabs -->
+                    <div class="tabs-row">
+                        <button type="button" data-tab="modules" class="btn-tab active">1. МОДУЛИ</button>
+                        <button type="button" data-tab="state" class="btn-tab">2. СОСТОЯНИЕ</button>
+                        <button type="button" data-tab="view" class="btn-tab">3. ВИД / PS1</button>
+                    </div>
+
+                    <!-- TAB 1: МОДУЛИ -->
+                    <div id="pane-modules" class="tab-pane active">
+                        <!-- Floors Toggle (Izba only) -->
+                        <div id="row-floors" class="mod-row">
+                            <span class="mod-label">Этажность:</span>
+                            <div class="pill-grid-2">
+                                <button type="button" data-floors="1" class="pill active-floor">1 этаж</button>
+                                <button type="button" data-floors="2" class="pill">2 этажа</button>
+                            </div>
+                        </div>
+
+                        <!-- Building Module Rows (Izba / Banya / Saray) -->
+                        <div id="row-walls" class="mod-row">
+                            <span class="mod-label">Стены:</span>
+                            <span id="lbl-walls" class="mod-val">1/5 Старый тёмный сруб</span>
+                            <button type="button" id="btn-walls" class="btn-cycle" title="Следующий вариант">↻</button>
+                        </div>
+
+                        <div id="row-roof" class="mod-row">
+                            <span class="mod-label">Крыша:</span>
+                            <span id="lbl-roof" class="mod-val">1/5 Шифер с дырами (двускатная)</span>
+                            <button type="button" id="btn-roof" class="btn-cycle" title="Следующий вариант">↻</button>
+                        </div>
+
+                        <div id="row-window" class="mod-row">
+                            <span class="mod-label">Окна (стиль):</span>
+                            <span id="lbl-window" class="mod-val">1/5 Резные башкирские</span>
+                            <button type="button" id="btn-window" class="btn-cycle" title="Следующий вариант">↻</button>
+                        </div>
+
+                        <div id="row-win-fixed" class="mod-row hidden">
+                            <span class="mod-label">Окно:</span>
+                            <span id="lbl-win-fixed" class="mod-val">Маленькое банное окошко</span>
+                        </div>
+
+                        <div id="row-door" class="mod-row">
+                            <span class="mod-label">Вход:</span>
+                            <span id="lbl-door" class="mod-val">1/5 Простое крыльцо с козырьком</span>
+                            <button type="button" id="btn-door" class="btn-cycle" title="Следующий вариант">↻</button>
+                        </div>
+
+                        <!-- Fence Module Rows (Zabor only) -->
+                        <div id="row-fence-mat" class="mod-row hidden">
+                            <span class="mod-label">Материал:</span>
+                            <span id="lbl-fence-mat" class="mod-val">1/3 Деревянный штакетник</span>
+                            <button type="button" id="btn-fence-mat" class="btn-cycle" title="Следующий вариант">↻</button>
+                        </div>
+
+                        <div id="row-fence-form" class="mod-row hidden">
+                            <span class="mod-label">Секция:</span>
+                            <span id="lbl-fence-form" class="mod-val">1/3 Прямая секция 4 м</span>
+                            <button type="button" id="btn-fence-form" class="btn-cycle" title="Следующий вариант">↻</button>
+                        </div>
+
+                        <!-- Export Option -->
+                        <div class="export-opt-row">
+                            <label class="check-label">
+                                <input type="checkbox" id="chk-only-building" checked>
+                                <span>Только постройка (без земли)</span>
+                            </label>
+                            <span class="godot-tag">Y=0 • Godot 4</span>
+                        </div>
+
+                        <!-- Main Action Buttons -->
+                        <div class="actions-grid">
+                            <button type="button" id="btn-randomize" class="btn-amber">🎲 СЛУЧАЙНАЯ СБОРКА</button>
+                            <button type="button" id="btn-export-glb" class="btn-godot">⬇ ЭКСПОРТ .GLB (GODOT)</button>
+                        </div>
+                        <div class="library-actions">
+                            <input id="building-name" type="text" maxlength="80" autocomplete="off" aria-label="Название модели" placeholder="Название модели">
+                            <button type="button" id="btn-save-building" class="btn-godot" disabled>Сохранить в библиотеку</button>
+                            <a id="place-building" hidden>Разместить в Quest Lab ↗</a>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: СОСТОЯНИЕ -->
+                    <div id="pane-state" class="tab-pane">
+                        <div class="section-caption">Пресет на всю постройку:</div>
+                        <div class="pill-grid-3">
+                            <button type="button" data-preset="normal" class="pill">Нормальное</button>
+                            <button type="button" data-preset="ruined" class="pill">Разрушенное</button>
+                            <button type="button" data-preset="cultist" class="pill">Культистское</button>
+                        </div>
+
+                        <!-- Building Individual Parts State -->
+                        <div id="state-parts-building">
+                            <div class="state-row" style="margin-bottom: 5px;">
+                                <span class="mod-label">Стены:</span>
+                                <div class="pill-grid-3">
+                                    <button type="button" data-part="walls" data-cond="normal" class="pill active-norm">Норма</button>
+                                    <button type="button" data-part="walls" data-cond="ruined" class="pill">Разруш.</button>
+                                    <button type="button" data-part="walls" data-cond="cultist" class="pill">Культ</button>
+                                </div>
+                            </div>
+                            <div class="state-row" style="margin-bottom: 5px;">
+                                <span class="mod-label">Крыша:</span>
+                                <div class="pill-grid-3">
+                                    <button type="button" data-part="roof" data-cond="normal" class="pill active-norm">Норма</button>
+                                    <button type="button" data-part="roof" data-cond="ruined" class="pill">Разруш.</button>
+                                    <button type="button" data-part="roof" data-cond="cultist" class="pill">Культ</button>
+                                </div>
+                            </div>
+                            <div class="state-row">
+                                <span class="mod-label">Вход:</span>
+                                <div class="pill-grid-3">
+                                    <button type="button" data-part="door" data-cond="normal" class="pill active-norm">Норма</button>
+                                    <button type="button" data-part="door" data-cond="ruined" class="pill">Разруш.</button>
+                                    <button type="button" data-part="door" data-cond="cultist" class="pill">Культ</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fence Single Overall State -->
+                        <div id="state-part-fence" class="state-row hidden">
+                            <span class="mod-label">Секция забора:</span>
+                            <div class="pill-grid-3">
+                                <button type="button" data-part="fence" data-cond="normal" class="pill active-norm">Норма</button>
+                                <button type="button" data-part="fence" data-cond="ruined" class="pill">Разруш.</button>
+                                <button type="button" data-part="fence" data-cond="cultist" class="pill">Культ</button>
+                            </div>
+                        </div>
+
+                        <!-- Window State (5 independent states, hidden for Fence) -->
+                        <div id="state-windows-block">
+                            <div class="section-caption" style="margin-bottom: 4px;">Состояние окон (отдельно):</div>
+                            <div class="pill-grid-5">
+                                <button type="button" data-winstate="0" class="pill active-win">Без света</button>
+                                <button type="button" data-winstate="1" class="pill">Свет</button>
+                                <button type="button" data-winstate="2" class="pill">Потусторонний</button>
+                                <button type="button" data-winstate="3" class="pill">Разбитые</button>
+                                <button type="button" data-winstate="4" class="pill">Заколоченные</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: ВИД / PS1 -->
+                    <div id="pane-view" class="tab-pane">
+                        <div class="ps1-grid">
+                            <button type="button" id="tog-jitter" class="btn-toggle">PS1 Jitter: ВЫКЛ</button>
+                            <button type="button" id="tog-pixel" class="btn-toggle">PS1 Пиксели: ВЫКЛ</button>
+                            <button type="button" id="tog-vhs" class="btn-toggle">VHS Шум: ВЫКЛ</button>
+                            <button type="button" id="tog-wire" class="btn-toggle">Сетка (Wire): ВЫКЛ</button>
+                            <button type="button" id="tog-rotate" class="btn-toggle">Авто-вращ.: ВЫКЛ</button>
+                            <button type="button" id="tog-night" class="btn-toggle">Ночной туман: ВЫКЛ</button>
+                        </div>
+                        <button type="button" id="btn-reset-cam" style="width: 100%; padding: 8px;">⌖ Сброс камеры</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ONLY TWO UMD SCRIPTS (Three.js r128 + GLTFExporter) -->
+    <script src="../object-library/library.js?v=3"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+
+    <script>
+        (function () {
+            'use strict';
+
+            /* =========================================================
+               1. APPLICATION STATE & METADATA
+               ========================================================= */
+            const state = {
+                buildingType: 'izba', // 'izba' | 'banya' | 'saray' | 'zabor'
+                activeTab: 'modules', // 'modules' | 'state' | 'view'
+                drawerCollapsed: false,
+                onlyBuilding: true,
+
+                // View / PS1 Settings (ALL OFF by default)
+                view: {
+                    jitter: false,
+                    pixel: false,
+                    vhs: false,
+                    wire: false,
+                    autoRotate: false,
+                    nightFog: false
+                },
+
+                // Module indices
+                izba: { floors: 1, walls: 0, roof: 0, window: 0, door: 0 },
+                banya: { walls: 0, roof: 0, door: 0 },
+                saray: { walls: 0, roof: 0, door: 0 },
+                zabor: { mat: 0, form: 0 },
+
+                // Conditions ('normal' | 'ruined' | 'cultist') + Window state (0..4)
+                conditions: {
+                    walls: 'normal',
+                    roof: 'normal',
+                    door: 'normal',
+                    fence: 'normal',
+                    window: 0 // 0=dark, 1=lit, 2=eerie, 3=broken, 4=boarded
+                }
+            };
+
+            const META = {
+                condShort: { normal: 'N', ruined: 'D', cultist: 'C' },
+                winShort: ['n', 'l', 'e', 'b', 'k'],
+                izba: {
+                    walls: [
+                        '1/5 Старый тёмный сруб',
+                        '2/5 Синяя обшивка',
+                        '3/5 Жёлто-бирюзовый',
+                        '4/5 Заброшенный гнилой',
+                        '5/5 Совхозный кирпич/доски'
+                    ],
+                    roof: [
+                        '1/5 Шифер с дырами (двускатная)',
+                        '2/5 Профлист + синий фронтон',
+                        '3/5 Вальмовая красная',
+                        '4/5 Двускатная с резным фронтоном',
+                        '5/5 Полувальмовая ржавая жесть'
+                    ],
+                    window: [
+                        '1/5 Резные башкирские',
+                        '2/5 Со ставнями',
+                        '3/5 Советские простые',
+                        '4/5 Деревенские с узором',
+                        '5/5 Узкие старые'
+                    ],
+                    door: [
+                        '1/5 Простое крыльцо с козырьком',
+                        '2/5 Закрытая веранда',
+                        '3/5 Деревянные сени',
+                        '4/5 Боковой сарай-пристрой',
+                        '5/5 Полуразрушенное крыльцо со ступенями'
+                    ]
+                },
+                banya: {
+                    title: 'БАНЯ (УПРОЩЁННАЯ)',
+                    winDesc: 'Маленькое банное окошко',
+                    walls: [
+                        '1/3 Сырой сруб',
+                        '2/3 Сруб по-чёрному',
+                        '3/3 Тёмная доска'
+                    ],
+                    roof: [
+                        '1/3 Двускатная шифер + труба',
+                        '2/3 Односкатная рубероид + труба',
+                        '3/3 Двускатная ржавая жесть + кирпичная труба'
+                    ],
+                    door: [
+                        '1/2 Низкая дверь + козырёк и поленница',
+                        '2/2 Дощатый предбанник'
+                    ]
+                },
+                saray: {
+                    title: 'САРАЙ (ХОЗПОСТРОЙКА)',
+                    winDesc: 'Узкое боковое окошко-прорезь',
+                    walls: [
+                        '1/3 Необрезная доска со щелями',
+                        '2/3 Тёмный горбыль',
+                        '3/3 Доски с заплатками жести'
+                    ],
+                    roof: [
+                        '1/3 Односкатная шифер',
+                        '2/3 Односкатная ржавая жесть',
+                        '3/3 Двускатная шифер'
+                    ],
+                    door: [
+                        '1/3 Одинарная дверь на петлях',
+                        '2/3 Двойные ворота с раскосами',
+                        '3/3 Открытый дровяник с поленницей внутри'
+                    ]
+                },
+                zabor: {
+                    title: 'ЗАБОР (СЕКЦИЯ)',
+                    mat: [
+                        '1/3 Деревянный штакетник',
+                        '2/3 Глухой дощатый забор',
+                        '3/3 Профлист / ржавая жесть'
+                    ],
+                    form: [
+                        '1/3 Прямая секция 4 м',
+                        '2/3 Секция с калиткой',
+                        '3/3 Угловая секция 90°'
+                    ]
+                }
+            };
+
+            /* =========================================================
+               2. TOAST NOTIFICATION & CALLBACK HOOKS
+               ========================================================= */
+            let toastTimer = null;
+            function showToast(message, isError) {
+                const el = document.getElementById('toast');
+                if (!el) return;
+                el.textContent = message;
+                el.classList.toggle('error', !!isError);
+                el.classList.add('visible');
+                clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => el.classList.remove('visible'), 2800);
+            }
+
+            // Hooks populated after Three.js initializes
+            let rebuildScene = function () {};
+            let resetCamera = function () {};
+            let frameIzbaFloors = function () {};
+            let applyViewSettings = function () {};
+            let exportGLB = function () { showToast('3D-движок не готов к экспорту', true); };
+
+            /* =========================================================
+               3. UI SYNC & IMMEDIATE EVENT BINDING (BEFORE WEBGL)
+               ========================================================= */
+            function syncUI() {
+                const t = state.buildingType;
+                const isIzba = (t === 'izba');
+                const isZabor = (t === 'zabor');
+                const cfg = state[t];
+                const m = META[t];
+
+                // Building selector buttons
+                document.querySelectorAll('[data-building]').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.building === t);
+                });
+
+                // Drawer title
+                const dockTitle = document.getElementById('dock-title');
+                if (isIzba) {
+                    dockTitle.textContent = cfg.floors === 2 ? 'ИЗБА (2 ЭТАЖА)' : 'ИЗБА (1 ЭТАЖ)';
+                } else {
+                    dockTitle.textContent = m.title;
+                }
+
+                // Tabs
+                document.querySelectorAll('[data-tab]').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.tab === state.activeTab);
+                });
+                document.getElementById('pane-modules').classList.toggle('active', state.activeTab === 'modules');
+                document.getElementById('pane-state').classList.toggle('active', state.activeTab === 'state');
+                document.getElementById('pane-view').classList.toggle('active', state.activeTab === 'view');
+
+                // Drawer collapsed state
+                const drawer = document.getElementById('drawer');
+                drawer.classList.toggle('collapsed', state.drawerCollapsed);
+                document.getElementById('btn-toggle-drawer').textContent = state.drawerCollapsed ? 'Развернуть ▼' : 'Свернуть ▲';
+
+                // Module rows visibility
+                document.getElementById('row-floors').classList.toggle('hidden', !isIzba);
+                document.getElementById('row-walls').classList.toggle('hidden', isZabor);
+                document.getElementById('row-roof').classList.toggle('hidden', isZabor);
+                document.getElementById('row-window').classList.toggle('hidden', !isIzba);
+                document.getElementById('row-win-fixed').classList.toggle('hidden', isIzba || isZabor);
+                document.getElementById('row-door').classList.toggle('hidden', isZabor);
+                document.getElementById('row-fence-mat').classList.toggle('hidden', !isZabor);
+                document.getElementById('row-fence-form').classList.toggle('hidden', !isZabor);
+
+                // Module labels & preset code
+                const codeEl = document.getElementById('preset-code');
+                if (isZabor) {
+                    document.getElementById('lbl-fence-mat').textContent = m.mat[cfg.mat];
+                    document.getElementById('lbl-fence-form').textContent = m.form[cfg.form];
+                    codeEl.textContent = 'Z-T' + (cfg.mat + 1) + '-F' + (cfg.form + 1) + '-' + META.condShort[state.conditions.fence];
+                } else {
+                    document.getElementById('lbl-walls').textContent = m.walls[cfg.walls];
+                    document.getElementById('lbl-roof').textContent = m.roof[cfg.roof];
+                    document.getElementById('lbl-door').textContent = m.door[cfg.door];
+                    if (isIzba) {
+                        document.getElementById('lbl-window').textContent = m.window[cfg.window];
+                        document.querySelectorAll('[data-floors]').forEach(btn => {
+                            btn.classList.toggle('active-floor', Number(btn.dataset.floors) === cfg.floors);
+                        });
+                    } else {
+                        document.getElementById('lbl-win-fixed').textContent = m.winDesc;
+                    }
+                    const prefix = isIzba ? (cfg.floors + 'F-') : '';
+                    codeEl.textContent =
+                        prefix +
+                        'W' + (cfg.walls + 1) + META.condShort[state.conditions.walls] +
+                        '-R' + (cfg.roof + 1) + META.condShort[state.conditions.roof] +
+                        '-E' + (cfg.door + 1) + META.condShort[state.conditions.door];
+                }
+
+                // State tab visibility
+                document.getElementById('state-parts-building').classList.toggle('hidden', isZabor);
+                document.getElementById('state-part-fence').classList.toggle('hidden', !isZabor);
+                document.getElementById('state-windows-block').classList.toggle('hidden', isZabor);
+
+                // State pills highlighting
+                document.querySelectorAll('[data-part]').forEach(btn => {
+                    const part = btn.dataset.part;
+                    const cond = btn.dataset.cond;
+                    const active = state.conditions[part] === cond;
+                    btn.classList.remove('active-norm', 'active-ruin', 'active-cult');
+                    if (active) {
+                        btn.classList.add(cond === 'normal' ? 'active-norm' : (cond === 'ruined' ? 'active-ruin' : 'active-cult'));
+                    }
+                });
+
+                document.querySelectorAll('[data-winstate]').forEach(btn => {
+                    btn.classList.toggle('active-win', Number(btn.dataset.winstate) === state.conditions.window);
+                });
+
+                // View / PS1 toggle buttons
+                const v = state.view;
+                const setTog = (id, label, on) => {
+                    const el = document.getElementById(id);
+                    el.textContent = label + ': ' + (on ? 'ВКЛ' : 'ВЫКЛ');
+                    el.classList.toggle('on', on);
+                };
+                setTog('tog-jitter', 'PS1 Jitter', v.jitter);
+                setTog('tog-pixel', 'PS1 Пиксели', v.pixel);
+                setTog('tog-vhs', 'VHS Шум', v.vhs);
+                setTog('tog-wire', 'Сетка (Wire)', v.wire);
+                setTog('tog-rotate', 'Авто-вращ.', v.autoRotate);
+                setTog('tog-night', 'Ночной туман', v.nightFog);
+            }
+
+            function randomizeCurrent() {
+                const t = state.buildingType;
+                const cfg = state[t];
+                const m = META[t];
+                const conds = ['normal', 'ruined', 'cultist'];
+
+                if (t === 'zabor') {
+                    cfg.mat = Math.floor(Math.random() * m.mat.length);
+                    cfg.form = Math.floor(Math.random() * m.form.length);
+                    state.conditions.fence = conds[Math.floor(Math.random() * 3)];
+                } else {
+                    cfg.walls = Math.floor(Math.random() * m.walls.length);
+                    cfg.roof = Math.floor(Math.random() * m.roof.length);
+                    cfg.door = Math.floor(Math.random() * m.door.length);
+                    if (t === 'izba') {
+                        cfg.floors = Math.random() < 0.5 ? 1 : 2;
+                        cfg.window = Math.floor(Math.random() * m.window.length);
+                    }
+                    state.conditions.walls = conds[Math.floor(Math.random() * 3)];
+                    state.conditions.roof = conds[Math.floor(Math.random() * 3)];
+                    state.conditions.door = conds[Math.floor(Math.random() * 3)];
+                    state.conditions.window = Math.floor(Math.random() * 5);
+                }
+
+                syncUI();
+                rebuildScene();
+                if (t === 'izba') frameIzbaFloors();
+            }
+
+            function bindUIEvents() {
+                // Hide / Restore UI
+                document.getElementById('btn-hide-ui').addEventListener('click', () => {
+                    document.body.classList.add('ui-hidden');
+                });
+                document.getElementById('restore-ui-btn').addEventListener('click', () => {
+                    document.body.classList.remove('ui-hidden');
+                });
+
+                // Building type switcher
+                document.querySelectorAll('[data-building]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const next = btn.dataset.building;
+                        if (state.buildingType === next) return;
+                        state.buildingType = next;
+                        syncUI();
+                        rebuildScene();
+                        resetCamera();
+                    });
+                });
+
+                // Drawer collapse toggle
+                document.getElementById('btn-toggle-drawer').addEventListener('click', () => {
+                    state.drawerCollapsed = !state.drawerCollapsed;
+                    syncUI();
+                });
+
+                // Quick randomize & export
+                document.getElementById('btn-quick-rand').addEventListener('click', randomizeCurrent);
+                document.getElementById('btn-randomize').addEventListener('click', randomizeCurrent);
+                document.getElementById('btn-quick-glb').addEventListener('click', () => exportGLB());
+                document.getElementById('btn-export-glb').addEventListener('click', () => exportGLB());
+
+                // Tabs
+                document.querySelectorAll('[data-tab]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        state.activeTab = btn.dataset.tab;
+                        syncUI();
+                    });
+                });
+
+                // Izba floors toggle
+                document.querySelectorAll('[data-floors]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        if (state.buildingType !== 'izba') return;
+                        const fl = Number(btn.dataset.floors);
+                        if (state.izba.floors === fl) return;
+                        state.izba.floors = fl;
+                        syncUI();
+                        rebuildScene();
+                        frameIzbaFloors();
+                    });
+                });
+
+                // Module cyclers
+                document.getElementById('btn-walls').addEventListener('click', () => {
+                    const t = state.buildingType;
+                    if (t === 'zabor') return;
+                    state[t].walls = (state[t].walls + 1) % META[t].walls.length;
+                    syncUI();
+                    rebuildScene();
+                });
+
+                document.getElementById('btn-roof').addEventListener('click', () => {
+                    const t = state.buildingType;
+                    if (t === 'zabor') return;
+                    state[t].roof = (state[t].roof + 1) % META[t].roof.length;
+                    syncUI();
+                    rebuildScene();
+                });
+
+                document.getElementById('btn-window').addEventListener('click', () => {
+                    if (state.buildingType !== 'izba') return;
+                    state.izba.window = (state.izba.window + 1) % META.izba.window.length;
+                    syncUI();
+                    rebuildScene();
+                });
+
+                document.getElementById('btn-door').addEventListener('click', () => {
+                    const t = state.buildingType;
+                    if (t === 'zabor') return;
+                    state[t].door = (state[t].door + 1) % META[t].door.length;
+                    syncUI();
+                    rebuildScene();
+                });
+
+                document.getElementById('btn-fence-mat').addEventListener('click', () => {
+                    state.zabor.mat = (state.zabor.mat + 1) % META.zabor.mat.length;
+                    syncUI();
+                    rebuildScene();
+                });
+
+                document.getElementById('btn-fence-form').addEventListener('click', () => {
+                    state.zabor.form = (state.zabor.form + 1) % META.zabor.form.length;
+                    syncUI();
+                    rebuildScene();
+                });
+
+                // Export only building checkbox
+                document.getElementById('chk-only-building').addEventListener('change', (e) => {
+                    state.onlyBuilding = !!e.target.checked;
+                });
+
+                // Whole-building condition presets
+                document.querySelectorAll('[data-preset]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const c = btn.dataset.preset;
+                        if (state.buildingType === 'zabor') {
+                            state.conditions.fence = c;
+                        } else {
+                            state.conditions.walls = c;
+                            state.conditions.roof = c;
+                            state.conditions.door = c;
+                        }
+                        syncUI();
+                        rebuildScene();
+                    });
+                });
+
+                // Per-part condition toggles
+                document.querySelectorAll('[data-part]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        state.conditions[btn.dataset.part] = btn.dataset.cond;
+                        syncUI();
+                        rebuildScene();
+                    });
+                });
+
+                // Independent window states
+                document.querySelectorAll('[data-winstate]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        state.conditions.window = Number(btn.dataset.winstate);
+                        syncUI();
+                        rebuildScene();
+                    });
+                });
+
+                // View / PS1 toggles
+                const bindToggle = (id, key) => {
+                    document.getElementById(id).addEventListener('click', () => {
+                        state.view[key] = !state.view[key];
+                        syncUI();
+                        applyViewSettings();
+                    });
+                };
+                bindToggle('tog-jitter', 'jitter');
+                bindToggle('tog-pixel', 'pixel');
+                bindToggle('tog-vhs', 'vhs');
+                bindToggle('tog-wire', 'wire');
+                bindToggle('tog-rotate', 'autoRotate');
+                bindToggle('tog-night', 'nightFog');
+
+                document.getElementById('btn-reset-cam').addEventListener('click', () => {
+                    resetCamera();
+                });
+            }
+
+            // Bind UI immediately so controls respond even before/without WebGL
+            bindUIEvents();
+            syncUI();
+
+            /* =========================================================
+               4. THREE.JS INITIALIZATION (WRAPPED IN TRY/CATCH)
+               ========================================================= */
+            function showWebGLError(msg) {
+                const box = document.getElementById('webgl-error');
+                const p = document.getElementById('webgl-error-msg');
+                if (p && msg) p.textContent = msg;
+                if (box) box.style.display = 'block';
+            }
+
+            function init3D() {
+                if (typeof THREE === 'undefined') {
+                    showWebGLError('Библиотека Three.js не загрузилась. Проверьте подключение к интернету.');
+                    return;
+                }
+
+                const canvas = document.getElementById('gl-canvas');
+                let renderer;
+                try {
+                    renderer = new THREE.WebGLRenderer({
+                        canvas: canvas,
+                        antialias: true,
+                        alpha: false,
+                        powerPreference: 'high-performance'
+                    });
+                } catch (err) {
+                    showWebGLError('WebGL контекст недоступен: ' + err.message);
+                    return;
+                }
+
+                renderer.outputEncoding = THREE.sRGBEncoding;
+                renderer.shadowMap.enabled = false;
+                renderer.setClearColor(0x131613, 1);
+
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(44, window.innerWidth / Math.max(1, window.innerHeight), 0.1, 140);
+
+                // Lighting (Studio default + Night Fog option)
+                const hemiLight = new THREE.HemisphereLight(0xdce6d8, 0x2c3029, 0.92);
+                scene.add(hemiLight);
+
+                const dirLight = new THREE.DirectionalLight(0xfff1dc, 1.05);
+                dirLight.position.set(8, 13, 9);
+                scene.add(dirLight);
+
+                const rimLight = new THREE.DirectionalLight(0x6d828c, 0.42);
+                rimLight.position.set(-9, 6, -8);
+                scene.add(rimLight);
+
+                const previewWinLight = new THREE.PointLight(0xffb45c, 0, 7.5);
+                previewWinLight.position.set(0, 1.8, 3.2);
+                scene.add(previewWinLight);
+
+                /* =========================================================
+                   5. BUILT-IN SMOOTH TOUCH & MOUSE ORBIT CONTROLLER
+                   ========================================================= */
+                const orbit = {
+                    theta: 0.68,
+                    phi: 1.15,
+                    radius: 10.6,
+                    target: new THREE.Vector3(0, 1.6, 0),
+                    desiredTheta: 0.68,
+                    desiredPhi: 1.15,
+                    desiredRadius: 10.6,
+                    desiredTarget: new THREE.Vector3(0, 1.6, 0),
+                    dragging: false,
+                    lastX: 0,
+                    lastY: 0,
+                    pinchDist: 0
+                };
+
+                function clampOrbit() {
+                    orbit.desiredPhi = Math.max(0.22, Math.min(Math.PI / 2 - 0.04, orbit.desiredPhi));
+                    orbit.desiredRadius = Math.max(2.6, Math.min(24.0, orbit.desiredRadius));
+                    orbit.phi = Math.max(0.22, Math.min(Math.PI / 2 - 0.04, orbit.phi));
+                    orbit.radius = Math.max(2.6, Math.min(24.0, orbit.radius));
+                }
+
+                function updateCameraTransform() {
+                    clampOrbit();
+                    const sinPhi = Math.sin(orbit.phi);
+                    camera.position.set(
+                        orbit.target.x + orbit.radius * sinPhi * Math.sin(orbit.theta),
+                        orbit.target.y + orbit.radius * Math.cos(orbit.phi),
+                        orbit.target.z + orbit.radius * sinPhi * Math.cos(orbit.theta)
+                    );
+                    camera.lookAt(orbit.target);
+                }
+
+                frameIzbaFloors = function () {
+                    if (state.izba.floors === 2) {
+                        orbit.desiredRadius = 13.8;
+                        orbit.desiredTarget.set(0, 2.8, 0);
+                        orbit.desiredPhi = 1.16;
+                    } else {
+                        orbit.desiredRadius = 10.6;
+                        orbit.desiredTarget.set(0, 1.6, 0);
+                        orbit.desiredPhi = 1.15;
+                    }
+                };
+
+                resetCamera = function () {
+                    const t = state.buildingType;
+                    if (t === 'izba') {
+                        orbit.desiredTheta = 0.68;
+                        frameIzbaFloors();
+                    } else if (t === 'banya') {
+                        orbit.desiredTheta = 0.72;
+                        orbit.desiredPhi = 1.14;
+                        orbit.desiredRadius = 7.8;
+                        orbit.desiredTarget.set(0, 1.25, 0);
+                    } else if (t === 'saray') {
+                        orbit.desiredTheta = 0.70;
+                        orbit.desiredPhi = 1.14;
+                        orbit.desiredRadius = 8.4;
+                        orbit.desiredTarget.set(0, 1.25, 0);
+                    } else {
+                        orbit.desiredTheta = 0.52;
+                        orbit.desiredPhi = 1.20;
+                        orbit.desiredRadius = 6.2;
+                        orbit.desiredTarget.set(0, 0.85, 0);
+                    }
+                    orbit.theta = orbit.desiredTheta;
+                    orbit.phi = orbit.desiredPhi;
+                    orbit.radius = orbit.desiredRadius;
+                    orbit.target.copy(orbit.desiredTarget);
+                    updateCameraTransform();
+                };
+
+                // Mouse controls
+                canvas.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0) return;
+                    orbit.dragging = true;
+                    orbit.lastX = e.clientX;
+                    orbit.lastY = e.clientY;
+                });
+                window.addEventListener('mousemove', (e) => {
+                    if (!orbit.dragging) return;
+                    const dx = e.clientX - orbit.lastX;
+                    const dy = e.clientY - orbit.lastY;
+                    orbit.lastX = e.clientX;
+                    orbit.lastY = e.clientY;
+                    orbit.desiredTheta -= dx * 0.008;
+                    orbit.desiredPhi -= dy * 0.008;
+                });
+                window.addEventListener('mouseup', () => { orbit.dragging = false; });
+
+                canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    orbit.desiredRadius += e.deltaY * 0.008;
+                }, { passive: false });
+
+                // Touch controls (1-finger orbit, 2-finger pinch zoom)
+                canvas.addEventListener('touchstart', (e) => {
+                    if (e.touches.length === 1) {
+                        orbit.dragging = true;
+                        orbit.lastX = e.touches[0].clientX;
+                        orbit.lastY = e.touches[0].clientY;
+                    } else if (e.touches.length === 2) {
+                        orbit.dragging = false;
+                        orbit.pinchDist = Math.hypot(
+                            e.touches[0].clientX - e.touches[1].clientX,
+                            e.touches[0].clientY - e.touches[1].clientY
+                        );
+                    }
+                }, { passive: true });
+
+                canvas.addEventListener('touchmove', (e) => {
+                    if (e.touches.length === 1 && orbit.dragging) {
+                        const dx = e.touches[0].clientX - orbit.lastX;
+                        const dy = e.touches[0].clientY - orbit.lastY;
+                        orbit.lastX = e.touches[0].clientX;
+                        orbit.lastY = e.touches[0].clientY;
+                        orbit.desiredTheta -= dx * 0.009;
+                        orbit.desiredPhi -= dy * 0.009;
+                    } else if (e.touches.length === 2) {
+                        const dist = Math.hypot(
+                            e.touches[0].clientX - e.touches[1].clientX,
+                            e.touches[0].clientY - e.touches[1].clientY
+                        );
+                        orbit.desiredRadius += (orbit.pinchDist - dist) * 0.025;
+                        orbit.pinchDist = dist;
+                    }
+                }, { passive: true });
+
+                canvas.addEventListener('touchend', () => { orbit.dragging = false; });
+
+                /* =========================================================
+                   6. PROCEDURAL LOW-RES PIXEL TEXTURES (NearestFilter)
+                   ========================================================= */
+                function createPixelTex(size, drawFn, repX, repY) {
+                    const c = document.createElement('canvas');
+                    c.width = size;
+                    c.height = size;
+                    const ctx = c.getContext('2d');
+                    drawFn(ctx, size, size);
+                    const tex = new THREE.CanvasTexture(c);
+                    tex.magFilter = THREE.NearestFilter;
+                    tex.minFilter = THREE.NearestFilter;
+                    tex.generateMipmaps = false;
+                    tex.wrapS = THREE.RepeatWrapping;
+                    tex.wrapT = THREE.RepeatWrapping;
+                    tex.repeat.set(repX || 1, repY || 1);
+                    tex.encoding = THREE.sRGBEncoding;
+                    return tex;
+                }
+
+                // Deterministic PRNG for clean repeatable pixel noise
+                function prng(seed) {
+                    let s = seed % 2147483647;
+                    if (s <= 0) s += 2147483646;
+                    return function () {
+                        s = (s * 16807) % 2147483647;
+                        return (s - 1) / 2147483646;
+                    };
+                }
+
+                const TEX = {
+                    logsDark: createPixelTex(64, (ctx, w, h) => {
+                        const rnd = prng(101);
+                        ctx.fillStyle = '#4e3b2a';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let y = 0; y < h; y += 8) {
+                            ctx.fillStyle = '#2d2015';
+                            ctx.fillRect(0, y, w, 1);
+                            ctx.fillStyle = '#5c4632';
+                            ctx.fillRect(0, y + 1, w, 2);
+                            ctx.fillStyle = '#423122';
+                            ctx.fillRect(0, y + 6, w, 2);
+                            for (let x = 0; x < w; x += 4) {
+                                if (rnd() > 0.65) {
+                                    ctx.fillStyle = rnd() > 0.5 ? '#36271a' : '#664f3a';
+                                    ctx.fillRect(x, y + 2 + Math.floor(rnd() * 4), 4, 1);
+                                }
+                            }
+                        }
+                    }, 2, 1),
+
+                    logsDamp: createPixelTex(64, (ctx, w, h) => {
+                        const rnd = prng(102);
+                        ctx.fillStyle = '#4a4334';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let y = 0; y < h; y += 8) {
+                            ctx.fillStyle = '#28251c';
+                            ctx.fillRect(0, y, w, 1);
+                            ctx.fillStyle = '#58503e';
+                            ctx.fillRect(0, y + 1, w, 2);
+                            for (let x = 0; x < w; x += 4) {
+                                if (rnd() > 0.72) {
+                                    ctx.fillStyle = '#3a4a2e'; // moss streak
+                                    ctx.fillRect(x, y + 3, 5, 2);
+                                }
+                            }
+                        }
+                    }, 2, 1),
+
+                    logsSoot: createPixelTex(64, (ctx, w, h) => {
+                        const rnd = prng(103);
+                        ctx.fillStyle = '#2d2723';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let y = 0; y < h; y += 8) {
+                            ctx.fillStyle = '#181412';
+                            ctx.fillRect(0, y, w, 2);
+                            ctx.fillStyle = '#3c342e';
+                            ctx.fillRect(0, y + 2, w, 2);
+                            for (let x = 0; x < w; x += 6) {
+                                if (rnd() > 0.6) {
+                                    ctx.fillStyle = '#201b18';
+                                    ctx.fillRect(x, y + 4, 4, 2);
+                                }
+                            }
+                        }
+                    }, 2, 1),
+
+                    bluePlanks: createPixelTex(64, (ctx, w, h) => {
+                        const rnd = prng(104);
+                        ctx.fillStyle = '#3b647d';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let y = 0; y < h; y += 6) {
+                            ctx.fillStyle = '#274354';
+                            ctx.fillRect(0, y, w, 1);
+                            ctx.fillStyle = '#487691';
+                            ctx.fillRect(0, y + 1, w, 1);
+                            for (let x = 0; x < w; x += 4) {
+                                if (rnd() > 0.82) {
+                                    ctx.fillStyle = '#6c6252'; // peeling paint
+                                    ctx.fillRect(x, y + 2, 4, 3);
+                                }
+                            }
+                        }
+                    }, 2, 1),
+
+                    yellowTeal: createPixelTex(64, (ctx, w, h) => {
+                        const rnd = prng(105);
+                        ctx.fillStyle = '#8f7b3e';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let y = 0; y < h; y += 6) {
+                            ctx.fillStyle = '#5e5028';
+                            ctx.fillRect(0, y, w, 1);
+                            if (y > 46) {
+                                ctx.fillStyle = '#2e6661'; // teal lower dado
+                                ctx.fillRect(0, y + 1, w, 5);
+                            }
+                            for (let x = 0; x < w; x += 6) {
+                                if (rnd() > 0.78) {
+                                    ctx.fillStyle = '#736231';
+                                    ctx.fillRect(x, y + 2, 5, 2);
+                                }
+                            }
+                        }
+                    }, 2, 1),
+
+                    rottenWood: createPixelTex(64, (ctx, w, h) => {
+                        const rnd = prng(106);
+                        ctx.fillStyle = '#3c3932';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let y = 0; y < h; y += 7) {
+                            ctx.fillStyle = '#211f1b';
+                            ctx.fillRect(0, y, w, 1);
+                            for (let x = 0; x < w; x += 4) {
+                                const r = rnd();
+                                if (r > 0.7) {
+                                    ctx.fillStyle = '#2b3324';
+                                    ctx.fillRect(x, y + 1, 4, 4);
+                                } else if (r < 0.2) {
+                                    ctx.fillStyle = '#4e4940';
+                                    ctx.fillRect(x, y + 2, 3, 2);
+                                }
+                            }
+                        }
+                    }, 2, 1),
+
+                    brickWood: createPixelTex(64, (ctx, w, h) => {
+                        const rnd = prng(107);
+                        // Upper wood planks
+                        ctx.fillStyle = '#594836';
+                        ctx.fillRect(0, 0, w, 30);
+                        for (let y = 0; y < 30; y += 6) {
+                            ctx.fillStyle = '#362b20';
+                            ctx.fillRect(0, y, w, 1);
+                        }
+                        // Lower soviet brick
+                        ctx.fillStyle = '#734136';
+                        ctx.fillRect(0, 30, w, 34);
+                        for (let y = 30; y < h; y += 6) {
+                            ctx.fillStyle = '#4a3d38';
+                            ctx.fillRect(0, y, w, 1);
+                            const off = ((y - 30) / 6) % 2 === 0 ? 0 : 6;
+                            for (let x = off; x < w; x += 12) {
+                                ctx.fillRect(x, y, 1, 6);
+                                if (rnd() > 0.65) {
+                                    ctx.fillStyle = '#854c3f';
+                                    ctx.fillRect(x + 2, y + 2, 8, 3);
+                                    ctx.fillStyle = '#4a3d38';
+                                }
+                            }
+                        }
+                    }, 2, 1),
+
+                    planksGap: createPixelTex(64, (ctx, w, h) => {
+                        const rnd = prng(108);
+                        ctx.fillStyle = '#5c4b38';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let x = 0; x < w; x += 8) {
+                            ctx.fillStyle = '#1d1914'; // vertical gap
+                            ctx.fillRect(x, 0, 2, h);
+                            ctx.fillStyle = rnd() > 0.5 ? '#66533e' : '#524231';
+                            ctx.fillRect(x + 2, 0, 6, h);
+                        }
+                    }, 2, 1),
+
+                    slabWood: createPixelTex(64, (ctx, w, h) => {
+                        const rnd = prng(109);
+                        ctx.fillStyle = '#3d3328';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let x = 0; x < w; x += 8) {
+                            ctx.fillStyle = '#241e17';
+                            ctx.fillRect(x, 0, 2, h);
+                            for (let y = 0; y < h; y += 6) {
+                                if (rnd() > 0.6) {
+                                    ctx.fillStyle = '#4a3e31';
+                                    ctx.fillRect(x + 2, y, 5, 4);
+                                }
+                            }
+                        }
+                    }, 2, 1),
+
+                    planksTinPatch: createPixelTex(64, (ctx, w, h) => {
+                        ctx.fillStyle = '#544535';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let x = 0; x < w; x += 8) {
+                            ctx.fillStyle = '#241e17';
+                            ctx.fillRect(x, 0, 1, h);
+                        }
+                        // Rusted tin patches
+                        ctx.fillStyle = '#6c4230';
+                        ctx.fillRect(8, 12, 22, 18);
+                        ctx.fillStyle = '#585e60';
+                        ctx.fillRect(36, 32, 20, 22);
+                        ctx.fillStyle = '#7d4b34';
+                        ctx.fillRect(40, 38, 12, 10);
+                    }, 2, 1),
+
+                    slate: createPixelTex(64, (ctx, w, h) => {
+                        const rnd = prng(110);
+                        ctx.fillStyle = '#525857';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let x = 0; x < w; x += 4) {
+                            ctx.fillStyle = x % 8 === 0 ? '#3f4443' : '#636a68';
+                            ctx.fillRect(x, 0, 2, h);
+                        }
+                        for (let y = 0; y < h; y += 16) {
+                            ctx.fillStyle = '#2e3332';
+                            ctx.fillRect(0, y, w, 1);
+                        }
+                        for (let i = 0; i < 18; i++) {
+                            ctx.fillStyle = '#44543c'; // lichen/moss
+                            ctx.fillRect(Math.floor(rnd() * 58), Math.floor(rnd() * 58), 5, 4);
+                        }
+                    }, 3, 2),
+
+                    corrugatedMetal: createPixelTex(64, (ctx, w, h) => {
+                        ctx.fillStyle = '#5b6770';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let x = 0; x < w; x += 4) {
+                            ctx.fillStyle = x % 8 === 0 ? '#434d54' : '#707e87';
+                            ctx.fillRect(x, 0, 2, h);
+                        }
+                    }, 3, 2),
+
+                    redMetal: createPixelTex(64, (ctx, w, h) => {
+                        const rnd = prng(111);
+                        ctx.fillStyle = '#6e2e26';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let x = 0; x < w; x += 8) {
+                            ctx.fillStyle = '#52211b';
+                            ctx.fillRect(x, 0, 2, h);
+                        }
+                        for (let i = 0; i < 14; i++) {
+                            ctx.fillStyle = '#7f3b28';
+                            ctx.fillRect(Math.floor(rnd() * 58), Math.floor(rnd() * 58), 6, 4);
+                        }
+                    }, 3, 2),
+
+                    rustTin: createPixelTex(64, (ctx, w, h) => {
+                        const rnd = prng(112);
+                        ctx.fillStyle = '#6b422d';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let x = 0; x < w; x += 16) {
+                            ctx.fillStyle = '#3d2518';
+                            ctx.fillRect(x, 0, 1, h);
+                        }
+                        for (let y = 0; y < h; y += 16) {
+                            ctx.fillStyle = '#3d2518';
+                            ctx.fillRect(0, y, w, 1);
+                        }
+                        for (let i = 0; i < 32; i++) {
+                            ctx.fillStyle = rnd() > 0.5 ? '#854e32' : '#524d4a';
+                            ctx.fillRect(Math.floor(rnd() * 58), Math.floor(rnd() * 58), 5, 5);
+                        }
+                    }, 3, 2),
+
+                    ruberoid: createPixelTex(64, (ctx, w, h) => {
+                        const rnd = prng(113);
+                        ctx.fillStyle = '#2c2d2b';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let x = 0; x < w; x += 16) {
+                            ctx.fillStyle = '#1b1c1a';
+                            ctx.fillRect(x, 0, 2, h);
+                        }
+                        for (let i = 0; i < 40; i++) {
+                            ctx.fillStyle = rnd() > 0.5 ? '#3a3b38' : '#222421';
+                            ctx.fillRect(Math.floor(rnd() * 62), Math.floor(rnd() * 62), 3, 3);
+                        }
+                    }, 2, 2),
+
+                    rootsBark: createPixelTex(64, (ctx, w, h) => {
+                        const rnd = prng(114);
+                        ctx.fillStyle = '#1a1514';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let x = 0; x < w; x += 4) {
+                            ctx.fillStyle = rnd() > 0.5 ? '#2b201e' : '#110e0d';
+                            ctx.fillRect(x, 0, 2, h);
+                        }
+                        for (let i = 0; i < 16; i++) {
+                            ctx.fillStyle = '#471a18'; // dried blood/sap veins
+                            ctx.fillRect(Math.floor(rnd() * 60), Math.floor(rnd() * 60), 2, 8);
+                        }
+                    }, 1, 2),
+
+                    groundMud: createPixelTex(128, (ctx, w, h) => {
+                        const rnd = prng(115);
+                        ctx.fillStyle = '#2d3326';
+                        ctx.fillRect(0, 0, w, h);
+                        for (let i = 0; i < 420; i++) {
+                            const r = rnd();
+                            ctx.fillStyle = r < 0.35 ? '#39422e' : (r < 0.7 ? '#26241d' : '#4a4332');
+                            ctx.fillRect(Math.floor(rnd() * 124), Math.floor(rnd() * 124), 4, 4);
+                        }
+                    }, 4, 4)
+                };
+
+                /* =========================================================
+                   7. PS1 MATERIAL FACTORY (WITH OPTIONAL VERTEX JITTER)
+                   ========================================================= */
+                const ps1Uniforms = { uJitter: { value: 0.0 } };
+                const activeMaterials = [];
+
+                function makeMat(opts) {
+                    const mat = new THREE.MeshStandardMaterial({
+                        color: opts.color !== undefined ? opts.color : 0xffffff,
+                        map: opts.map || null,
+                        emissive: opts.emissive !== undefined ? opts.emissive : 0x000000,
+                        emissiveIntensity: opts.emissiveIntensity !== undefined ? opts.emissiveIntensity : 0,
+                        roughness: opts.roughness !== undefined ? opts.roughness : 0.92,
+                        metalness: opts.metalness !== undefined ? opts.metalness : 0.05,
+                        side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
+                        wireframe: state.view.wire
+                    });
+
+                    // Authentic PS1 Vertex Jitter (controlled by uJitter uniform; ignored cleanly by GLTFExporter)
+                    mat.onBeforeCompile = function (shader) {
+                        shader.uniforms.uJitter = ps1Uniforms.uJitter;
+                        shader.vertexShader = 'uniform float uJitter;\n' + shader.vertexShader;
+                        shader.vertexShader = shader.vertexShader.replace(
+                            '#include <project_vertex>',
+                            `
+                            #include <project_vertex>
+                            if (uJitter > 0.5) {
+                                vec2 snapGrid = vec2(150.0, 112.0);
+                                vec4 snapped = gl_Position;
+                                snapped.xyz = gl_Position.xyz / gl_Position.w;
+                                snapped.xy = floor(snapped.xy * snapGrid + 0.5) / snapGrid;
+                                snapped.xyz *= gl_Position.w;
+                                gl_Position = snapped;
+                            }
+                            `
+                        );
+                    };
+
+                    activeMaterials.push(mat);
+                    return mat;
+                }
+
+                /* =========================================================
+                   8. EXACT BUFFERGEOMETRY ROOF BUILDERS
+                      (Zero crooked primitives — aligned squarely to W x D)
+                   ========================================================= */
+                function pushTri(pos, uv, a, b, c, ua, ub, uc) {
+                    pos.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+                    uv.push(ua[0], ua[1], ub[0], ub[1], uc[0], uc[1]);
+                }
+
+                function finalizeGeo(pos, uv) {
+                    const geo = new THREE.BufferGeometry();
+                    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+                    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+                    geo.computeVertexNormals();
+                    return geo;
+                }
+
+                // Gable Roof (ridge along Z): returns { slopesGeo, gablesGeo }
+                function createGableRoofGeos(w, d, h) {
+                    const hw = w / 2, hd = d / 2;
+                    const sPos = [], sUv = [];
+                    const gPos = [], gUv = [];
+
+                    const R0 = [0, h, -hd], R1 = [0, h, hd];
+                    const L0 = [-hw, 0, -hd], L1 = [-hw, 0, hd];
+                    const E0 = [hw, 0, -hd], E1 = [hw, 0, hd];
+
+                    // Right slope (+X, +Y)
+                    pushTri(sPos, sUv, R0, R1, E1, [0, 1], [1, 1], [1, 0]);
+                    pushTri(sPos, sUv, R0, E1, E0, [0, 1], [1, 0], [0, 0]);
+
+                    // Left slope (-X, +Y)
+                    pushTri(sPos, sUv, R0, L0, L1, [1, 1], [1, 0], [0, 0]);
+                    pushTri(sPos, sUv, R0, L1, R1, [1, 1], [0, 0], [0, 1]);
+
+                    // Front gable (+Z) & Back gable (-Z) inset slightly for eaves
+                    const ghw = hw - 0.12;
+                    const ghd = hd - 0.14;
+                    pushTri(gPos, gUv, [-ghw, 0, ghd], [ghw, 0, ghd], [0, h - 0.04, ghd], [0, 0], [1, 0], [0.5, 1]);
+                    pushTri(gPos, gUv, [ghw, 0, -ghd], [-ghw, 0, -ghd], [0, h - 0.04, -ghd], [0, 0], [1, 0], [0.5, 1]);
+
+                    return {
+                        slopesGeo: finalizeGeo(sPos, sUv),
+                        gablesGeo: finalizeGeo(gPos, gUv)
+                    };
+                }
+
+                // Hipped Roof (4 slopes meeting at shorter Z ridge)
+                function createHippedRoofGeo(w, d, h) {
+                    const hw = w / 2, hd = d / 2;
+                    const rhd = Math.max(0.25, hd - hw * 0.55);
+                    const pos = [], uv = [];
+
+                    const R0 = [0, h, -rhd], R1 = [0, h, rhd];
+                    const L0 = [-hw, 0, -hd], L1 = [-hw, 0, hd];
+                    const E0 = [hw, 0, -hd], E1 = [hw, 0, hd];
+
+                    // Right slope
+                    pushTri(pos, uv, R0, R1, E1, [0.2, 1], [0.8, 1], [1, 0]);
+                    pushTri(pos, uv, R0, E1, E0, [0.2, 1], [1, 0], [0, 0]);
+                    // Left slope
+                    pushTri(pos, uv, R0, L0, L1, [0.8, 1], [1, 0], [0, 0]);
+                    pushTri(pos, uv, R0, L1, R1, [0.8, 1], [0, 0], [0.2, 1]);
+                    // Front hip triangle
+                    pushTri(pos, uv, L1, E1, R1, [0, 0], [1, 0], [0.5, 1]);
+                    // Back hip triangle
+                    pushTri(pos, uv, E0, L0, R0, [0, 0], [1, 0], [0.5, 1]);
+
+                    return finalizeGeo(pos, uv);
+                }
+
+                // Half-Hipped Roof (lower vertical trapezoid gable + upper hipped cap)
+                function createHalfHippedRoofGeos(w, d, h) {
+                    const hw = w / 2, hd = d / 2;
+                    const midY = h * 0.52;
+                    const midX = hw * (1 - 0.52);
+                    const rhd = hd * 0.62;
+                    const sPos = [], sUv = [];
+                    const gPos = [], gUv = [];
+
+                    const R0 = [0, h, -rhd], R1 = [0, h, rhd];
+                    const L0 = [-hw, 0, -hd], L1 = [-hw, 0, hd];
+                    const E0 = [hw, 0, -hd], E1 = [hw, 0, hd];
+                    const ML0 = [-midX, midY, -hd], ML1 = [-midX, midY, hd];
+                    const ME0 = [midX, midY, -hd], ME1 = [midX, midY, hd];
+
+                    // Right slope (split cleanly to meet half-hip corners)
+                    pushTri(sPos, sUv, R0, R1, ME1, [0.2, 1], [0.8, 1], [1, 0.5]);
+                    pushTri(sPos, sUv, R0, ME1, ME0, [0.2, 1], [1, 0.5], [0, 0.5]);
+                    pushTri(sPos, sUv, ME0, ME1, E1, [0, 0.5], [1, 0.5], [1, 0]);
+                    pushTri(sPos, sUv, ME0, E1, E0, [0, 0.5], [1, 0], [0, 0]);
+
+                    // Left slope
+                    pushTri(sPos, sUv, R0, ML0, ML1, [0.8, 1], [1, 0.5], [0, 0.5]);
+                    pushTri(sPos, sUv, R0, ML1, R1, [0.8, 1], [0, 0.5], [0.2, 1]);
+                    pushTri(sPos, sUv, ML0, L0, L1, [1, 0.5], [1, 0], [0, 0]);
+                    pushTri(sPos, sUv, ML0, L1, ML1, [1, 0.5], [0, 0], [0, 0.5]);
+
+                    // Upper front & back half-hip triangles
+                    pushTri(sPos, sUv, ML1, ME1, R1, [0, 0], [1, 0], [0.5, 1]);
+                    pushTri(sPos, sUv, ME0, ML0, R0, [0, 0], [1, 0], [0.5, 1]);
+
+                    // Lower front & back vertical trapezoid gables
+                    const inset = 0.08;
+                    const gL1 = [-hw + inset, 0, hd - inset], gE1 = [hw - inset, 0, hd - inset];
+                    const gML1 = [-midX, midY, hd - inset], gME1 = [midX, midY, hd - inset];
+                    pushTri(gPos, gUv, gL1, gE1, gME1, [0, 0], [1, 0], [0.75, 1]);
+                    pushTri(gPos, gUv, gL1, gME1, gML1, [0, 0], [0.75, 1], [0.25, 1]);
+
+                    const gL0 = [-hw + inset, 0, -hd + inset], gE0 = [hw - inset, 0, -hd + inset];
+                    const gML0 = [-midX, midY, -hd + inset], gME0 = [midX, midY, -hd + inset];
+                    pushTri(gPos, gUv, gE0, gL0, gML0, [0, 0], [1, 0], [0.75, 1]);
+                    pushTri(gPos, gUv, gE0, gML0, gME0, [0, 0], [0.75, 1], [0.25, 1]);
+
+                    return {
+                        slopesGeo: finalizeGeo(sPos, sUv),
+                        gablesGeo: finalizeGeo(gPos, gUv)
+                    };
+                }
+
+                // Shed Roof (single slope, high at +Z front, low at -Z back)
+                function createShedRoofGeos(w, d, hFront, hBack) {
+                    const hw = w / 2, hd = d / 2;
+                    const sPos = [], sUv = [];
+                    const sidePos = [], sideUv = [];
+
+                    const FL = [-hw, hFront, hd], FR = [hw, hFront, hd];
+                    const BL = [-hw, hBack, -hd], BR = [hw, hBack, -hd];
+
+                    // Top sloped roof plane (+Y, -Z)
+                    pushTri(sPos, sUv, BL, FL, FR, [0, 1], [0, 0], [1, 0]);
+                    pushTri(sPos, sUv, BL, FR, BR, [0, 1], [1, 0], [1, 1]);
+
+                    // Side triangular/trapezoidal wall fillers under slope
+                    const sw = hw - 0.14, sd = hd - 0.14;
+                    // Front lip
+                    pushTri(sidePos, sideUv, [-sw, 0, sd], [sw, 0, sd], [sw, hFront - 0.02, sd], [0, 0], [1, 0], [1, 1]);
+                    pushTri(sidePos, sideUv, [-sw, 0, sd], [sw, hFront - 0.02, sd], [-sw, hFront - 0.02, sd], [0, 0], [1, 1], [0, 1]);
+                    // Left side filler
+                    pushTri(sidePos, sideUv, [-sw, 0, -sd], [-sw, 0, sd], [-sw, hFront - 0.02, sd], [0, 0], [1, 0], [1, 1]);
+                    pushTri(sidePos, sideUv, [-sw, 0, -sd], [-sw, hFront - 0.02, sd], [-sw, hBack - 0.02, -sd], [0, 0], [1, 1], [0, 0.4]);
+                    // Right side filler
+                    pushTri(sidePos, sideUv, [sw, 0, sd], [sw, 0, -sd], [sw, hBack - 0.02, -sd], [0, 0], [1, 0], [1, 0.4]);
+                    pushTri(sidePos, sideUv, [sw, 0, sd], [sw, hBack - 0.02, -sd], [sw, hFront - 0.02, sd], [0, 0], [1, 0.4], [0, 1]);
+
+                    return {
+                        slopeGeo: finalizeGeo(sPos, sUv),
+                        fillerGeo: finalizeGeo(sidePos, sideUv)
+                    };
+                }
+
+                /* =========================================================
+                   9. REUSABLE PROPS: WINDOWS, CULTIST ROOTS, BARBED WIRE
+                   ========================================================= */
+                let cultistRootMeshes = [];
+
+                function addCultistRoot(parent, points, rStart, rEnd) {
+                    const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(p[0], p[1], p[2])));
+                    const segs = 10;
+                    const mat = makeMat({ map: TEX.rootsBark, color: 0x3b2d2a, roughness: 0.96 });
+                    for (let i = 0; i < segs; i++) {
+                        const t0 = i / segs;
+                        const t1 = (i + 1) / segs;
+                        const p0 = curve.getPoint(t0);
+                        const p1 = curve.getPoint(t1);
+                        const dir = new THREE.Vector3().subVectors(p1, p0);
+                        const len = dir.length();
+                        const r0 = rStart + (rEnd - rStart) * t0;
+                        const r1 = rStart + (rEnd - rStart) * t1;
+                        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, len + 0.04, 5), mat);
+                        mesh.position.copy(p0).add(p1).multiplyScalar(0.5);
+                        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+                        parent.add(mesh);
+                        cultistRootMeshes.push(mesh);
+                    }
+                }
+
+                function addBarbedCoil(parent, x, y, z, radius) {
+                    const grp = new THREE.Group();
+                    grp.position.set(x, y, z);
+                    const wireMat = makeMat({ color: 0x5c3a2a, metalness: 0.45, roughness: 0.75 });
+                    for (let i = 0; i < 3; i++) {
+                        const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.016, 4, 9), wireMat);
+                        ring.position.set((i - 1) * 0.14, (i % 2) * 0.04, 0);
+                        ring.rotation.set(0.35 + i * 0.2, 0.5, i * 0.4);
+                        grp.add(ring);
+                    }
+                    parent.add(grp);
+                }
+
+                function addCultistMask(parent, x, y, z, rotY) {
+                    const grp = new THREE.Group();
+                    grp.position.set(x, y, z);
+                    grp.rotation.y = rotY || 0;
+                    const woodMat = makeMat({ color: 0x6b5741 });
+                    const darkMat = makeMat({ color: 0x161110 });
+                    const mask = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.44, 0.07), woodMat);
+                    const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.06, 0.08), darkMat);
+                    eyeL.position.set(-0.07, 0.06, 0.01);
+                    const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.06, 0.08), darkMat);
+                    eyeR.position.set(0.07, 0.06, 0.01);
+                    const hornL = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.28, 4), woodMat);
+                    hornL.position.set(-0.14, 0.28, 0);
+                    hornL.rotation.z = 0.35;
+                    const hornR = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.28, 4), woodMat);
+                    hornR.position.set(0.14, 0.28, 0);
+                    hornR.rotation.z = -0.35;
+                    grp.add(mask, eyeL, eyeR, hornL, hornR);
+                    parent.add(grp);
+                }
+
+                function addRitualStake(parent, x, z, h) {
+                    const mat = makeMat({ color: 0x3b2c20 });
+                    const stake = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.06, h, 5), mat);
+                    stake.position.set(x, h / 2, z);
+                    stake.rotation.z = (x > 0 ? -0.14 : 0.14);
+                    const rag = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.28, 0.03), makeMat({ color: 0x5c1a16 }));
+                    rag.position.set(x + (x > 0 ? -0.05 : 0.05), h * 0.72, z + 0.05);
+                    rag.rotation.z = 0.2;
+                    parent.add(stake, rag);
+                }
+
+                // Reusable Window Unit (5 trim styles x 5 window states)
+                function buildWindowUnit(w, h, trimStyle, winState) {
+                    const grp = new THREE.Group();
+
+                    // Glass material by state: 0=dark, 1=lit, 2=eerie, 3=broken, 4=boarded
+                    let glassMat;
+                    if (winState === 1) {
+                        glassMat = makeMat({ color: 0xffd28a, emissive: 0xffa033, emissiveIntensity: 1.35, roughness: 0.4 });
+                    } else if (winState === 2) {
+                        glassMat = makeMat({ color: 0x7bffb5, emissive: 0x4ae09c, emissiveIntensity: 1.45, roughness: 0.35 });
+                    } else if (winState === 3) {
+                        glassMat = makeMat({ color: 0x0e1110, roughness: 0.95 });
+                    } else {
+                        glassMat = makeMat({ color: 0x1a2224, roughness: 0.55, metalness: 0.2 });
+                    }
+
+                    const pane = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.05), glassMat);
+                    grp.add(pane);
+
+                    // Frame & crossbars
+                    const frameColor = trimStyle === 0 ? 0xd8d3c5 : (trimStyle === 1 ? 0x346375 : (trimStyle === 3 ? 0x457d6e : 0x594a3b));
+                    const frameMat = makeMat({ color: frameColor });
+                    const barT = 0.055;
+
+                    const topBar = new THREE.Mesh(new THREE.BoxGeometry(w + 0.12, barT, 0.09), frameMat);
+                    topBar.position.y = h / 2 + barT / 2;
+                    const botBar = new THREE.Mesh(new THREE.BoxGeometry(w + 0.16, barT * 1.2, 0.12), frameMat);
+                    botBar.position.y = -h / 2 - barT / 2;
+                    const leftBar = new THREE.Mesh(new THREE.BoxGeometry(barT, h + 0.1, 0.09), frameMat);
+                    leftBar.position.x = -w / 2 - barT / 2;
+                    const rightBar = new THREE.Mesh(new THREE.BoxGeometry(barT, h + 0.1, 0.09), frameMat);
+                    rightBar.position.x = w / 2 + barT / 2;
+                    grp.add(topBar, botBar, leftBar, rightBar);
+
+                    // Inner muntins
+                    if (winState !== 3) {
+                        const vMun = new THREE.Mesh(new THREE.BoxGeometry(0.03, h, 0.07), frameMat);
+                        const hMun = new THREE.Mesh(new THREE.BoxGeometry(w, 0.03, 0.07), frameMat);
+                        hMun.position.y = h * 0.12;
+                        grp.add(vMun, hMun);
+                    }
+
+                    // Trim styles (0..4)
+                    if (trimStyle === 0) {
+                        // Carved Bashkir crown
+                        const crown = new THREE.Mesh(new THREE.BoxGeometry(w + 0.28, 0.15, 0.11), makeMat({ color: 0xe2dcd0 }));
+                        crown.position.y = h / 2 + 0.12;
+                        const peak = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.18, 4), makeMat({ color: 0x3b7268 }));
+                        peak.position.y = h / 2 + 0.26;
+                        peak.rotation.y = Math.PI / 4;
+                        grp.add(crown, peak);
+                    } else if (trimStyle === 1) {
+                        // Wooden shutters on sides
+                        const shutMat = makeMat({ color: 0x2f5a6b });
+                        const sL = new THREE.Mesh(new THREE.BoxGeometry(w * 0.45, h, 0.05), shutMat);
+                        sL.position.set(-w / 2 - w * 0.25, 0, 0.05);
+                        sL.rotation.y = 0.22;
+                        const sR = new THREE.Mesh(new THREE.BoxGeometry(w * 0.45, h, 0.05), shutMat);
+                        sR.position.set(w / 2 + w * 0.25, 0, 0.05);
+                        sR.rotation.y = -0.22;
+                        grp.add(sL, sR);
+                    } else if (trimStyle === 3) {
+                        // Village patterned header + lower apron
+                        const head = new THREE.Mesh(new THREE.BoxGeometry(w + 0.26, 0.14, 0.10), makeMat({ color: 0xc9b468 }));
+                        head.position.y = h / 2 + 0.10;
+                        const apron = new THREE.Mesh(new THREE.BoxGeometry(w + 0.20, 0.10, 0.09), makeMat({ color: 0x3b7268 }));
+                        apron.position.y = -h / 2 - 0.10;
+                        grp.add(head, apron);
+                    }
+
+                    // Broken glass shards + hanging rag
+                    if (winState === 3) {
+                        const shardMat = makeMat({ color: 0x8ea3a6, roughness: 0.2, metalness: 0.4 });
+                        const sh1 = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.24, 3), shardMat);
+                        sh1.position.set(-w * 0.28, -h * 0.34, 0.04);
+                        sh1.rotation.z = -0.35;
+                        const sh2 = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.20, 3), shardMat);
+                        sh2.position.set(w * 0.26, h * 0.30, 0.04);
+                        sh2.rotation.z = 2.6;
+                        const rag = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.46, 0.04), makeMat({ color: 0x6e685f }));
+                        rag.position.set(w * 0.15, -h * 0.16, 0.08);
+                        rag.rotation.z = 0.16;
+                        grp.add(sh1, sh2, rag);
+                    }
+
+                    // Boarded up with crooked planks
+                    if (winState === 4) {
+                        const boardMat = makeMat({ color: 0x5c4a38 });
+                        for (let i = 0; i < 3; i++) {
+                            const b = new THREE.Mesh(new THREE.BoxGeometry(w + 0.28, 0.14, 0.05), boardMat);
+                            b.position.set(0, (i - 1) * (h * 0.32), 0.10);
+                            b.rotation.z = (i % 2 === 0 ? 0.12 : -0.15);
+                            grp.add(b);
+                        }
+                    }
+
+                    return grp;
+                }
+
+                // Helper to add roof damage holes/rafters or cultist roof props
+                function decorateRoofCondition(roofGrp, cRoof, W, D, roofH, yRoof) {
+                    if (cRoof === 'ruined') {
+                        const holeMat = makeMat({ color: 0x10110f });
+                        const rafterMat = makeMat({ color: 0x453525 });
+                        const hole = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.12, 1.05), holeMat);
+                        hole.position.set(W * 0.24, yRoof + roofH * 0.48, 0.2);
+                        hole.rotation.z = -0.58;
+                        roofGrp.add(hole);
+                        for (let i = -1; i <= 1; i++) {
+                            const raf = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.07, 0.07), rafterMat);
+                            raf.position.set(W * 0.24, yRoof + roofH * 0.50, 0.2 + i * 0.32);
+                            raf.rotation.z = -0.58;
+                            roofGrp.add(raf);
+                        }
+                    } else if (cRoof === 'cultist') {
+                        addCultistRoot(roofGrp, [
+                            [-W * 0.46, yRoof + 0.05, D * 0.35],
+                            [-W * 0.20, yRoof + roofH * 0.65, D * 0.15],
+                            [0.12, yRoof + roofH + 0.15, -0.2],
+                            [W * 0.32, yRoof + roofH * 0.5, -D * 0.3]
+                        ], 0.12, 0.04);
+                        addBarbedCoil(roofGrp, 0, yRoof + roofH + 0.08, D * 0.32, 0.24);
+                    }
+                }
+
+                /* =========================================================
+                   10. BUILDING GENERATORS (IZBA 1-2F, BANYA, SARAY, ZABOR)
+                   ========================================================= */
+
+                // 10A. IZBA (Izba_1F_Root / Izba_2F_Root: 4.8 x 4.2 m)
+                function buildIzba() {
+                    const floors = state.izba.floors || 1;
+                    const root = new THREE.Group();
+                    root.name = floors === 2 ? 'Izba_2F_Root' : 'Izba_1F_Root';
+
+                    const W = 4.8, D = 4.2, H1 = 2.50, H2 = floors === 2 ? 2.25 : 0;
+                    const H = H1 + H2;
+                    const foundH = 0.34;
+                    const yWall = foundH;
+                    const yFloor2 = foundH + H1;
+                    const yRoof = foundH + H;
+
+                    const cWalls = state.conditions.walls;
+                    const cRoof = state.conditions.roof;
+                    const cDoor = state.conditions.door;
+                    const cWin = state.conditions.window;
+
+                    // --- WALLS ---
+                    const wallsGrp = new THREE.Group();
+                    wallsGrp.name = 'Walls';
+                    root.add(wallsGrp);
+
+                    const found = new THREE.Mesh(
+                        new THREE.BoxGeometry(W + 0.18, foundH, D + 0.18),
+                        makeMat({ color: 0x454742 })
+                    );
+                    found.position.y = foundH / 2;
+                    wallsGrp.add(found);
+
+                    const wallTexList = [TEX.logsDark, TEX.bluePlanks, TEX.yellowTeal, TEX.rottenWood, TEX.brickWood];
+                    const wTint = cWalls === 'ruined' ? 0xb5afa5 : (cWalls === 'cultist' ? 0xa39794 : 0xffffff);
+                    const wallMat1 = makeMat({ map: wallTexList[state.izba.walls], color: wTint });
+
+                    const body1 = new THREE.Mesh(new THREE.BoxGeometry(W, H1, D), wallMat1);
+                    body1.position.y = yWall + H1 / 2;
+                    wallsGrp.add(body1);
+
+                    // Second floor body + horizontal timber belt
+                    if (floors === 2) {
+                        const secGrp = new THREE.Group();
+                        secGrp.name = 'SecondFloor';
+                        root.add(secGrp);
+
+                        const beltMat = makeMat({ color: cWalls === 'ruined' ? 0x3b3228 : 0x4e3b29 });
+                        const beltTrim = makeMat({ color: 0x2c2218 });
+                        const belt = new THREE.Mesh(new THREE.BoxGeometry(W + 0.28, 0.18, D + 0.28), beltMat);
+                        belt.position.y = yFloor2;
+                        const beltLip = new THREE.Mesh(new THREE.BoxGeometry(W + 0.36, 0.06, D + 0.36), beltTrim);
+                        beltLip.position.y = yFloor2 + 0.10;
+                        secGrp.add(belt, beltLip);
+
+                        const tex2 = state.izba.walls === 4 ? TEX.logsDark : wallTexList[state.izba.walls];
+                        const body2 = new THREE.Mesh(new THREE.BoxGeometry(W, H2, D), makeMat({ map: tex2, color: wTint }));
+                        body2.position.y = yFloor2 + H2 / 2;
+                        secGrp.add(body2);
+                    }
+
+                    // Corner logs
+                    const cornerMat = makeMat({ color: 0x35281c });
+                    [[-W / 2, -D / 2], [W / 2, -D / 2], [-W / 2, D / 2], [W / 2, D / 2]].forEach(p => {
+                        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.14, H + 0.08, 6), cornerMat);
+                        post.position.set(p[0], yWall + H / 2, p[1]);
+                        wallsGrp.add(post);
+                    });
+
+                    // Wall conditions
+                    if (cWalls === 'ruined') {
+                        const patchCount = floors === 2 ? 5 : 3;
+                        for (let i = 0; i < patchCount; i++) {
+                            const rotPatch = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.14, 0.08), makeMat({ color: 0x241f18 }));
+                            const py = i >= 3 ? (yFloor2 + 0.7 + (i % 2) * 0.55) : (yWall + 0.65 + (i % 2) * 0.5);
+                            const px = i >= 3 ? (i === 3 ? -1.45 : 1.45) : (-1.3 + i * 1.25);
+                            rotPatch.position.set(px, py, D / 2 + 0.04);
+                            rotPatch.rotation.z = i % 2 ? 0.18 : -0.14;
+                            wallsGrp.add(rotPatch);
+                        }
+                    } else if (cWalls === 'cultist') {
+                        if (floors === 2) {
+                            addCultistRoot(wallsGrp, [
+                                [-W / 2 - 0.55, 0, D / 2 + 0.55],
+                                [-W / 2 + 0.05, 1.35, D / 2 + 0.14],
+                                [-W / 2 + 0.50, 2.95, D / 2 + 0.12],
+                                [-1.15, yFloor2 + 1.05, D / 2 + 0.65]
+                            ], 0.16, 0.045);
+                            addCultistRoot(wallsGrp, [
+                                [W / 2 + 0.45, 0, D / 2 + 0.45],
+                                [W / 2 - 0.08, 1.55, D / 2 + 0.12],
+                                [W / 2 - 0.35, 3.25, D / 2 + 0.10],
+                                [1.15, yFloor2 + 1.35, D / 2 + 0.55]
+                            ], 0.15, 0.04);
+                            addCultistMask(wallsGrp, 0, yFloor2 + H2 - 0.32, D / 2 + 0.08, 0);
+                        } else {
+                            addCultistRoot(wallsGrp, [[-W / 2 - 0.5, 0, D / 2 + 0.5], [-W / 2 + 0.1, 1.1, D / 2 + 0.12], [-W / 2 + 0.6, 2.3, D / 2 + 0.08]], 0.15, 0.04);
+                            addCultistRoot(wallsGrp, [[W / 2 + 0.4, 0, D / 2 + 0.4], [W / 2 - 0.1, 1.3, D / 2 + 0.1], [W / 2 - 0.4, 2.6, D / 2 + 0.05]], 0.14, 0.04);
+                            addCultistMask(wallsGrp, 0, yWall + H - 0.35, D / 2 + 0.08, 0);
+                        }
+                        addBarbedCoil(wallsGrp, -W / 2, yWall + 1.2, D / 2 + 0.1, 0.25);
+                        addRitualStake(wallsGrp, -W / 2 - 0.65, D / 2 + 0.3, 1.45);
+                    }
+
+                    // --- 2ND FLOOR BALCONY (Balcony) ---
+                    if (floors === 2) {
+                        const balGrp = new THREE.Group();
+                        balGrp.name = 'Balcony';
+                        root.add(balGrp);
+
+                        const bW = 2.36, bD = 1.05, railH = 0.88;
+                        const balRuined = (cWalls === 'ruined' || cDoor === 'ruined');
+                        const balCultist = (cWalls === 'cultist' || cDoor === 'cultist');
+                        const balWood = makeMat({ color: balRuined ? 0x453b31 : 0x5c4733 });
+                        const balTrim = makeMat({ color: 0x3b2d20 });
+
+                        const deck = new THREE.Mesh(new THREE.BoxGeometry(bW, 0.14, bD), balWood);
+                        deck.position.set(0, yFloor2 + 0.04, D / 2 + bD / 2);
+                        balGrp.add(deck);
+
+                        [-0.95, 0, 0.95].forEach(bx => {
+                            const beam = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, bD + 0.12), balTrim);
+                            beam.position.set(bx, yFloor2 - 0.08, D / 2 + bD / 2 - 0.04);
+                            const brace = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.72, 0.10), balTrim);
+                            brace.position.set(bx, yFloor2 - 0.34, D / 2 + 0.34);
+                            brace.rotation.x = 0.72;
+                            balGrp.add(beam, brace);
+                        });
+
+                        const bDoor = new THREE.Mesh(new THREE.BoxGeometry(0.84, 1.78, 0.08), makeMat({ color: 0x36281c }));
+                        bDoor.position.set(0, yFloor2 + 0.92, D / 2 + 0.04);
+                        if (balRuined) bDoor.rotation.z = 0.06;
+                        balGrp.add(bDoor);
+
+                        const doorGlass = buildWindowUnit(0.46, 0.62, 4, cWin);
+                        doorGlass.position.set(0, yFloor2 + 1.32, D / 2 + 0.07);
+                        balGrp.add(doorGlass);
+
+                        const postCoords = [
+                            [-bW / 2 + 0.06, D / 2 + 0.06],
+                            [bW / 2 - 0.06, D / 2 + 0.06],
+                            [-bW / 2 + 0.06, D / 2 + bD - 0.06],
+                            [bW / 2 - 0.06, D / 2 + bD - 0.06]
+                        ];
+                        postCoords.forEach((pc, idx) => {
+                            const p = new THREE.Mesh(new THREE.BoxGeometry(0.10, railH, 0.10), balTrim);
+                            p.position.set(pc[0], yFloor2 + 0.10 + railH / 2, pc[1]);
+                            if (balRuined && idx === 3) p.rotation.set(0.18, 0, -0.22);
+                            balGrp.add(p);
+                        });
+
+                        const fRail = new THREE.Mesh(new THREE.BoxGeometry(bW, 0.08, 0.09), balTrim);
+                        fRail.position.set(0, yFloor2 + 0.10 + railH, D / 2 + bD - 0.06);
+                        if (balRuined) {
+                            fRail.rotation.z = -0.13;
+                            fRail.position.y -= 0.08;
+                        }
+                        const lRail = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.08, bD), balTrim);
+                        lRail.position.set(-bW / 2 + 0.06, yFloor2 + 0.10 + railH, D / 2 + bD / 2);
+                        const rRail = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.08, bD), balTrim);
+                        rRail.position.set(bW / 2 - 0.06, yFloor2 + 0.10 + railH, D / 2 + bD / 2);
+                        if (balRuined) rRail.rotation.x = 0.16;
+                        balGrp.add(fRail, lRail, rRail);
+
+                        const balCount = 9;
+                        for (let i = 0; i < balCount; i++) {
+                            if (balRuined && (i === 5 || i === 6)) continue;
+                            const bx = -bW / 2 + 0.24 + i * ((bW - 0.48) / (balCount - 1));
+                            const bal = new THREE.Mesh(new THREE.BoxGeometry(0.065, railH - 0.06, 0.045), balWood);
+                            bal.position.set(bx, yFloor2 + 0.10 + (railH - 0.06) / 2, D / 2 + bD - 0.06);
+                            if (balRuined && i === 4) bal.rotation.z = 0.28;
+                            if (balRuined && i === 7) bal.rotation.set(0.24, 0, -0.18);
+                            balGrp.add(bal);
+                        }
+
+                        [-bW / 2 + 0.06, bW / 2 - 0.06].forEach(sx => {
+                            for (let j = 0; j < 3; j++) {
+                                if (balRuined && sx > 0 && j === 1) continue;
+                                const bz = D / 2 + 0.26 + j * 0.25;
+                                const sb = new THREE.Mesh(new THREE.BoxGeometry(0.045, railH - 0.06, 0.065), balWood);
+                                sb.position.set(sx, yFloor2 + 0.10 + (railH - 0.06) / 2, bz);
+                                balGrp.add(sb);
+                            }
+                        });
+
+                        if (balRuined) {
+                            const fallenPlank = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.04, 0.11), balWood);
+                            fallenPlank.position.set(0.32, yFloor2 + 0.13, D / 2 + 0.55);
+                            fallenPlank.rotation.y = 0.42;
+                            balGrp.add(fallenPlank);
+                        }
+
+                        if (balCultist) {
+                            addBarbedCoil(balGrp, -0.65, yFloor2 + railH + 0.12, D / 2 + bD - 0.04, 0.22);
+                            addBarbedCoil(balGrp, 0.65, yFloor2 + railH + 0.12, D / 2 + bD - 0.04, 0.22);
+                            const r1 = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.72, 0.04), makeMat({ color: 0x5c1a16 }));
+                            r1.position.set(-0.45, yFloor2 + 0.52, D / 2 + bD + 0.02);
+                            r1.rotation.z = 0.08;
+                            const r2 = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.62, 0.04), makeMat({ color: 0x221c1c }));
+                            r2.position.set(0.55, yFloor2 + 0.46, D / 2 + bD + 0.02);
+                            r2.rotation.z = -0.10;
+                            balGrp.add(r1, r2);
+                            addCultistRoot(balGrp, [
+                                [-bW / 2, yFloor2 + 0.15, D / 2 + bD],
+                                [-0.4, yFloor2 + railH + 0.06, D / 2 + bD + 0.04],
+                                [0.5, yFloor2 + railH + 0.10, D / 2 + bD - 0.02],
+                                [bW / 2, yFloor2 + 0.65, D / 2 + bD - 0.1]
+                            ], 0.075, 0.035);
+                        }
+                    }
+
+                    // --- ROOF (5 exact BufferGeometry types aligned cleanly at yRoof) ---
+                    const roofGrp = new THREE.Group();
+                    roofGrp.name = 'Roof';
+                    root.add(roofGrp);
+
+                    const rType = state.izba.roof;
+                    const rW = W + 0.68, rD = D + 0.72;
+                    const rH = (rType === 2) ? 1.55 : 1.85;
+                    const rTint = cRoof === 'ruined' ? 0xaba59b : (cRoof === 'cultist' ? 0x998e8c : 0xffffff);
+
+                    if (rType === 0 || rType === 1 || rType === 3) {
+                        const geos = createGableRoofGeos(rW, rD, rH);
+                        const slopeTex = rType === 1 ? TEX.corrugatedMetal : TEX.slate;
+                        const slopeMesh = new THREE.Mesh(geos.slopesGeo, makeMat({ map: slopeTex, color: rTint, doubleSide: true }));
+                        slopeMesh.position.y = yRoof;
+                        roofGrp.add(slopeMesh);
+
+                        const gableColor = rType === 1 ? 0x2f5e78 : (rType === 3 ? 0x8f793f : 0x524232);
+                        const gableMesh = new THREE.Mesh(geos.gablesGeo, makeMat({ color: gableColor, doubleSide: true }));
+                        gableMesh.position.y = yRoof;
+                        roofGrp.add(gableMesh);
+
+                        // Ridge beam
+                        const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, rD + 0.06), makeMat({ color: 0x3a322b }));
+                        ridge.position.set(0, yRoof + rH + 0.02, 0);
+                        roofGrp.add(ridge);
+
+                        // Attic window on front gable
+                        const atticWin = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.54, 0.08), makeMat({ color: 0x181c1d }));
+                        atticWin.position.set(0, yRoof + rH * 0.44, rD / 2 - 0.12);
+                        roofGrp.add(atticWin);
+
+                        if (rType === 3) {
+                            // Carved turquoise cornice & gable ornament
+                            const trimMat = makeMat({ color: 0x3b7a6f });
+                            const cornice = new THREE.Mesh(new THREE.BoxGeometry(W + 0.44, 0.12, D + 0.44), trimMat);
+                            cornice.position.y = yRoof;
+                            const crest = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.12), trimMat);
+                            crest.position.set(0, yRoof + rH * 0.72, rD / 2 - 0.10);
+                            roofGrp.add(cornice, crest);
+                        }
+                    } else if (rType === 2) {
+                        // Hipped Red Roof
+                        const hipGeo = createHippedRoofGeo(rW, rD, rH);
+                        const hipMesh = new THREE.Mesh(hipGeo, makeMat({ map: TEX.redMetal, color: rTint, doubleSide: true }));
+                        hipMesh.position.y = yRoof;
+                        const cornice = new THREE.Mesh(new THREE.BoxGeometry(W + 0.36, 0.12, D + 0.36), makeMat({ color: 0xd9d4c7 }));
+                        cornice.position.y = yRoof;
+                        roofGrp.add(hipMesh, cornice);
+                    } else {
+                        // Half-Hipped Rusted Tin Roof
+                        const hhGeos = createHalfHippedRoofGeos(rW, rD, rH);
+                        const hhSlopes = new THREE.Mesh(hhGeos.slopesGeo, makeMat({ map: TEX.rustTin, color: rTint, doubleSide: true }));
+                        hhSlopes.position.y = yRoof;
+                        const hhGables = new THREE.Mesh(hhGeos.gablesGeo, makeMat({ color: 0x4e3e2f, doubleSide: true }));
+                        hhGables.position.y = yRoof;
+                        roofGrp.add(hhSlopes, hhGables);
+                    }
+
+                    // Brick Chimney
+                    const chim = new THREE.Mesh(new THREE.BoxGeometry(0.46, 1.15, 0.46), makeMat({ color: 0x6b3b30 }));
+                    chim.position.set(-0.9, yRoof + rH * 0.78, -0.5);
+                    if (cRoof === 'ruined') chim.rotation.z = 0.22;
+                    const chimCap = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.10, 0.56), makeMat({ color: 0x3b3532 }));
+                    chimCap.position.set(0, 0.60, 0);
+                    chim.add(chimCap);
+                    roofGrp.add(chim);
+
+                    decorateRoofCondition(roofGrp, cRoof, W, D, rH, yRoof);
+
+                    // --- WINDOWS ---
+                    const winGrp = new THREE.Group();
+                    winGrp.name = 'Windows';
+                    root.add(winGrp);
+
+                    const winStyle = state.izba.window;
+                    const winW = winStyle === 4 ? 0.64 : 0.82;
+                    const winH = winStyle === 4 ? 1.12 : 1.04;
+
+                    // 1st Floor Windows
+                    [-1.52, 1.52].forEach(wx => {
+                        const wObj = buildWindowUnit(winW, winH, winStyle, cWin);
+                        wObj.position.set(wx, yWall + 1.35, D / 2 + 0.03);
+                        winGrp.add(wObj);
+                    });
+                    [-1.25, 1.25].forEach(wx => {
+                        const wObj = buildWindowUnit(winW, winH, winStyle, cWin);
+                        wObj.position.set(wx, yWall + 1.35, -D / 2 - 0.03);
+                        wObj.rotation.y = Math.PI;
+                        winGrp.add(wObj);
+                    });
+                    [-1.05, 1.05].forEach(wz => {
+                        const wObj = buildWindowUnit(winW, winH, winStyle, cWin);
+                        wObj.position.set(-W / 2 - 0.03, yWall + 1.35, wz);
+                        wObj.rotation.y = -Math.PI / 2;
+                        winGrp.add(wObj);
+                    });
+                    if (state.izba.door !== 3) {
+                        const wObj = buildWindowUnit(winW, winH, winStyle, cWin);
+                        wObj.position.set(W / 2 + 0.03, yWall + 1.35, -0.75);
+                        wObj.rotation.y = Math.PI / 2;
+                        winGrp.add(wObj);
+                    }
+
+                    // 2nd Floor Windows (all 4 walls)
+                    if (floors === 2) {
+                        const yWin2 = yFloor2 + 1.15;
+                        const w2W = winW * 0.92;
+                        const w2H = winH * 0.92;
+
+                        [-1.68, 1.68].forEach(wx => {
+                            const wObj = buildWindowUnit(w2W, w2H, winStyle, cWin);
+                            wObj.position.set(wx, yWin2, D / 2 + 0.03);
+                            winGrp.add(wObj);
+                        });
+                        [-1.25, 1.25].forEach(wx => {
+                            const wObj = buildWindowUnit(w2W, w2H, winStyle, cWin);
+                            wObj.position.set(wx, yWin2, -D / 2 - 0.03);
+                            wObj.rotation.y = Math.PI;
+                            winGrp.add(wObj);
+                        });
+                        [-1.05, 1.05].forEach(wz => {
+                            const wObj = buildWindowUnit(w2W, w2H, winStyle, cWin);
+                            wObj.position.set(-W / 2 - 0.03, yWin2, wz);
+                            wObj.rotation.y = -Math.PI / 2;
+                            winGrp.add(wObj);
+                        });
+                        [-1.05, 1.05].forEach(wz => {
+                            const wObj = buildWindowUnit(w2W, w2H, winStyle, cWin);
+                            wObj.position.set(W / 2 + 0.03, yWin2, wz);
+                            wObj.rotation.y = Math.PI / 2;
+                            winGrp.add(wObj);
+                        });
+                    }
+
+                    // --- ENTRANCE (5 variants) ---
+                    const entGrp = new THREE.Group();
+                    entGrp.name = 'Entrance';
+                    root.add(entGrp);
+
+                    const dType = state.izba.door;
+                    const woodMat = makeMat({ color: cDoor === 'ruined' ? 0x453b31 : 0x5c4734 });
+                    const darkWood = makeMat({ color: 0x33261b });
+                    const roofTin = makeMat({ map: TEX.rustTin, doubleSide: true });
+
+                    if (dType === 0 || dType === 4) {
+                        // Simple porch or ruined porch with steps on front
+                        const door = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.88, 0.09), darkWood);
+                        door.position.set(0, yWall + 0.94, D / 2 + 0.04);
+                        if (cDoor === 'ruined' || dType === 4) door.rotation.z = 0.08;
+                        entGrp.add(door);
+
+                        const deck = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.16, 1.05), woodMat);
+                        deck.position.set(0, foundH, D / 2 + 0.52);
+                        entGrp.add(deck);
+
+                        for (let s = 0; s < 2; s++) {
+                            const step = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.14, 0.30), woodMat);
+                            step.position.set(0, foundH - 0.14 * (s + 1), D / 2 + 1.12 + s * 0.28);
+                            if ((cDoor === 'ruined' || dType === 4) && s === 1) step.rotation.z = -0.14;
+                            entGrp.add(step);
+                        }
+
+                        if (dType === 0) {
+                            // Porch canopy + posts
+                            const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.08, 1.25), roofTin);
+                            canopy.position.set(0, yWall + 2.15, D / 2 + 0.58);
+                            canopy.rotation.x = 0.24;
+                            if (cDoor === 'ruined') canopy.rotation.z = -0.14;
+                            entGrp.add(canopy);
+                            [-0.72, 0.72].forEach(px => {
+                                const post = new THREE.Mesh(new THREE.BoxGeometry(0.10, 2.05, 0.10), darkWood);
+                                post.position.set(px, yWall + 1.02, D / 2 + 0.96);
+                                entGrp.add(post);
+                            });
+                        }
+                    } else if (dType === 1 || dType === 2) {
+                        // Closed veranda (1) or Wooden seni vestibule (2) on front
+                        const vW = dType === 1 ? 2.3 : 1.75;
+                        const vD = dType === 1 ? 1.35 : 1.25;
+                        const vH = 2.15;
+                        const box = new THREE.Mesh(new THREE.BoxGeometry(vW, vH, vD), makeMat({ map: TEX.planksGap, color: cDoor === 'ruined' ? 0xaba296 : 0xffffff }));
+                        box.position.set(0, yWall + vH / 2 - 0.1, D / 2 + vD / 2);
+                        const vRoof = new THREE.Mesh(new THREE.BoxGeometry(vW + 0.3, 0.10, vD + 0.32), roofTin);
+                        vRoof.position.set(0, yWall + vH - 0.04, D / 2 + vD / 2 + 0.06);
+                        vRoof.rotation.x = 0.22;
+                        const vDoor = new THREE.Mesh(new THREE.BoxGeometry(0.84, 1.76, 0.08), darkWood);
+                        vDoor.position.set(dType === 1 ? 0.52 : 0, yWall + 0.82, D / 2 + vD + 0.03);
+                        if (cDoor === 'ruined') vDoor.rotation.z = -0.09;
+                        entGrp.add(box, vRoof, vDoor);
+
+                        if (dType === 1) {
+                            const vWin = buildWindowUnit(0.76, 0.84, 2, cWin);
+                            vWin.position.set(-0.55, yWall + 1.15, D / 2 + vD + 0.04);
+                            entGrp.add(vWin);
+                        }
+                    } else {
+                        // Side shed annex (right wall)
+                        const sW = 1.65, sD = 3.2, sH = 2.10;
+                        const annex = new THREE.Mesh(new THREE.BoxGeometry(sW, sH, sD), makeMat({ map: TEX.slabWood }));
+                        annex.position.set(W / 2 + sW / 2, yWall + sH / 2 - 0.12, 0.1);
+                        const aRoof = new THREE.Mesh(new THREE.BoxGeometry(sW + 0.35, 0.10, sD + 0.35), roofTin);
+                        aRoof.position.set(W / 2 + sW / 2 + 0.08, yWall + sH - 0.04, 0.1);
+                        aRoof.rotation.z = -0.26;
+                        const aDoor = new THREE.Mesh(new THREE.BoxGeometry(0.86, 1.76, 0.08), darkWood);
+                        aDoor.position.set(W / 2 + sW / 2, yWall + 0.80, 0.1 + sD / 2 + 0.03);
+                        if (cDoor === 'ruined') aDoor.rotation.z = 0.11;
+                        entGrp.add(annex, aRoof, aDoor);
+                    }
+
+                    if (cDoor === 'cultist') {
+                        addBarbedCoil(entGrp, 0, yWall + 0.55, D / 2 + 1.15, 0.28);
+                        addRitualStake(entGrp, 1.15, D / 2 + 1.15, 1.35);
+                        addRitualStake(entGrp, -1.15, D / 2 + 1.15, 1.25);
+                    }
+
+                    return root;
+                }
+
+                // 10B. BANYA (Banya_Root: 3.4 x 3.0 m)
+                function buildBanya() {
+                    const root = new THREE.Group();
+                    root.name = 'Banya_Root';
+
+                    const W = 3.4, D = 3.0, H = 2.05, foundH = 0.24;
+                    const yWall = foundH, yRoof = foundH + H;
+                    const cWalls = state.conditions.walls;
+                    const cRoof = state.conditions.roof;
+                    const cDoor = state.conditions.door;
+                    const cWin = state.conditions.window;
+
+                    // WALLS
+                    const wallsGrp = new THREE.Group();
+                    wallsGrp.name = 'Walls';
+                    root.add(wallsGrp);
+
+                    const found = new THREE.Mesh(new THREE.BoxGeometry(W + 0.14, foundH, D + 0.14), makeMat({ color: 0x3e403b }));
+                    found.position.y = foundH / 2;
+                    wallsGrp.add(found);
+
+                    const wTexList = [TEX.logsDamp, TEX.logsSoot, TEX.slabWood];
+                    const wTint = cWalls === 'ruined' ? 0xaba49a : (cWalls === 'cultist' ? 0x998e8c : 0xffffff);
+                    const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), makeMat({ map: wTexList[state.banya.walls], color: wTint }));
+                    body.position.y = yWall + H / 2;
+                    wallsGrp.add(body);
+
+                    const cMat = makeMat({ color: 0x2c231a });
+                    [[-W / 2, -D / 2], [W / 2, -D / 2], [-W / 2, D / 2], [W / 2, D / 2]].forEach(p => {
+                        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, H + 0.06, 6), cMat);
+                        log.position.set(p[0], yWall + H / 2, p[1]);
+                        wallsGrp.add(log);
+                    });
+
+                    if (cWalls === 'ruined') {
+                        const patch = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.14, 0.08), makeMat({ color: 0x201c16 }));
+                        patch.position.set(-0.7, yWall + 0.65, D / 2 + 0.04);
+                        patch.rotation.z = 0.18;
+                        wallsGrp.add(patch);
+                    } else if (cWalls === 'cultist') {
+                        addCultistRoot(wallsGrp, [[-W / 2 - 0.35, 0, D / 2 + 0.35], [-W / 2 + 0.1, 1.0, D / 2 + 0.08], [-0.4, 2.0, D / 2 + 0.05]], 0.13, 0.035);
+                        addCultistMask(wallsGrp, 0.85, yWall + 1.45, D / 2 + 0.06, 0);
+                    }
+
+                    // ROOF (3 variants + mandatory stove chimney)
+                    const roofGrp = new THREE.Group();
+                    roofGrp.name = 'Roof';
+                    root.add(roofGrp);
+
+                    const rType = state.banya.roof;
+                    const rW = W + 0.56, rD = D + 0.58;
+                    const rTint = cRoof === 'ruined' ? 0xaba59b : (cRoof === 'cultist' ? 0x998e8c : 0xffffff);
+                    let rTopH = 1.25;
+
+                    if (rType === 0 || rType === 2) {
+                        const geos = createGableRoofGeos(rW, rD, rTopH);
+                        const tex = rType === 0 ? TEX.slate : TEX.rustTin;
+                        const sMesh = new THREE.Mesh(geos.slopesGeo, makeMat({ map: tex, color: rTint, doubleSide: true }));
+                        sMesh.position.y = yRoof;
+                        const gMesh = new THREE.Mesh(geos.gablesGeo, makeMat({ color: 0x3b2f24, doubleSide: true }));
+                        gMesh.position.y = yRoof;
+                        roofGrp.add(sMesh, gMesh);
+                    } else {
+                        // Single-slope ruberoid roof
+                        rTopH = 0.82;
+                        const geos = createShedRoofGeos(rW, rD, rTopH, 0.16);
+                        const sMesh = new THREE.Mesh(geos.slopeGeo, makeMat({ map: TEX.ruberoid, color: rTint, doubleSide: true }));
+                        sMesh.position.y = yRoof;
+                        const fMesh = new THREE.Mesh(geos.fillerGeo, makeMat({ color: 0x3b2f24, doubleSide: true }));
+                        fMesh.position.y = yRoof;
+                        roofGrp.add(sMesh, fMesh);
+                    }
+
+                    // Mandatory Stove Chimney
+                    if (rType === 2) {
+                        const brickChim = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.42), makeMat({ color: 0x6b3a2e }));
+                        brickChim.position.set(0.65, yRoof + rTopH * 0.72, -0.45);
+                        if (cRoof === 'ruined') brickChim.rotation.z = -0.22;
+                        roofGrp.add(brickChim);
+                    } else {
+                        const pipeMat = makeMat({ color: 0x323638, metalness: 0.45, roughness: 0.6 });
+                        const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 1.25, 7), pipeMat);
+                        pipe.position.set(0.65, yRoof + rTopH * 0.78, -0.45);
+                        if (cRoof === 'ruined') pipe.rotation.z = -0.24;
+                        const cap = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.16, 7), pipeMat);
+                        cap.position.y = 0.72;
+                        pipe.add(cap);
+                        roofGrp.add(pipe);
+                    }
+
+                    decorateRoofCondition(roofGrp, cRoof, W, D, rTopH, yRoof);
+
+                    // SMALL BATHHOUSE WINDOW (fixed style, 5 states)
+                    const winGrp = new THREE.Group();
+                    winGrp.name = 'Windows';
+                    root.add(winGrp);
+                    const bWin = buildWindowUnit(0.52, 0.52, 2, cWin);
+                    bWin.position.set(-W / 2 - 0.03, yWall + 1.12, 0.15);
+                    bWin.rotation.y = -Math.PI / 2;
+                    winGrp.add(bWin);
+
+                    // ENTRANCE (2 variants)
+                    const entGrp = new THREE.Group();
+                    entGrp.name = 'Entrance';
+                    root.add(entGrp);
+                    const darkWood = makeMat({ color: 0x2f2319 });
+
+                    if (state.banya.door === 0) {
+                        // Low door + small canopy + stacked firewood
+                        const door = new THREE.Mesh(new THREE.BoxGeometry(0.76, 1.48, 0.08), darkWood);
+                        door.position.set(-0.25, yWall + 0.74, D / 2 + 0.04);
+                        if (cDoor === 'ruined') door.rotation.z = 0.10;
+                        const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.07, 0.75), makeMat({ map: TEX.rustTin, doubleSide: true }));
+                        canopy.position.set(-0.25, yWall + 1.66, D / 2 + 0.36);
+                        canopy.rotation.x = 0.28;
+                        entGrp.add(door, canopy);
+
+                        // Firewood stack next to door
+                        const logMat = makeMat({ color: 0x7a6248 });
+                        for (let r = 0; r < 3; r++) {
+                            for (let c = 0; c < 4; c++) {
+                                const log = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.44, 5), logMat);
+                                log.rotation.x = Math.PI / 2;
+                                log.position.set(0.68 + c * 0.13, foundH + 0.07 + r * 0.12, D / 2 + 0.24);
+                                entGrp.add(log);
+                            }
+                        }
+                    } else {
+                        // Boarded pre-bath vestibule (Предбанник)
+                        const vest = new THREE.Mesh(new THREE.BoxGeometry(1.55, 1.85, 1.10), makeMat({ map: TEX.planksGap }));
+                        vest.position.set(0, yWall + 0.90, D / 2 + 0.55);
+                        const vRoof = new THREE.Mesh(new THREE.BoxGeometry(1.80, 0.09, 1.32), makeMat({ map: TEX.ruberoid, doubleSide: true }));
+                        vRoof.position.set(0, yWall + 1.86, D / 2 + 0.58);
+                        vRoof.rotation.x = 0.22;
+                        const vDoor = new THREE.Mesh(new THREE.BoxGeometry(0.78, 1.56, 0.08), darkWood);
+                        vDoor.position.set(0, yWall + 0.76, D / 2 + 1.12);
+                        if (cDoor === 'ruined') vDoor.rotation.z = -0.10;
+                        entGrp.add(vest, vRoof, vDoor);
+                    }
+
+                    if (cDoor === 'cultist') {
+                        addBarbedCoil(entGrp, 0, yWall + 0.45, D / 2 + 0.95, 0.24);
+                        addRitualStake(entGrp, -1.05, D / 2 + 0.8, 1.2);
+                    }
+
+                    return root;
+                }
+
+                // 10C. SARAY (Saray_Root: 3.8 x 2.8 m)
+                function buildSaray() {
+                    const root = new THREE.Group();
+                    root.name = 'Saray_Root';
+
+                    const W = 3.8, D = 2.8, H = 2.15, foundH = 0.12;
+                    const yWall = foundH, yRoof = foundH + H;
+                    const cWalls = state.conditions.walls;
+                    const cRoof = state.conditions.roof;
+                    const cDoor = state.conditions.door;
+                    const cWin = state.conditions.window;
+
+                    const isOpenWoodshed = (state.saray.door === 2);
+
+                    // WALLS
+                    const wallsGrp = new THREE.Group();
+                    wallsGrp.name = 'Walls';
+                    root.add(wallsGrp);
+
+                    const base = new THREE.Mesh(new THREE.BoxGeometry(W + 0.12, foundH, D + 0.12), makeMat({ color: 0x3b3832 }));
+                    base.position.y = foundH / 2;
+                    wallsGrp.add(base);
+
+                    const wTexList = [TEX.planksGap, TEX.slabWood, TEX.planksTinPatch];
+                    const wTint = cWalls === 'ruined' ? 0xa8a096 : (cWalls === 'cultist' ? 0x948988 : 0xffffff);
+                    const wMat = makeMat({ map: wTexList[state.saray.walls], color: wTint, doubleSide: true });
+
+                    if (isOpenWoodshed) {
+                        // Open front: back, left, right walls + corner posts + stacked logs inside
+                        const backW = new THREE.Mesh(new THREE.BoxGeometry(W, H, 0.12), wMat);
+                        backW.position.set(0, yWall + H / 2, -D / 2 + 0.06);
+                        const leftW = new THREE.Mesh(new THREE.BoxGeometry(0.12, H, D), wMat);
+                        leftW.position.set(-W / 2 + 0.06, yWall + H / 2, 0);
+                        const rightW = new THREE.Mesh(new THREE.BoxGeometry(0.12, H, D), wMat);
+                        rightW.position.set(W / 2 - 0.06, yWall + H / 2, 0);
+                        wallsGrp.add(backW, leftW, rightW);
+
+                        const postMat = makeMat({ color: 0x382c21 });
+                        [-W / 2 + 0.1, 0, W / 2 - 0.1].forEach(px => {
+                            const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, H, 0.14), postMat);
+                            post.position.set(px, yWall + H / 2, D / 2 - 0.08);
+                            wallsGrp.add(post);
+                        });
+                    } else {
+                        const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), wMat);
+                        body.position.y = yWall + H / 2;
+                        wallsGrp.add(body);
+                    }
+
+                    if (cWalls === 'ruined') {
+                        const gapBoard = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.45, 0.06), makeMat({ color: 0x4e3e2f }));
+                        gapBoard.position.set(-1.1, yWall + 0.85, D / 2 + 0.06);
+                        gapBoard.rotation.z = 0.26;
+                        wallsGrp.add(gapBoard);
+                    } else if (cWalls === 'cultist') {
+                        addCultistRoot(wallsGrp, [[-W / 2 - 0.3, 0, D / 2 + 0.3], [-W / 2 + 0.1, 1.15, D / 2 + 0.08], [-0.5, 2.05, D / 2 + 0.05]], 0.13, 0.035);
+                        addCultistMask(wallsGrp, 1.25, yWall + 1.55, D / 2 + 0.06, 0);
+                    }
+
+                    // ROOF (3 variants)
+                    const roofGrp = new THREE.Group();
+                    roofGrp.name = 'Roof';
+                    root.add(roofGrp);
+
+                    const rType = state.saray.roof;
+                    const rW = W + 0.56, rD = D + 0.56;
+                    const rTint = cRoof === 'ruined' ? 0xa8a298 : (cRoof === 'cultist' ? 0x948a88 : 0xffffff);
+                    let rH = 0.78;
+
+                    if (rType === 0 || rType === 1) {
+                        const geos = createShedRoofGeos(rW, rD, rH, 0.15);
+                        const tex = rType === 0 ? TEX.slate : TEX.rustTin;
+                        const sMesh = new THREE.Mesh(geos.slopeGeo, makeMat({ map: tex, color: rTint, doubleSide: true }));
+                        sMesh.position.y = yRoof;
+                        const fMesh = new THREE.Mesh(geos.fillerGeo, makeMat({ color: 0x3b2f24, doubleSide: true }));
+                        fMesh.position.y = yRoof;
+                        roofGrp.add(sMesh, fMesh);
+                    } else {
+                        rH = 1.20;
+                        const geos = createGableRoofGeos(rW, rD, rH);
+                        const sMesh = new THREE.Mesh(geos.slopesGeo, makeMat({ map: TEX.slate, color: rTint, doubleSide: true }));
+                        sMesh.position.y = yRoof;
+                        const gMesh = new THREE.Mesh(geos.gablesGeo, makeMat({ color: 0x3b2f24, doubleSide: true }));
+                        gMesh.position.y = yRoof;
+                        roofGrp.add(sMesh, gMesh);
+                    }
+
+                    decorateRoofCondition(roofGrp, cRoof, W, D, rH, yRoof);
+
+                    // NARROW SIDE SLOT WINDOW
+                    const winGrp = new THREE.Group();
+                    winGrp.name = 'Windows';
+                    root.add(winGrp);
+                    const slotWin = buildWindowUnit(0.86, 0.34, 4, cWin);
+                    slotWin.position.set(-W / 2 - 0.03, yWall + 1.52, 0);
+                    slotWin.rotation.y = -Math.PI / 2;
+                    winGrp.add(slotWin);
+
+                    // ENTRANCE (3 variants)
+                    const entGrp = new THREE.Group();
+                    entGrp.name = 'Entrance';
+                    root.add(entGrp);
+                    const doorWood = makeMat({ color: cDoor === 'ruined' ? 0x3c3228 : 0x4f3e2e });
+                    const braceMat = makeMat({ color: 0x2c2218 });
+
+                    if (state.saray.door === 0) {
+                        // Single hinged door
+                        const door = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.85, 0.08), doorWood);
+                        door.position.set(0, yWall + 0.92, D / 2 + 0.04);
+                        if (cDoor === 'ruined') door.rotation.z = 0.09;
+                        const brace = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.10, 0.10), braceMat);
+                        brace.rotation.z = 0.95;
+                        door.add(brace);
+                        entGrp.add(door);
+                    } else if (state.saray.door === 1) {
+                        // Double barn gates with diagonal braces
+                        [-0.58, 0.58].forEach((gx, idx) => {
+                            const leaf = new THREE.Mesh(new THREE.BoxGeometry(1.10, 1.92, 0.08), doorWood);
+                            leaf.position.set(gx, yWall + 0.96, D / 2 + 0.04);
+                            if (cDoor === 'ruined' && idx === 1) {
+                                leaf.rotation.y = -0.35;
+                                leaf.rotation.z = -0.07;
+                            }
+                            const br = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.09, 0.10), braceMat);
+                            br.rotation.z = idx === 0 ? 0.85 : -0.85;
+                            leaf.add(br);
+                            entGrp.add(leaf);
+                        });
+                    } else {
+                        // Open woodshed: visible firewood stacks inside
+                        const logMat = makeMat({ color: 0x7b6347 });
+                        for (let row = 0; row < 6; row++) {
+                            for (let col = 0; col < 10; col++) {
+                                const log = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.65, 5), logMat);
+                                log.rotation.x = Math.PI / 2;
+                                log.position.set(-1.35 + col * 0.30, yWall + 0.09 + row * 0.16, -0.55);
+                                entGrp.add(log);
+                            }
+                        }
+                    }
+
+                    if (cDoor === 'cultist') {
+                        addBarbedCoil(entGrp, 0, yWall + 0.55, D / 2 + 0.45, 0.28);
+                        addRitualStake(entGrp, 1.35, D / 2 + 0.65, 1.4);
+                    }
+
+                    return root;
+                }
+
+                // 10D. ZABOR (Zabor_Root: 3 materials x 3 modular forms x 3 states)
+                function buildZabor() {
+                    const root = new THREE.Group();
+                    root.name = 'Zabor_Root';
+
+                    const matIdx = state.zabor.mat; // 0=picket, 1=solid planks, 2=corrugated/rust tin
+                    const formIdx = state.zabor.form; // 0=straight 4m, 1=with gate, 2=corner 90deg
+                    const cond = state.conditions.fence;
+
+                    const isMetal = (matIdx === 2);
+                    const fenceH = matIdx === 0 ? 1.35 : 1.78;
+                    const postMat = makeMat({ color: isMetal ? 0x3b4042 : 0x3d2f22, metalness: isMetal ? 0.45 : 0.05 });
+                    const railMat = makeMat({ color: isMetal ? 0x454a4d : 0x4d3c2b });
+                    const picketMat = makeMat({ color: cond === 'ruined' ? 0x5c5b50 : 0x627366 }); // weathered painted wood
+                    const solidMat = makeMat({ map: TEX.planksGap, color: cond === 'ruined' ? 0xa69f94 : 0xffffff });
+                    const sheetMat = makeMat({ map: cond === 'ruined' ? TEX.rustTin : TEX.corrugatedMetal, doubleSide: true });
+
+                    function buildSegment(parent, length, startX, zPos, rotY, allowGap) {
+                        const seg = new THREE.Group();
+                        seg.position.set(startX, 0, zPos);
+                        seg.rotation.y = rotY;
+                        parent.add(seg);
+
+                        // Posts at ends
+                        [0, length].forEach((px, idx) => {
+                            const post = new THREE.Mesh(
+                                isMetal ? new THREE.CylinderGeometry(0.05, 0.05, fenceH + 0.08, 6) : new THREE.BoxGeometry(0.12, fenceH + 0.08, 0.12),
+                                postMat
+                            );
+                            post.position.set(px, (fenceH + 0.08) / 2, 0);
+                            if (cond === 'ruined' && idx === 1) {
+                                post.rotation.z = -0.14;
+                                post.rotation.x = 0.08;
+                            }
+                            seg.add(post);
+                        });
+
+                        // Horizontal rails
+                        [fenceH * 0.28, fenceH * 0.78].forEach(ry => {
+                            const rail = new THREE.Mesh(new THREE.BoxGeometry(length, 0.07, 0.05), railMat);
+                            rail.position.set(length / 2, ry, -0.04);
+                            if (cond === 'ruined') rail.rotation.z = -0.04;
+                            seg.add(rail);
+                        });
+
+                        if (matIdx === 0) {
+                            // Wooden picket fence
+                            const count = Math.max(4, Math.floor(length / 0.17));
+                            for (let i = 0; i < count; i++) {
+                                if (allowGap && cond === 'ruined' && (i === Math.floor(count / 2) || i === Math.floor(count / 2) + 1)) continue;
+                                const px = 0.10 + (i / (count - 1)) * (length - 0.20);
+                                const hVar = fenceH - 0.05 + ((i % 3) - 1) * 0.03;
+                                const picket = new THREE.Mesh(new THREE.BoxGeometry(0.11, hVar, 0.03), picketMat);
+                                picket.position.set(px, hVar / 2 + 0.04, 0.04);
+                                if (cond === 'ruined' && i % 4 === 0) picket.rotation.z = (i % 8 === 0 ? 0.16 : -0.14);
+                                seg.add(picket);
+                            }
+                        } else if (matIdx === 1) {
+                            // Solid plank fence
+                            const count = Math.max(4, Math.floor(length / 0.22));
+                            for (let i = 0; i < count; i++) {
+                                if (allowGap && cond === 'ruined' && i === Math.floor(count / 2)) continue;
+                                const px = 0.11 + (i / (count - 1)) * (length - 0.22);
+                                const board = new THREE.Mesh(new THREE.BoxGeometry(0.20, fenceH, 0.035), solidMat);
+                                board.position.set(px, fenceH / 2 + 0.02, 0.04);
+                                if (cond === 'ruined' && i === Math.floor(count / 2) - 1) board.rotation.z = 0.18;
+                                seg.add(board);
+                            }
+                        } else {
+                            // Corrugated metal / rusted tin sheets
+                            const panel = new THREE.Mesh(new THREE.BoxGeometry(length - 0.08, fenceH - 0.06, 0.03), sheetMat);
+                            panel.position.set(length / 2, fenceH / 2 + 0.02, 0.04);
+                            if (cond === 'ruined') {
+                                panel.rotation.x = 0.10;
+                                panel.rotation.z = -0.05;
+                            }
+                            seg.add(panel);
+                        }
+
+                        // Fallen debris planks in ruined state
+                        if (allowGap && cond === 'ruined') {
+                            const fallen = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.1, 0.04), matIdx === 2 ? sheetMat : picketMat);
+                            fallen.position.set(length * 0.52, 0.04, 0.42);
+                            fallen.rotation.set(Math.PI / 2, 0.35, 0.2);
+                            seg.add(fallen);
+                        }
+                    }
+
+                    const fenceGrp = new THREE.Group();
+                    fenceGrp.name = 'Fence_Panels';
+                    root.add(fenceGrp);
+
+                    if (formIdx === 0) {
+                        // Straight 4m section
+                        buildSegment(fenceGrp, 4.0, -2.0, 0, 0, true);
+                    } else if (formIdx === 1) {
+                        // Section with separate Fence_Gate child node
+                        buildSegment(fenceGrp, 1.45, -2.0, 0, 0, false);
+                        buildSegment(fenceGrp, 1.45, 0.55, 0, 0, true);
+
+                        // Separate Gate Node (pivoted at left hinge for easy animation in Godot 4)
+                        const gateNode = new THREE.Group();
+                        gateNode.name = 'Fence_Gate';
+                        gateNode.position.set(-0.55, 0, 0);
+                        if (cond === 'ruined') {
+                            gateNode.rotation.y = 0.42;
+                            gateNode.rotation.z = -0.07;
+                        } else {
+                            gateNode.rotation.y = 0.14;
+                        }
+                        root.add(gateNode);
+
+                        const gW = 1.06;
+                        const gFrame = new THREE.Mesh(new THREE.BoxGeometry(gW, fenceH - 0.08, 0.04), matIdx === 2 ? sheetMat : (matIdx === 0 ? picketMat : solidMat));
+                        gFrame.position.set(gW / 2, fenceH / 2, 0.03);
+                        const gBrace = new THREE.Mesh(new THREE.BoxGeometry(gW * 0.9, 0.07, 0.06), railMat);
+                        gBrace.position.set(gW / 2, fenceH / 2, -0.01);
+                        gBrace.rotation.z = 0.65;
+                        const latch = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.09), makeMat({ color: 0x222526, metalness: 0.6 }));
+                        latch.position.set(gW - 0.08, fenceH * 0.54, 0.06);
+                        gateNode.add(gFrame, gBrace, latch);
+                    } else {
+                        // Corner 90 deg (2.5m x 2.5m)
+                        buildSegment(fenceGrp, 2.5, -1.25, -1.25, 0, true);
+                        buildSegment(fenceGrp, 2.5, 1.25, -1.25, -Math.PI / 2, false);
+                    }
+
+                    // Cultist decorations on fence
+                    if (cond === 'cultist') {
+                        const decoGrp = new THREE.Group();
+                        decoGrp.name = 'Cultist_Decor';
+                        root.add(decoGrp);
+
+                        addBarbedCoil(decoGrp, -1.1, fenceH + 0.08, 0.04, 0.22);
+                        addBarbedCoil(decoGrp, 0.9, fenceH + 0.08, 0.04, 0.22);
+                        addCultistRoot(decoGrp, [[-1.6, 0, 0.35], [-0.9, fenceH * 0.6, 0.10], [0.2, fenceH + 0.05, 0.06], [1.2, fenceH * 0.7, -0.1]], 0.11, 0.035);
+                        addCultistMask(decoGrp, -1.95, fenceH - 0.1, 0.12, 0.15);
+                        addRitualStake(decoGrp, 1.65, 0.45, 1.3);
+                    }
+
+                    return root;
+                }
+
+                /* =========================================================
+                   11. GROUND BASE & SCENE REBUILDER
+                   ========================================================= */
+                const groundGroup = new THREE.Group();
+                groundGroup.name = 'Ground_Preview';
+                scene.add(groundGroup);
+
+                const groundDisc = new THREE.Mesh(
+                    new THREE.CylinderGeometry(5.8, 6.1, 0.24, 16),
+                    makeMat({ map: TEX.groundMud, roughness: 1.0 })
+                );
+                groundDisc.position.y = -0.12;
+                groundGroup.add(groundDisc);
+
+                // Subtle low-poly dry grass tufts around perimeter
+                const grassMat = makeMat({ color: 0x3b452e });
+                for (let i = 0; i < 14; i++) {
+                    const ang = (i / 14) * Math.PI * 2 + 0.2;
+                    const dist = 3.8 + (i % 3) * 0.65;
+                    const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.55 + (i % 2) * 0.2, 4), grassMat);
+                    tuft.position.set(Math.cos(ang) * dist, 0.26, Math.sin(ang) * dist);
+                    groundGroup.add(tuft);
+                }
+
+                let currentModelRoot = null;
+
+                function disposeObject(obj) {
+                    if (!obj) return;
+                    obj.traverse(child => {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) {
+                            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                            else child.material.dispose();
+                        }
+                    });
+                }
+
+                rebuildScene = function () {
+                    if (currentModelRoot) {
+                        scene.remove(currentModelRoot);
+                        disposeObject(currentModelRoot);
+                        currentModelRoot = null;
+                    }
+                    activeMaterials.length = 0;
+                    cultistRootMeshes = [];
+
+                    const t = state.buildingType;
+                    if (t === 'izba') currentModelRoot = buildIzba();
+                    else if (t === 'banya') currentModelRoot = buildBanya();
+                    else if (t === 'saray') currentModelRoot = buildSaray();
+                    else currentModelRoot = buildZabor();
+
+                    scene.add(currentModelRoot);
+
+                    // Update subtle window preview point light
+                    if (t !== 'zabor' && state.conditions.window === 1) {
+                        previewWinLight.color.setHex(0xffb45c);
+                        previewWinLight.intensity = 1.1;
+                    } else if (t !== 'zabor' && state.conditions.window === 2) {
+                        previewWinLight.color.setHex(0x55ffaa);
+                        previewWinLight.intensity = 1.3;
+                    } else {
+                        previewWinLight.intensity = 0;
+                    }
+
+                    applyViewSettings();
+                };
+
+                /* =========================================================
+                   12. VIEW / PS1 POST-PROCESSING SETTINGS
+                   ========================================================= */
+                function handleResize() {
+                    const w = Math.max(1, window.innerWidth);
+                    const h = Math.max(1, window.innerHeight);
+                    camera.aspect = w / h;
+                    camera.updateProjectionMatrix();
+
+                    if (state.view.pixel) {
+                        // Authentic PS1 low-res render target scaled cleanly via CSS
+                        const scale = 0.28;
+                        renderer.setPixelRatio(1);
+                        renderer.setSize(Math.max(160, Math.floor(w * scale)), Math.max(120, Math.floor(h * scale)), false);
+                        canvas.classList.add('pixelated');
+                    } else {
+                        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+                        renderer.setSize(w, h, false);
+                        canvas.classList.remove('pixelated');
+                    }
+                }
+
+                applyViewSettings = function () {
+                    const v = state.view;
+
+                    // Vertex Jitter
+                    ps1Uniforms.uJitter.value = v.jitter ? 1.0 : 0.0;
+
+                    // VHS Overlay
+                    document.getElementById('vhs-overlay').classList.toggle('active', v.vhs);
+
+                    // Wireframe on all building + ground materials
+                    scene.traverse(obj => {
+                        if (obj.isMesh && obj.material) {
+                            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                            mats.forEach(m => { m.wireframe = v.wire; });
+                        }
+                    });
+
+                    // Night Fog vs Studio Lighting
+                    if (v.nightFog) {
+                        renderer.setClearColor(0x090c0a, 1);
+                        scene.fog = new THREE.FogExp2(0x0b100d, 0.075);
+                        hemiLight.intensity = 0.35;
+                        dirLight.intensity = 0.40;
+                        dirLight.color.setHex(0x88a2b5);
+                    } else {
+                        renderer.setClearColor(0x131613, 1);
+                        scene.fog = null;
+                        hemiLight.intensity = 0.92;
+                        dirLight.intensity = 1.05;
+                        dirLight.color.setHex(0xfff1dc);
+                    }
+
+                    handleResize();
+                };
+
+                /* =========================================================
+                   13. GODOT 4 BINARY .GLB EXPORT
+                   ========================================================= */
+                function exportFileName() {
+                    const t = state.buildingType;
+                    const cfg = state[t];
+                    let fileName = '';
+
+                    if (t === 'zabor') {
+                        const fc = META.condShort[state.conditions.fence].toLowerCase();
+                        fileName = 'zabor_t' + (cfg.mat + 1) + '_f' + (cfg.form + 1) + '_' + fc + '.glb';
+                    } else {
+                        const wc = META.condShort[state.conditions.walls].toLowerCase();
+                        const rc = META.condShort[state.conditions.roof].toLowerCase();
+                        const ec = META.condShort[state.conditions.door].toLowerCase();
+                        const winC = META.winShort[state.conditions.window];
+                        const floorPart = t === 'izba' ? (cfg.floors + 'f_') : '';
+                        const winPart = t === 'izba' ? ('win' + (cfg.window + 1) + winC) : ('win_' + winC);
+                        fileName = t + '_' + floorPart + 'w' + (cfg.walls + 1) + wc + '_r' + (cfg.roof + 1) + rc + '_e' + (cfg.door + 1) + ec + '_' + winPart + '.glb';
+                    }
+
+                    return fileName;
+                }
+
+                async function exportBuilding(includeGround) {
+                    if (!THREE.GLTFExporter) throw new Error('GLTFExporter не загружен');
+                    if (!currentModelRoot) throw new Error('Нет модели для экспорта');
+
+                    const target = currentModelRoot.clone(true);
+                    if (includeGround) {
+                        const wrapper = new THREE.Group();
+                        wrapper.name = target.name + '_WithGround';
+                        wrapper.add(target, groundGroup.clone(true));
+                        return encodeGLB(wrapper);
+                    }
+                    return encodeGLB(target);
+                }
+
+                function encodeGLB(root) {
+                    // Keep preview wireframe, jitter and materials independent of export.
+                    const copies = new Map();
+                    function solidMaterial(source) {
+                        if (!copies.has(source)) {
+                            const copy = source.clone();
+                            copy.wireframe = false;
+                            copies.set(source, copy);
+                        }
+                        return copies.get(source);
+                    }
+                    root.traverse(node => {
+                        if (!node.isMesh || !node.material) return;
+                        node.material = Array.isArray(node.material)
+                            ? node.material.map(solidMaterial)
+                            : solidMaterial(node.material);
+                    });
+                    return new Promise((resolve, reject) => {
+                        new THREE.GLTFExporter().parse(root, result => {
+                            if (!(result instanceof ArrayBuffer)) {
+                                reject(new Error('Не получен бинарный GLB'));
+                                return;
+                            }
+                            resolve(new Blob([result], { type: 'model/gltf-binary' }));
+                        }, { binary: true });
+                    }).finally(() => copies.forEach(material => material.dispose()));
+                }
+
+                exportGLB = async function () {
+                    try {
+                        const fileName = exportFileName();
+                        const blob = await exportBuilding(!state.onlyBuilding);
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                        setTimeout(() => URL.revokeObjectURL(url), 300);
+                        showToast('Сохранено для Godot 4: ' + fileName, false);
+                    } catch (error) {
+                        showToast('Ошибка экспорта .GLB: ' + error.message, true);
+                    }
+                };
+
+                const saveButton = document.getElementById('btn-save-building');
+                const placeLink = document.getElementById('place-building');
+                const buildingNames = { izba: 'Изба', banya: 'Баня', saray: 'Сарай', zabor: 'Забор' };
+                saveButton.disabled = false;
+                saveButton.addEventListener('click', async () => {
+                    saveButton.disabled = true;
+                    try {
+                        const type = state.buildingType;
+                        const recipe = {
+                            version: 1, type,
+                            modules: { ...state[type] },
+                            conditions: { ...state.conditions }
+                        };
+                        const name = document.getElementById('building-name').value.trim() ||
+                            buildingNames[type] + ' · ' + exportFileName().replace(/\.glb$/, '');
+                        const blob = await exportBuilding(false);
+                        const id = 'building-' + crypto.randomUUID();
+                        await window.ChernoObjectLibrary.saveModel({
+                            id, name, blob, recipe, kind: 'building', source: 'building-generator',
+                            updatedAt: new Date().toISOString()
+                        });
+                        const url = new URL('../quest/', location.href);
+                        url.searchParams.set('model', id);
+                        placeLink.href = url.href;
+                        placeLink.textContent = 'Разместить «' + name + '» в Quest Lab ↗';
+                        placeLink.hidden = false;
+                        showToast('В библиотеке: ' + name, false);
+                    } catch (error) {
+                        showToast('Не удалось сохранить постройку: ' + error.message, true);
+                    } finally {
+                        saveButton.disabled = false;
+                    }
+                });
+
+                /* =========================================================
+                   14. INITIAL BUILD & ANIMATION LOOP
+                   ========================================================= */
+                rebuildScene();
+                resetCamera();
+                handleResize();
+
+                const clock = new THREE.Clock();
+                let lastW = 0, lastH = 0;
+
+                function animate() {
+                    requestAnimationFrame(animate);
+                    const dt = Math.min(clock.getDelta(), 0.1);
+                    const elapsed = clock.getElapsedTime();
+
+                    // Sync canvas dimensions cleanly inside rAF
+                    const cw = window.innerWidth;
+                    const ch = window.innerHeight;
+                    if (cw > 0 && ch > 0 && (cw !== lastW || ch !== lastH)) {
+                        lastW = cw;
+                        lastH = ch;
+                        handleResize();
+                    }
+
+                    if (state.view.autoRotate && !orbit.dragging) {
+                        orbit.desiredTheta += dt * 0.42;
+                    }
+
+                    // Smooth spherical camera damping
+                    const damp = 1 - Math.exp(-10 * dt);
+                    orbit.theta += (orbit.desiredTheta - orbit.theta) * damp;
+                    orbit.phi += (orbit.desiredPhi - orbit.phi) * damp;
+                    orbit.radius += (orbit.desiredRadius - orbit.radius) * damp;
+                    orbit.target.lerp(orbit.desiredTarget, damp);
+                    updateCameraTransform();
+
+                    // Subtle living pulse on Cultist roots ("Черная живица")
+                    if (cultistRootMeshes.length > 0) {
+                        const pulse = 1 + Math.sin(elapsed * 2.4) * 0.03;
+                        for (let i = 0; i < cultistRootMeshes.length; i++) {
+                            cultistRootMeshes[i].scale.set(pulse, 1, pulse);
+                        }
+                    }
+
+                    renderer.render(scene, camera);
+                }
+
+                animate();
+            }
+
+            // Start 3D after window load
+            window.addEventListener('load', init3D);
+        })();
+    </script>
+</body>
+</html>

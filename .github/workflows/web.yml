@@ -510,7 +510,7 @@ jobs:
           node --check site/quest/geo-overlay-core.js
           node --test tests/quest-geo-overlay.test.cjs
           node --test tests/quest-geo-link.test.cjs
-          grep -q 'quest.js?v=11' site/quest/index.html
+          grep -q 'quest.js?v=12' site/quest/index.html
           grep -q 'geo-overlay-core.js?v=2' site/quest/index.html
           grep -q 'quest-core.js?v=3' site/quest/index.html
           grep -q 'id="step-document-fields"' site/quest/index.html
@@ -585,6 +585,9 @@ jobs:
           mkdir -p build/web/weapon-generator
           cp -a site/weapon-generator/. build/web/weapon-generator/
           test -s build/web/weapon-generator/index.html
+          mkdir -p build/web/building-generator
+          cp -a site/building-generator/. build/web/building-generator/
+          node --test tests/building-generator.test.cjs
           mkdir -p build/web/arms
           cp -a site/arms/. build/web/arms/
           node - <<'JS'
@@ -601,11 +604,11 @@ jobs:
           node --check site/studio/studio-releases.js
           node --test tests/studio-state.test.cjs
           node --test tests/studio-releases.test.cjs
-          grep -q 'studio-state.js?v=2' site/studio/index.html
+          grep -q 'studio-state.js?v=3' site/studio/index.html
           grep -q 'release-core.js?v=1' site/studio/index.html
           grep -q 'studio-releases.js?v=1' site/studio/index.html
           grep -q 'studio.css?v=4' site/studio/index.html
-          grep -q 'studio.js?v=5' site/studio/index.html
+          grep -q 'studio.js?v=6' site/studio/index.html
           grep -q 'id="release-list"' site/studio/index.html
           grep -q 'id="roadmap-list"' site/studio/index.html
           grep -q 'id="rail-toggle"' site/studio/index.html
@@ -631,7 +634,7 @@ jobs:
           version=manifest["current"]["studio"]
           sha=os.environ["GITHUB_SHA"]
           assert re.fullmatch(r"[a-f0-9]{40}",sha), sha
-          assert version=="0.6.0", "Unexpected Studio release number"
+          assert version=="0.6.1", "Unexpected Studio release number"
           info={"commit":sha,"studioVersion":version,"gameDirectory":os.environ["GAME_DIRECTORY"],
                 "builtAtUtc":datetime.datetime.now(datetime.timezone.utc).isoformat()}
           Path("build/web/studio/build-meta.json").write_text(
@@ -714,6 +717,8 @@ jobs:
               && grep -q 'chernozerye.hellish-forge' /tmp/pages-forge-core.js \
               && curl -fsSL --max-time 20 "${SITE_URL}weapon-generator/index.html" -o /tmp/pages-weapon-generator.html \
               && grep -q 'WEAPON GENERATOR\|Генератор Оружия' /tmp/pages-weapon-generator.html \
+              && curl -fsSL --max-time 20 "${SITE_URL}building-generator/index.html" -o /tmp/pages-building-generator.html \
+              && grep -q 'id="btn-save-building"' /tmp/pages-building-generator.html \
               && curl -fsSL --max-time 20 "${SITE_URL}arms/index.html" -o /tmp/pages-arms.html \
               && grep -q 'id="arms-weapon"' /tmp/pages-arms.html \
               && curl -fsSL --max-time 20 "${SITE_URL}studio/index.html" -o /tmp/pages-studio.html \
@@ -721,7 +726,7 @@ jobs:
               && curl -fsSL --max-time 20 "${SITE_URL}studio/studio.js" -o /tmp/pages-studio.js \
               && grep -q 'CHERNOZERYE_STUDIO_READY' /tmp/pages-studio.js \
               && curl -fsSL --max-time 20 "${SITE_URL}studio/releases.json" -o /tmp/pages-studio-releases.json \
-              && grep -q '"studio": "0.6.0"' /tmp/pages-studio-releases.json \
+              && grep -q '"studio": "0.6.1"' /tmp/pages-studio-releases.json \
               && curl -fsSL --max-time 20 "${SITE_URL}studio/build-meta.json" -o /tmp/pages-studio-build-meta.json \
               && grep -q "${GITHUB_SHA}" /tmp/pages-studio-build-meta.json; then
               echo "LIVE_PAGES_OK: ${SITE_URL}, ${SITE_URL}${RELEASE_DIR}/, geo/, quest/, model/, forge/, weapon-generator/, studio/"
