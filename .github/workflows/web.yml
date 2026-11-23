@@ -3,6 +3,8 @@ name: Build and deploy Fearless Knights of the Cordon (Godot Web)
 on:
   push:
     branches: [main, feature/cultist-npc-foundation]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
