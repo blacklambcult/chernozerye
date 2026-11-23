@@ -9,7 +9,7 @@
     quest: {kicker:"MISSION WORKSPACE / 02", name:"QUEST LAB · РЕДАКТОР КВЕСТОВ", url:"../quest/", file:"../quest/?studio=1"},
     model: {kicker:"ASSET WORKSPACE / 03", name:"MODEL LAB · 3D-КОНСТРУКТОР", url:"../model/", file:"../model/?studio=1"},
     forge: {kicker:"ARMORY ASSET WORKSPACE / 04", name:"HELLISH FORGE · ИГРОВЫЕ МОДЕЛИ", url:"../forge/", file:"../forge/?studio=1"},
-    buildings: {kicker:"ARCHITECTURE / 07", name:"ГЕНЕРАТОР ПОСТРОЕК", url:"../building-generator/?v=2", file:"../building-generator/?studio=1&v=2"},
+    buildings: {kicker:"ARCHITECTURE / 07", name:"ГЕНЕРАТОР ПОСТРОЕК", url:"../building-generator/?v=3", file:"../building-generator/?studio=1&v=3"},
     arms: {kicker:"FIRST PERSON / 06", name:"РУКИ ОТ ПЕРВОГО ЛИЦА", url:"../arms/", file:"../arms/?studio=1"},
     weapon: {kicker:"PROCEDURAL ARMORY / 05", name:"ГЕНЕРАТОР ОРУЖИЯ · 8 КЛАССОВ", url:"../weapon-generator/", file:"../weapon-generator/?studio=1"}
   });

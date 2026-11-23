@@ -151,7 +151,7 @@ func add_building(points: PackedVector2Array, category: String, front: int,
             _tight_sites += 1
             return {}
     _queue(id, Transform3D(basis.scaled(Vector3.ONE * scale_factor),
-        Vector3(center.x, 0.025, -center.y)))
+        Vector3(center.x, 0.0, -center.y)))
     if category == "house" and profile >= 4:
         var light := OmniLight3D.new()
         var anchor := center + outward * (size.y * scale_factor * 0.5 + 0.6)

@@ -76,7 +76,16 @@ function batchModel(model) {
 }
 
 async function bake(id, type, modules, conditions) {
-  const model = batchModel(sandbox.bakeBuilding({ type, modules, conditions }));
+  const source = sandbox.bakeBuilding({ type, modules, conditions });
+  if (type === "saray" && source.getObjectByName("Windows"))
+    throw new Error(id + " contains a shed window");
+  if ((type === "izba" && [1, 2, 3].includes(modules.door)) ||
+      (type === "banya" && modules.door === 1)) {
+    const annex = source.getObjectByName("GroundedAnnex");
+    if (!annex || Math.abs(new THREE.Box3().setFromObject(annex).min.y) > 0.00001)
+      throw new Error(id + " has a floating annex");
+  }
+  const model = batchModel(source);
   const bytes = await new Promise(resolve =>
     new THREE.GLTFExporter().parse(model, resolve, { binary: true }));
   fs.writeFileSync(path.join(output, id + ".glb"), Buffer.from(bytes));

@@ -954,7 +954,6 @@
                 },
                 saray: {
                     title: 'САРАЙ (ХОЗПОСТРОЙКА)',
-                    winDesc: 'Узкое боковое окошко-прорезь',
                     walls: [
                         '1/3 Необрезная доска со щелями',
                         '2/3 Тёмный горбыль',
@@ -1048,7 +1047,7 @@
                 document.getElementById('row-walls').classList.toggle('hidden', isZabor);
                 document.getElementById('row-roof').classList.toggle('hidden', isZabor);
                 document.getElementById('row-window').classList.toggle('hidden', !isIzba);
-                document.getElementById('row-win-fixed').classList.toggle('hidden', isIzba || isZabor);
+                document.getElementById('row-win-fixed').classList.toggle('hidden', t !== 'banya');
                 document.getElementById('row-door').classList.toggle('hidden', isZabor);
                 document.getElementById('row-fence-mat').classList.toggle('hidden', !isZabor);
                 document.getElementById('row-fence-form').classList.toggle('hidden', !isZabor);
@@ -1068,7 +1067,7 @@
                         document.querySelectorAll('[data-floors]').forEach(btn => {
                             btn.classList.toggle('active-floor', Number(btn.dataset.floors) === cfg.floors);
                         });
-                    } else {
+                    } else if (t === 'banya') {
                         document.getElementById('lbl-win-fixed').textContent = m.winDesc;
                     }
                     const prefix = isIzba ? (cfg.floors + 'F-') : '';
@@ -1082,7 +1081,7 @@
                 // State tab visibility
                 document.getElementById('state-parts-building').classList.toggle('hidden', isZabor);
                 document.getElementById('state-part-fence').classList.toggle('hidden', !isZabor);
-                document.getElementById('state-windows-block').classList.toggle('hidden', isZabor);
+                document.getElementById('state-windows-block').classList.toggle('hidden', isZabor || t === 'saray');
 
                 // State pills highlighting
                 document.querySelectorAll('[data-part]').forEach(btn => {
@@ -2579,8 +2578,9 @@
                             if (cDoor === 'ruined') canopy.rotation.z = -0.14;
                             entGrp.add(canopy);
                             [-0.72, 0.72].forEach(px => {
-                                const post = new THREE.Mesh(new THREE.BoxGeometry(0.10, 2.05, 0.10), darkWood);
-                                post.position.set(px, yWall + 1.02, D / 2 + 0.96);
+                                const postHeight = yWall + 2.045;
+                                const post = new THREE.Mesh(new THREE.BoxGeometry(0.10, postHeight, 0.10), darkWood);
+                                post.position.set(px, postHeight / 2, D / 2 + 0.96);
                                 entGrp.add(post);
                             });
                         }
@@ -2589,8 +2589,10 @@
                         const vW = dType === 1 ? 2.3 : 1.75;
                         const vD = dType === 1 ? 1.35 : 1.25;
                         const vH = 2.15;
-                        const box = new THREE.Mesh(new THREE.BoxGeometry(vW, vH, vD), makeMat({ map: TEX.planksGap, color: cDoor === 'ruined' ? 0xaba296 : 0xffffff }));
-                        box.position.set(0, yWall + vH / 2 - 0.1, D / 2 + vD / 2);
+                        const groundedHeight = yWall + vH - 0.1;
+                        const box = new THREE.Mesh(new THREE.BoxGeometry(vW, groundedHeight, vD), makeMat({ map: TEX.planksGap, color: cDoor === 'ruined' ? 0xaba296 : 0xffffff }));
+                        box.name = 'GroundedAnnex';
+                        box.position.set(0, groundedHeight / 2, D / 2 + vD / 2);
                         const vRoof = new THREE.Mesh(new THREE.BoxGeometry(vW + 0.3, 0.10, vD + 0.32), roofTin);
                         vRoof.position.set(0, yWall + vH - 0.04, D / 2 + vD / 2 + 0.06);
                         vRoof.rotation.x = 0.22;
@@ -2607,8 +2609,10 @@
                     } else {
                         // Side shed annex (right wall)
                         const sW = 1.65, sD = 3.2, sH = 2.10;
-                        const annex = new THREE.Mesh(new THREE.BoxGeometry(sW, sH, sD), makeMat({ map: TEX.slabWood }));
-                        annex.position.set(W / 2 + sW / 2, yWall + sH / 2 - 0.12, 0.1);
+                        const groundedHeight = yWall + sH - 0.12;
+                        const annex = new THREE.Mesh(new THREE.BoxGeometry(sW, groundedHeight, sD), makeMat({ map: TEX.slabWood }));
+                        annex.name = 'GroundedAnnex';
+                        annex.position.set(W / 2 + sW / 2, groundedHeight / 2, 0.1);
                         const aRoof = new THREE.Mesh(new THREE.BoxGeometry(sW + 0.35, 0.10, sD + 0.35), roofTin);
                         aRoof.position.set(W / 2 + sW / 2 + 0.08, yWall + sH - 0.04, 0.1);
                         aRoof.rotation.z = -0.26;
@@ -2756,8 +2760,10 @@
                         }
                     } else {
                         // Boarded pre-bath vestibule (Предбанник)
-                        const vest = new THREE.Mesh(new THREE.BoxGeometry(1.55, 1.85, 1.10), makeMat({ map: TEX.planksGap }));
-                        vest.position.set(0, yWall + 0.90, D / 2 + 0.55);
+                        const groundedHeight = yWall + 1.825;
+                        const vest = new THREE.Mesh(new THREE.BoxGeometry(1.55, groundedHeight, 1.10), makeMat({ map: TEX.planksGap }));
+                        vest.name = 'GroundedAnnex';
+                        vest.position.set(0, groundedHeight / 2, D / 2 + 0.55);
                         const vRoof = new THREE.Mesh(new THREE.BoxGeometry(1.80, 0.09, 1.32), makeMat({ map: TEX.ruberoid, doubleSide: true }));
                         vRoof.position.set(0, yWall + 1.86, D / 2 + 0.58);
                         vRoof.rotation.x = 0.22;
@@ -2785,7 +2791,6 @@
                     const cWalls = state.conditions.walls;
                     const cRoof = state.conditions.roof;
                     const cDoor = state.conditions.door;
-                    const cWin = state.conditions.window;
 
                     const isOpenWoodshed = (state.saray.door === 2);
 
@@ -2863,15 +2868,6 @@
                     }
 
                     decorateRoofCondition(roofGrp, cRoof, W, D, rH, yRoof);
-
-                    // NARROW SIDE SLOT WINDOW
-                    const winGrp = new THREE.Group();
-                    winGrp.name = 'Windows';
-                    root.add(winGrp);
-                    const slotWin = buildWindowUnit(0.86, 0.34, 4, cWin);
-                    slotWin.position.set(-W / 2 - 0.03, yWall + 1.52, 0);
-                    slotWin.rotation.y = -Math.PI / 2;
-                    winGrp.add(slotWin);
 
                     // ENTRANCE (3 variants)
                     const entGrp = new THREE.Group();
@@ -3214,7 +3210,7 @@
                         const winC = META.winShort[state.conditions.window];
                         const floorPart = t === 'izba' ? (cfg.floors + 'f_') : '';
                         const winPart = t === 'izba' ? ('win' + (cfg.window + 1) + winC) : ('win_' + winC);
-                        fileName = t + '_' + floorPart + 'w' + (cfg.walls + 1) + wc + '_r' + (cfg.roof + 1) + rc + '_e' + (cfg.door + 1) + ec + '_' + winPart + '.glb';
+                        fileName = t + '_' + floorPart + 'w' + (cfg.walls + 1) + wc + '_r' + (cfg.roof + 1) + rc + '_e' + (cfg.door + 1) + ec + (t === 'saray' ? '' : '_' + winPart) + '.glb';
                     }
 
                     return fileName;

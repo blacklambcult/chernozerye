@@ -605,7 +605,7 @@ jobs:
           grep -q 'release-core.js?v=1' site/studio/index.html
           grep -q 'studio-releases.js?v=1' site/studio/index.html
           grep -q 'studio.css?v=4' site/studio/index.html
-          grep -q 'studio.js?v=7' site/studio/index.html
+          grep -q 'studio.js?v=8' site/studio/index.html
           grep -q 'id="release-list"' site/studio/index.html
           grep -q 'id="roadmap-list"' site/studio/index.html
           grep -q 'id="rail-toggle"' site/studio/index.html

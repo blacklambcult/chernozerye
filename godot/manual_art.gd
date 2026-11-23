@@ -1062,7 +1062,7 @@ func _place_studio_building(points: PackedVector2Array, category: String, featur
     if placement.is_empty():
         return
     _track_building(placement.envelope)
-    _register_building_collider(placement.foundation, height * placement.scale + 0.025, category != "shed")
+    _register_building_collider(placement.foundation, height * placement.scale, category != "shed")
     if category == "house":
         _house_approaches.append(placement)
         _reserved_building_space.append(placement.reserved)
