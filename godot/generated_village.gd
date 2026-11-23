@@ -91,7 +91,7 @@ func plot_profile(points: PackedVector2Array) -> int:
 
 
 func add_building(points: PackedVector2Array, category: String, front: int,
-        floors: int, ordinal: int) -> void:
+        floors: int, ordinal: int) -> PackedVector2Array:
     var center := _center(points)
     var a := points[front]
     var b := points[(front + 1) % points.size()]
@@ -109,23 +109,28 @@ func add_building(points: PackedVector2Array, category: String, front: int,
     var midpoint := (lo + hi) * 0.5
     center = right * midpoint.x + outward * midpoint.y
     var size: Vector2 = BASE_SIZES[category]
-    var fit := (hi - lo) / size
     var profile := profile_at(_center(points))
     if profile == 0:
         profile = ordinal % 4
     var prefix: String = {"house": "izba%d" % floors, "sauna": "banya", "shed": "saray"}[category]
     var basis := Basis(Vector3.UP, atan2(outward.x, -outward.y))
     _queue(prefix + "_" + str(profile), Transform3D(
-        basis.scaled_local(Vector3(fit.x, 1.0, fit.y)), Vector3(center.x, 0.025, -center.y)))
+        basis, Vector3(center.x, 0.025, -center.y)))
     if category == "house" and profile >= 4:
         var light := OmniLight3D.new()
-        var anchor := (a + b) * 0.5 + outward * 0.6
+        var anchor := center + outward * (size.y * 0.5 + 0.6)
         light.position = Vector3(anchor.x, 1.9, -anchor.y)
         light.light_color = Color("#ffb46b") if profile == 4 else Color("#63ebaf")
         light.light_energy = 0.32
         light.omni_range = 5.0
         add_child(light)
     _placed += 1
+    var across := right * size.x * 0.5
+    var depth := outward * size.y * 0.5
+    return PackedVector2Array([
+        center - across - depth, center + across - depth,
+        center + across + depth, center - across + depth,
+    ])
 
 
 func add_fence(a: Vector2, b: Vector2, profile: int, material_index: int) -> void:

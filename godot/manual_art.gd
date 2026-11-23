@@ -978,9 +978,9 @@ func _place_studio_building(points: PackedVector2Array, category: String) -> voi
     var front := _building_front_edge(points)
     var recipe: Dictionary = IZBA_VARIANTS.recipe(points) if category == "house" else {}
     var floors := int(recipe.get("floor_count", 1))
-    var height := (4.95 if floors == 2 else 2.76) if category == "house" else 2.3
-    _register_building_collider(points, height, category != "shed")
-    _studio_village.add_building(points, category, front, floors, _building_count)
+    var height := (5.09 if floors == 2 else 2.84) if category == "house" else (2.29 if category == "sauna" else 2.27)
+    var footprint: PackedVector2Array = _studio_village.add_building(points, category, front, floors, _building_count)
+    _register_building_collider(footprint, height + 0.025, category != "shed")
     if category == "house":
         _decorate_showcase_yard(points, front)
 

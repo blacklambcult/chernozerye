@@ -130,5 +130,15 @@ func _initialize() -> void:
     if art.call("_yard_spot_ok", midpoint + Vector2(3.1, 0.0), garden, [], 2):
         _fail("greenhouse allowed to overlap a doorway")
         return
+    var village := preload("res://generated_village.gd").new()
+    var survey_outline := PackedVector2Array([Vector2(-12, -4), Vector2(12, -4),
+        Vector2(12, 4), Vector2(-12, 4)])
+    var foundation := village.add_building(survey_outline, "house", 0, 1, 0)
+    village.free()
+    if not is_equal_approx(foundation[0].distance_to(foundation[1]), 4.8) \
+            or not is_equal_approx(foundation[1].distance_to(foundation[2]), 4.2) \
+            or not (foundation[0] + foundation[2]).is_zero_approx():
+        _fail("generator footprint follows the survey scale or moves the center")
+        return
     print("GEOMETRY_REGRESSION_OK: no circle caps, biased road levels, crossroads and safe entrances")
     quit(0)

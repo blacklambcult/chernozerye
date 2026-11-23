@@ -57,11 +57,11 @@ void fragment() {
     EMISSION = emission;
 }
 """
-var pixels_enabled := false
-var jitter_enabled := false
-var pixel_strength := 55.0
-var jitter_strength := 35.0
-var jitter_targets := {&"viewmodel": false, &"objects": false, &"road": false, &"nature": true}
+var pixels_enabled := true
+var jitter_enabled := true
+var pixel_strength := 80.0
+var jitter_strength := 50.0
+var jitter_targets := {&"viewmodel": true, &"objects": true, &"road": false, &"nature": true}
 var grade_material: ShaderMaterial
 var _originals: Dictionary = {}
 var _materials: Dictionary = {}
@@ -70,6 +70,9 @@ var _shaders: Dictionary = {}
 
 func _ready() -> void:
     _update_jitter_uniform()
+    set_pixels(pixels_enabled)
+    set_pixel_strength(pixel_strength)
+    _refresh_jitter()
     get_tree().node_added.connect(_on_node_added)
     get_tree().node_removed.connect(_on_node_removed)
 
@@ -125,7 +128,7 @@ func _refresh_jitter() -> void:
 
 func _on_node_added(node: Node) -> void:
     if jitter_enabled and jitter_strength > 0.0 and node is GeometryInstance3D:
-        _apply_jitter.call_deferred(node, false)
+        _apply_jitter.call_deferred(node, node is MultiMeshInstance3D)
 
 
 func _on_node_removed(node: Node) -> void:
