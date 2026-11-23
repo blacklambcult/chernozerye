@@ -2,7 +2,7 @@
   "schema": "chernozerye.studio.release-notes",
   "formatVersion": 1,
   "current": {
-    "studio": "0.6.1",
+    "studio": "0.6.2",
     "game": "pre-alpha 0.8.13",
     "date": "2026-11-23",
     "channel": "PRE-ALPHA",
@@ -11,6 +11,18 @@
     "project": "Fearless Knights of the Cordon"
   },
   "releases": [
+    {
+      "id": "studio-062-nature-generator",
+      "version": "0.6.2",
+      "area": "studio",
+      "date": "2026-11-23",
+      "title": "Генератор природы",
+      "commits": [],
+      "changes": [
+        "Добавлены деревья, кусты, камни и пни, водные тайлы и мистические объекты.",
+        "Объекты сохраняются в библиотеку в формате GLB и открываются для размещения в Quest Lab."
+      ]
+    },
     {
       "id": "studio-061-building-generator",
       "version": "0.6.1",
