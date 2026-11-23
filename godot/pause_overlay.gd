@@ -128,7 +128,8 @@ func _build_ui() -> void:
             targets.add_child(toggle)
 
     items.add_child(_make_label("WASD — идти    SHIFT — бег    C — тихий шаг    МЫШЬ — осмотр", 13, MUTED))
-    items.add_child(_make_label("E — взаимодействие    J — журнал    M — карта", 13, MUTED))
+    var journal := "" if player.get("shrine_loadout") == true else "    J — журнал"
+    items.add_child(_make_label("E — взаимодействие" + journal + "    M — карта", 13, MUTED))
     items.add_child(_make_label("ESC — вернуться к игре", 13, ACCENT))
     backdrop.visible = false
 

@@ -26,6 +26,7 @@ var _forest_sites: Array[Vector2] = []
 var _forest_cells: Dictionary = {}
 var _forest_models: Dictionary = {}
 var _shrine_sites: Array[Vector2] = []
+var _quest_shrines: Array[Node3D] = []
 var tree_trunks: Array[Transform3D] = []
 var _tree_collision_total := 0
 var manual_roads: Array = []
@@ -143,6 +144,10 @@ func _build_manual() -> void:
     art.set_script(preload("res://manual_art.gd"))
     add_child(art)
     art.call("decorate", features)
+    var totem: Vector2 = art.get("cultist_totem_site")
+    if totem.is_finite():
+        _spawn_shrine(totem, 0.035, "crimson_totem", Color("#ff294e"))
+    print("SHRINE_QUEST_READY: targets=", _quest_shrines.size(), " final=", totem)
     print("MANUAL_LAYOUT_READY: ", object_count)
     print("MANUAL_STREETSCAPE_READY: roadside_sections=", _roadside_sections,
         " roadside_grass=", _roadside_tufts,
@@ -727,16 +732,38 @@ func _place_forest_shrines() -> void:
                 selected = point
         if selected == Vector2.INF:
             continue
-        var model := _forest_model("shrine_%d_active" % i)
-        var ruined := _forest_model("shrine_%d_broken" % i)
-        if model == null or ruined == null:
-            continue
-        _shrine_sites.append(selected)
-        var shrine := SHRINE.new()
-        shrine.name = "ForestShrine%d" % (i + 1)
-        shrine.position = _pos(selected, _forest_floor.sample_height(selected) + 0.03)
-        add_child(shrine)
-        shrine.install(model, ruined, colors[i])
+        if _spawn_shrine(selected, _forest_floor.sample_height(selected) + 0.03,
+                "shrine_%d" % i, colors[i]):
+            _shrine_sites.append(selected)
+
+
+func _spawn_shrine(point: Vector2, height: float, id: String, color: Color) -> bool:
+    var model := _forest_model(id + "_active")
+    var ruined := _forest_model(id + "_broken")
+    if model == null or ruined == null:
+        return false
+    var shrine := SHRINE.new()
+    shrine.name = id
+    shrine.position = _pos(point, height)
+    add_child(shrine)
+    shrine.install(model, ruined, color)
+    var stage := _quest_shrines.size()
+    shrine.can_take_damage = func() -> bool:
+        var objective := shrine_objective()
+        return objective.ready and objective.cleared == stage
+    _quest_shrines.append(shrine)
+    return true
+
+
+func shrine_objective() -> Dictionary:
+    var target: Variant = null
+    var cleared := 0
+    for shrine in _quest_shrines:
+        if shrine.is_destroyed:
+            cleared += 1
+        elif target == null:
+            target = shrine.global_position
+    return {"cleared": cleared, "target": target, "ready": _quest_shrines.size() == 5}
 
 
 func _build_trunk_collision() -> void:

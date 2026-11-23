@@ -4,12 +4,20 @@ extends Node3D
 var snapshot: Dictionary = {}
 
 func _ready() -> void:
-    if not OS.has_feature("web"):
+    var web := OS.has_feature("web")
+    if web:
+        # Let the first playable frame render before decoding placed assets.
+        await RenderingServer.frame_post_draw
+    const PUBLISHED := "res://published_placements.json"
+    if FileAccess.file_exists(PUBLISHED):
+        await _load_objects(JSON.parse_string(FileAccess.get_file_as_string(PUBLISHED)), web)
+    if not web:
         return
-    # Let the first playable frame render before reading IndexedDB.
-    await RenderingServer.frame_post_draw
     if not snapshot.is_empty():
         await _load_objects(snapshot, true)
+        return
+    if not JavaScriptBridge.eval(
+        "new URLSearchParams(location.search).has('placements') || location.hash.startsWith('#world=')", true):
         return
     if not JavaScriptBridge.eval("typeof window.chernozeryeLoadLocalObjects === 'function'", true):
         return
@@ -78,6 +86,13 @@ func _load_objects(data: Variant, spread_over_frames := false) -> void:
         if spread_over_frames and count > 0 and count % 16 == 0:
             await RenderingServer.frame_post_draw
         var instance := template.duplicate() as Node3D
+        var id := String(placement.get("id", ""))
+        if not id.is_empty():
+            var previous := get_node_or_null(id)
+            if previous != null:
+                remove_child(previous)
+                previous.queue_free()
+            instance.name = id
         instance.position = Vector3(point[0] - origin[0], 0.04, origin[1] - point[1])
         instance.scale *= clampf(float(placement.get("scale", 1.0)), 0.1, 4.0)
         instance.rotate_y(-deg_to_rad(float(placement.get("heading", 0.0))))

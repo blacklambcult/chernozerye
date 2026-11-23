@@ -1,5 +1,8 @@
 extends StaticBody3D
 
+var is_destroyed := false
+var can_take_damage := Callable()
+
 var _health := 90.0
 var _active_model: Node3D
 var _ruins: PackedScene
@@ -40,6 +43,8 @@ func install(active: PackedScene, ruins: PackedScene, color: Color) -> void:
 func apply_damage(amount: float) -> void:
     if _health <= 0.0 or amount <= 0.0:
         return
+    if can_take_damage.is_valid() and not can_take_damage.call():
+        return
     _health -= amount
     if _health > 0.0:
         return
@@ -48,3 +53,4 @@ func apply_damage(amount: float) -> void:
     _light.hide()
     _collision.set_deferred("disabled", true)
     add_child(_ruins.instantiate())
+    is_destroyed = true

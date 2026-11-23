@@ -50,6 +50,7 @@ var revolver := preload("res://revolver.gd").new()
 var forge_pistol := preload("res://forge_pistol.gd").new()
 var forge_weapons: Dictionary = {}
 var test_loadout := false
+var shrine_loadout := false
 var step_sound := AudioStreamPlayer.new()
 var music := preload("res://location_music.gd").new()
 var wind := AudioStreamPlayer.new()
@@ -142,7 +143,9 @@ func _ready() -> void:
     if test_loadout and OS.has_feature("web"):
         test_loadout = JavaScriptBridge.eval(
             "new URLSearchParams(location.search).get('forge')", true) != "local"
-    if test_loadout:
+    if shrine_loadout:
+        _load_apostol()
+    elif test_loadout:
         _load_test_weapons()
     else:
         camera.add_child(forge_pistol)
@@ -213,7 +216,26 @@ func _start_character_sequence() -> bool:
 
 func _armed_slot() -> bool:
     var hud := get_parent().get_node_or_null("GameplayHUD/SurvivalHUD")
-    return not test_loadout and hud != null and int(hud.get("selected_slot")) == 1
+    return not shrine_loadout and not test_loadout and hud != null and int(hud.get("selected_slot")) == 1
+
+func _load_apostol() -> void:
+    var specs: Dictionary = TEST_WEAPONS[0]
+    forge_pistol.test_label = "АПОСТОЛ"
+    forge_pistol.test_slot_label = "АПОСТОЛ"
+    forge_pistol.model_override = specs["model"]
+    forge_pistol.package_override = {
+        "name": "Апостол", "slot": 2, "weaponType": "revolver",
+        "gameplay": specs,
+        "viewmodel": {
+            "position": [0.245, -0.235, -0.47],
+            "rotation": [0.0, 6.0, 0.0],
+            "hand_position": [0.012, 0.015, 0.025],
+        },
+    }
+    camera.add_child(forge_pistol)
+    forge_pistol.inventory_slot = 1
+    forge_weapons[1] = forge_pistol
+
 
 func _load_test_weapons() -> void:
     for index in range(TEST_WEAPONS.size()):

@@ -103,6 +103,7 @@ func _process(delta: float) -> void:
 
 
 const STUDIO_VILLAGE := preload("res://generated_village.gd")
+var cultist_totem_site := Vector2.INF
 var _studio_village: Node3D
 var _studio_fence_profile := 0
 var _plot_polygons: Array[PackedVector2Array] = []
@@ -185,6 +186,7 @@ func decorate(features: Array) -> void:
                 _decorate_fence(polygon)
             "road":
                 _decorate_road(polygon)
+    _choose_cultist_totem_site()
     var total_plots := _fence_count
     for i in _placed_plots.size():
         _fence_count = i + 1
@@ -192,6 +194,7 @@ func decorate(features: Array) -> void:
     _fence_count = total_plots
     print("VILLAGE_ACCESS_READY: homes=", _house_approaches.size(), " segments=", _entrance_routes.size(),
         " blocked=", _approaches_blocked, " merged_fence_spans=", _fence_duplicates)
+    _add_yard_vegetation()
     _studio_village.finish()
     _flush_details()
     _build_collision_bodies()
@@ -2033,6 +2036,49 @@ func _decorate_plot_props(points: PackedVector2Array) -> void:
             continue
         _flower_patch(p, _fence_count * 31 + trial)
         flowers_placed += 1
+
+
+func _choose_cultist_totem_site() -> void:
+    for plot in _placed_plots:
+        if _studio_village.plot_profile(plot) != 6:
+            continue
+        var center := _polygon_bounds(plot).get_center()
+        for radius in [0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 13.0, 16.0]:
+            for i in 16:
+                var candidate: Vector2 = center + Vector2.from_angle(TAU * i / 16.0) * radius
+                if _yard_spot_ok(candidate, plot, [], 6):
+                    cultist_totem_site = candidate
+                    _yard_objects.append({"center": candidate, "radius": 2.0})
+                    return
+
+
+func _add_yard_vegetation() -> void:
+    var geo := get_parent()
+    var batches := {}
+    var rng := RandomNumberGenerator.new()
+    rng.seed = 481056
+    var count := 0
+    for i in _placed_plots.size():
+        if i % 3 != 1:
+            continue
+        var plot := _placed_plots[i]
+        var bounds := _polygon_bounds(plot)
+        var placed := 0
+        for attempt in 32:
+            if placed == 3:
+                break
+            var point := Vector2(rng.randf_range(bounds.position.x, bounds.end.x),
+                rng.randf_range(bounds.position.y, bounds.end.y))
+            if not _yard_spot_ok(point, plot, [], 3):
+                continue
+            var basis := Basis(Vector3.UP, rng.randf_range(-PI, PI)).scaled(Vector3.ONE * rng.randf_range(0.85, 1.3))
+            geo.call("_queue_forest_asset", batches, "yard_scrub" if placed == 0 else "understory_%d" % (i % 4),
+                Transform3D(basis, _pt(point, 0.025)))
+            _yard_objects.append({"center": point, "radius": 2.0})
+            placed += 1
+            count += 1
+    geo.call("_render_forest_batches", batches)
+    print("YARD_VEGETATION_READY: clusters=", count)
 
 
 func _decorate_fence(points: PackedVector2Array) -> void:

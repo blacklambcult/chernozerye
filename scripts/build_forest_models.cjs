@@ -45,6 +45,9 @@ async function main() {
   await bake("pond_water", "water", { tile: 8, depth: 0, seed: 1 });
   await bake("bog_water", "water", { tile: 0, depth: 0, seed: 2 });
   await bake("bog_reeds", "bush", { species: 3, group: 0, density: 1, seed: 3 });
-  console.log("STUDIO_FOREST_MODELS_READY: 25");
+  await bake("yard_scrub", "bush", { species: 4, group: 1, density: 1, seed: 3 });
+  for (const altarState of ["active", "broken"])
+    await bake("crimson_totem_" + altarState, "mystic", { shrine: 2, altarState, runeCol: 1, seed: 4 });
+  console.log("STUDIO_FOREST_MODELS_READY: 28");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
