@@ -20,6 +20,8 @@ def test_cultist_is_self_contained_and_has_six_zones():
         assert f'"{part}"' in NPC
     assert 'if ResourceLoader.exists(model_path):' in NPC
     assert '"Robe"' in NPC and '"Hood"' in NPC and '"RedRuneCross"' in NPC
+    assert '"Trouser"' in NPC and '"Boot"' in NPC
+    assert '"torso": [Vector3' in NPC
     assert "collision_layer = 0" in NPC
     assert "collision_mask = 1" in NPC
 
@@ -35,4 +37,6 @@ def test_walk_and_alert_behavior():
     assert 'func _physics_process(delta: float)' in NPC
     assert 'move_and_slide()' in NPC
     assert 'notice_distance' in NPC
-    assert '_parts[hand]' in NPC
+    assert '_parts[limb_name]' in NPC
+    assert 'PhysicsRayQueryParameters3D.create' in NPC
+    assert 'if desired.length() < 2.1' in NPC
