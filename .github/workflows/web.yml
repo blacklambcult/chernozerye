@@ -194,7 +194,11 @@ jobs:
           grep -q SHRINE_CAMPAIGN_OK /tmp/shrine-campaign.log
 
       - name: Test NPC source integration
-        run: python -m pytest -q tests/test_npc_cultist_foundation.py
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -q 'pytest>=8,<10'
+          python -m pytest -q tests/test_npc_cultist_foundation.py
 
       - name: Regression-test imported cultist skeleton and boot hierarchy
         shell: bash
