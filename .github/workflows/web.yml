@@ -156,7 +156,7 @@ jobs:
           npm install --prefix /tmp/studio-village --no-save --no-audit --no-fund three@0.128.0 @napi-rs/canvas@0.1.80
           NODE_PATH=/tmp/studio-village/node_modules node scripts/build_village_models.cjs
           NODE_PATH=/tmp/studio-village/node_modules node scripts/build_forest_models.cjs
-          test "$(find godot/generated_forest -name '*.glb' | wc -l)" -eq 22
+          test "$(find godot/generated_forest -name '*.glb' | wc -l)" -eq 25
           test "$(find godot/generated_village -name '*.glb' | wc -l)" -eq 37
 
       - name: Import project
@@ -167,6 +167,8 @@ jobs:
           set -o pipefail
           timeout 30s godot --headless --path godot --script res://forest_shrine_regression.gd | tee /tmp/forest-shrine.log
           grep -q FOREST_SHRINE_REGRESSION_OK /tmp/forest-shrine.log
+          timeout 30s godot --headless --path godot --script res://forest_floor_regression.gd | tee /tmp/forest-floor.log
+          grep -q FOREST_FLOOR_REGRESSION_OK /tmp/forest-floor.log
 
       - name: Validate GDScript sources
         shell: bash
@@ -407,6 +409,8 @@ jobs:
           grep -q 'ambient_light_energy = 0.57 if manual_mode' godot/world.gd
           grep -q 'light_specular = 0.0' godot/world.gd
           grep -Eq "MANUAL_FOREST_READY: trees=[1-9][0-9]+.* bushes=[1-9][0-9]* ground_details=[1-9][0-9]* shrines=4" /tmp/world-smoke.log
+          grep -q "FOREST_WATER_READY: surfaces=3" /tmp/world-smoke.log
+          grep -Eq "FOREST_TERRAIN_READY: chunks=[1-9][0-9]* ponds=3" /tmp/world-smoke.log
           grep -q "clearance=roads13/buildings6.5" /tmp/world-smoke.log
           grep -q "MANUAL_SHOWCASE_YARD_READY:" /tmp/world-smoke.log
           grep -q "MANUAL_UTILITY_READY: poles=" /tmp/world-smoke.log

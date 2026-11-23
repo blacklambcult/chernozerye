@@ -25,7 +25,8 @@ async function bake(name, category, parameters) {
   if (!model) throw new Error("Missing model: " + name);
   // Keep the shrine's named hierarchy so Godot can play the Studio clips.
   const animated = category === "mystic" && parameters.altarState === "active";
-  const bytes = await encodeModel(animated ? model : batchModel(model), animated ? animations : []);
+  const preserveNodes = animated || category === "water";
+  const bytes = await encodeModel(preserveNodes ? model : batchModel(model), animated ? animations : []);
   fs.writeFileSync(path.join(output, name + ".glb"), Buffer.from(bytes));
 }
 
@@ -41,6 +42,9 @@ async function main() {
   for (let i = 0; i < 4; i++)
     for (const altarState of ["active", "broken"])
       await bake("shrine_" + i + "_" + altarState, "mystic", { shrine: i, altarState, seed: i });
-  console.log("STUDIO_FOREST_MODELS_READY: 22");
+  await bake("pond_water", "water", { tile: 8, depth: 0, seed: 1 });
+  await bake("bog_water", "water", { tile: 0, depth: 0, seed: 2 });
+  await bake("bog_reeds", "bush", { species: 3, group: 0, density: 1, seed: 3 });
+  console.log("STUDIO_FOREST_MODELS_READY: 25");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
