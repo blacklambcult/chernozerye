@@ -8,6 +8,7 @@
 canvas{display:block}#hud{position:fixed;z-index:4;top:12px;left:12px;max-width:335px;background:#0b1011e9;border:1px solid #685443;padding:16px;line-height:1.45;box-shadow:0 12px 32px #0005}
 h1{color:#d69a6a;font-size:17px;letter-spacing:1.2px;margin:0 0 10px}button{font:inherit;background:#34241d;color:#f3dcc1;border:1px solid #795840;padding:9px 11px;margin:3px 4px 3px 0;cursor:pointer}button:focus-visible{outline:2px solid #ea9663}p{margin:8px 0}#status{color:#ffb378;min-height:21px}small{color:#a2a39d}#mark{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;color:#efaf73;opacity:.5}
 label{display:block;margin:10px 0;font-size:12px}input{max-width:100%;width:100%;background:#172022;border:1px solid #685443;color:#e0d5c8;padding:5px;accent-color:#d69a6a}#hud{max-height:calc(100vh - 24px);overflow:auto;width:300px}output{color:#ffb378}#profileStatus{font-size:12px;color:#a8c0ad}@media(max-width:600px){#hud{width:190px;padding:8px;font-size:11px}}
+button.active{border-color:#e5b489;background:#68503c;color:#fff}#scenarios{border-top:1px solid #685443;padding-top:8px;margin-top:8px}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
 </head>
@@ -16,6 +17,7 @@ label{display:block;margin:10px 0;font-size:12px}input{max-width:100%;width:100%
 <h1>NPC LAB / 01</h1><small>СЛУЖИТЕЛЬ ЧЁРНОЙ ЖИВИЦЫ · PROFILE EDITOR</small>
 <p>Осмотр модели и настройки персонажа.</p>
 <button id="idle">Покой</button><button id="patrol">Ходьба</button><button id="reset">Сброс позы</button>
+<div id="scenarios"><small>AMBIENT BEHAVIOR / v1.3</small><div><button data-pose="prayer">Молитва</button><button data-pose="look_around">Осмотр</button><button data-pose="adjust_robe">Поправить рясу</button><button data-pose="rest">Отдых</button><button data-pose="auto">Автоцикл</button></div></div>
 <p id="status">Загрузка GLB…</p>
 <label>Имя <input id="npcName" value="Служитель Чёрной Живицы"></label>
 <label>Скорость ходьбы <input id="walkSpeed" type="range" min=".3" max="1.5" step=".05" value=".85"><output id="walkValue"></output></label>
@@ -131,7 +133,7 @@ function animateFootsteps(dt,travelled,moving){
   }
 }
 const status=document.getElementById('status');const hitRay=new T.Raycaster(),pointer=new T.Vector2();
-const loader=new GLTFLoader();loader.load('./cultist_v09.glb?v=2',(gltf)=>{
+const loader=new GLTFLoader();loader.load('./cultist_v09.glb?v=3',(gltf)=>{
 const model=gltf.scene;
 // Source GLB is explicitly authored in Z-up, rotate to Three.js Y-up first.
 model.rotation.x=-Math.PI/2;
@@ -146,11 +148,21 @@ connectBones();resetFeet();
 model.traverse((obj)=>{if(obj.isMesh){obj.castShadow=true;obj.receiveShadow=true;meshes.push(obj);if(obj.material){obj.material.side=T.DoubleSide;obj.material.roughness=1;obj.material.metalness=0}}});
 status.textContent='Модель: '+Object.keys(rig).length+'/9 подвижных узлов, включая голени и стопы.';
 },undefined,(error)=>{status.textContent='GLB не загрузился: проверь сборку';console.error(error)});
-function mode(s){if(fallen)return;pose=s;restTime=0;status.textContent=s==='patrol'?'ПАТРУЛЬ — опорные стопы':s==='alert'?'ТРЕВОГА — ускорение и шаг':'ОЖИДАНИЕ — без прыжков'}
+const poseLabels={idle:'ОЖИДАНИЕ',patrol:'ХОДЬБА',prayer:'МОЛИТВА',look_around:'ОСМОТР ОКРУЖЕНИЯ',adjust_robe:'ПОПРАВЛЕНИЕ РЯСЫ',rest:'ОТДЫХ'};
+const ambientSequence=['patrol','rest','patrol','prayer','patrol','look_around','patrol','adjust_robe'];
+let poseTime=0,autoMode=false,autoIndex=0,autoDuration=4;
+let poseMix={prayer:0,look_around:0,adjust_robe:0,rest:0};
+function mode(s,keepAuto=false){
+  if(!keepAuto)autoMode=s==='auto';
+  if(s==='auto'){autoIndex=0;s=ambientSequence[0]}
+  pose=s;poseTime=0;restTime=0;autoDuration=3.5+Math.random()*3;
+  status.textContent=(autoMode?'АВТОЦИКЛ / ':'')+(poseLabels[s]||s);
+  document.querySelectorAll('[data-pose],#idle,#patrol').forEach(b=>b.classList.toggle('active',autoMode?b.dataset.pose==='auto':(b.dataset.pose||b.id)===s));
+}
 document.getElementById('idle').onclick=()=>mode('idle');
 document.getElementById('patrol').onclick=()=>mode('patrol');
-
-document.getElementById('reset').onclick=()=>{fallen=false;pose='idle';hits=0;pace=0;clockTime=0;strideMeters=0;patrolIndex=0;restTime=0;velocity.set(0,0,0);root.position.set(0,0,0);actor.position.set(0,0,0);actor.rotation.set(0,0,0);resetFeet();status.textContent='Сброс: модель готова';};
+document.querySelectorAll('[data-pose]').forEach(b=>b.onclick=()=>mode(b.dataset.pose));
+document.getElementById('reset').onclick=()=>{fallen=false;hits=0;pace=0;clockTime=0;strideMeters=0;patrolIndex=0;velocity.set(0,0,0);root.position.set(0,0,0);actor.position.set(0,0,0);actor.rotation.set(0,0,0);resetFeet();for(const key of Object.keys(poseMix))poseMix[key]=0;mode('idle')};
 const fields=['npcName','walkSpeed','heightScale','lightLevel','murmurDb'];
 const defaults={npcName:'Служитель Чёрной Живицы',walkSpeed:.85,heightScale:1,lightLevel:2,murmurDb:-10};
 const storageKey='chernozerye.npclab.v1';
@@ -165,7 +177,9 @@ apply();
 const clock=new T.Clock();
 function animate(){
 requestAnimationFrame(animate);
-const dt=Math.min(clock.getDelta(),.05);clockTime+=dt;
+const dt=Math.min(clock.getDelta(),.05);clockTime+=dt;poseTime+=dt;
+if(autoMode&&poseTime>=autoDuration){autoIndex=(autoIndex+1)%ambientSequence.length;mode(ambientSequence[autoIndex],true)}
+for(const key of Object.keys(poseMix))poseMix[key]=T.MathUtils.damp(poseMix[key],pose===key?1:0,3,dt);
 const wanted=new T.Vector3();
 if(!fallen && (pose==='patrol'||pose==='alert')){
   if(pose==='patrol' && restTime>0){restTime=Math.max(0,restTime-dt)}
@@ -199,12 +213,18 @@ if(!fallen){
   for(const side of ['Left','Right']){
     const arm=rig[side+'Arm'];if(!arm)continue;
     const swing=side==='Left'?b:a;
-    arm.pivot.rotation.x=T.MathUtils.damp(arm.pivot.rotation.x,swing*.17*moving,7,dt);
+    const sign=side==='Left'?-1:1;
+    const bend=swing*.17*moving-.27*poseMix.prayer-(.13+.065*Math.sin(poseTime*2.2+(side==='Left'?0:Math.PI)))*poseMix.adjust_robe;
+    const sleeve=-sign*(.15*poseMix.prayer+.09*poseMix.adjust_robe)+sign*.025*poseMix.rest;
+    arm.pivot.rotation.x=T.MathUtils.damp(arm.pivot.rotation.x,bend,7,dt);
+    arm.pivot.rotation.y=T.MathUtils.damp(arm.pivot.rotation.y,sleeve,7,dt);
   }
   if(rig.Head){
     const head=rig.Head.pivot;
-    head.rotation.x=T.MathUtils.damp(head.rotation.x,.025+Math.sin(clockTime*.65)*.015,3,dt);
-    head.rotation.z=T.MathUtils.damp(head.rotation.z,Math.sin(clockTime*.4)*.025,3,dt);
+    const pitch=.035+Math.sin(clockTime*1.7)*.018-.225*poseMix.prayer-.10*poseMix.adjust_robe;
+    const yaw=Math.sin(clockTime*.73)*.19*(1-moving)*(1-poseMix.prayer)+Math.sin(poseTime*1.1)*.32*poseMix.look_around;
+    head.rotation.x=T.MathUtils.damp(head.rotation.x,pitch,7,dt);
+    head.rotation.z=T.MathUtils.damp(head.rotation.z,yaw,7,dt);
   }
   if(travelled>.00001)animateFootsteps(dt,travelled,moving);
   else if(modelRef && velocity.length()<.02){
