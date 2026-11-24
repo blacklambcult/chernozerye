@@ -470,7 +470,10 @@ func _build_version_text() -> String:
 
 
 func _fog_distance_label() -> String:
-    return " · Дальность %d м" % int(FOG_TEST_CAMERA_FAR if _fog_distance_test else MANUAL_CAMERA_FAR)
+    var label := " · Дальность %d м" % int(FOG_TEST_CAMERA_FAR if _fog_distance_test else MANUAL_CAMERA_FAR)
+    if "--world-chunks-96" in OS.get_cmdline_user_args():
+        label += " · Чанки 96 м"
+    return label
 
 
 func _apply_village_fog_distance() -> void:

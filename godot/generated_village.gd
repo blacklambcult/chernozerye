@@ -8,6 +8,7 @@ const SECTOR_CENTER := Vector2(-660.0, 390.0)
 const SECTOR_HALF := 340.0
 const BASE_SIZES := {"house": Vector2(4.8, 4.2), "sauna": Vector2(3.4, 3.0), "shed": Vector2(3.8, 2.8)}
 var _fence_chunk_size := DEFAULT_CHUNK_SIZE
+var _building_chunk_size := DEFAULT_CHUNK_SIZE
 var _plots: Array[Dictionary] = []
 var _models: Dictionary = {}
 var _transforms: Dictionary = {}
@@ -23,6 +24,7 @@ var _cultist_point := Vector2.ZERO
 
 
 func prepare(features: Array) -> void:
+    _building_chunk_size = 96.0 if "--world-chunks-96" in OS.get_cmdline_user_args() else DEFAULT_CHUNK_SIZE
     if OS.has_feature("web") and JavaScriptBridge.eval(
         "new URLSearchParams(window.location.search).get('fence_chunks') === '96'", true
     ) == true:
@@ -215,7 +217,7 @@ func add_fence(a: Vector2, b: Vector2, profile: int, material_index: int) -> voi
 func _queue(id: String, pose: Transform3D) -> void:
     if not _transforms.has(id):
         _transforms[id] = {}
-    var size := _fence_chunk_size if id.begins_with("fence_") else DEFAULT_CHUNK_SIZE
+    var size := _fence_chunk_size if id.begins_with("fence_") else _building_chunk_size
     var cell := Vector2i(floori(pose.origin.x / size), floori(pose.origin.z / size))
     var cells: Dictionary = _transforms[id]
     if not cells.has(cell):

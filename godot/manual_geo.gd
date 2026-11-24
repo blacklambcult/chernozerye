@@ -24,6 +24,7 @@ var forest_positions: Array[Transform3D] = []
 var _forest_floor: Node3D
 var _forest_sites: Array[Vector2] = []
 var _forest_cells: Dictionary = {}
+var _forest_chunk_size := 145.0
 var _forest_models: Dictionary = {}
 var _shrine_sites: Array[Vector2] = []
 var _quest_shrines: Array[Node3D] = []
@@ -40,6 +41,7 @@ var _junction_mesh_count := 0
 var _base_buildings: Node3D
 
 func _ready() -> void:
+    _forest_chunk_size = 96.0 if "--world-chunks-96" in OS.get_cmdline_user_args() else 145.0
     visible = false
     call_deferred("_build_manual")
 
@@ -679,7 +681,7 @@ func _forest_model(id: String) -> PackedScene:
 
 
 func _queue_forest_asset(batches: Dictionary, id: String, pose: Transform3D) -> void:
-    var cell := Vector2i((Vector2(pose.origin.x, pose.origin.z) / 145.0).floor())
+    var cell := Vector2i((Vector2(pose.origin.x, pose.origin.z) / _forest_chunk_size).floor())
     if not batches.has(id):
         batches[id] = {}
     var cells: Dictionary = batches[id]
