@@ -2,9 +2,12 @@ extends Node3D
 ## Batches Studio models across the surveyed plots without changing the map data.
 
 const MODEL_DIR := "res://generated_village/"
+const DEFAULT_CHUNK_SIZE := 128.0
+const TEST_FENCE_CHUNK_SIZE := 96.0
 const SECTOR_CENTER := Vector2(-660.0, 390.0)
 const SECTOR_HALF := 340.0
 const BASE_SIZES := {"house": Vector2(4.8, 4.2), "sauna": Vector2(3.4, 3.0), "shed": Vector2(3.8, 2.8)}
+var _fence_chunk_size := DEFAULT_CHUNK_SIZE
 var _plots: Array[Dictionary] = []
 var _models: Dictionary = {}
 var _transforms: Dictionary = {}
@@ -20,6 +23,10 @@ var _cultist_point := Vector2.ZERO
 
 
 func prepare(features: Array) -> void:
+    if OS.has_feature("web") and JavaScriptBridge.eval(
+        "new URLSearchParams(window.location.search).get('fence_chunks') === '96'", true
+    ) == true:
+        _fence_chunk_size = TEST_FENCE_CHUNK_SIZE
     var houses: Array[Vector2] = []
     for feature in features:
         if feature.get("type") == "house":
@@ -208,7 +215,8 @@ func add_fence(a: Vector2, b: Vector2, profile: int, material_index: int) -> voi
 func _queue(id: String, pose: Transform3D) -> void:
     if not _transforms.has(id):
         _transforms[id] = {}
-    var cell := Vector2i(floori(pose.origin.x / 128.0), floori(pose.origin.z / 128.0))
+    var size := _fence_chunk_size if id.begins_with("fence_") else DEFAULT_CHUNK_SIZE
+    var cell := Vector2i(floori(pose.origin.x / size), floori(pose.origin.z / size))
     var cells: Dictionary = _transforms[id]
     if not cells.has(cell):
         cells[cell] = []
