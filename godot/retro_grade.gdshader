@@ -12,6 +12,10 @@ float luminance(vec3 c) {
     return dot(c, vec3(0.299, 0.587, 0.114));
 }
 
+float blue_excess(vec3 c) {
+    return c.b - max(c.r, c.g);
+}
+
 void fragment() {
     vec2 scene_uv = SCREEN_UV;
     if (ps1_pixels_enabled && ps1_pixel_strength > 0.0) {
@@ -28,12 +32,23 @@ void fragment() {
     float right_l = luminance(texture(scene_color, scene_uv + vec2(offset.x, 0.0)).rgb);
     float up_l = luminance(texture(scene_color, scene_uv + vec2(0.0, offset.y)).rgb);
     float contrast = abs(center_l - right_l) + abs(center_l - up_l);
-    float sky_blue = original.b - max(original.r, original.g);
+    float sky_blue = blue_excess(original);
     float sky_mask = smoothstep(0.012, 0.055, sky_blue)
         * (1.0 - smoothstep(0.012, 0.055, contrast))
         * (1.0 - smoothstep(0.64, 0.88, scene_uv.y));
 
     vec3 scene = original;
+    if (ps1_pixels_enabled && ps1_pixel_strength > 0.0) {
+        // Use the native sample when snapping crosses a contrasting twilight silhouette.
+        vec3 native_color = texture(scene_color, SCREEN_UV).rgb;
+        float native_blue = blue_excess(native_color);
+        float twilight = smoothstep(0.012, 0.04, max(sky_blue, native_blue))
+            * (1.0 - smoothstep(0.64, 0.88, SCREEN_UV.y));
+        float silhouette = smoothstep(0.014, 0.042, abs(sky_blue - native_blue));
+        float edge_keep = twilight * silhouette;
+        scene = mix(scene, native_color, edge_keep);
+        sky_mask = mix(sky_mask, smoothstep(0.012, 0.055, native_blue), edge_keep);
+    }
 
     // Modest posterization and cel shading on solid objects.
     vec3 poster = floor(scene * poster_levels + 0.5) / poster_levels;
