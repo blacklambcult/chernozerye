@@ -25,6 +25,10 @@ label{display:block;margin:10px 0;font-size:12px}input{max-width:100%;width:100%
 <button id="saveProfile">Скачать JSON</button><button id="resetProfile">По умолчанию</button>
 <p><small>ЛКМ / свайп — вращение, колесо — масштаб. Профиль сохраняется локально. Экспорт не меняет опубликованную игру.</small></p><p id="profileStatus"></p>
 </div>
+<script>
+window.addEventListener('error',()=>{document.getElementById('status').textContent='Ошибка загрузки 3D-редактора. Проверь доступность WebGL и CDN.'});
+window.addEventListener('unhandledrejection',()=>{document.getElementById('status').textContent='Не удалось загрузить 3D-компоненты.'});
+</script>
 <script type="module">
 import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -127,7 +131,7 @@ function animateFootsteps(dt,travelled,moving){
   }
 }
 const status=document.getElementById('status');const hitRay=new T.Raycaster(),pointer=new T.Vector2();
-const loader=new GLTFLoader();loader.load('./cultist_v09.glb',(gltf)=>{
+const loader=new GLTFLoader();loader.load('./cultist_v09.glb?v=2',(gltf)=>{
 const model=gltf.scene;
 // Source GLB is explicitly authored in Z-up, rotate to Three.js Y-up first.
 model.rotation.x=-Math.PI/2;
