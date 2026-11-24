@@ -37,7 +37,7 @@ func _process(_delta: float) -> void:
         set_process(false)
 
 func _ready() -> void:
-    _fog_distance_test = "--fog-distance-145" in OS.get_cmdline_user_args()
+    _fog_distance_test = OS.has_feature("web") or "--fog-distance-145" in OS.get_cmdline_user_args()
     _create_ground()
     _create_lighting()
     var ps1 := preload("res://ps1_effects.gd").new()
