@@ -445,7 +445,7 @@ func _create_gameplay_hud() -> void:
 
     var build_label := Label.new()
     build_label.name = "BuildVersion"
-    build_label.text = _build_version_text()
+    build_label.text = _build_version_text() + _fog_distance_label()
     build_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
     build_label.add_theme_font_size_override("font_size", 13)
     build_label.add_theme_color_override("font_color", Color("#d4c9b6"))
@@ -465,11 +465,21 @@ func _build_version_text() -> String:
             "/pre-alpha-([0-9]+[.][0-9]+[.][0-9]+)-([a-f0-9]{8})/(?:index[.]html)?$")
         var release := release_pattern.search(path)
         if release != null:
-            var version := "Pre-Alpha %s · %s" % [release.get_string(1), release.get_string(2)]
-            if _fog_distance_test:
-                version += " · Туман %d м" % int(FOG_TEST_CAMERA_FAR)
-            return version
+            return "Pre-Alpha %s · %s" % [release.get_string(1), release.get_string(2)]
     return GAME_STAGE
+
+
+func _fog_distance_label() -> String:
+    return " · Дальность %d м" % int(FOG_TEST_CAMERA_FAR if _fog_distance_test else MANUAL_CAMERA_FAR)
+
+
+func _apply_village_fog_distance() -> void:
+    if _night_environment != null:
+        _night_environment.fog_density = 1.0 if _fog_distance_test else 0.88
+        _night_environment.fog_depth_end = FOG_TEST_DEPTH_END if _fog_distance_test else 180.0
+    var camera := get_node_or_null("Player/Camera3D") as Camera3D
+    if camera != null:
+        camera.far = FOG_TEST_CAMERA_FAR if _fog_distance_test else MANUAL_CAMERA_FAR
 
 
 func _create_label() -> void:
@@ -831,9 +841,6 @@ func _toggle_manual_preview() -> void:
         _night_environment.fog_density = 0.88 if manual_mode else 0.0018
         _night_environment.fog_depth_begin = 38.0 if manual_mode else 24.0
         _night_environment.fog_depth_end = 180.0 if manual_mode else 118.0
-        if manual_mode and _fog_distance_test:
-            _night_environment.fog_density = 1.0
-            _night_environment.fog_depth_end = FOG_TEST_DEPTH_END
         _night_environment.fog_depth_curve = 1.3
         _night_environment.fog_height = 0.8 if manual_mode else 0.0
         _night_environment.fog_height_density = 0.010 if manual_mode else 0.0
@@ -873,8 +880,6 @@ func _toggle_manual_preview() -> void:
             player_camera.near = MANUAL_CAMERA_NEAR if manual_mode else 0.25
             player_camera.far = MANUAL_CAMERA_FAR if manual_mode else 2300.0
             if manual_mode:
-                if _fog_distance_test:
-                    player_camera.far = FOG_TEST_CAMERA_FAR
                 var capsule := character.get_node_or_null("CollisionShape3D") as CollisionShape3D
                 var shape: CapsuleShape3D = null
                 if capsule != null:
@@ -884,6 +889,8 @@ func _toggle_manual_preview() -> void:
                     push_error("CAMERA_CLIP_GUARD_FAILED: camera near plane too far into walls")
                 print("CAMERA_CLIP_GUARD_READY: near=", player_camera.near,
                     " far=", player_camera.far, " radius=", radius)
+    if manual_mode:
+        _apply_village_fog_distance()
     overview_layer.visible = false
     Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
@@ -933,7 +940,14 @@ func _toggle_houses() -> void:
 
 func _input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
-        if event.physical_keycode == KEY_M or event.keycode == KEY_M or (event.unicode != 0 and char(event.unicode).to_lower() == "ь"):
+        if manual_mode and event.shift_pressed and (event.physical_keycode == KEY_G or event.keycode == KEY_G):
+            _fog_distance_test = not _fog_distance_test
+            _apply_village_fog_distance()
+            var build_label := get_node_or_null("GameplayHUD/BuildVersion") as Label
+            if build_label != null:
+                build_label.text = _build_version_text() + _fog_distance_label()
+            get_viewport().set_input_as_handled()
+        elif event.physical_keycode == KEY_M or event.keycode == KEY_M or (event.unicode != 0 and char(event.unicode).to_lower() == "ь"):
             var prologue := get_node_or_null("StoryPrologue")
             if prologue != null and (bool(prologue.get("inside_home")) or bool(prologue.get("journal_open"))):
                 return
