@@ -27,6 +27,11 @@ var _gait_blend := 0.0
 var _robe_pivot: Node3D
 var _robe_rest := Vector3.ZERO
 var _cloth_sway := 0.0
+var _ambient_pose := "rest"
+var _pose_time := 0.0
+var _pose_mix := 0.0
+var _pose_index := 0
+const AMBIENT_POSES := ["rest", "prayer", "look_around", "adjust_robe"]
 var _ambience: Node3D
 
 func _ready() -> void:
@@ -291,6 +296,13 @@ func _choose_target() -> void:
     _state = "patrol"
     _state_timer = randf_range(3.0, 6.0)
 
+func _begin_ambient_pause() -> void:
+    _state = "ambient_pause"
+    _ambient_pose = AMBIENT_POSES[_pose_index % AMBIENT_POSES.size()]
+    _pose_index += 1
+    _pose_time = 0.0
+    _state_timer = randf_range(3.5, 6.5)
+
 func _physics_process(delta: float) -> void:
     if _state == "down":
         return
@@ -324,12 +336,16 @@ func _physics_process(delta: float) -> void:
     elif _state == "alert":
         _state_timer -= delta
         if _state_timer <= 0.0:
+            _begin_ambient_pause()
+    elif _state == "ambient_pause":
+        _state_timer -= delta
+        if _state_timer <= 0.0:
             _choose_target()
     else:
         desired = _target - global_position
         _state_timer -= delta
         if desired.length() < 0.9 or _state_timer <= 0.0:
-            _choose_target()
+            _begin_ambient_pause()
             desired = Vector3.ZERO
     desired.y = 0.0
     var speed := walk_speed * (1.25 if _state == "alert" else 1.0)
@@ -387,6 +403,8 @@ func _setup_cloth(model: Node3D) -> void:
 
 func _animate_character(delta: float, distance: float) -> void:
     _animation_time += delta
+    _pose_time += delta
+    _pose_mix = lerpf(_pose_mix, 1.0 if _state == "ambient_pause" else 0.0, 1.0 - exp(-delta * 3.0))
     var speed_now := distance / maxf(delta, 0.0001)
     _gait_blend = lerpf(_gait_blend, clampf(speed_now / 0.65, 0.0, 1.0), 1.0 - exp(-delta * 5.0))
     _step_clock = fmod(_step_clock + distance * 9.5, TAU)
@@ -399,8 +417,17 @@ func _animate_character(delta: float, distance: float) -> void:
     if _head != null and _head != _parts.get("model"):
         var scan := sin(_animation_time * 0.73) * 0.19 * (1.0 - _gait_blend)
         if _has_joint_rig:
-            _head.rotation.z = lerp_angle(_head.rotation.z, scan, ease)
-            _head.rotation.x = lerpf(_head.rotation.x, 0.035 + sin(_animation_time * 1.7) * 0.018, ease)
+            var head_yaw := scan
+            var head_pitch := 0.035 + sin(_animation_time * 1.7) * 0.018
+            if _ambient_pose == "prayer":
+                head_pitch = lerpf(head_pitch, -0.19, _pose_mix)
+                head_yaw *= 1.0 - _pose_mix
+            elif _ambient_pose == "look_around":
+                head_yaw += sin(_pose_time * 1.1) * 0.32 * _pose_mix
+            elif _ambient_pose == "adjust_robe":
+                head_pitch -= 0.10 * _pose_mix
+            _head.rotation.z = lerp_angle(_head.rotation.z, head_yaw, ease)
+            _head.rotation.x = lerpf(_head.rotation.x, head_pitch, ease)
         else:
             _head.rotation.y = lerp_angle(_head.rotation.y, scan, ease)
     for limb_name in ["leftArm", "rightArm", "leftLeg", "rightLeg", "leftShin", "rightShin", "leftFoot", "rightFoot"]:
@@ -412,7 +439,18 @@ func _animate_character(delta: float, distance: float) -> void:
         var bend := 0.0
         if limb_name.ends_with("Arm"):
             bend = -sin(phase - 0.32) * 0.17 * _gait_blend + sin(_animation_time * 1.6) * 0.014
-            limb.rotation.y = lerpf(limb.rotation.y, base.y + cos(phase - 0.45) * 0.025 * _gait_blend, ease)
+            var sleeve_angle := cos(phase - 0.45) * 0.025 * _gait_blend
+            if _has_joint_rig:
+                var side_sign := -1.0 if limb_name.begins_with("left") else 1.0
+                if _ambient_pose == "prayer":
+                    bend -= 0.27 * _pose_mix
+                    sleeve_angle -= side_sign * 0.15 * _pose_mix
+                elif _ambient_pose == "adjust_robe":
+                    bend -= (0.13 + 0.065 * sin(_pose_time * 2.2 + phase)) * _pose_mix
+                    sleeve_angle -= side_sign * 0.09 * _pose_mix
+                elif _ambient_pose == "rest":
+                    sleeve_angle += side_sign * 0.025 * _pose_mix
+            limb.rotation.y = lerpf(limb.rotation.y, base.y + sleeve_angle, ease)
         elif limb_name.ends_with("Leg"):
             bend = sin(phase) * 0.28 * _gait_blend
         elif limb_name.ends_with("Shin"):
