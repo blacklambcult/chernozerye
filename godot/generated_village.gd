@@ -249,6 +249,8 @@ func finish() -> void:
                 var batch := MultiMeshInstance3D.new()
                 batch.name = id
                 batch.add_to_group(render_group)
+                if render_group == &"perf_fences":
+                    batch.lod_bias = 0.6
                 batch.multimesh = multi
                 batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
                 add_child(batch, true)
