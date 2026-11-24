@@ -474,6 +474,8 @@ jobs:
           # Pass preview mode as a Godot user argument before the scene starts.
           sed -i '/^const engine = new Engine(GODOT_CONFIG);/i\if (new URLSearchParams(window.location.search).get("forge") === "local") GODOT_CONFIG.args.push("--", "--forge-local");' "build/web/${RELEASE_DIR}/index.html"
           sed -i '/^const engine = new Engine(GODOT_CONFIG);/i\if (new URLSearchParams(window.location.search).get("fog_distance") === "145") { if (!GODOT_CONFIG.args.includes("--")) GODOT_CONFIG.args.push("--"); GODOT_CONFIG.args.push("--fog-distance-145"); }' "build/web/${RELEASE_DIR}/index.html"
+          sed -i '/^const engine = new Engine(GODOT_CONFIG);/i\if (new URLSearchParams(window.location.search).get("world_chunks") === "96") { if (!GODOT_CONFIG.args.includes("--")) GODOT_CONFIG.args.push("--"); GODOT_CONFIG.args.push("--world-chunks-96"); }' "build/web/${RELEASE_DIR}/index.html"
+          grep -Fq 'GODOT_CONFIG.args.push("--world-chunks-96")' "build/web/${RELEASE_DIR}/index.html"
           grep -Fq 'GODOT_CONFIG.args.push("--fog-distance-145")' "build/web/${RELEASE_DIR}/index.html"
           grep -Fq 'GODOT_CONFIG.args.push("--", "--forge-local")' "build/web/${RELEASE_DIR}/index.html"
           grep -Fq "object-library/game.js" "build/web/${RELEASE_DIR}/index.html"
