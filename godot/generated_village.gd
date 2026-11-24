@@ -236,6 +236,9 @@ func finish() -> void:
                 var material := mesh.surface_get_material(i) as BaseMaterial3D
                 if material != null:
                     material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
+                    # Godot's glTF import does not enable albedo vertex colors for these batches.
+                    if (mesh.surface_get_format(i) & Mesh.ARRAY_FORMAT_COLOR) != 0:
+                        material.vertex_color_use_as_albedo = true
             for poses: Array in cells.values():
                 var multi := MultiMesh.new()
                 multi.transform_format = MultiMesh.TRANSFORM_3D
