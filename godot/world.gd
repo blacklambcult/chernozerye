@@ -442,6 +442,31 @@ func _create_gameplay_hud() -> void:
     ui.set_script(preload("res://gameplay_hud.gd"))
     hud_layer.add_child(ui)
 
+    var build_label := Label.new()
+    build_label.name = "BuildVersion"
+    build_label.text = _build_version_text()
+    build_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    build_label.add_theme_font_size_override("font_size", 13)
+    build_label.add_theme_color_override("font_color", Color("#d4c9b6"))
+    build_label.add_theme_color_override("font_outline_color", Color("#111311"))
+    build_label.add_theme_constant_override("outline_size", 4)
+    hud_layer.add_child(build_label)
+    build_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 8)
+    build_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+    build_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+
+
+func _build_version_text() -> String:
+    if OS.has_feature("web"):
+        # Pages uses one immutable directory per game version and commit.
+        var path := str(JavaScriptBridge.eval("window.location.pathname", true))
+        var release_pattern := RegEx.create_from_string(
+            "/pre-alpha-([0-9]+[.][0-9]+[.][0-9]+)-([a-f0-9]{8})/(?:index[.]html)?$")
+        var release := release_pattern.search(path)
+        if release != null:
+            return "Pre-Alpha %s · %s" % [release.get_string(1), release.get_string(2)]
+    return GAME_STAGE
+
 
 func _create_label() -> void:
     var layer := CanvasLayer.new()
