@@ -9,6 +9,7 @@
     quest: {kicker:"MISSION WORKSPACE / 02", name:"QUEST LAB · РЕДАКТОР КВЕСТОВ", url:"../quest/", file:"../quest/?studio=1"},
     model: {kicker:"ASSET WORKSPACE / 03", name:"MODEL LAB · 3D-КОНСТРУКТОР", url:"../model/", file:"../model/?studio=1"},
     forge: {kicker:"ARMORY ASSET WORKSPACE / 04", name:"HELLISH FORGE · ИГРОВЫЕ МОДЕЛИ", url:"../forge/", file:"../forge/?studio=1"},
+    npc: {kicker:"CHARACTER WORKSPACE / 09", name:"NPC LAB · РЕДАКТОР ПЕРСОНАЖЕЙ", url:"../npc/", file:"../npc/?studio=1"},
     nature: {kicker:"ENVIRONMENT / 08", name:"ГЕНЕРАТОР ПРИРОДЫ", url:"../nature-generator/", file:"../nature-generator/?studio=1"},
     buildings: {kicker:"ARCHITECTURE / 07", name:"ГЕНЕРАТОР ПОСТРОЕК", url:"../building-generator/?v=3", file:"../building-generator/?studio=1&v=3"},
     arms: {kicker:"FIRST PERSON / 06", name:"РУКИ ОТ ПЕРВОГО ЛИЦА", url:"../arms/", file:"../arms/?studio=1"},
@@ -73,7 +74,7 @@
         let url;
         try { url = new URL(link.href, frame.contentWindow.location.href); } catch { return; }
         if (url.origin !== window.location.origin) return;
-        const match = url.pathname.match(/\/chernozerye\/(map|quest|model|forge|weapon-generator|building-generator|nature-generator|arms|studio)\/?$/);
+        const match = url.pathname.match(/\/chernozerye\/(map|quest|model|forge|weapon-generator|building-generator|nature-generator|arms|npc|studio)\/?$/);
         if (!match) return;
         event.preventDefault();
         show(match[1] === "map" ? "geo" : match[1] === "studio" ? "home" :
@@ -81,7 +82,7 @@
       }, {capture: true});
       doc.addEventListener("keydown", (event) => {
         if (!event.altKey || event.ctrlKey || event.metaKey) return;
-        const next = { Digit0:"home", Digit1:"geo", Digit2:"quest", Digit3:"model", Digit4:"forge", Digit5:"weapon", Digit6:"arms", Digit7:"buildings", Digit8:"nature" }[event.code];
+        const next = { Digit0:"home", Digit1:"geo", Digit2:"quest", Digit3:"model", Digit4:"forge", Digit5:"weapon", Digit6:"arms", Digit7:"buildings", Digit8:"nature", Digit9:"npc" }[event.code];
         if (next) { event.preventDefault(); event.stopImmediatePropagation(); show(next); }
       }, {capture: true});
     } catch (error) {
@@ -201,7 +202,7 @@
       return;
     }
     if (!evt.altKey || evt.ctrlKey || evt.metaKey) return;
-    const id = {Digit0:"home",Digit1:"geo",Digit2:"quest",Digit3:"model",Digit4:"forge",Digit5:"weapon", Digit6:"arms", Digit7:"buildings", Digit8:"nature"}[evt.code];
+    const id = {Digit0:"home",Digit1:"geo",Digit2:"quest",Digit3:"model",Digit4:"forge",Digit5:"weapon", Digit6:"arms", Digit7:"buildings", Digit8:"nature", Digit9:"npc"}[evt.code];
     if (id) { evt.preventDefault(); show(id); }
   });
   setRailCollapsed(railCollapsed);
