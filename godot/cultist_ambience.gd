@@ -8,7 +8,9 @@ var _foot: AudioStreamPlayer3D
 var _cloth: AudioStreamPlayer3D
 var _voice: AudioStreamPlayer3D
 var _distance := 0.0
-var _timer := 3.0
+var _breathing: AudioStreamPlayer3D
+var _breath_timer := 0.4
+var _murmur_timer := 2.0
 var _rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
@@ -20,7 +22,12 @@ func _ready() -> void:
     _murmur = _make_sound(3, 2.3)
     _foot = _speaker("Footsteps", 0.15, -13.0, 12.0)
     _cloth = _speaker("RobeRustle", 0.95, -24.0, 8.0)
-    _voice = _speaker("QuietVoice", 1.58, -22.0, 10.0)
+    _breathing = _speaker("Breathing", 1.58, -5.0, 12.0)
+    _voice = _speaker("QuietVoice", 1.58, -3.0, 16.0)
+    _breathing.unit_size = 3.0
+    _voice.unit_size = 3.5
+    _breathing.stream = _breath
+    _voice.stream = _murmur
 
 func _speaker(label: String, height: float, db: float, reach: float) -> AudioStreamPlayer3D:
     var p := AudioStreamPlayer3D.new()
@@ -52,11 +59,11 @@ func _make_sound(kind: int, seconds: float) -> AudioStreamWAV:
         elif kind == 1:
             x = (n - low) * 0.22 * pow(sin(PI * u), 2.0) * (0.7 + 0.3 * sin(t * 48.0))
         elif kind == 2:
-            x = (low * 0.50 + n * 0.08) * pow(sin(PI * u), 2.0)
+            x = (low * 1.3 + (n - low) * 0.20) * (0.65 + 0.35 * sin(TAU * 1.3 * t)) * pow(sin(PI * u), 1.5)
         else:
             phase += TAU * (92.0 + 8.0 * sin(t * 5.3)) / rate
             var syllable := pow(0.5 + 0.5 * sin(t * 10.7 + sin(t * 4.0)), 2.0)
-            x = (sin(phase) * 0.16 + sin(phase * 2.0) * 0.07 + low * 0.15) * syllable * pow(sin(PI * u), 1.4)
+            x = (sin(phase) * 0.32 + sin(phase * 2.0) * 0.18 + sin(phase * 5.0) * 0.13 + sin(phase * 8.0) * 0.06 + low * 0.24) * syllable * pow(sin(PI * u), 1.4)
         bytes.encode_s16(i * 2, int(clampf(x, -1.0, 1.0) * 32760.0))
     var stream := AudioStreamWAV.new()
     stream.format = AudioStreamWAV.FORMAT_16_BITS
@@ -79,9 +86,13 @@ func update_motion(delta: float, travelled: float, grounded: bool) -> void:
                 _cloth.stream = _rustle
                 _cloth.pitch_scale = _rng.randf_range(0.88, 1.12)
                 _cloth.play()
-    _timer -= delta
-    if _timer <= 0.0 and not _voice.playing:
-        _voice.stream = _murmur if _rng.randf() < 0.23 else _breath
-        _voice.pitch_scale = _rng.randf_range(0.92, 1.06)
+    _breath_timer -= delta
+    if _breath_timer <= 0.0 and not _breathing.playing:
+        _breathing.pitch_scale = _rng.randf_range(0.92, 1.06)
+        _breathing.play()
+        _breath_timer = _rng.randf_range(2.5, 3.8)
+    _murmur_timer -= delta
+    if _murmur_timer <= 0.0 and not _voice.playing:
+        _voice.pitch_scale = _rng.randf_range(0.92, 1.04)
         _voice.play()
-        _timer = _rng.randf_range(5.0, 11.0)
+        _murmur_timer = _rng.randf_range(6.0, 10.0)
