@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Чернозёрье / NPC LAB</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#101416;color:#d8d0c4;overflow:hidden;font-family:ui-monospace,monospace}
+canvas{display:block}#hud{position:fixed;z-index:4;top:12px;left:12px;max-width:335px;background:#0b1011e9;border:1px solid #685443;padding:16px;line-height:1.45;box-shadow:0 12px 32px #0005}
+h1{color:#d69a6a;font-size:17px;letter-spacing:1.2px;margin:0 0 10px}button{font:inherit;background:#34241d;color:#f3dcc1;border:1px solid #795840;padding:9px 11px;margin:3px 4px 3px 0;cursor:pointer}button:focus-visible{outline:2px solid #ea9663}p{margin:8px 0}#status{color:#ffb378;min-height:21px}small{color:#a2a39d}#mark{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;color:#efaf73;opacity:.5}
+label{display:block;margin:10px 0;font-size:12px}input{max-width:100%;width:100%;background:#172022;border:1px solid #685443;color:#e0d5c8;padding:5px;accent-color:#d69a6a}#hud{max-height:calc(100vh - 24px);overflow:auto;width:300px}output{color:#ffb378}#profileStatus{font-size:12px;color:#a8c0ad}@media(max-width:600px){#hud{width:190px;padding:8px;font-size:11px}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="hud">
+<h1>NPC LAB / 01</h1><small>СЛУЖИТЕЛЬ ЧЁРНОЙ ЖИВИЦЫ · PROFILE EDITOR</small>
+<p>Осмотр модели и настройки персонажа.</p>
+<button id="idle">Покой</button><button id="patrol">Ходьба</button><button id="reset">Сброс позы</button>
+<p id="status">Загрузка GLB…</p>
+<label>Имя <input id="npcName" value="Служитель Чёрной Живицы"></label>
+<label>Скорость ходьбы <input id="walkSpeed" type="range" min=".3" max="1.5" step=".05" value=".85"><output id="walkValue"></output></label>
+<label>Масштаб <input id="heightScale" type="range" min=".8" max="1.2" step=".01" value="1"><output id="scaleValue"></output></label>
+<label>Освещение <input id="lightLevel" type="range" min=".2" max="4" step=".1" value="2"></label>
+<label>Бормотание, дБ <input id="murmurDb" type="number" min="-40" max="0" value="-10"></label>
+<button id="saveProfile">Скачать JSON</button><button id="resetProfile">По умолчанию</button>
+<p><small>ЛКМ / свайп — вращение, колесо — масштаб. Профиль сохраняется локально. Экспорт не меняет опубликованную игру.</small></p><p id="profileStatus"></p>
+</div>
+<script type="module">
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const scene=new T.Scene();scene.background=new T.Color(0x101719);scene.fog=new T.FogExp2(0x101719,.05);
+const camera=new T.PerspectiveCamera(44,innerWidth/innerHeight,.05,150);camera.position.set(3.1,2.55,5.2);
+const renderer=new T.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.outputColorSpace=T.SRGBColorSpace;document.body.appendChild(renderer.domElement);
+const orbit=new OrbitControls(camera,renderer.domElement);orbit.target.set(0,1.15,0);orbit.enablePan=false;orbit.mouseButtons.LEFT=T.MOUSE.ROTATE;orbit.mouseButtons.RIGHT=T.MOUSE.ROTATE;orbit.minDistance=1.8;orbit.maxDistance=11;orbit.update();
+const ambient=new T.HemisphereLight(0xbacdd1,0x191510,2);scene.add(ambient);
+const key=new T.DirectionalLight(0xffd0ac,3);key.position.set(-3,6,4);key.castShadow=true;key.shadow.mapSize.set(1024,1024);scene.add(key);
+const rim=new T.DirectionalLight(0x749496,1.3);rim.position.set(2,3,-3);scene.add(rim);
+const floor=new T.Mesh(new T.PlaneGeometry(150,150),new T.MeshStandardMaterial({color:0x353c3c,roughness:1}));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+let seed=7382;function rand(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
+for(let i=0;i<95;i++){const x=(rand()-.5)*75,z=(rand()-.5)*75;if(Math.hypot(x,z)<7)continue;const h=4+rand()*3;const trunk=new T.Mesh(new T.CylinderGeometry(.09,.16,h,5),new T.MeshStandardMaterial({color:0x292a28}));trunk.position.set(x,h/2,z);scene.add(trunk);const crown=new T.Mesh(new T.ConeGeometry(1.15,h*.63,6),new T.MeshStandardMaterial({color:0x25342f,roughness:1}));crown.position.set(x,h*.72,z);scene.add(crown)}
+const root=new T.Group(),actor=new T.Group();scene.add(root);root.add(actor);let meshes=[],pose='idle',pace=0,clockTime=0,hits=0,flash=[],fallen=false;
+const rig={};const velocity=new T.Vector3();const patrolPoints=[new T.Vector3(-1.45,0,-.6),new T.Vector3(1.45,0,.6)];let patrolIndex=0,restTime=0;
+let modelRef=null,strideMeters=0;
+const feet={Left:{x:-.195,anchor:null,start:null,end:null,swing:false},Right:{x:.195,anchor:null,start:null,end:null,swing:false}};
+const neutralJoints={Head:[0,0,2.23],LeftArm:[-.42,0,1.94],RightArm:[.42,0,1.94],LeftLeg:[-.195,0,.78],RightLeg:[.195,0,.78],LeftShin:[-.195,0,.46],RightShin:[.195,0,.46],LeftFoot:[-.195,0,.16],RightFoot:[.195,0,.16]};
+function makePivot(model,name,position){
+  const part=model.getObjectByName(name);if(!part)return false;
+  model.updateMatrixWorld(true);const pivot=new T.Group();pivot.name=name+'GaitPivot';
+  pivot.position.set(...position);model.add(pivot);pivot.attach(part);
+  rig[name]={pivot,rest:pivot.position.clone()};return true
+}
+function connectBones(){
+  for(const side of ['Left','Right']){
+    if(!rig[side+'Leg']||!rig[side+'Shin']||!rig[side+'Foot'])continue;
+    // An actual articulated hierarchy, not just a bouncing whole-body mesh.
+    rig[side+'Leg'].pivot.attach(rig[side+'Shin'].pivot);
+    rig[side+'Shin'].pivot.attach(rig[side+'Foot'].pivot);
+  }
+  for(const joint of Object.values(rig))joint.rest.copy(joint.pivot.position);
+}
+function resetJoints(){
+  for(const joint of Object.values(rig)){
+    joint.pivot.rotation.set(0,0,0);
+    joint.pivot.position.copy(joint.rest);
+  }
+}
+function resetFeet(){
+  if(!modelRef)return;
+  resetJoints();modelRef.updateMatrixWorld(true);
+  for(const side of ['Left','Right']){
+    const state=feet[side],bone=rig[side+'Foot'];
+    if(!bone)continue;
+    state.anchor=bone.pivot.getWorldPosition(new T.Vector3());
+    state.start=state.anchor.clone();state.end=state.anchor.clone();state.swing=false;
+  }
+}
+function solveTwoBoneIK(side,targetWorld,dt){
+  if(!modelRef)return;
+  const upper=rig[side+'Leg'],lower=rig[side+'Shin'],boot=rig[side+'Foot'];
+  if(!upper||!lower||!boot)return;
+  const foot=modelRef.worldToLocal(targetWorld.clone());
+  // 2D sagittal IK in the source model's Z-up coordinate system.
+  const hipZ=.78,upperLength=.32,lowerLength=.32;
+  let dy=foot.y, dz=foot.z-hipZ;
+  const raw=Math.max(.0001,Math.hypot(dy,dz));
+  const d=T.MathUtils.clamp(raw,.05,upperLength+lowerLength-.012);
+  dy*=d/raw; dz*=d/raw;
+  const along=(upperLength*upperLength-lowerLength*lowerLength+d*d)/(2*d);
+  const bend=Math.sqrt(Math.max(0,upperLength*upperLength-along*along));
+  const kneeY=dy*along/d-(-dz/d)*bend;
+  const kneeZ=hipZ+dz*along/d-(dy/d)*bend;
+  const hipAngle=Math.atan2(kneeY,hipZ-kneeZ);
+  const lowerAngle=Math.atan2(dy-kneeY,kneeZ-(hipZ+dz));
+  const alpha=1-Math.exp(-dt*12);
+  upper.pivot.rotation.x+= (hipAngle-upper.pivot.rotation.x)*alpha;
+  lower.pivot.rotation.x+= (lowerAngle-hipAngle-lower.pivot.rotation.x)*alpha;
+  boot.pivot.rotation.x+= (-lowerAngle-boot.pivot.rotation.x)*alpha;
+}
+function animateFootsteps(dt,travelled,moving){
+  if(!modelRef)return;
+  modelRef.updateMatrixWorld(true);
+  // The next footfall is based on actual distance travelled, not frame count.
+  strideMeters+=travelled;
+  const stanceRatio=.63,cycleDistance=.60;
+  for(const side of ['Left','Right']){
+    const st=feet[side];if(!st.anchor)continue;
+    const offset=side==='Left'?0:Math.PI;
+    const phase=((strideMeters/cycleDistance*Math.PI*2+offset)%(2*Math.PI))/(2*Math.PI);
+    let target=st.anchor.clone();
+    if(phase<stanceRatio){
+      if(st.swing){st.anchor.copy(st.end);st.swing=false}
+      target.copy(st.anchor);
+    }else{
+      if(!st.swing){
+        st.swing=true;st.start.copy(st.anchor);
+        // Plant the next foot ahead of the character, with slight side separation.
+        st.end.copy(modelRef.localToWorld(new T.Vector3(st.x,-.25,.16)));
+        st.end.y=st.anchor.y;
+      }
+      const t=(phase-stanceRatio)/(1-stanceRatio);
+      const ease=t*t*(3-2*t);
+      target.lerpVectors(st.start,st.end,ease);
+      target.y+=Math.sin(Math.PI*t)*.09*Math.min(1,moving*2);
+    }
+    solveTwoBoneIK(side,target,dt);
+  }
+}
+const status=document.getElementById('status');const hitRay=new T.Raycaster(),pointer=new T.Vector2();
+const loader=new GLTFLoader();loader.load('./cultist_v09.glb',(gltf)=>{
+const model=gltf.scene;
+// Source GLB is explicitly authored in Z-up, rotate to Three.js Y-up first.
+model.rotation.x=-Math.PI/2;
+model.updateWorldMatrix(true,true);
+// Normalize after axis conversion to the desired 1.85m character height.
+const bounds=new T.Box3().setFromObject(model);const size=bounds.getSize(new T.Vector3());const factor=1.85/size.y;model.scale.setScalar(factor);model.updateWorldMatrix(true,true);
+const box=new T.Box3().setFromObject(model);model.position.y=-box.min.y;model.position.x=-(box.min.x+box.max.x)/2;model.position.z=-(box.min.z+box.max.z)/2;
+actor.add(model);
+modelRef=model;
+for(const [name,position] of Object.entries(neutralJoints))makePivot(model,name,position);
+connectBones();resetFeet();
+model.traverse((obj)=>{if(obj.isMesh){obj.castShadow=true;obj.receiveShadow=true;meshes.push(obj);if(obj.material){obj.material.side=T.DoubleSide;obj.material.roughness=1;obj.material.metalness=0}}});
+status.textContent='Модель: '+Object.keys(rig).length+'/9 подвижных узлов, включая голени и стопы.';
+},undefined,(error)=>{status.textContent='GLB не загрузился: проверь сборку';console.error(error)});
+function mode(s){if(fallen)return;pose=s;restTime=0;status.textContent=s==='patrol'?'ПАТРУЛЬ — опорные стопы':s==='alert'?'ТРЕВОГА — ускорение и шаг':'ОЖИДАНИЕ — без прыжков'}
+document.getElementById('idle').onclick=()=>mode('idle');
+document.getElementById('patrol').onclick=()=>mode('patrol');
+
+document.getElementById('reset').onclick=()=>{fallen=false;pose='idle';hits=0;pace=0;clockTime=0;strideMeters=0;patrolIndex=0;restTime=0;velocity.set(0,0,0);root.position.set(0,0,0);actor.position.set(0,0,0);actor.rotation.set(0,0,0);resetFeet();status.textContent='Сброс: модель готова';};
+const fields=['npcName','walkSpeed','heightScale','lightLevel','murmurDb'];
+const defaults={npcName:'Служитель Чёрной Живицы',walkSpeed:.85,heightScale:1,lightLevel:2,murmurDb:-10};
+const storageKey='chernozerye.npclab.v1';
+const byId=id=>document.getElementById(id);
+function profile(){return {format:'chernozerye.npclab',version:1,model:'cultist_modular',name:byId('npcName').value,walkSpeed:Number(byId('walkSpeed').value),heightScale:Number(byId('heightScale').value),previewLight:Number(byId('lightLevel').value),murmurDb:Number(byId('murmurDb').value)}}
+function apply(){actor.scale.setScalar(Number(byId('heightScale').value));ambient.intensity=Number(byId('lightLevel').value);byId('walkValue').value=byId('walkSpeed').value+' м/с';byId('scaleValue').value=byId('heightScale').value+'×';try{localStorage.setItem(storageKey,JSON.stringify(profile()));byId('profileStatus').textContent='Профиль сохранён локально'}catch{byId('profileStatus').textContent='Локальное сохранение недоступно'}}
+try{const p=JSON.parse(localStorage.getItem(storageKey)||'null');if(p?.format==='chernozerye.npclab'){for(const [k,v] of Object.entries({npcName:p.name,walkSpeed:p.walkSpeed,heightScale:p.heightScale,lightLevel:p.previewLight,murmurDb:p.murmurDb}))if(v!=null)byId(k).value=v}}catch{}
+for(const id of fields)byId(id).addEventListener('input',apply);
+byId('resetProfile').onclick=()=>{for(const id of fields)byId(id).value=defaults[id];apply()};
+byId('saveProfile').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(profile(),null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='cultist.npc.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+apply();
+const clock=new T.Clock();
+function animate(){
+requestAnimationFrame(animate);
+const dt=Math.min(clock.getDelta(),.05);clockTime+=dt;
+const wanted=new T.Vector3();
+if(!fallen && (pose==='patrol'||pose==='alert')){
+  if(pose==='patrol' && restTime>0){restTime=Math.max(0,restTime-dt)}
+  else{
+    const destination=pose==='patrol'?patrolPoints[patrolIndex]:new T.Vector3(1.75,0,1.15);
+    const heading=destination.clone().sub(root.position);heading.y=0;
+    const distance=heading.length();
+    if(pose==='patrol' && distance<.12){restTime=.85;patrolIndex=(patrolIndex+1)%patrolPoints.length}
+    else if(distance>.15){
+      const nominal=Number(document.getElementById('walkSpeed').value);
+      const eased=nominal*Math.min(1,distance/.65);
+      wanted.copy(heading).normalize().multiplyScalar(eased);
+    }
+  }
+}
+velocity.lerp(wanted,1-Math.exp(-dt*4));
+const travelled=velocity.length()*dt;
+root.position.addScaledVector(velocity,dt);
+root.position.y=0;
+const moving=Math.min(1,velocity.length()/.5);
+if(!fallen){
+  actor.position.y=0; // No up/down sine-wave jumps: the feet do the work.
+  actor.rotation.z=T.MathUtils.damp(actor.rotation.z,0,6,dt);
+  if(velocity.length()>.045){
+    const targetYaw=Math.atan2(velocity.x,velocity.z);
+    const angle=Math.atan2(Math.sin(targetYaw-actor.rotation.y),Math.cos(targetYaw-actor.rotation.y));
+    actor.rotation.y+=angle*(1-Math.exp(-dt*2.8));
+  }
+  const stepPhase=strideMeters/.6*Math.PI*2;
+  const a=Math.sin(stepPhase),b=Math.sin(stepPhase+Math.PI);
+  for(const side of ['Left','Right']){
+    const arm=rig[side+'Arm'];if(!arm)continue;
+    const swing=side==='Left'?b:a;
+    arm.pivot.rotation.x=T.MathUtils.damp(arm.pivot.rotation.x,swing*.17*moving,7,dt);
+  }
+  if(rig.Head){
+    const head=rig.Head.pivot;
+    head.rotation.x=T.MathUtils.damp(head.rotation.x,.025+Math.sin(clockTime*.65)*.015,3,dt);
+    head.rotation.z=T.MathUtils.damp(head.rotation.z,Math.sin(clockTime*.4)*.025,3,dt);
+  }
+  if(travelled>.00001)animateFootsteps(dt,travelled,moving);
+  else if(modelRef && velocity.length()<.02){
+    // Keep planted feet stationary at a patrol pause, not repeatedly resetting gait.
+    for(const side of ['Left','Right']){
+      const st=feet[side];if(st.anchor)solveTwoBoneIK(side,st.anchor,dt);
+    }
+  }
+}else{
+ velocity.multiplyScalar(Math.exp(-dt*9));
+ actor.position.y=0;
+ actor.rotation.z=T.MathUtils.damp(actor.rotation.z,1.18,3,dt);
+ resetJoints();
+}
+for(let i=flash.length-1;i>=0;i--){const f=flash[i];f.t-=dt;if(f.t<=0){f.obj.material=f.original;flash.splice(i,1)}}
+orbit.update();renderer.render(scene,camera)}animate();
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+</script>
+</body></html>
