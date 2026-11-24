@@ -2,8 +2,8 @@ extends CanvasLayer
 
 const SAMPLE_WINDOW_USEC := 2_000_000
 const MIB := 1048576.0
-const RENDER_GROUPS := [&"perf_fences", &"perf_buildings", &"perf_roadside"]
-const RENDER_MODES := ["Вся сцена", "Без заборов", "Без моделей зданий", "Без деталей обочины"]
+const RENDER_GROUPS := [&"perf_fences", &"perf_buildings", &"perf_roadside", &"perf_forest_vegetation"]
+const RENDER_MODES := ["Вся сцена", "Без заборов", "Без моделей зданий", "Без деталей обочины", "Без растительности леса"]
 
 var _render_mode := 0
 var _hidden_meshes: Array[Node3D] = []
