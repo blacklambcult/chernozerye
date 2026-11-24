@@ -31,13 +31,13 @@ vm.createContext(sandbox);
 for (const addon of ["exporters/GLTFExporter.js", "utils/BufferGeometryUtils.js"])
   vm.runInContext(fs.readFileSync(require.resolve("three/examples/js/" + addon), "utf8"), sandbox);
 
-function batchModel(model) {
+function batchModel(model, { bakeTint = false } = {}) {
   model.updateMatrixWorld(true);
   const groups = new Map();
   model.traverse(mesh => {
     if (!mesh.isMesh) return;
     const material = mesh.material;
-    const key = JSON.stringify([material.color.getHex(), material.map?.uuid, material.roughness,
+    const key = JSON.stringify([bakeTint ? null : material.color.getHex(), material.map?.uuid, material.roughness,
       material.metalness, material.side, material.emissive.getHex(), material.emissiveIntensity]);
     const geometry = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
     if (!geometry.getAttribute("normal")) geometry.computeVertexNormals();
@@ -46,7 +46,25 @@ function batchModel(model) {
     for (const attr of Object.keys(geometry.attributes))
       if (!["position", "normal", "uv"].includes(attr)) geometry.deleteAttribute(attr);
     geometry.applyMatrix4(mesh.matrixWorld);
-    if (!groups.has(key)) groups.set(key, { material, geometries: [] });
+    if (bakeTint) {
+      // glTF multiplies the base color (including its texture) by COLOR_0.
+      // Store the original tint per vertex so different paint colors can share one draw.
+      const colors = new Float32Array(geometry.getAttribute("position").count * 3);
+      for (let i = 0; i < colors.length; i += 3) {
+        colors[i] = material.color.r;
+        colors[i + 1] = material.color.g;
+        colors[i + 2] = material.color.b;
+      }
+      geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    }
+    if (!groups.has(key)) {
+      const batchMaterial = bakeTint ? material.clone() : material;
+      if (bakeTint) {
+        batchMaterial.color.setRGB(1, 1, 1);
+        batchMaterial.vertexColors = true;
+      }
+      groups.set(key, { material: batchMaterial, geometries: [] });
+    }
     groups.get(key).geometries.push(geometry);
   });
   const result = new THREE.Group();
