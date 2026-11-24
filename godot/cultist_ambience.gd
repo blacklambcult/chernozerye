@@ -2,14 +2,11 @@ extends Node3D
 ## Original procedural sound textures; no external downloads or audio assets.
 var _steps: Array[AudioStreamWAV] = []
 var _rustle: AudioStreamWAV
-var _breath: AudioStreamWAV
 var _murmur: AudioStreamWAV
 var _foot: AudioStreamPlayer3D
 var _cloth: AudioStreamPlayer3D
 var _voice: AudioStreamPlayer3D
 var _distance := 0.0
-var _breathing: AudioStreamPlayer3D
-var _breath_timer := 0.4
 var _murmur_timer := 2.0
 var _rng := RandomNumberGenerator.new()
 
@@ -18,15 +15,11 @@ func _ready() -> void:
     for i in range(4):
         _steps.append(_make_sound(0, 0.29 + i * 0.018))
     _rustle = _make_sound(1, 0.38)
-    _breath = _make_sound(2, 1.25)
     _murmur = _make_sound(3, 2.3)
     _foot = _speaker("Footsteps", 0.15, -13.0, 12.0)
     _cloth = _speaker("RobeRustle", 0.95, -24.0, 8.0)
-    _breathing = _speaker("Breathing", 1.58, -5.0, 12.0)
-    _voice = _speaker("QuietVoice", 1.58, -3.0, 16.0)
-    _breathing.unit_size = 3.0
+    _voice = _speaker("QuietVoice", 1.58, -10.0, 16.0)
     _voice.unit_size = 3.5
-    _breathing.stream = _breath
     _voice.stream = _murmur
 
 func _speaker(label: String, height: float, db: float, reach: float) -> AudioStreamPlayer3D:
@@ -58,8 +51,6 @@ func _make_sound(kind: int, seconds: float) -> AudioStreamWAV:
             x += n * 0.16 * exp(-pow((t - 0.11) / 0.045, 2.0))
         elif kind == 1:
             x = (n - low) * 0.22 * pow(sin(PI * u), 2.0) * (0.7 + 0.3 * sin(t * 48.0))
-        elif kind == 2:
-            x = (low * 1.3 + (n - low) * 0.20) * (0.65 + 0.35 * sin(TAU * 1.3 * t)) * pow(sin(PI * u), 1.5)
         else:
             phase += TAU * (92.0 + 8.0 * sin(t * 5.3)) / rate
             var syllable := pow(0.5 + 0.5 * sin(t * 10.7 + sin(t * 4.0)), 2.0)
@@ -86,11 +77,6 @@ func update_motion(delta: float, travelled: float, grounded: bool) -> void:
                 _cloth.stream = _rustle
                 _cloth.pitch_scale = _rng.randf_range(0.88, 1.12)
                 _cloth.play()
-    _breath_timer -= delta
-    if _breath_timer <= 0.0 and not _breathing.playing:
-        _breathing.pitch_scale = _rng.randf_range(0.92, 1.06)
-        _breathing.play()
-        _breath_timer = _rng.randf_range(2.5, 3.8)
     _murmur_timer -= delta
     if _murmur_timer <= 0.0 and not _voice.playing:
         _voice.pitch_scale = _rng.randf_range(0.92, 1.04)
