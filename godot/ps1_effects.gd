@@ -262,7 +262,9 @@ func _surface_code(base: BaseMaterial3D) -> String:
             options.append("unshaded")
         if base.no_depth_test:
             options.append("depth_test_disabled")
-        if base.texture_filter in [BaseMaterial3D.TEXTURE_FILTER_LINEAR, BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS, BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC]:
+        if base.texture_filter == BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC:
+            filtering = "filter_linear_mipmap_anisotropic"
+        elif base.texture_filter in [BaseMaterial3D.TEXTURE_FILTER_LINEAR, BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS]:
             filtering = "filter_linear_mipmap"
     return SURFACE_SHADER.replace("OPTIONS", ", ".join(options)).replace("FILTERING", filtering) \
         .replace("JITTER_UNIFORMS", JITTER_UNIFORMS).replace("    JITTER\n", JITTER_VERTEX)

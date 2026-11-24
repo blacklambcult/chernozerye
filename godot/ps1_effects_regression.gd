@@ -52,6 +52,7 @@ func _run() -> void:
             mesh.add_to_group(&"ps1_jitter_foliage")
         elif i == 4:
             mesh.add_to_group(&"ps1_jitter_road")
+            material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
             mesh.name = "Road"
             mesh.scale = Vector3(4, 0.01, 12)
         var parent: Node = camera if i == 6 else world
@@ -94,6 +95,7 @@ func _run() -> void:
     assert(nature.button_pressed and not road.button_pressed and objects.button_pressed and viewmodel.button_pressed)
     road.button_pressed = true
     assert(meshes[4].material_override is ShaderMaterial)
+    assert("filter_linear_mipmap_anisotropic" in meshes[4].material_override.shader.code)
     assert(meshes[4].material_override.get_shader_parameter("jitter_axes") == Vector2(0.22, 0.0))
     assert(meshes[5].material_override is ShaderMaterial)
     objects.button_pressed = false

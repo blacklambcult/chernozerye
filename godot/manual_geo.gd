@@ -195,7 +195,8 @@ func _mesh_from_triangles(vertices: PackedVector3Array, color: Color, label: Str
             uvs[i] = Vector2(vertices[i].x, vertices[i].z) / 3.6
         arrays[Mesh.ARRAY_TEX_UV] = uvs
         material.albedo_texture = preload("res://textures/lane_soil.png")
-        material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS_ANISOTROPIC
+        # Blend mip samples to reduce shimmer when the camera looks along the road.
+        material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
         material.albedo_color = Color(color.r * 2.15, color.g * 2.25, color.b * 2.40)
     var mesh := ArrayMesh.new()
     mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
