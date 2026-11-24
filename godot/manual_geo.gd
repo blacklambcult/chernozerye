@@ -711,6 +711,7 @@ func _render_forest_batches(batches: Dictionary) -> void:
                 batch.multimesh = multi
                 batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
                 batch.add_to_group(&"ps1_jitter_foliage")
+                batch.add_to_group(&"perf_forest_vegetation")
                 add_child(batch)
         template.free()
 
