@@ -65,8 +65,8 @@ func _run() -> void:
     var pixels := pause.find_child("PS1Pixels", true, false) as CheckButton
     var strength := pause.find_child("PS1PixelStrength", true, false) as HSlider
     assert(jitter != null and pixels != null and strength != null)
-    assert(strength.value == 80.0)
-    assert(grade.get_shader_parameter("ps1_pixel_strength") == 0.8)
+    assert(strength.value == 55.0)
+    assert(is_equal_approx(grade.get_shader_parameter("ps1_pixel_strength"), 0.55))
     assert(jitter.button_pressed and pixels.button_pressed)
     assert(grade.get_shader_parameter("ps1_pixels_enabled"))
     pixels.button_pressed = false

@@ -270,9 +270,6 @@ func _create_retro_grade() -> ShaderMaterial:
     screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
     var grade := ShaderMaterial.new()
     grade.shader = preload("res://retro_grade.gdshader")
-    # Stronger pixel grid on objects; keep the original twilight sky gradient.
-    grade.set_shader_parameter("virtual_height", 320.0)
-    grade.set_shader_parameter("pixel_mix", 0.94)
     grade.set_shader_parameter("cel_strength", 0.34)
     grade.set_shader_parameter("poster_levels", 18.0)
     grade.set_shader_parameter("edge_strength", 0.14)
