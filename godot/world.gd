@@ -797,7 +797,7 @@ func _toggle_manual_preview() -> void:
         if manual_mode and _night_environment.sky == null:
             var dusk := ProceduralSkyMaterial.new()
             dusk.sky_top_color = Color("#080f1d")
-            dusk.sky_horizon_color = Color("#333949")
+            dusk.sky_horizon_color = Color("#404759")
             dusk.ground_horizon_color = dusk.sky_horizon_color
             dusk.ground_bottom_color = Color("#1b222c")
             dusk.sky_curve = 0.15
@@ -809,24 +809,24 @@ func _toggle_manual_preview() -> void:
         # Godot Compatibility Web: artistic depth fog, not unsupported volumetric fog.
         _night_environment.background_color = Color("#303441") if manual_mode else Color("#575b69")
         _night_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-        _night_environment.ambient_light_color = Color("#8e9fac") if manual_mode else Color("#b0a9a4")
+        _night_environment.ambient_light_color = Color("#a2a9b4") if manual_mode else Color("#b0a9a4")
         _night_environment.ambient_light_energy = 0.57 if manual_mode else 0.82
         _night_environment.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED if manual_mode else Environment.REFLECTION_SOURCE_BG
         _night_environment.glow_enabled = false
         _night_environment.tonemap_exposure = 1.01 if manual_mode else 1.0
         _night_environment.fog_enabled = true
         _night_environment.fog_mode = Environment.FOG_MODE_DEPTH if manual_mode else Environment.FOG_MODE_EXPONENTIAL
-        _night_environment.fog_light_color = Color("#343e51") if manual_mode else Color("#676976")
-        _night_environment.fog_light_energy = 0.50 if manual_mode else 1.0
+        _night_environment.fog_light_color = Color("#3c4658") if manual_mode else Color("#676976")
+        _night_environment.fog_light_energy = 0.56 if manual_mode else 1.0
         _night_environment.fog_sky_affect = 0.33 if manual_mode else 1.0
         _night_environment.fog_sun_scatter = 0.0
         _night_environment.fog_aerial_perspective = 0.0
         _night_environment.fog_density = 0.88 if manual_mode else 0.0018
-        _night_environment.fog_depth_begin = 28.0 if manual_mode else 24.0
-        _night_environment.fog_depth_end = 165.0 if manual_mode else 118.0
+        _night_environment.fog_depth_begin = 38.0 if manual_mode else 24.0
+        _night_environment.fog_depth_end = 180.0 if manual_mode else 118.0
         _night_environment.fog_depth_curve = 1.3
         _night_environment.fog_height = 0.8 if manual_mode else 0.0
-        _night_environment.fog_height_density = 0.017 if manual_mode else 0.0
+        _night_environment.fog_height_density = 0.010 if manual_mode else 0.0
     if _sun_light != null:
         _sun_light.light_energy = 0.62 if manual_mode else 1.05
         _sun_light.light_specular = 0.0
@@ -834,7 +834,7 @@ func _toggle_manual_preview() -> void:
         # The shadow map produced hard triangular streaks across the road and low-poly trees.
         _sun_light.shadow_enabled = not manual_mode
     if manual_mode:
-        print("MANUAL_NO_GLARE_READY: ambient=0.57, moon=0.62, fog_light=0.50, exposure=1.01")
+        print("MANUAL_NO_GLARE_READY: ambient=0.57, moon=0.62, fog_light=0.56, exposure=1.01")
     print("MANUAL_NIGHT_READY: ", manual_mode,
         " fog=", _night_environment.fog_mode if _night_environment != null else "MISSING_ENV",
         " glow=", _night_environment.glow_enabled if _night_environment != null else "MISSING_ENV",
