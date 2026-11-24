@@ -87,6 +87,18 @@ func prepare(features: Array, roads: Array, sites: Array[Vector2]) -> void:
                 break
 
 
+func benchmark_view() -> Transform3D:
+    if _trails.is_empty():
+        return Transform3D.IDENTITY
+    var trail := _trails[mini(1, _trails.size() - 1)]
+    var step := trail.size() / 2
+    var point := trail[step]
+    var heading := trail[step + 1] - trail[step - 1]
+    var yaw := atan2(-heading.x, heading.y)
+    return Transform3D(Basis(Vector3.UP, yaw),
+        Vector3(point.x, sample_height(point) + 0.22, -point.y))
+
+
 func is_on_trail(point: Vector2) -> bool:
     for trail in _trails:
         if point.distance_squared_to(trail[0]) > 21.0 ** 2:
