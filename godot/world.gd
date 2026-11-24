@@ -897,6 +897,22 @@ func _toggle_manual_preview() -> void:
     overview_layer.visible = false
     Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
+func _visit_forest_benchmark() -> void:
+    var forest := get_node_or_null("ManualSurvey/ForestFloor")
+    var character := get_node_or_null("Player") as CharacterBody3D
+    if forest == null or character == null:
+        return
+    var view: Transform3D = forest.call("benchmark_view")
+    if view == Transform3D.IDENTITY:
+        return
+    character.velocity = Vector3.ZERO
+    character.global_transform = view
+    var camera := character.get_node_or_null("Camera3D") as Camera3D
+    if camera != null:
+        camera.rotation = Vector3.ZERO
+    overview_layer.hide()
+
+
 func _visit_sector_a() -> void:
     # Location sampled from a residential OSM road away from mapped rooftops.
     var character := get_node_or_null("Player") as CharacterBody3D
@@ -949,6 +965,9 @@ func _input(event: InputEvent) -> void:
             var build_label := get_node_or_null("GameplayHUD/BuildVersion") as Label
             if build_label != null:
                 build_label.text = _build_version_text() + _fog_distance_label()
+            get_viewport().set_input_as_handled()
+        elif manual_mode and event.shift_pressed and (event.physical_keycode == KEY_B or event.keycode == KEY_B):
+            _visit_forest_benchmark()
             get_viewport().set_input_as_handled()
         elif event.physical_keycode == KEY_M or event.keycode == KEY_M or (event.unicode != 0 and char(event.unicode).to_lower() == "ь"):
             var prologue := get_node_or_null("StoryPrologue")
