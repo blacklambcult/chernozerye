@@ -844,6 +844,19 @@ func _build_forest_instances() -> void:
             Transform3D(pose.basis, _pos(detail, _forest_floor.sample_height(detail) + 0.015)))
         ground_details += int(kind == "ground")
         undergrowth += int(kind == "understory")
+        if kind == "understory" and i % 12 == 2:
+            # Break the single-bush pattern without increasing tree density.
+            var companion := detail + Vector2.from_angle(float(i) * 1.618) * 1.35
+            if not _forest_floor._inside(companion, 2.0) or _nearest_road(companion) < 13.0 \
+                    or _near_building(companion, 6.5) or _forest_floor.is_wet(companion) \
+                    or _forest_floor.is_on_trail(companion):
+                continue
+            if _shrine_sites.any(func(site): return companion.distance_squared_to(site) < 5.5 ** 2):
+                continue
+            var basis := pose.basis.rotated(Vector3.UP, 1.7).scaled_local(Vector3.ONE * 0.78)
+            _queue_forest_asset(batches, "understory_%d" % ((i / 2 + 1) % 4),
+                Transform3D(basis, _pos(companion, _forest_floor.sample_height(companion) + 0.015)))
+            undergrowth += 1
     _add_forest_ponds(batches)
     _forest_floor.add_snow(snow)
     _render_forest_batches(batches)
