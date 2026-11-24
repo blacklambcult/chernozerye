@@ -224,6 +224,7 @@ func finish() -> void:
             continue
         var template := packed.instantiate() as Node3D
         var cells: Dictionary = _transforms[id]
+        var render_group := &"perf_fences" if id.begins_with("fence_") else &"perf_buildings"
         for part in template.find_children("*", "MeshInstance3D", true, false):
             var relative: Transform3D = part.transform
             var parent: Node3D = part.get_parent()
@@ -244,6 +245,7 @@ func finish() -> void:
                     multi.set_instance_transform(i, poses[i] * relative)
                 var batch := MultiMeshInstance3D.new()
                 batch.name = id
+                batch.add_to_group(render_group)
                 batch.multimesh = multi
                 batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
                 add_child(batch, true)
