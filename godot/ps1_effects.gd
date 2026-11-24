@@ -59,7 +59,7 @@ void fragment() {
 """
 var pixels_enabled := true
 var jitter_enabled := true
-var pixel_strength := 80.0
+var pixel_strength := 55.0
 var jitter_strength := 50.0
 var jitter_targets := {&"viewmodel": true, &"objects": true, &"road": false, &"nature": true}
 var grade_material: ShaderMaterial
