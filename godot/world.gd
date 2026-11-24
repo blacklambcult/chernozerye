@@ -11,9 +11,12 @@ const GAME_STAGE := "Pre-Alpha 0.8.17"
 const MANUAL_VILLAGE_SPAWN := Vector3(-789.7, 0.22, -268.6)
 const MANUAL_CAMERA_NEAR := 0.16
 const MANUAL_CAMERA_FAR := 250.0
+const FOG_TEST_CAMERA_FAR := 145.0
+const FOG_TEST_DEPTH_END := 125.0
 const SEASON := "NOVEMBER"
 const GAME_HUD_TITLE := "FEARLESS KNIGHTS OF THE CORDON / PRE-ALPHA 0.8.17 · ЧЕРНОЗЁРЬЕ · 710 ОБЪЕКТОВ"
 var manual_mode := false
+var _fog_distance_test := false
 var manual_button: Button
 var _status_label: Label
 var _night_environment: Environment
@@ -34,6 +37,10 @@ func _process(_delta: float) -> void:
         set_process(false)
 
 func _ready() -> void:
+    if OS.has_feature("web"):
+        _fog_distance_test = JavaScriptBridge.eval(
+            "new URLSearchParams(window.location.search).get('fog_distance') === '145'", true
+        ) == true
     _create_ground()
     _create_lighting()
     var ps1 := preload("res://ps1_effects.gd").new()
@@ -461,7 +468,10 @@ func _build_version_text() -> String:
             "/pre-alpha-([0-9]+[.][0-9]+[.][0-9]+)-([a-f0-9]{8})/(?:index[.]html)?$")
         var release := release_pattern.search(path)
         if release != null:
-            return "Pre-Alpha %s · %s" % [release.get_string(1), release.get_string(2)]
+            var version := "Pre-Alpha %s · %s" % [release.get_string(1), release.get_string(2)]
+            if _fog_distance_test:
+                version += " · Туман %d м" % int(FOG_TEST_CAMERA_FAR)
+            return version
     return GAME_STAGE
 
 
@@ -824,6 +834,9 @@ func _toggle_manual_preview() -> void:
         _night_environment.fog_density = 0.88 if manual_mode else 0.0018
         _night_environment.fog_depth_begin = 38.0 if manual_mode else 24.0
         _night_environment.fog_depth_end = 180.0 if manual_mode else 118.0
+        if manual_mode and _fog_distance_test:
+            _night_environment.fog_density = 1.0
+            _night_environment.fog_depth_end = FOG_TEST_DEPTH_END
         _night_environment.fog_depth_curve = 1.3
         _night_environment.fog_height = 0.8 if manual_mode else 0.0
         _night_environment.fog_height_density = 0.010 if manual_mode else 0.0
@@ -863,6 +876,8 @@ func _toggle_manual_preview() -> void:
             player_camera.near = MANUAL_CAMERA_NEAR if manual_mode else 0.25
             player_camera.far = MANUAL_CAMERA_FAR if manual_mode else 2300.0
             if manual_mode:
+                if _fog_distance_test:
+                    player_camera.far = FOG_TEST_CAMERA_FAR
                 var capsule := character.get_node_or_null("CollisionShape3D") as CollisionShape3D
                 var shape: CapsuleShape3D = null
                 if capsule != null:
