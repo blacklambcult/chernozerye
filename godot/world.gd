@@ -76,6 +76,9 @@ func _ready() -> void:
     _create_brand_watermark()
     _create_overview_map()
     _create_gameplay_hud()
+    var performance_overlay := preload("res://performance_overlay.gd").new()
+    performance_overlay.name = "PerformanceOverlay"
+    add_child(performance_overlay)
     # Load the manual 710-object village from the first playable frame.
     # The original sector/preview buttons are no longer part of the player HUD.
     _activate_default_village()
