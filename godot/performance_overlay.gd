@@ -2,6 +2,11 @@ extends CanvasLayer
 
 const SAMPLE_WINDOW_USEC := 2_000_000
 const MIB := 1048576.0
+const RENDER_GROUPS := [&"perf_fences", &"perf_buildings", &"perf_roadside"]
+const RENDER_MODES := ["Вся сцена", "Без заборов", "Без моделей зданий", "Без деталей обочины"]
+
+var _render_mode := 0
+var _hidden_meshes: Array[Node3D] = []
 
 var _panel := PanelContainer.new()
 var _metrics := Label.new()
@@ -33,25 +38,51 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
-    if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F8:
+    if not event is InputEventKey or not event.pressed or event.echo:
+        return
+    if event.keycode == KEY_F8:
         _panel.visible = not _panel.visible
-        _metrics.text = "F8 · Performance Lab\nСбор замеров…"
-        _reset_sample()
+        if not _panel.visible:
+            _show_full_scene()
         set_process(_panel.visible)
-        get_viewport().set_input_as_handled()
+    elif event.keycode == KEY_F9 and _panel.visible:
+        var next_mode := (_render_mode + 1) % RENDER_MODES.size()
+        _show_full_scene()
+        _render_mode = next_mode
+        if _render_mode > 0:
+            for mesh: Node3D in get_tree().get_nodes_in_group(RENDER_GROUPS[_render_mode - 1]):
+                if mesh.visible:
+                    mesh.hide()
+                    _hidden_meshes.append(mesh)
+    else:
+        return
+    _reset_sample()
+    get_viewport().set_input_as_handled()
+
+
+func _show_full_scene() -> void:
+    for mesh in _hidden_meshes:
+        if is_instance_valid(mesh):
+            mesh.show()
+    _hidden_meshes.clear()
+    _render_mode = 0
+
+
+func _heading() -> String:
+    return "F8 · Performance Lab\nF9 · %s" % RENDER_MODES[_render_mode]
 
 
 func _notification(what: int) -> void:
     if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_IN:
         _reset_sample()
-        if _panel.visible:
-            _metrics.text = "F8 · Performance Lab\nСбор замеров…"
 
 
 func _reset_sample() -> void:
     _previous_frame_usec = 0
     _window_start_usec = 0
     _frame_times.clear()
+    if _panel.visible:
+        _metrics.text = _heading() + "\nСбор замеров…"
 
 
 func _process(_delta: float) -> void:
@@ -77,7 +108,7 @@ func _process(_delta: float) -> void:
     var memory := Performance.get_monitor(Performance.MEMORY_STATIC)
     var memory_text := "%.1f МиБ" % (memory / MIB) if memory > 0 else "н/д"
     _metrics.text = "\n".join([
-        "F8 · Performance Lab",
+        _heading(),
         "%.1f FPS   |   p95 %.1f мс" % [fps, _frame_times[p95_index]],
         "Draw calls / кадр    %d" % draw_calls,
         "Примитивы / кадр     %d" % primitives,
