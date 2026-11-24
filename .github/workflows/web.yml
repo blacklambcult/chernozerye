@@ -673,6 +673,11 @@ jobs:
           grep -q 'href="../studio/"' site/model/index.html
           mkdir -p build/web/studio
           cp -a site/studio/. build/web/studio/
+          mkdir -p build/web/npc
+          cp -a site/npc/. build/web/npc/
+          cp godot/assets/npc/cultist_modular.glb build/web/npc/cultist_v09.glb
+          test -s build/web/npc/cultist_v09.glb
+          test -s build/web/npc/index.html
           test -s build/web/studio/index.html
           test -s build/web/studio/studio-state.js
           test -s build/web/studio/studio.js
