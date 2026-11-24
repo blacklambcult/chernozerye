@@ -179,7 +179,8 @@ func _mat(color: Color) -> StandardMaterial3D:
     return m
 
 func _mesh_from_triangles(vertices: PackedVector3Array, color: Color, label: String,
-        soil: bool = false, jitter_group: StringName = &"") -> void:
+        soil: bool = false, jitter_group: StringName = &"",
+        render_group: StringName = &"") -> void:
     if vertices.is_empty():
         return
     var arrays := []
@@ -202,6 +203,8 @@ func _mesh_from_triangles(vertices: PackedVector3Array, color: Color, label: Str
     instance.name = label
     if jitter_group != &"":
         instance.add_to_group(jitter_group)
+    if render_group != &"":
+        instance.add_to_group(render_group)
     instance.mesh = mesh
     instance.material_override = material
     instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -471,10 +474,10 @@ func _add_village_roadside(points: PackedVector2Array, width: float, height: flo
                     var plane_y := height + 0.052
                     _put_triangle(stones, _pos(t - dx, plane_y),
                         _pos(t + dy, plane_y), _pos(t + dx, plane_y))
-    _mesh_from_triangles(shoulders, Color("#3e3830"), "Дорога / сырые земляные обочины", true, &"ps1_jitter_road")
-    _mesh_from_triangles(stones, Color("#544d43"), "Дорога / мокрый гравий и выбоины", true, &"ps1_jitter_road")
-    _mesh_from_triangles(weeds, Color("#3f4439"), "Обочина / пожухлая ноябрьская трава", false, &"ps1_jitter_foliage")
-    _mesh_from_triangles(dried, Color("#605444"), "Обочина / сухие стебли", false, &"ps1_jitter_foliage")
+    _mesh_from_triangles(shoulders, Color("#3e3830"), "Дорога / сырые земляные обочины", true, &"ps1_jitter_road", &"perf_roadside")
+    _mesh_from_triangles(stones, Color("#544d43"), "Дорога / мокрый гравий и выбоины", true, &"ps1_jitter_road", &"perf_roadside")
+    _mesh_from_triangles(weeds, Color("#3f4439"), "Обочина / пожухлая ноябрьская трава", false, &"ps1_jitter_foliage", &"perf_roadside")
+    _mesh_from_triangles(dried, Color("#605444"), "Обочина / сухие стебли", false, &"ps1_jitter_foliage", &"perf_roadside")
 
 
 func _register_road_junction(point: Vector2, radius: float) -> void:
