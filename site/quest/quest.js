@@ -223,6 +223,7 @@
   function selectWorldItem(id) {
     const item=project.worldItems.find(x=>x.id===id);
     if(!item)return;
+    if(pendingPlacement)cancelPlacement();
     library = item.type;
     selectedWorldItemId=id;
     selectedStepId=null;
@@ -354,6 +355,7 @@
   }
   function cancelPlacement() {
     pendingPlacement = null;
+    if(mode==="browse")$("map-hint").textContent="Просмотр карты · координаты не меняются.";
     syncPlacementSelection();
     draftMarker?.remove();
     draftMarker = null;
@@ -410,6 +412,7 @@
     cancelPlacement();
     setMode("browse");
     pendingPlacement = { ...item };
+    $("map-hint").textContent = "Размещение модели · клик задаёт черновую точку. Сохранить или отменить в панели модели.";
     syncPlacementSelection();
     $("local-placement-edit").hidden = false;
     const model = localModels.find(entry => entry.id === item.modelId);
@@ -577,7 +580,13 @@
     if(next === "object" && !geoEnabled) toggleGeoLayers();
     mode = next;
     for (const button of document.querySelectorAll("[data-mode]")) {
-      const active = button.dataset.mode === next;
+      const tool = button.dataset.mode;
+      const active = tool === next;
+      const inFinds = library === "note" || library === "item";
+      button.hidden = (["spawn","step"].includes(tool)&&library!=="quest") || (tool==="world_place"&&!inFinds) || (tool==="object"&&library==="character");
+      const unavailable = C.mapModeError(tool,mapContext());
+      button.disabled = !!unavailable;
+      button.title = unavailable || "";
       button.classList.toggle("active", active);
       button.setAttribute("aria-pressed", String(active));
     }
@@ -585,7 +594,7 @@
       "Кликни на карту, чтобы установить стартовую позицию игрока." :
       mode === "object" ? "Кликни на геообъект Geo Lab. Привязка сохранит ID для выбранной находки или шага." :
       mode === "world_place" ? "Кликни на карту, чтобы разместить постоянную находку. Её можно передвигать за маркер." :
-      mode === "step" ? "Кликни на карту, чтобы привязать выбранный шаг к местности." : "Просмотр карты · координаты не меняются. Выбери режим редактирования для изменений.";
+      mode === "step" ? "Кликни на карту, чтобы привязать выбранный шаг к местности." : pendingPlacement ? "Размещение модели · клик задаёт черновую точку." : "Просмотр карты · координаты не меняются. Выбери режим редактирования для изменений.";
     $("map-hint").classList.toggle("picking", mode==="object");
     $("quest-map").classList.toggle("is-object-picking", mode==="object");
     $("quest-map").classList.toggle("is-placement",mode!=="object" && mode!=="browse");
@@ -603,7 +612,7 @@
     });
   }
   function updatePoint(location, destination = mode) {
-    if (destination === "browse" || destination === "object" || C.mapModeError(destination, mapContext())) return;
+    if (destination !== mode || destination === "browse" || destination === "object" || C.mapModeError(destination, mapContext())) return;
     const p = C.point({ lat: location.lat, lon: location.lng });
     if(destination==="world_place"){
       const item=worldItem();
@@ -684,6 +693,7 @@
     const item=activeGeoItem();
     const match=item&&Geo?Geo.resolveBinding(item,manualIndex,C):null;
     if(!match?.entry||!map)return;
+    setMode("browse");
     map.setView([match.point.lat,match.point.lon],Math.max(map.getZoom(),18),{animate:false});
     renderObjectHighlight();
   }
@@ -806,11 +816,14 @@
     try { raw = window.localStorage.getItem(Geo.STORAGE_KEY); }
     catch {
       manualError = "нет доступа к черновику";
-      if (mode==="object") setMode("browse");
+      setMode(mode==="object"?"browse":mode);
       updateGeoStatus();
       return;
     }
-    if (!force && raw === manualRaw) { manualError=""; updateGeoStatus(); return; }
+    if (!force && raw === manualRaw) {
+      if(manualError){manualError="";setMode(mode);}
+      updateGeoStatus();return;
+    }
     // Preserve previously drawn overlay if storage unexpectedly becomes corrupted.
     try {
       const features = Geo.readManual(raw, GeoEditor);
@@ -825,7 +838,7 @@
       pickLayer=nextPick;
       manualRaw=raw;
       manualError="";
-      if (mode==="object" && !nextIndex.size) setMode("browse");
+      setMode(C.mapModeError(mode,mapContext())?"browse":mode);
       if(geoEnabled&&manualLayer)manualLayer.addTo(map);
       manualCount=features.length;
       updatePickVisibility();
@@ -837,7 +850,7 @@
     } catch (error) {
       console.warn("QUEST_GEO_MANUAL_INVALID", error);
       manualError = "ошибка черновика; сохранён предыдущий слой";
-      if (mode==="object") setMode("browse");
+      setMode(mode==="object"?"browse":mode);
       updateGeoStatus();
     }
   }
@@ -1035,6 +1048,7 @@
   $("world-bind-geo").addEventListener("click",()=>setMode("object"));
   $("world-go-to").addEventListener("click",()=>{
     const item=worldItem();if(item?.target&&map){
+      setMode("browse");
       map.setView([item.target.lat,item.target.lon],Math.max(map.getZoom(),18),{animate:false});
     }
   });
