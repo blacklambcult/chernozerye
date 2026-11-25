@@ -969,6 +969,7 @@
   }
   window.QuestOpenPlacements = (id) => {
     if (typeof id !== "string" || !id || id.length > 200) return false;
+    if (pendingPlacement && !window.confirm("Отменить незавершённое размещение и выбрать другую модель?")) return false;
     if (pendingPlacement) cancelPlacement();
     requestedModel = id;
     changeLibrary("placement");
