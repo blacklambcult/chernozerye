@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1114">
   <meta name="description" content="Чернозёрье Studio — рабочее пространство, журнал обновлений и роадмап Geo Lab, Quest Lab, Model Lab и Hellish Forge.">
   <title>Чернозёрье / STUDIO 0.6 — генератор оружия</title>
-  <link rel="stylesheet" href="./studio.css?v=5">
+  <link rel="stylesheet" href="./studio.css?v=6">
 </head>
 <body>
 <div class="studio">
@@ -155,8 +155,22 @@
                   <span class="panel-index">01 / VERSION HISTORY</span>
                   <h5 id="changelog-title">ИСТОРИЯ ИЗМЕНЕНИЙ</h5>
                 </div>
-                <span class="panel-counter" id="release-count">— ВЕРСИЙ</span>
+                <span class="panel-counter" id="release-count">— РЕЛИЗОВ</span>
               </div>
+              <div class="changelog-filters" aria-label="Вид истории">
+                <button type="button" id="history-mode-micro" class="filter-tab active" aria-pressed="true">МИНИ-ВЕРСИИ</button>
+                <button type="button" id="history-mode-releases" class="filter-tab" aria-pressed="false">РЕЛИЗЫ</button>
+              </div>
+              <div id="micro-history">
+                <div class="micro-controls">
+                  <label for="micro-search">Поиск изменений</label>
+                  <input id="micro-search" type="search" placeholder="Дата, DEV-ID, описание">
+                  <span id="micro-count" class="panel-counter" aria-live="polite">ЗАГРУЗКА…</span>
+                </div>
+                <div id="micro-list" class="release-list" aria-live="polite"><p class="release-loading">Чтение истории Git…</p></div>
+                <button id="micro-more" type="button" class="filter-tab micro-more" hidden>ПОКАЗАТЬ ЕЩЁ 30</button>
+              </div>
+              <div id="release-archive" hidden>
               <div class="changelog-filters" aria-label="Фильтр журнала по модулю">
                 <button type="button" data-changelog-filter="all" class="filter-tab active" aria-pressed="true">ВСЁ</button>
                 <button type="button" data-changelog-filter="studio" class="filter-tab" aria-pressed="false">STUDIO</button>
@@ -166,7 +180,8 @@
               <div id="release-list" class="release-list" aria-live="polite">
                 <p class="release-loading">Чтение истории проекта…</p>
               </div>
-              <div class="panel-foot">Данные основаны на коммитах GitHub. Подробнее — раскрывай записи.</div>
+              </div>
+              <div class="panel-foot">Мини-версия = один Git-коммит этой сборки. Время МСК. <a href="https://github.com/blacklambcult/chernozerye/commits/main/" target="_blank" rel="noopener noreferrer">ИСТОРИЯ GIT ↗</a></div>
             </section>
             <aside class="roadmap-panel" aria-labelledby="roadmap-title">
               <div class="panel-topline">
@@ -249,6 +264,7 @@
 <script src="./project-snapshot.js?v=6"></script>
 <script src="./release-core.js?v=2"></script>
 <script src="./studio-releases.js?v=2"></script>
+<script src="./commit-history.js?v=1"></script>
 <script src="./studio.js?v=10"></script>
 </body>
 </html>
