@@ -18,5 +18,6 @@ test("Studio routes nature from shared library to Quest Lab", () => {
   assert.match(page, /await window\.ChernoObjectLibrary\.saveModel/);
   assert.match(page, /url\.searchParams\.set\('model', id\)/);
   assert.match(read("site/studio/index.html"), /data-target="nature"/);
-  assert.match(read("site/studio/studio.js"), /Digit8:"nature"/);
+  const state = require("../site/studio/studio-state.js");
+  assert.equal(state.shortcut({altKey:true,code:"Digit8"}), "nature");
 });
