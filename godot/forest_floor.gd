@@ -7,6 +7,7 @@ var ponds: Array[Dictionary] = []
 var _trails: Array[PackedVector2Array] = []
 var _heights: Dictionary = {}
 var _forest: Array[Dictionary] = []
+var _forest_index: Dictionary = {}
 var _excluded: Dictionary = {}
 var _roads: Dictionary = {}
 var _noise := FastNoiseLite.new()
@@ -47,10 +48,11 @@ func prepare(features: Array, roads: Array, sites: Array[Vector2]) -> void:
             polygon.append(Vector2(point[0], point[1]))
         if polygon.size() < 3:
             continue
+        var area := _area(polygon)
         if kind == "forest":
-            _forest.append(_area(polygon))
+            _forest.append(area)
+            _index(_forest_index, area.bounds, area)
         else:
-            var area := _area(polygon)
             _index(_excluded, area.bounds.grow(24.0), area.bounds)
     for anchor in [Vector2(-850, 480), Vector2(-555, 500), Vector2(-450, 225)]:
         var best := Vector2.INF
@@ -136,8 +138,9 @@ func _build_trails() -> void:
 
 
 func _inside(point: Vector2, clearance: float) -> bool:
+    var cell := Vector2i((point / INDEX_SIZE).floor())
     var in_forest := false
-    for area in _forest:
+    for area: Dictionary in _forest_index.get(cell, []):
         if not area.bounds.has_point(point) or not Geometry2D.is_point_in_polygon(point, area.polygon):
             continue
         in_forest = true
@@ -152,7 +155,6 @@ func _inside(point: Vector2, clearance: float) -> bool:
             break
     if not in_forest:
         return false
-    var cell := Vector2i((point / INDEX_SIZE).floor())
     for bounds: Rect2 in _excluded.get(cell, []):
         if bounds.grow(clearance + 5.0).has_point(point):
             return false
@@ -234,6 +236,9 @@ func build() -> void:
             for y in range(lo.y, hi.y):
                 cells[Vector2i(x, y)] = true
     var chunks := {}
+    # Adjacent triangles share grid vertices and use the same soil color.
+    var colors: Dictionary = {}
+    var offsets := [Vector2i.ZERO, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.ONE]
     for cell: Vector2i in cells:
         var heights := [_grid_height(cell), _grid_height(cell + Vector2i.RIGHT),
             _grid_height(cell + Vector2i.DOWN), _grid_height(cell + Vector2i.ONE)]
@@ -245,10 +250,12 @@ func build() -> void:
             surface.begin(Mesh.PRIMITIVE_TRIANGLES)
             chunks[chunk] = surface
         var surface: SurfaceTool = chunks[chunk]
-        var offsets := [Vector2.ZERO, Vector2.RIGHT, Vector2.DOWN, Vector2.ONE]
         for i in [0, 3, 1, 0, 2, 3]:
-            var point: Vector2 = (Vector2(cell) + offsets[i]) * STEP
-            surface.set_color(_ground_color(point, heights[i]))
+            var vertex: Vector2i = cell + offsets[i]
+            var point := Vector2(vertex) * STEP
+            if not colors.has(vertex):
+                colors[vertex] = _ground_color(point, heights[i])
+            surface.set_color(colors[vertex])
             surface.set_uv(point * 0.42)
             surface.add_vertex(Vector3(point.x, maxf(0.018, heights[i]), -point.y))
     var material := StandardMaterial3D.new()
