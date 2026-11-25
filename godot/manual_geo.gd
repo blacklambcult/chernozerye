@@ -944,7 +944,7 @@ func _build_forest_instances() -> Dictionary:
                 Transform3D(basis, _pos(companion, _forest_floor.sample_height(companion) + 0.015)))
             undergrowth += 1
     _add_forest_ponds(batches)
-    _forest_floor.add_snow(snow)
+    _forest_floor.add_snow(snow, _forest_chunk_size)
     phase_start = _profile_phase("forest_placement", phase_start)
     _build_trunk_collision()
     _profile_phase("forest_trunk_collision", phase_start)

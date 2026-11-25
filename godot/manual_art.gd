@@ -26,6 +26,7 @@ var _collision_building_count := 0
 var _collision_fence_span_count := 0
 var _collision_yard_count := 0
 var _plot_edges: Array = []
+var _plot_edge_cells: Dictionary = {}
 const CLEARANCE_CELL_SIZE := 16.0
 var _entrance_routes: Array = []
 var _entrance_cells: Dictionary = {}
@@ -121,6 +122,7 @@ var _reserved_building_bounds: Array[Rect2] = []
 var _reserved_building_cells: Dictionary = {}
 var _fence_cells: Dictionary = {}
 var _yard_objects: Array = []
+var _yard_object_cells: Dictionary = {}
 var _placed_plots: Array[PackedVector2Array] = []
 var _fence_duplicates := 0
 var _approaches_blocked := 0
@@ -177,7 +179,10 @@ func decorate(features: Array, vegetation_batches: Dictionary, profile_startup :
                 _index_clearance(_plot_cells, _polygon_bounds(plot_points), _plot_polygons.size())
                 _plot_polygons.append(plot_points)
                 for i in range(plot_points.size()):
-                    _plot_edges.append([plot_points[i], plot_points[(i + 1) % plot_points.size()]])
+                    var a := plot_points[i]
+                    var b := plot_points[(i + 1) % plot_points.size()]
+                    _index_clearance(_plot_edge_cells, Rect2(a.min(b), (a - b).abs()), _plot_edges.size())
+                    _plot_edges.append([a, b])
     for item in features:
         if not item is Dictionary:
             continue
@@ -653,12 +658,24 @@ func _road_surface_gap(p: Vector2) -> float:
     return best
 
 
-func _plot_boundary_gap(p: Vector2) -> float:
-    var best := INF
-    for edge in _plot_edges:
-        var nearest := Geometry2D.get_closest_point_to_segment(p, edge[0], edge[1])
-        best = minf(best, p.distance_to(nearest))
-    return best
+func _road_within(p: Vector2, gap: float) -> bool:
+    var area := Rect2(p, Vector2.ZERO).grow(gap)
+    for i: int in _clearance_candidates(_road_clearance_cells, area):
+        var segment: Array = _roads[i]
+        var nearest := Geometry2D.get_closest_point_to_segment(p, segment[0], segment[1])
+        if p.distance_to(nearest) - float(segment[2]) * 0.5 < gap:
+            return true
+    return false
+
+
+func _plot_edge_within(p: Vector2, gap: float, include_boundary := false) -> bool:
+    var area := Rect2(p, Vector2.ZERO).grow(gap)
+    for i: int in _clearance_candidates(_plot_edge_cells, area):
+        var segment: Array = _plot_edges[i]
+        var distance := p.distance_to(Geometry2D.get_closest_point_to_segment(p, segment[0], segment[1]))
+        if distance < gap or (include_boundary and distance == gap):
+            return true
+    return false
 
 
 func _fence_point_clear(p: Vector2) -> bool:
@@ -690,7 +707,7 @@ func _entry_clear(mid: Vector3, tangent: Vector3, outward: Vector3,
     for side in [-1.0, 0.0, 1.0]:
         var test: Vector3 = mid + outward * extension + tangent * float(side) * half_width
         var p := Vector2(test.x, -test.z)
-        if _road_surface_gap(p) < 0.48 or _plot_boundary_gap(p) < 0.38:
+        if _road_within(p, 0.48) or _plot_edge_within(p, 0.38):
             return false
         if not _clear_of_buildings(p, 0.35):
             return false
@@ -794,7 +811,7 @@ func _building_front_edge(points: PackedVector2Array) -> int:
             var facing := (nearest - mid).normalized().dot(outward)
             if facing < 0.20:
                 score += 18.0 + 8.0 * (0.20 - facing)
-        if _road_surface_gap(mid) < 1.0:
+        if _road_within(mid, 1.0):
             score += 8.0
         # Test the two door jambs and the exterior approach along the normal.
         var tangent := side / length
@@ -803,7 +820,7 @@ func _building_front_edge(points: PackedVector2Array) -> int:
                 var p := mid + outward * float(depth) + tangent * float(across)
                 if not _clear_of_buildings(p, 0.16):
                     score += 15.0
-                if depth < 1.8 and _road_surface_gap(p) < 0.15:
+                if depth < 1.8 and _road_within(p, 0.15):
                     score += 6.0
         if score < best_score:
             best_score = score
@@ -1307,9 +1324,9 @@ func _decorate_house_walk(a: Vector2, b: Vector2, outward: Vector3) -> void:
         var center := origin + outward * (1.25 + float(i) * 0.54)
         center += tangent * (0.13 * sin(float(i) * 1.67))
         var p := Vector2(center.x, -center.z)
-        if _road_surface_gap(p) < 0.68:
+        if _road_within(p, 0.68):
             break
-        if _plot_boundary_gap(p) < 0.26 or not _clear_of_buildings(p, 0.23):
+        if _plot_edge_within(p, 0.26) or not _clear_of_buildings(p, 0.23):
             continue
         var half := tangent * (0.29 + 0.03 * cos(float(i) * 2.1))
         var deep := outward * 0.19
@@ -1330,7 +1347,7 @@ func _decorate_balcony(a: Vector2, b: Vector2, outward: Vector3) -> void:
     for sign in [-1.0, 1.0]:
         var check := front + tangent * float(sign) * half_width
         var p := Vector2(check.x, -check.z)
-        if _road_surface_gap(p) < 0.85 or _plot_boundary_gap(p) < 0.15:
+        if _road_within(p, 0.85) or _plot_edge_within(p, 0.15):
             return
         if not _clear_of_buildings(p, 0.18):
             return
@@ -1373,7 +1390,7 @@ func _decorate_lean_to(a: Vector2, b: Vector2, outward: Vector3) -> void:
     # the road surface, or a plot boundary/fence.
     for corner in [left_front, right_front]:
         var p := Vector2(corner.x, -corner.z)
-        if _road_surface_gap(p) < 0.65 or _plot_boundary_gap(p) < 0.45:
+        if _road_within(p, 0.65) or _plot_edge_within(p, 0.45):
             return
         if not _clear_of_buildings(p, 0.5) or _entry_zone_conflict(p, 0.8):
             return
@@ -1442,7 +1459,7 @@ func _decorate_showcase_yard(points: PackedVector2Array, front_edge: int) -> voi
         slab += tangent * (0.09 * sin(float(i) * 2.4))
         slab.y = 0.14
         var p := Vector2(slab.x, -slab.z)
-        if _road_surface_gap(p) < 0.75 or _plot_boundary_gap(p) < 0.30:
+        if _road_within(p, 0.75) or _plot_edge_within(p, 0.30):
             continue
         if not _clear_of_buildings(p, 0.20):
             continue
@@ -1455,7 +1472,7 @@ func _decorate_showcase_yard(points: PackedVector2Array, front_edge: int) -> voi
     var stack_origin := origin + tangent * 2.25 + vout * 1.4
     var stack_p := Vector2(stack_origin.x, -stack_origin.z)
     var stack_clear := _road_surface_gap(stack_p) > 0.8
-    stack_clear = stack_clear and _plot_boundary_gap(stack_p) > 0.7
+    stack_clear = stack_clear and not _plot_edge_within(stack_p, 0.7, true)
     stack_clear = stack_clear and _clear_of_buildings(stack_p, 0.65)
     if stack_clear:
         for i in range(4):
@@ -1465,7 +1482,7 @@ func _decorate_showcase_yard(points: PackedVector2Array, front_edge: int) -> voi
     var lamp_origin := origin - tangent * 2.0 + vout * 2.25
     var lamp_p := Vector2(lamp_origin.x, -lamp_origin.z)
     var lamp_clear := _road_surface_gap(lamp_p) > 0.8
-    lamp_clear = lamp_clear and _plot_boundary_gap(lamp_p) > 0.65
+    lamp_clear = lamp_clear and not _plot_edge_within(lamp_p, 0.65, true)
     lamp_clear = lamp_clear and _clear_of_buildings(lamp_p, 0.65)
     if lamp_clear:
         _batch_box("chimney", lamp_origin + Vector3.UP * 1.55, Vector3(0.13, 3.05, 0.13))
@@ -2025,6 +2042,12 @@ func _yard_radius(kind: int) -> float:
         _: return 2.05  # Scrap, barrels and tools
 
 
+func _register_yard_object(object: Dictionary) -> void:
+    var bounds := Rect2(object.center, Vector2.ZERO).grow(float(object.radius) + 0.5)
+    _index_clearance(_yard_object_cells, bounds, _yard_objects.size())
+    _yard_objects.append(object)
+
+
 func _yard_spot_ok(p: Vector2, polygon: PackedVector2Array,
         other: Array, kind: int) -> bool:
     var radius := _yard_radius(kind)
@@ -2033,11 +2056,11 @@ func _yard_spot_ok(p: Vector2, polygon: PackedVector2Array,
     if not Geometry2D.is_point_in_polygon(p, polygon):
         return false
     # Test the whole item's bounding radius instead of its centre.
-    if _road_surface_gap(p) < radius + 0.45:
+    if _road_within(p, radius + 0.45):
         return false
     if not _clear_of_buildings(p, radius + 0.45):
         return false
-    if _plot_boundary_gap(p) < radius + 0.32:
+    if _plot_edge_within(p, radius + 0.32):
         return false
     for i in range(polygon.size()):
         var q := Geometry2D.get_closest_point_to_segment(p, polygon[i],
@@ -2046,9 +2069,16 @@ func _yard_spot_ok(p: Vector2, polygon: PackedVector2Array,
             return false
     if _distance_to_fence(p, radius + 0.45) < radius + 0.45:
         return false
-    for previous in _yard_objects if not _yard_objects.is_empty() else other:
-        if p.distance_to(previous["center"]) < radius + float(previous["radius"]) + 0.5:
-            return false
+    var area := Rect2(p, Vector2.ZERO).grow(radius)
+    if _yard_objects.is_empty():
+        for previous in other:
+            if p.distance_to(previous["center"]) < radius + float(previous["radius"]) + 0.5:
+                return false
+    else:
+        for i: int in _clearance_candidates(_yard_object_cells, area):
+            var previous: Dictionary = _yard_objects[i]
+            if p.distance_to(previous.center) < radius + float(previous.radius) + 0.5:
+                return false
     return true
 
 
@@ -2105,7 +2135,7 @@ func _decorate_plot_props(points: PackedVector2Array) -> void:
         _plot_props_count += 1
         var object := {"center": p, "radius": _yard_radius(kind)}
         placed.append(object)
-        _yard_objects.append(object)
+        _register_yard_object(object)
     # Bounded flower patches: well away from buildings, fences and road surfaces.
     # Remaining November stalks are rare; most abandoned plots have none.
     var flower_goal := 1 if _fence_count % 5 == 0 else 0
@@ -2117,7 +2147,7 @@ func _decorate_plot_props(points: PackedVector2Array) -> void:
             rng.randf_range(low.y, high.y))
         if not Geometry2D.is_point_in_polygon(p, points):
             continue
-        if _road_surface_gap(p) < 0.72 or _plot_boundary_gap(p) < 0.70 \
+        if _road_within(p, 0.72) or _plot_edge_within(p, 0.70) \
                 or _distance_to_fence(p, 0.75) < 0.75:
             continue
         if _entry_zone_conflict(p, 0.75):
@@ -2145,7 +2175,7 @@ func _choose_cultist_totem_site() -> void:
                 var candidate: Vector2 = center + Vector2.from_angle(TAU * i / 16.0) * radius
                 if _yard_spot_ok(candidate, plot, [], 6):
                     cultist_totem_site = candidate
-                    _yard_objects.append({"center": candidate, "radius": 2.0})
+                    _register_yard_object({"center": candidate, "radius": 2.0})
                     return
 
 
@@ -2170,7 +2200,7 @@ func _add_yard_vegetation(batches: Dictionary) -> void:
             var basis := Basis(Vector3.UP, rng.randf_range(-PI, PI)).scaled(Vector3.ONE * rng.randf_range(0.85, 1.3))
             geo.call("_queue_forest_asset", batches, "yard_scrub" if placed == 0 else "understory_%d" % (i % 4),
                 Transform3D(basis, _pt(point, 0.025)))
-            _yard_objects.append({"center": point, "radius": 2.0})
+            _register_yard_object({"center": point, "radius": 2.0})
             placed += 1
             count += 1
     print("YARD_VEGETATION_READY: clusters=", count)
@@ -2229,7 +2259,7 @@ func _decorate_utility_poles(points: PackedVector2Array) -> void:
             if _utility_pole_count >= 35:
                 return
             var p := a.lerp(b, (float(j) + 0.5) / float(number)) + perpendicular * roadside
-            if _road_surface_gap(p) < 0.65 or _plot_boundary_gap(p) < 0.55:
+            if _road_within(p, 0.65) or _plot_edge_within(p, 0.55):
                 continue
             if not _clear_of_buildings(p, 0.85):
                 continue
