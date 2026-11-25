@@ -7,6 +7,8 @@ if (new URLSearchParams(location.search).get("startup_profile") === "1") {
     const resources = ["index.wasm", "index.pck"];
     window.chernozeryeStartupProfile = {
         worldStart: null,
+        worldReady: null,
+        mapStart: null,
         finish() {
             const ready = performance.now();
             const files = resources.map(file => {
@@ -21,14 +23,17 @@ if (new URLSearchParams(location.search).get("startup_profile") === "1") {
             });
             const responses = files.map(file => file.responseEndMs);
             const filesEnd = responses.every(value => value !== null) ? Math.max(...responses) : null;
+            const elapsed = (start, end) =>
+                start === null || end === null ? null : Math.round(end - start);
             console.table(files);
             console.table({
                 navigationToMapReadyMs: Math.round(ready),
                 navigationToFilesReadyMs: filesEnd === null ? null : Math.round(filesEnd),
-                filesReadyToWorldStartMs: filesEnd === null || this.worldStart === null
-                    ? null : Math.round(this.worldStart - filesEnd),
-                worldStartToMapReadyMs: this.worldStart === null
-                    ? null : Math.round(ready - this.worldStart),
+                filesReadyToWorldStartMs: elapsed(filesEnd, this.worldStart),
+                worldStartToMapReadyMs: elapsed(this.worldStart, ready),
+                worldInitMs: elapsed(this.worldStart, this.worldReady),
+                worldReadyToMapStartMs: elapsed(this.worldReady, this.mapStart),
+                manualMapBuildMs: elapsed(this.mapStart, ready),
             });
         },
     };

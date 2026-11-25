@@ -54,6 +54,8 @@ func _ready() -> void:
 
 func _build_manual() -> void:
     await get_tree().process_frame
+    if _profile_startup and OS.has_feature("web"):
+        JavaScriptBridge.eval("if (window.chernozeryeStartupProfile) window.chernozeryeStartupProfile.mapStart = performance.now();", true)
     var phase_start := Time.get_ticks_usec()
     if not FileAccess.file_exists(SOURCE):
         push_warning("GeoLab manual layout absent")
@@ -201,7 +203,6 @@ func _mat(color: Color) -> StandardMaterial3D:
     var m := StandardMaterial3D.new()
     m.albedo_color = color
     m.roughness = 1.0
-    m.specular = 0.0
     m.metallic = 0.0
     m.clearcoat_enabled = false
     m.rim_enabled = false
