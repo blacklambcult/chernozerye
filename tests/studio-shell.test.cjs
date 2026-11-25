@@ -14,6 +14,7 @@ class Element {
   }
   addEventListener(k,fn){(this.events[k]??=[]).push(fn);}
   setAttribute(k,v){this.attrs[k]=v;}
+  getAttribute(k){return this.attrs[k]??null;}
   appendChild(e){this.children.push(e);}
   emit(k,e={}){for(const f of this.events[k]||[])f({preventDefault(){},...e});}
 }
@@ -23,7 +24,7 @@ test("shell keeps one navigation per tool and all dashboard contracts",()=>{
   assert.deepEqual(new Set([...html.matchAll(/data-target="([^"]+)"/g)].map(m=>m[1])),new Set(State.TOOLS));
   assert.equal((html.match(/data-target="/g)||[]).length,State.TOOLS.length);
   assert.equal((html.match(/data-open="/g)||[]).length,0);
-  for(const file of ["studio.js","studio-releases.js","commit-history.js","project-snapshot.js"]){
+  for(const file of ["studio.js","studio-releases.js","commit-history.js","project-snapshot.js","asset-catalog.js"]){
     const script=fs.readFileSync(path.join(dir,file),"utf8");
     for(const m of script.matchAll(/\$\("([^"]+)"\)|(?:getElementById|querySelector)\("#([a-z][a-z0-9-]+)"\)/g))
       assert.ok(ids.includes(m[1]||m[2]),file+": "+(m[1]||m[2]));
@@ -33,15 +34,16 @@ test("repeated switches preserve iframe cache, storage and one rail event handle
   const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
   const nodes=new Map(ids.map(id=>[id,new Element()]));
   const nav=State.TOOLS.map(id=>{const n=new Element("button");n.dataset.target=id;return n;});
-  const tabs=["roadmap","history","data"].map(id=>{const n=new Element("button");n.dataset.dashboard=id;return n;});
-  const panels=["roadmap","history","data"].map(id=>{const n=new Element();n.dataset.dashboardPanel=id;return n;});
+  const tabs=["roadmap","history","data","assets"].map(id=>{const n=new Element("button");n.dataset.dashboard=id;return n;});
+  const panels=["roadmap","history","data","assets"].map(id=>{const n=new Element();n.dataset.dashboardPanel=id;return n;});
   const selectors=new Map([".studio",".rail",".rail-toggle-text"].map(k=>[k,new Element()]));
   const document={getElementById:id=>nodes.get(id),querySelector:k=>selectors.get(k),querySelectorAll:k=>k==="[data-target]"?nav:k==="[data-dashboard]"?tabs:k==="[data-dashboard-panel]"?panels:[],createElement:t=>new Element(t)};
   const data=JSON.stringify({type:"FeatureCollection",features:[{}]});
   const store=new Map([[State.KEYS.geo,data]]);
   const storage={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v)};
   const win=new Element();const location={hash:"",href:"https://example.test/studio/",origin:"https://example.test"};
-  Object.assign(win,{ChernoStudioState:State,location,localStorage:storage,requestAnimationFrame:fn=>fn()});
+  let catalogRefreshes=0;
+  Object.assign(win,{ChernoStudioState:State,location,localStorage:storage,requestAnimationFrame:fn=>fn(),ChernoAssetCatalogRefresh:()=>{catalogRefreshes++;}});
   const history={pushState:(_,__,hash)=>{location.hash=hash;location.href="https://example.test/studio/"+hash;}};
   new Function("window","document","localStorage","location","history","requestAnimationFrame","console",source)(win,document,storage,location,history,fn=>fn(),{info(){},warn(){}});
   for(const id of ["geo","quest","npc","home","quest","geo","home"])nav.find(x=>x.dataset.target===id).emit("click");
@@ -50,8 +52,13 @@ test("repeated switches preserve iframe cache, storage and one rail event handle
   assert.equal(nodes.get("editors").children.length,3);
   nodes.get("rail-toggle").emit("click");assert.ok(selectors.get(".studio").classes.has("nav-collapsed"));
   nodes.get("rail-toggle").emit("click");assert.ok(!selectors.get(".studio").classes.has("nav-collapsed"));
-  tabs[2].emit("click");assert.deepEqual(panels.map(p=>p.hidden),[true,true,false]);
+  tabs[2].emit("click");assert.deepEqual(panels.map(p=>p.hidden),[true,true,false,true]);
   assert.equal(nodes.get("geo-count").textContent,"1");
-  tabs[1].emit("click");assert.deepEqual(panels.map(p=>p.hidden),[true,false,true]);
+  tabs[1].emit("click");assert.deepEqual(panels.map(p=>p.hidden),[true,false,true,true]);
+  tabs[3].emit("click");assert.deepEqual(panels.map(p=>p.hidden),[true,true,true,false]);
+  assert.equal(catalogRefreshes,1);
+  nav.find(n=>n.dataset.target==="geo").emit("click");
+  nav.find(n=>n.dataset.target==="home").emit("click");
+  assert.equal(catalogRefreshes,2);
   assert.equal(store.get(State.KEYS.geo),data);
 });
