@@ -106,7 +106,7 @@
       catch { /* the standalone editors still work */ }
     });
   }
-  function createFrame(id) {
+  function createFrame(id, initialUrl = null) {
     if (cached.has(id)) return cached.get(id);
     const config = MODES[id];
     const frame = document.createElement("iframe");
@@ -129,7 +129,7 @@
     frame.addEventListener("error", () => {
       if (id === active) $("frame-status").textContent = "ОШИБКА ЗАГРУЗКИ · ОТКРОЙТЕ ОТДЕЛЬНО";
     });
-    frame.src = config.file;
+    frame.src = initialUrl || config.file;
     $("editors").appendChild(frame);
     return entry;
   }
@@ -154,11 +154,17 @@
     if (!isHome) $("external-editor").href = config.url;
     for (const [key, value] of cached.entries()) value.frame.hidden = key !== id;
     if (!isHome) {
-      const entry = createFrame(id);
-      if (editorUrl && (id === "arms" || (id === "quest" && editorUrl.searchParams.has("model")))) {
+      const existing = cached.get(id);
+      const isQuestModel = !!(editorUrl && id === "quest" && editorUrl.searchParams.has("model"));
+      const initial = isQuestModel && !existing ? new URL(editorUrl.href) : null;
+      if(initial)initial.searchParams.set("studio","1");
+      const entry = createFrame(id,initial?.href);
+      if (editorUrl && (id === "arms" || isQuestModel)) {
         $("external-editor").href = editorUrl.href;
         editorUrl.searchParams.set("studio", "1");
-        if (entry.frame.src !== editorUrl.href) {
+        if(isQuestModel && existing && entry.ready && typeof entry.frame.contentWindow.QuestOpenPlacements==="function") {
+          entry.frame.contentWindow.QuestOpenPlacements(editorUrl.searchParams.get("model"));
+        }else if (entry.frame.src !== editorUrl.href) {
           entry.ready = false;
           entry.frame.src = editorUrl.href;
         }
@@ -172,6 +178,7 @@
       history.pushState(null, "", "#" + id);
     }
     refreshStats();
+    if(isHome && dashboardTabs.some(t=>t.dataset.dashboard==="assets"&&t.getAttribute?.("aria-pressed")==="true"))void window.ChernoAssetCatalogRefresh?.();
   }
   for (const b of document.querySelectorAll("[data-target]")) {
     b.addEventListener("click", (event) => { event.preventDefault(); show(b.dataset.target); });
@@ -192,6 +199,7 @@
       }
       for (const panel of dashboardPanels) panel.hidden = panel.dataset.dashboardPanel !== id;
       if (id === "data") refreshStats();
+      if (id === "assets") void window.ChernoAssetCatalogRefresh?.();
     });
   }
   $("reload-editor").addEventListener("click", () => {

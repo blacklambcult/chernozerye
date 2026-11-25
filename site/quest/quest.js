@@ -12,7 +12,7 @@
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
   let project;
   let requestedModel = new URLSearchParams(location.search).get("model");
-  let library = requestedModel ? "item" : "quest";
+  let library = requestedModel ? "placement" : "quest";
   const objects = window.ChernoObjectLibrary;
   let localMarkers;
   const placementMarkers = new Map();
@@ -28,8 +28,7 @@
 
   function selectPlacement(item) {
     if (pendingPlacement?.id === item.id) return;
-    if (!document.querySelector('[data-library="item"]').matches('[aria-pressed="true"]'))
-      document.querySelector('[data-library="item"]').click();
+    if (library !== "placement") changeLibrary("placement");
     beginPlacement(item);
     $("local-placement-edit").scrollIntoView({ block: "nearest" });
   }
@@ -159,7 +158,7 @@
   function renderQuestInspector() {
     const q = quest();
     $("quest-fields").hidden = !q;
-    $("map-quest-title").textContent = q ? q.title : "Выбери квест";
+    if(library==="quest") $("map-quest-title").textContent = q ? q.title : "Выбери квест";
     if (!q) return;
     $("quest-title").value = q.title;
     $("quest-type").value = q.type;
@@ -183,7 +182,7 @@
   }
   function renderWorldItemInspector() {
     const item=worldItem();
-    $("world-item-fields").hidden=!item;
+    $("world-item-fields").hidden=!item || !["note","item"].includes(library);
     if(!item)return;
     $("world-item-id").textContent="ID / "+item.id;
     $("world-item-title").value=item.title;
@@ -272,7 +271,7 @@
   }
   function renderStepInspector() {
     const q = quest(), item = step();
-    $("step-fields").hidden = !item || !!selectedWorldItemId;
+    $("step-fields").hidden = library !== "quest" || !item || !!selectedWorldItemId;
     if (!q || !item) return;
     $("step-index").textContent = "STEP " + String(selectedStepIndex(q) + 1).padStart(2, "0");
     $("step-type").value = item.type;
@@ -362,6 +361,7 @@
     window.updatePlacementContext?.(null);
     void window.showPlacementPreview?.(null);
     $("local-placement-edit").hidden = true;
+    $("placement-inspector-empty").hidden = false;
     $("local-model-status").textContent = "";
   }
 
@@ -415,6 +415,7 @@
     $("map-hint").textContent = "Размещение модели · клик задаёт черновую точку. Сохранить или отменить в панели модели.";
     syncPlacementSelection();
     $("local-placement-edit").hidden = false;
+    $("placement-inspector-empty").hidden = true;
     const model = localModels.find(entry => entry.id === item.modelId);
     $("local-placement-name").value = item.name || defaultPlacementName(model, item.id);
     $("local-heading").value = item.heading ?? 0;
@@ -480,7 +481,11 @@
     $("quest-scenario").hidden = !isQuest;
     if (!isQuest) $("quest-fields").hidden = true;
     $("world-library").hidden = !isFind;
-    $("local-object-library").hidden = library !== "item";
+    $("local-object-library").hidden = library !== "placement";
+    $("placement-inspector").hidden = library !== "placement";
+    $("character-inspector").hidden = library !== "character";
+    document.body.dataset.questWorkspace = library;
+    if(!isQuest) $("map-quest-title").textContent = ({note:"Записки",item:"Предметы",character:"Персонажи",placement:"Размещения"})[library] || "Карта мира";
     $("character-library").hidden = library !== "character";
     $("world-library-title").textContent = library === "note" ? "Записки" : "Предметы";
     $("add-world-note").hidden = library !== "note";
@@ -583,7 +588,7 @@
       const tool = button.dataset.mode;
       const active = tool === next;
       const inFinds = library === "note" || library === "item";
-      button.hidden = (["spawn","step"].includes(tool)&&library!=="quest") || (tool==="world_place"&&!inFinds) || (tool==="object"&&library==="character");
+      button.hidden = (["spawn","step"].includes(tool)&&library!=="quest") || (tool==="world_place"&&!inFinds) || (tool==="object"&&!["quest","note","item"].includes(library));
       const unavailable = C.mapModeError(tool,mapContext());
       button.disabled = !!unavailable;
       button.title = unavailable || "";
@@ -950,16 +955,26 @@
   }
 
 
-  for (const tab of document.querySelectorAll("[data-library]")) {
-    tab.addEventListener("click", () => {
-      if (pendingPlacement) cancelPlacement();
-      library = tab.dataset.library;
-      if (library === "item") void refreshLocalObjects();
-      selectedWorldItemId = null;
-      renderAll();
-      setMode("browse");
-    });
+  function changeLibrary(next) {
+    if (!["quest","note","item","character","placement"].includes(next)) return;
+    if (next !== library && pendingPlacement) cancelPlacement();
+    library = next;
+    selectedWorldItemId = null;
+    renderAll();
+    setMode("browse");
+    if (library === "placement") void refreshLocalObjects();
   }
+  for (const tab of document.querySelectorAll("[data-library]")) {
+    tab.addEventListener("click", () => changeLibrary(tab.dataset.library));
+  }
+  window.QuestOpenPlacements = (id) => {
+    if (typeof id !== "string" || !id || id.length > 200) return false;
+    if (pendingPlacement && !window.confirm("Отменить незавершённое размещение и выбрать другую модель?")) return false;
+    if (pendingPlacement) cancelPlacement();
+    requestedModel = id;
+    changeLibrary("placement");
+    return true;
+  };
   $("character-list").addEventListener("click", event => {
     const button = event.target.closest("[data-character]");
     if (!button) return;

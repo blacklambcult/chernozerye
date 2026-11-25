@@ -8,6 +8,7 @@
   <title>ЧЕРНОЗЁРЬЕ / QUEST LAB 0.4</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="./quest.css?v=4">
+  <link rel="stylesheet" href="../studio/workbench.css?v=1">
   <script>if(new URLSearchParams(location.search).has("studio"))document.documentElement.classList.add("studio-embedded");</script>
   <style>
     html.studio-embedded .topbar, html.studio-embedded .statusbar { display:none!important; }
@@ -17,7 +18,7 @@
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}
 </script>
 </head>
-<body>
+<body class="wb-quest">
 <div class="studio">
   <header class="topbar">
     <div class="brand">
@@ -37,19 +38,18 @@
     </nav>
   </header>
 
-  <div class="workspace">
-    <aside class="sidebar panel-left" aria-label="Библиотека и параметры квестов">
-      <div class="panel-section heading-section">
-        <div class="eyebrow">01 / БИБЛИОТЕКА</div>
-        <h2>Конструктор квестов</h2>
-        <p class="subtle">Создавай задания и настраивай последовательность игровых событий. Все изменения сохраняются локально.</p>
-      </div>
-      <nav class="panel-section two-buttons" aria-label="Разделы Quest Lab">
-        <button class="button" type="button" data-library="quest" aria-pressed="true">Квесты</button>
+  <div class="workspace quest-workbench">
+    <header class="quest-workspace-bar"><div class="wb-toolbar-title"><span class="wb-kicker">QUEST LAB</span><h2>Сценарии и мир</h2></div>
+      <nav class="quest-workspace-tabs" aria-label="Разделы Quest Lab">
+        <button class="button" type="button" data-library="quest" aria-pressed="true">Сценарии</button>
         <button class="button" type="button" data-library="note" aria-pressed="false">Записки</button>
         <button class="button" type="button" data-library="item" aria-pressed="false">Предметы</button>
         <button class="button" type="button" data-library="character" aria-pressed="false">Персонажи</button>
+        <button class="button" type="button" data-library="placement" aria-pressed="false">Размещения</button>
       </nav>
+    </header>
+    <aside class="sidebar panel-left" aria-label="Библиотека и параметры квестов">
+      <header class="workbench-heading"><span class="wb-kicker">QUEST / 01</span><h2>Навигатор</h2><span class="wb-muted">Локальный проект</span></header>
       <section class="panel-section" id="quest-library">
         <div class="section-heading"><h3>Квесты</h3><span id="quest-count" class="mini-count">0</span></div>
         <div class="two-buttons">
@@ -67,7 +67,7 @@
         <label for="quest-description">Описание</label>
         <textarea id="quest-description" rows="3" maxlength="1200" placeholder="Короткое описание истории"></textarea>
         <div class="section-heading split"><h3>Точка спавна игрока</h3><span class="mini-tag">WGS84</span></div>
-        <p class="hint">Выбери «Спавн» над картой и нажми на нужное место либо введи координаты ниже.</p>
+        <p class="hint">Выбери «Старт» над картой и нажми на нужное место либо введи координаты ниже.</p>
         <div class="coordinate-fields">
           <div><label for="spawn-lat">Широта (N)</label><input id="spawn-lat" type="number" step="0.0000001" min="-90" max="90"></div>
           <div><label for="spawn-lon">Долгота (E)</label><input id="spawn-lon" type="number" step="0.0000001" min="-180" max="180"></div>
@@ -88,10 +88,66 @@
         <div id="world-item-list" class="quest-list" aria-label="Находки для размещения"></div>
       </section>
       <section class="panel-section" id="local-object-library" hidden>
-        <h3>Модели на карте</h3>
-        <label for="local-model">Модель из Model Lab</label>
+        <div class="section-heading"><h3>Экземпляры на карте</h3></div>
+        <label for="local-model">Модель из общей библиотеки</label>
         <select id="local-model"></select>
         <button id="place-local-model" type="button" class="button full">Поставить на карту</button>
+        <div id="local-placements" class="quest-list"></div>
+        <button id="share-local-world" class="button full" type="button">Создать ссылку на снимок объектов</button>
+        <div id="local-share-result" hidden>
+          <label for="local-world-link">Ссылка для друга</label>
+          <input id="local-world-link" readonly>
+          <p class="hint">Снимок включает модели и размещения. В игре по ссылке доступны штатные квесты.</p>
+        </div>
+        <a class="button full" href="../?placements=local" target="_blank" rel="noopener">Открыть игру с размещениями</a>
+      </section>
+      <section class="panel-section" id="character-library" hidden>
+        <h3>Персонажи</h3>
+        <div id="character-list" class="quest-list"></div>
+        <button id="add-character" type="button" class="button full">+ Персонаж</button>
+      </section>
+      <section class="panel-section bottom-section">
+        <div class="section-heading"><h3>Проект</h3><span class="mini-tag">JSON / V1</span></div>
+        <button type="button" id="export-json" class="button primary full">↓ Скачать проект JSON</button>
+        <label class="button full import-button" for="import-json">↑ Импортировать проект JSON
+          <input id="import-json" type="file" accept=".json,application/json" hidden>
+        </label>
+        <div id="save-state" class="save-state" role="status">Сохранение в браузере.</div>
+        <p class="tiny-note">Экспорт содержит квесты и отдельные находки с постоянными ID и координатами. Для обновления опубликованной игры экспортированный JSON нужно добавить в репозиторий и собрать Godot.</p>
+      </section>
+    </aside>
+
+    <main class="map-main" aria-label="Карта квеста">
+      <div class="map-toolbar">
+        <div>
+          <div class="eyebrow">QUEST / 02 · КАРТА</div>
+          <h2 id="map-quest-title">Выбери квест</h2>
+        </div>
+        <div class="map-actions" role="group" aria-label="Режим карты">
+          <button id="tool-browse" type="button" class="map-tool active" data-mode="browse" aria-pressed="true">◎ Просмотр</button>
+          <button id="tool-spawn" type="button" class="map-tool" data-mode="spawn" aria-pressed="false">⌖ Старт</button>
+          <button id="tool-step" type="button" class="map-tool" data-mode="step" aria-pressed="false">◆ Точка шага</button>
+          <button id="tool-object" type="button" class="map-tool pick-object" data-mode="object" aria-pressed="false">▣ Выбрать объект</button>
+          <button id="tool-world-place" type="button" class="map-tool world-tool" data-mode="world_place" aria-pressed="false">✦ Разместить находку</button>
+          <button id="geo-layer-toggle" type="button" class="map-tool active" aria-pressed="true" title="Геообъекты Geo Lab: здания, лес, вода, дороги, ручная разметка">▥ Геообъекты</button>
+          <button id="basemap-toggle" type="button" class="map-tool basemap">◫ Схема</button>
+        </div>
+      </div>
+      <div class="map-frame">
+        <div id="quest-map" aria-label="Интерактивная карта стартовой точки и задач"></div>
+        <div class="map-head"><span class="live-dot"></span> ПРОСТРАНСТВО МИРА</div>
+        <div id="map-hint" class="map-hint" role="status">Просмотр карты · выбери режим редактирования для изменения координат.</div>
+        <div class="map-coords">УКАЗАТЕЛЬ <span id="pointer-coords">54.672897, 55.852815</span></div>
+        <div id="map-error" class="map-error" role="alert" hidden>Картографический модуль не загрузился. Проверь соединение с интернетом.</div>
+        <noscript>Для редактора квестов нужен JavaScript.</noscript>
+      </div>
+      <div class="map-footer"><span><b class="legend-dot spawn"></b> Спавн игрока</span><span><b class="legend-dot step"></b> Точка задачи</span><span><b class="legend-dot houses"></b> Дома</span><span><b class="legend-dot nature"></b> Лес / вода</span><span><b class="legend-dot world-item-dot"></b> Находки</span><span id="geo-layer-status" role="status">GEO LAB / ЗАГРУЗКА СЛОЁВ…</span></div>
+    </main>
+
+    <aside class="sidebar panel-right" aria-label="Инспектор сценариев и размещений">
+      <header class="workbench-heading"><span class="wb-kicker">QUEST / 03</span><h2>Инспектор</h2><span class="wb-muted">Свойства выбранной записи</span></header>
+      <section class="panel-section" id="placement-inspector" hidden><h3>Размещение модели</h3>
+        <div id="local-model-status" class="hint" role="status"></div>
         <div id="local-placement-edit" hidden>
           <label for="local-placement-name">Название экземпляра</label>
           <input id="local-placement-name" maxlength="80" type="text" required autocomplete="off">
@@ -112,20 +168,8 @@
             <button id="cancel-local-edit" type="button" class="button">Отмена</button>
           </div>
         </div>
-        <div id="local-model-status" class="hint" role="status"></div>
-        <div id="local-placements" class="quest-list"></div>
-        <button id="share-local-world" class="button full" type="button">Создать ссылку на снимок объектов</button>
-        <div id="local-share-result" hidden>
-          <label for="local-world-link">Ссылка для друга</label>
-          <input id="local-world-link" readonly>
-          <p class="hint">Снимок включает модели и размещения. В игре по ссылке доступны штатные квесты.</p>
-        </div>
-        <a class="button full" href="../?placements=local" target="_blank" rel="noopener">Открыть игру с размещениями</a>
-      </section>
-      <section class="panel-section" id="character-library" hidden>
-        <h3>Персонажи</h3>
-        <div id="character-list" class="quest-list"></div>
-        <button id="add-character" type="button" class="button full">+ Персонаж</button>
+<p class="hint" id="placement-inspector-empty">Выбери модель или экземпляр в навигаторе.</p></section>
+      <section class="panel-section" id="character-inspector" hidden><h3>Карточка персонажа</h3>
         <div id="character-fields" hidden>
           <label for="character-name">Имя</label>
           <input id="character-name" type="text" maxlength="140">
@@ -133,46 +177,7 @@
           <textarea id="character-description" rows="4" maxlength="1200"></textarea>
           <button id="delete-character" type="button" class="button danger full">Удалить персонажа</button>
         </div>
-      </section>
-      <section class="panel-section bottom-section">
-        <div class="section-heading"><h3>Проект</h3><span class="mini-tag">JSON / V1</span></div>
-        <button type="button" id="export-json" class="button primary full">↓ Скачать проект JSON</button>
-        <label class="button full import-button" for="import-json">↑ Импортировать проект JSON
-          <input id="import-json" type="file" accept=".json,application/json" hidden>
-        </label>
-        <div id="save-state" class="save-state" role="status">Сохранение в браузере.</div>
-        <p class="tiny-note">Экспорт содержит квесты и отдельные находки с постоянными ID и координатами. Для обновления опубликованной игры экспортированный JSON нужно добавить в репозиторий и собрать Godot.</p>
-      </section>
-    </aside>
-
-    <main class="map-main" aria-label="Карта квеста">
-      <div class="map-toolbar">
-        <div>
-          <div class="eyebrow">02 / ПРОСТРАНСТВО КВЕСТА</div>
-          <h2 id="map-quest-title">Выбери квест</h2>
-        </div>
-        <div class="map-actions" role="group" aria-label="Режим карты">
-          <button id="tool-browse" type="button" class="map-tool active" data-mode="browse" aria-pressed="true">◎ Просмотр</button>
-          <button id="tool-spawn" type="button" class="map-tool" data-mode="spawn" aria-pressed="false">⌖ Старт</button>
-          <button id="tool-step" type="button" class="map-tool" data-mode="step" aria-pressed="false">◆ Точка шага</button>
-          <button id="tool-object" type="button" class="map-tool pick-object" data-mode="object" aria-pressed="false">▣ Выбрать объект</button>
-          <button id="tool-world-place" type="button" class="map-tool world-tool" data-mode="world_place" aria-pressed="false">✦ Разместить находку</button>
-          <button id="geo-layer-toggle" type="button" class="map-tool active" aria-pressed="true" title="Геообъекты Geo Lab: здания, лес, вода, дороги, ручная разметка">▥ Геообъекты</button>
-          <button id="basemap-toggle" type="button" class="map-tool basemap">◫ Схема</button>
-        </div>
-      </div>
-      <div class="map-frame">
-        <div id="quest-map" aria-label="Интерактивная карта стартовой точки и задач"></div>
-        <div class="map-head"><span class="live-dot"></span> CHERNOZERYE / MISSION PLANNER</div>
-        <div id="map-hint" class="map-hint" role="status">Просмотр карты · выбери режим редактирования для изменения координат.</div>
-        <div class="map-coords">УКАЗАТЕЛЬ <span id="pointer-coords">54.672897, 55.852815</span></div>
-        <div id="map-error" class="map-error" role="alert" hidden>Картографический модуль не загрузился. Проверь соединение с интернетом.</div>
-        <noscript>Для редактора квестов нужен JavaScript.</noscript>
-      </div>
-      <div class="map-footer"><span><b class="legend-dot spawn"></b> Спавн игрока</span><span><b class="legend-dot step"></b> Точка задачи</span><span><b class="legend-dot houses"></b> Дома</span><span><b class="legend-dot nature"></b> Лес / вода</span><span><b class="legend-dot world-item-dot"></b> Находки</span><span id="geo-layer-status" role="status">GEO LAB / ЗАГРУЗКА СЛОЁВ…</span></div>
-    </main>
-
-    <aside class="sidebar panel-right" aria-label="Редактор событий квеста">
+</section>
       <div id="quest-scenario">
       <div class="panel-section heading-section">
         <div class="eyebrow">03 / СЦЕНАРИЙ</div>
@@ -274,7 +279,7 @@
 <script src="../map/editor-core.js?v=20"></script>
 <script src="./geo-overlay-core.js?v=3"></script>
 <script src="../object-library/library.js?v=3"></script>
-<script src="./quest.js?v=13"></script>
+<script src="./quest.js?v=14"></script>
 <script type="module" src="./placement-preview.mjs?v=2"></script>
 </body>
 </html>
