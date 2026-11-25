@@ -4,9 +4,9 @@ render_mode unshaded;
 uniform sampler2D scene_color : hint_screen_texture, repeat_disable, filter_nearest;
 uniform bool ps1_pixels_enabled = false;
 uniform float ps1_pixel_strength : hint_range(0.0, 1.0) = 0.55;
-uniform float cel_strength : hint_range(0.0, 1.0) = 0.34;
-uniform float poster_levels : hint_range(4.0, 32.0) = 18.0;
-uniform float edge_strength : hint_range(0.0, 1.0) = 0.14;
+uniform float cel_strength : hint_range(0.0, 1.0) = 0.30;
+uniform float poster_levels : hint_range(4.0, 32.0) = 22.0;
+uniform float edge_strength : hint_range(0.0, 1.0) = 0.10;
 
 float luminance(vec3 c) {
     return dot(c, vec3(0.299, 0.587, 0.114));
@@ -18,16 +18,19 @@ float blue_excess(vec3 c) {
 
 void fragment() {
     vec2 scene_uv = SCREEN_UV;
+    float block_size = 1.0;
     if (ps1_pixels_enabled && ps1_pixel_strength > 0.0) {
         float screen_height = 1.0 / SCREEN_PIXEL_SIZE.y;
-        float block_size = mix(1.0, max(1.0, screen_height / 160.0), ps1_pixel_strength);
+        block_size = mix(1.0, max(1.0, screen_height / 160.0), ps1_pixel_strength);
         vec2 block_uv = SCREEN_PIXEL_SIZE * block_size;
         scene_uv = (floor(SCREEN_UV / block_uv) + 0.5) * block_uv;
     }
 
     vec3 original = texture(scene_color, scene_uv).rgb;
 
-    vec2 offset = SCREEN_PIXEL_SIZE * 1.5;
+    // A subpixel contrast sample at a snapped texel can land inside the
+    // same block. Sample one full block away when the filter is active.
+    vec2 offset = SCREEN_PIXEL_SIZE * max(1.5, block_size);
     float center_l = luminance(original);
     float right_l = luminance(texture(scene_color, scene_uv + vec2(offset.x, 0.0)).rgb);
     float up_l = luminance(texture(scene_color, scene_uv + vec2(0.0, offset.y)).rgb);
@@ -56,11 +59,11 @@ void fragment() {
     float band = floor(luminance(scene) * 5.0) / 5.0;
     scene *= mix(1.0, 0.86 + band * 0.24, cel_strength * (1.0 - 0.96 * sky_mask));
 
-    float edge = smoothstep(0.05, 0.17, contrast);
+    float edge = smoothstep(0.065, 0.21, contrast);
     scene *= 1.0 - edge * edge_strength * (1.0 - sky_mask);
 
     vec2 corners = scene_uv * 2.0 - 1.0;
-    float vignette = 1.0 - 0.10 * smoothstep(0.35, 1.85, dot(corners, corners));
+    float vignette = 1.0 - 0.07 * smoothstep(0.35, 1.85, dot(corners, corners));
     scene *= mix(vignette, 1.0, sky_mask);
 
     COLOR = vec4(clamp(scene, 0.0, 1.0), 1.0);
