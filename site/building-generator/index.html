@@ -634,8 +634,9 @@
         .library-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; }
         .library-actions input { flex: 1 1 180px; min-width: 0; color: #eee; background: #171b1c; border: 1px solid #746453; padding: 8px; }
     </style>
+    <link rel="stylesheet" href="../studio/generator-workbench.css?v=1">
 </head>
-<body>
+<body class="generator-workbench">
     <!-- Fullscreen 3D Viewport -->
     <div id="viewport">
         <canvas id="gl-canvas"></canvas>
@@ -3154,8 +3155,8 @@
                    ========================================================= */
                 function handleResize() {
                     if (!renderer) return;
-                    const w = Math.max(1, window.innerWidth);
-                    const h = Math.max(1, window.innerHeight);
+                    const w = Math.max(1, canvas.clientWidth || window.innerWidth);
+                    const h = Math.max(1, canvas.clientHeight || window.innerHeight);
                     camera.aspect = w / h;
                     camera.updateProjectionMatrix();
 
@@ -3357,8 +3358,8 @@
                     const elapsed = clock.getElapsedTime();
 
                     // Sync canvas dimensions cleanly inside rAF
-                    const cw = window.innerWidth;
-                    const ch = window.innerHeight;
+                    const cw = canvas.clientWidth;
+                    const ch = canvas.clientHeight;
                     if (cw > 0 && ch > 0 && (cw !== lastW || ch !== lastH)) {
                         lastW = cw;
                         lastH = ch;
