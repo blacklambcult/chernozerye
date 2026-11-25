@@ -1,6 +1,7 @@
 extends Node3D
 ## Batches Studio models across the surveyed plots without changing the map data.
 
+const WORLD_RENDER_LOD := preload("res://world_render_lod.gd")
 const MODEL_DIR := "res://generated_village/"
 const DEFAULT_CHUNK_SIZE := 128.0
 const TEST_FENCE_CHUNK_SIZE := 96.0
@@ -227,6 +228,8 @@ func _queue(id: String, pose: Transform3D) -> void:
 
 func finish() -> void:
     var missing := 0
+    var world_lod := WORLD_RENDER_LOD.enabled()
+    var lod_batches := 0
     for id in _transforms:
         var packed := load(MODEL_DIR + id + ".glb") as PackedScene
         if packed == null:
@@ -261,11 +264,15 @@ func finish() -> void:
                 batch.add_to_group(render_group)
                 if render_group == &"perf_fences":
                     batch.lod_bias = 0.6
+                elif world_lod:
+                    batch.lod_bias = WORLD_RENDER_LOD.BUILDING_BIAS
+                    lod_batches += 1
                 batch.multimesh = multi
                 batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
                 add_child(batch, true)
         template.free()
     _transforms.clear()
+    print("VILLAGE_WORLD_LOD_READY: enabled=", world_lod, " batches=", lod_batches)
     print("STUDIO_CLEARANCE_READY: relocated=", _relocated, " no_safe_fit=", _tight_sites,
         " reduced=", _reduced, " average_scale=", _scale_sum / maxf(_placed, 1.0))
     print("STUDIO_VILLAGE_READY: buildings=", _placed, " fence_sections=", _fences,

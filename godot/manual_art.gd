@@ -71,7 +71,6 @@ var _road_count := 0
 var _feature_house_center := Vector2(INF, INF)
 var _feature_house_distance := INF
 var _building_polygons: Array[PackedVector2Array] = []
-const BUILDING_CELL_SIZE := 16.0
 var _building_bounds: Array[Rect2] = []
 var _building_cells: Dictionary = {}
 var _plot_props_count := 0
@@ -112,10 +111,12 @@ var cultist_totem_site := Vector2.INF
 var _studio_village: Node3D
 var _studio_fence_profile := 0
 var _plot_polygons: Array[PackedVector2Array] = []
+var _plot_cells: Dictionary = {}
 var _road_clearance: Array[Rect2] = []
 var _house_approaches: Array[Dictionary] = []
 var _reserved_building_space: Array[PackedVector2Array] = []
 var _reserved_building_bounds: Array[Rect2] = []
+var _reserved_building_cells: Dictionary = {}
 var _fence_cells: Dictionary = {}
 var _yard_objects: Array = []
 var _placed_plots: Array[PackedVector2Array] = []
@@ -171,6 +172,7 @@ func decorate(features: Array, profile_startup := false) -> void:
         elif kind == "plot":
             var plot_points := _local_points(item.get("points", []))
             if plot_points.size() >= 3:
+                _index_clearance(_plot_cells, _polygon_bounds(plot_points), _plot_polygons.size())
                 _plot_polygons.append(plot_points)
                 for i in range(plot_points.size()):
                     _plot_edges.append([plot_points[i], plot_points[(i + 1) % plot_points.size()]])
@@ -1048,15 +1050,18 @@ func _track_building(points: PackedVector2Array) -> void:
     var bounds := _polygon_bounds(points)
     _building_polygons.append(points)
     _building_bounds.append(bounds)
-    var lo := Vector2i((bounds.position / BUILDING_CELL_SIZE).floor())
-    var hi := Vector2i((bounds.end / BUILDING_CELL_SIZE).floor())
+    _index_clearance(_building_cells, bounds, index)
+
+
+func _clearance_candidates(cells: Dictionary, bounds: Rect2) -> Dictionary:
+    var lo := _clearance_cell(bounds.position)
+    var hi := _clearance_cell(bounds.end)
+    var candidates := {}
     for y in range(lo.y, hi.y + 1):
         for x in range(lo.x, hi.x + 1):
-            var cell := Vector2i(x, y)
-            if not _building_cells.has(cell):
-                _building_cells[cell] = []
-            _building_cells[cell].append(index)
-
+            for index: int in cells.get(Vector2i(x, y), []):
+                candidates[index] = true
+    return candidates
 
 func _segment_gap(a: Vector2, b: Vector2, c: Vector2, d: Vector2) -> float:
     var closest := Geometry2D.get_closest_points_between_segments(a, b, c, d)
@@ -1074,15 +1079,15 @@ func _clear_building_site(envelope: PackedVector2Array, plot: PackedVector2Array
                 if _segment_gap(envelope[i], envelope[(i + 1) % envelope.size()],
                         plot[j], plot[(j + 1) % plot.size()]) < 0.32:
                     return false
-    for i in _building_polygons.size():
+    for i: int in _clearance_candidates(_building_cells, bounds):
         if bounds.intersects(_building_bounds[i]) and not Geometry2D.intersect_polygons(
                 envelope, _building_polygons[i]).is_empty():
             return false
-    for i in _reserved_building_space.size():
+    for i: int in _clearance_candidates(_reserved_building_cells, bounds):
         if bounds.intersects(_reserved_building_bounds[i]) and not Geometry2D.intersect_polygons(
                 envelope, _reserved_building_space[i]).is_empty():
             return false
-    for i in _roads.size():
+    for i: int in _clearance_candidates(_road_clearance_cells, bounds):
         if not bounds.intersects(_road_clearance[i]):
             continue
         var road: Array = _roads[i]
@@ -1106,7 +1111,8 @@ func _place_studio_building(points: PackedVector2Array, category: String, featur
     var height := (5.09 if floors == 2 else 2.84) if category == "house" else (2.29 if category == "sauna" else 2.27)
     var center := _polygon_bounds(points).get_center()
     var plot := PackedVector2Array()
-    for candidate in _plot_polygons:
+    for index: int in _plot_cells.get(_clearance_cell(center), []):
+        var candidate := _plot_polygons[index]
         if Geometry2D.is_point_in_polygon(center, candidate):
             plot = candidate
             break
@@ -1118,8 +1124,10 @@ func _place_studio_building(points: PackedVector2Array, category: String, featur
     _register_building_collider(placement.foundation, height * placement.scale, category != "shed")
     if category == "house":
         _house_approaches.append(placement)
+        var reserved_bounds := _polygon_bounds(placement.reserved)
+        _index_clearance(_reserved_building_cells, reserved_bounds, _reserved_building_space.size())
         _reserved_building_space.append(placement.reserved)
-        _reserved_building_bounds.append(_polygon_bounds(placement.reserved))
+        _reserved_building_bounds.append(reserved_bounds)
         if center.distance_to(_feature_house_center) < 2.0:
             # Retain the start-area landmark without adding props in the new corridor.
             print("MANUAL_SHOWCASE_YARD_READY: ", placement.door)
@@ -1820,8 +1828,8 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool,
 
 func _clear_of_buildings(p: Vector2, gap: float) -> bool:
     var margin := Vector2.ONE * gap
-    var lo := Vector2i(((p - margin) / BUILDING_CELL_SIZE).floor())
-    var hi := Vector2i(((p + margin) / BUILDING_CELL_SIZE).floor())
+    var lo := Vector2i(((p - margin) / CLEARANCE_CELL_SIZE).floor())
+    var hi := Vector2i(((p + margin) / CLEARANCE_CELL_SIZE).floor())
     for y in range(lo.y, hi.y + 1):
         for x in range(lo.x, hi.x + 1):
             for j: int in _building_cells.get(Vector2i(x, y), []):

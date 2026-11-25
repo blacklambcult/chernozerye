@@ -17,6 +17,7 @@ const COLORS := {
 }
 var _soil_faces := PackedVector3Array()
 var object_count: int = 0
+const WORLD_RENDER_LOD := preload("res://world_render_lod.gd")
 const FOREST_MODELS := "res://generated_forest/"
 const FOREST_FLOOR := preload("res://forest_floor.gd")
 const SHRINE := preload("res://forest_shrine.gd")
@@ -43,7 +44,10 @@ var _puddle_patches := 0
 var _roadside_sections := 0
 var _junctions: Array = []
 var _junction_mesh_count := 0
-var _base_buildings: Node3D
+const CAR_SIZE := Vector3(2.0, 1.35, 4.0)
+const CAR_CHUNK_SIZE := 128.0
+var _car_cells: Dictionary = {}
+var _car_shape := BoxShape3D.new()
 var _profile_startup := false
 
 func _ready() -> void:
@@ -66,10 +70,7 @@ func _build_manual() -> void:
         return
     var features: Array = data.get("features", [])
     phase_start = _profile_phase("survey_read", phase_start)
-    _base_buildings = Node3D.new()
-    _base_buildings.name = "UnstyledBuildingBlockout"
-    _base_buildings.visible = false
-    add_child(_base_buildings)
+    _car_shape.size = CAR_SIZE
     var surveyed_road_id := 0
     for f in features:
         if not f is Dictionary:
@@ -133,14 +134,13 @@ func _build_manual() -> void:
                     _scatter_forest(points)
                 "water":
                     _add_area(points, 0.067, COLORS[category], "Водоём")
-                "house", "sauna", "shed":
-                    _add_building(points, category)
                 "object":
                     _add_area(points, 0.12, COLORS[category], "Объект")
         object_count += 1
     # Surveyed centre lines remain untouched. No visible round junction caps:
     # crossings are handled by small elevation separation + track clearance.
     _build_road_intersections()
+    _render_cars()
     if not _soil_faces.is_empty():
         var road_body := StaticBody3D.new()
         road_body.collision_layer = 2
@@ -242,10 +242,7 @@ func _mesh_from_triangles(vertices: PackedVector3Array, color: Color, label: Str
     instance.mesh = mesh
     instance.material_override = material
     instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-    if label.ends_with("_walls") or label.ends_with("_roof"):
-        _base_buildings.add_child(instance)
-    else:
-        add_child(instance)
+    add_child(instance)
 
 func _put_triangle(output: PackedVector3Array, a: Vector3, b: Vector3, c: Vector3) -> void:
     output.append_array(PackedVector3Array([a, b, c]))
@@ -594,52 +591,41 @@ func _add_outline(points: PackedVector2Array, width: float, height: float, tint:
     ring.append([points[0].x, points[0].y])
     _add_strip(ring, width, height, tint, label)
 
-func _add_building(points: PackedVector2Array, category: String) -> void:
-    var height := 5.0
-    var roof_tint := Color("#554a49")
-    match category:
-        "house":
-            height = 5.0
-            roof_tint = Color("#614d47")
-        "sauna":
-            height = 3.1
-            roof_tint = Color("#785548")
-        "shed":
-            height = 2.6
-            roof_tint = Color("#555958")
-    var verts := PackedVector3Array()
-    for i in range(points.size()):
-        var a: Vector2 = points[i]
-        var b: Vector2 = points[(i + 1) % points.size()]
-        if a.distance_squared_to(b) < 0.01:
-            continue
-        var alow := _pos(a, 0.11)
-        var blow := _pos(b, 0.11)
-        var atop := _pos(a, height)
-        var btop := _pos(b, height)
-        _put_triangle(verts, alow, blow, btop)
-        _put_triangle(verts, alow, btop, atop)
-    _mesh_from_triangles(verts, COLORS[category], category + "_walls")
-    _add_area(points, height, roof_tint, category + "_roof")
-
 func _add_car(point: Array, _feature: Dictionary) -> void:
     var p := Vector2(float(point[0]), float(point[1]))
-    var box := BoxMesh.new()
-    box.size = Vector3(2.0, 1.35, 4.0)
+    var position := _pos(p, 0.78)
+    var cell := Vector2i((p / CAR_CHUNK_SIZE).floor())
+    var poses: Array = _car_cells.get_or_add(cell, [])
+    poses.append(Transform3D(Basis.IDENTITY, position))
+
     var body := StaticBody3D.new()
     body.set_meta("impact_surface", &"metal")
     body.name = "Машина"
-    body.position = _pos(p, 0.78)
-    var visual := MeshInstance3D.new()
-    visual.mesh = box
-    visual.material_override = _mat(COLORS["car"])
-    body.add_child(visual)
+    body.position = position
     var collider := CollisionShape3D.new()
-    var shape := BoxShape3D.new()
-    shape.size = box.size
-    collider.shape = shape
+    collider.shape = _car_shape
     body.add_child(collider)
     add_child(body)
+
+
+func _render_cars() -> void:
+    var box := BoxMesh.new()
+    box.size = CAR_SIZE
+    var material := _mat(COLORS["car"])
+    for poses: Array in _car_cells.values():
+        var multi := MultiMesh.new()
+        multi.transform_format = MultiMesh.TRANSFORM_3D
+        multi.mesh = box
+        multi.instance_count = poses.size()
+        for i in poses.size():
+            multi.set_instance_transform(i, poses[i])
+        var batch := MultiMeshInstance3D.new()
+        batch.name = "SurveyedCars"
+        batch.multimesh = multi
+        batch.material_override = material
+        add_child(batch, true)
+    _car_cells.clear()
+
 
 func _survey_cell(point: Vector2) -> Vector2i:
     return Vector2i((point / SURVEY_CELL_SIZE).floor())
@@ -739,7 +725,12 @@ func _queue_forest_asset(batches: Dictionary, id: String, pose: Transform3D) -> 
 
 
 func _render_forest_batches(batches: Dictionary) -> void:
-    for id in batches:
+    var world_lod := WORLD_RENDER_LOD.enabled()
+    var tree_batches := 0
+    var detail_batches := 0
+    for id: String in batches:
+        var detail_distance := WORLD_RENDER_LOD.detail_distance(id) if world_lod else 0.0
+        var is_tree := id == "birch" or id.begins_with("pine_")
         var packed := _forest_model(id)
         if packed == null:
             continue
@@ -755,15 +746,28 @@ func _render_forest_batches(batches: Dictionary) -> void:
                 multi.transform_format = MultiMesh.TRANSFORM_3D
                 multi.mesh = mesh
                 multi.instance_count = poses.size()
+                var bounds := AABB()
                 for i in poses.size():
-                    multi.set_instance_transform(i, poses[i] * part.transform)
+                    var transform: Transform3D = poses[i] * part.transform
+                    multi.set_instance_transform(i, transform)
+                    if detail_distance > 0.0:
+                        var instance_bounds := transform * mesh.get_aabb()
+                        bounds = instance_bounds if i == 0 else bounds.merge(instance_bounds)
                 var batch := MultiMeshInstance3D.new()
                 batch.multimesh = multi
+                if detail_distance > 0.0:
+                    WORLD_RENDER_LOD.set_detail_range(batch, bounds, detail_distance)
+                    detail_batches += 1
+                elif world_lod and is_tree:
+                    batch.lod_bias = WORLD_RENDER_LOD.TREE_BIAS
+                    tree_batches += 1
                 batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
                 batch.add_to_group(&"ps1_jitter_foliage")
                 batch.add_to_group(&"perf_forest_vegetation")
                 add_child(batch)
         template.free()
+    print("FOREST_WORLD_LOD_READY: enabled=", world_lod, " trees=", tree_batches,
+        " details=", detail_batches)
 
 
 func _place_forest_shrines() -> void:

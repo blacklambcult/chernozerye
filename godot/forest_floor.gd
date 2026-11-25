@@ -3,6 +3,9 @@ extends Node3D
 ## raised banks, so the existing world floor can remain as a fallback.
 const STEP := 4.0
 const INDEX_SIZE := 48.0
+const MAX_FOREST_CLEARANCE := 19.0
+# Upper bound of the angular scale in pond_distance().
+const MAX_POND_SCALE := 1.0 + 0.09 + 0.06
 var ponds: Array[Dictionary] = []
 var _trails: Array[PackedVector2Array] = []
 var _heights: Dictionary = {}
@@ -11,6 +14,7 @@ var _forest_index: Dictionary = {}
 var _excluded: Dictionary = {}
 var _roads: Dictionary = {}
 var _noise := FastNoiseLite.new()
+var _ground_texture: ImageTexture
 
 
 func _area(polygon: PackedVector2Array) -> Dictionary:
@@ -50,6 +54,13 @@ func prepare(features: Array, roads: Array, sites: Array[Vector2]) -> void:
             continue
         var area := _area(polygon)
         if kind == "forest":
+            var edges := {}
+            for i in polygon.size():
+                var a := polygon[i]
+                var b := polygon[(i + 1) % polygon.size()]
+                var bounds := Rect2(a.min(b), (a - b).abs())
+                _index(edges, bounds.grow(MAX_FOREST_CLEARANCE), [a, b, bounds])
+            area.edges = edges
             _forest.append(area)
             _index(_forest_index, area.bounds, area)
         else:
@@ -58,7 +69,7 @@ func prepare(features: Array, roads: Array, sites: Array[Vector2]) -> void:
         var best := Vector2.INF
         var distance := INF
         for site in sites:
-            if site.distance_squared_to(anchor) >= distance or not _inside(site, 19.0):
+            if site.distance_squared_to(anchor) >= distance or not _inside(site, MAX_FOREST_CLEARANCE):
                 continue
             var separated := true
             for pond in ponds:
@@ -145,10 +156,9 @@ func _inside(point: Vector2, clearance: float) -> bool:
             continue
         in_forest = true
         if clearance > 0.0:
-            var ring: PackedVector2Array = area.polygon
-            for i in ring.size():
-                if point.distance_to(Geometry2D.get_closest_point_to_segment(
-                        point, ring[i], ring[(i + 1) % ring.size()])) < clearance:
+            for edge: Array in area.edges.get(cell, []):
+                if edge[2].grow(clearance).has_point(point) and point.distance_to(
+                        Geometry2D.get_closest_point_to_segment(point, edge[0], edge[1])) < clearance:
                     in_forest = false
                     break
         if in_forest:
@@ -174,9 +184,15 @@ func pond_distance(point: Vector2, pond: Dictionary) -> float:
     return offset.length() / (1.0 + 0.09 * sin(angle * 3.0) + 0.06 * cos(angle * 5.0))
 
 
+func _near_pond(point: Vector2, pond: Dictionary, bound: float) -> bool:
+    var offset: Vector2 = (point - pond.center).abs()
+    var extent: Vector2 = pond.radius * (bound * MAX_POND_SCALE)
+    return offset.x <= extent.x and offset.y <= extent.y
+
+
 func is_wet(point: Vector2) -> bool:
     for pond in ponds:
-        if pond_distance(point, pond) < 1.12:
+        if _near_pond(point, pond, 1.12) and pond_distance(point, pond) < 1.12:
             return true
     return false
 
@@ -193,6 +209,8 @@ func _grid_height(cell: Vector2i) -> float:
         if _inside(point, STEP * 2.0):
             height += 0.52
         for pond in ponds:
+            if not _near_pond(point, pond, 2.0):
+                continue
             var radius := pond_distance(point, pond)
             if radius < 2.0:
                 var basin: float = lerpf(0.13, pond.water + 0.42, smoothstep(0.40, 1.12, radius))
@@ -221,7 +239,7 @@ func _ground_color(point: Vector2, height: float) -> Color:
     if height < 0.01:
         soil = Color("#34382b")
     for pond in ponds:
-        if pond_distance(point, pond) < 1.34:
+        if _near_pond(point, pond, 1.34) and pond_distance(point, pond) < 1.34:
             return soil.lerp(Color("#394137"), 0.64)
     return soil
 
@@ -272,6 +290,8 @@ func build() -> void:
 
 
 func _litter_texture() -> ImageTexture:
+    if _ground_texture != null:
+        return _ground_texture
     var rng := RandomNumberGenerator.new()
     rng.seed = 200511
     var image := Image.create(32, 32, false, Image.FORMAT_RGB8)
@@ -280,7 +300,8 @@ func _litter_texture() -> ImageTexture:
             var value := rng.randf_range(0.65, 1.0)
             image.set_pixel(x, y, Color(value, value * 0.98, value * 0.92))
     image.generate_mipmaps()
-    return ImageTexture.create_from_image(image)
+    _ground_texture = ImageTexture.create_from_image(image)
+    return _ground_texture
 
 
 func _mesh(mesh: ArrayMesh, material: Material, solid: bool) -> void:

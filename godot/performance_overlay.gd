@@ -1,11 +1,13 @@
 extends CanvasLayer
 
+const WORLD_RENDER_LOD := preload("res://world_render_lod.gd")
 const SAMPLE_WINDOW_USEC := 2_000_000
 const MIB := 1048576.0
 const RENDER_GROUPS := [&"perf_fences", &"perf_buildings", &"perf_roadside", &"perf_forest_vegetation"]
 const RENDER_MODES := ["Вся сцена", "Без заборов", "Без моделей зданий", "Без деталей обочины", "Без растительности леса"]
 
 var _render_mode := 0
+var _lod_label := ""
 var _hidden_meshes: Array[Node3D] = []
 
 var _panel := PanelContainer.new()
@@ -16,6 +18,7 @@ var _window_start_usec := 0
 
 
 func _ready() -> void:
+    _lod_label = "вкл." if WORLD_RENDER_LOD.enabled() else "выкл."
     layer = 100
     add_child(_panel)
     _panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT, Control.PRESET_MODE_MINSIZE, 16)
@@ -69,7 +72,7 @@ func _show_full_scene() -> void:
 
 
 func _heading() -> String:
-    return "F8 · Performance Lab\nF9 · %s" % RENDER_MODES[_render_mode]
+    return "F8 · Performance Lab · LOD %s\nF9 · %s" % [_lod_label, RENDER_MODES[_render_mode]]
 
 
 func _notification(what: int) -> void:
