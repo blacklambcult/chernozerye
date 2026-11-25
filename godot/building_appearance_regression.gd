@@ -51,5 +51,23 @@ func _run() -> void:
     if batches == 0 or shared == 0 or int(village.get("_custom_placed")) != 3:
         _fail("expected actual shared MultiMesh instances")
         return
-    print("BUILDING_APPEARANCE_OK: features=3 unique=2 shared_batches=", shared)
+    # Exercise the real art-placement path as well: a custom two-storey
+    # recipe must set the wall collider height, not the baseline floor rule.
+    var art = load("res://manual_art.gd").new()
+    root.add_child(art)
+    var collision_village = load("res://generated_village.gd").new()
+    collision_village.model_dir = "res://generated_village_test/"
+    art.add_child(collision_village)
+    collision_village.prepare(features)
+    art.set("_studio_village", collision_village)
+    var footprint := PackedVector2Array([Vector2(0, 0), Vector2(5, 0), Vector2(5, 5), Vector2(0, 5)])
+    art.call("_place_studio_building", footprint, "house", "test-house-a")
+    var faces: PackedVector3Array = art.get("_timber_faces")
+    var max_height := 0.0
+    for point in faces:
+        max_height = maxf(max_height, point.y)
+    if int(art.get("_collision_building_count")) != 1 or max_height < 5.0:
+        _fail("two-storey recipe did not reach actual wall collider")
+        return
+    print("BUILDING_APPEARANCE_OK: features=3 unique=2 shared_batches=", shared, " collider_height=", max_height)
     quit()
