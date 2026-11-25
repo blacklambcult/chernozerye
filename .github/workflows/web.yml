@@ -334,7 +334,8 @@ jobs:
           grep -q "SHRINE_QUEST_READY: targets=5" /tmp/world-smoke.log
           grep -Eq "YARD_VEGETATION_READY: clusters=[1-9][0-9]*" /tmp/world-smoke.log
           grep -q "FIRST_PERSON_BODY_READY: torso=true legs=2 arms=2" /tmp/world-smoke.log
-          grep -q "MODELED_CHARACTER_READY: fps_body=disabled full_body=f4_only fps_arms=independent" /tmp/world-smoke.log
+          grep -q "MODELED_CHARACTER_DEFERRED: full_body=f4_only" /tmp/world-smoke.log
+          if grep -q "MODELED_CHARACTER_READY:" /tmp/world-smoke.log; then exit 1; fi
           grep -q "CHARACTER_SEQUENCE_READY: cosmetic=true selected_slot_required=true duration=120 states=8" /tmp/world-smoke.log
           grep -q "SURVIVAL_HUD_READY: compass=center hp=100 hotbar=10 cigarette_pack=slot1" /tmp/world-smoke.log
           grep -q "manual_mode=true" /tmp/world-smoke.log

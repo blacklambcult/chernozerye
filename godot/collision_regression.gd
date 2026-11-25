@@ -155,14 +155,14 @@ func _run() -> void:
         _fail("old procedural coat still renders over GLB cutaway")
         return
     var character := actor.get_node_or_null("ModeledCharacter") as Node3D
-    if character == null or not bool(character.get("model_loaded")):
-        _fail("F4 full-body resource unavailable")
+    if character == null or bool(character.get("model_loaded")):
+        _fail("F4 full-body resource loaded before inspection")
         return
     if character.get("first_person_body") != null:
         _fail("first-person body was instantiated despite being disabled")
         return
     var full := character.get("full_body") as Node3D
-    if full == null or full.visible or avatar.visible:
+    if full != null or avatar.visible:
         _fail("body obstructs camera while looking down")
         return
     var fps_arms := actor.get_node_or_null("Camera3D/FPSViewmodel") as Node3D
