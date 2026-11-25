@@ -37,6 +37,8 @@ func _process(_delta: float) -> void:
         set_process(false)
 
 func _ready() -> void:
+    if OS.has_feature("web") and "--startup-profile" in OS.get_cmdline_user_args():
+        JavaScriptBridge.eval("if (window.chernozeryeStartupProfile) window.chernozeryeStartupProfile.worldStart = performance.now();", true)
     _fog_distance_test = OS.has_feature("web") or "--fog-distance-145" in OS.get_cmdline_user_args()
     _create_ground()
     _create_lighting()

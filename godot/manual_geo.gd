@@ -173,6 +173,8 @@ func _build_manual() -> void:
         _spawn_shrine(totem, 0.035, "crimson_totem", Color("#ff294e"))
     print("SHRINE_QUEST_READY: targets=", _quest_shrines.size(), " final=", totem)
     print("MANUAL_LAYOUT_READY: ", object_count)
+    if _profile_startup and OS.has_feature("web"):
+        JavaScriptBridge.eval("window.chernozeryeStartupProfile?.finish();", true)
     print("MANUAL_STREETSCAPE_READY: roadside_sections=", _roadside_sections,
         " roadside_grass=", _roadside_tufts,
         " junctions=", _junction_mesh_count)
