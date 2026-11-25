@@ -26,7 +26,10 @@ var _collision_building_count := 0
 var _collision_fence_span_count := 0
 var _collision_yard_count := 0
 var _plot_edges: Array = []
+const CLEARANCE_CELL_SIZE := 16.0
 var _entrance_routes: Array = []
+var _entrance_cells: Dictionary = {}
+var _road_clearance_cells: Dictionary = {}
 var _fronts_facing_road := 0
 var _reserved_gate_sections := 0
 var _fence_panels_skipped := 0
@@ -158,8 +161,7 @@ func decorate(features: Array, profile_startup := false) -> void:
             for i in range(road_points.size() - 1):
                 var a := road_points[i]
                 var b := road_points[i + 1]
-                _roads.append([a, b, width])
-                _road_clearance.append(Rect2(a.min(b), (a - b).abs()).grow(width * 0.5 + 0.5))
+                _register_road_segment(a, b, width)
         elif kind == "car":
             var car := _local_points(item.get("points", []))
             if not car.is_empty():
@@ -633,7 +635,7 @@ func _plot_boundary_gap(p: Vector2) -> float:
 func _fence_point_clear(p: Vector2) -> bool:
     # These bounds include the road half-width plus 0.5 m. A segment
     # outside them cannot violate the fence's 0.23 m road clearance.
-    for i in _roads.size():
+    for i: int in _road_clearance_cells.get(_clearance_cell(p), []):
         if not _road_clearance[i].has_point(p):
             continue
         var segment: Array = _roads[i]
@@ -666,26 +668,48 @@ func _entry_clear(mid: Vector3, tangent: Vector3, outward: Vector3,
     return true
 
 
-func _entrance_route_distance(p: Vector2, extra: float = 0.0) -> float:
-    # A greenhouse's clearance radius must also expand the spatial prefilter.
-    # Otherwise its centre is missed despite its walls blocking the doorstep.
-    var best := INF
-    for route in _entrance_routes:
-        var bounds: Rect2 = route["bounds"]
-        if not bounds.grow(extra).has_point(p):
-            continue
-        var closest := Geometry2D.get_closest_point_to_segment(
-            p, route["start"], route["end"])
-        best = minf(best, p.distance_to(closest))
-    return best
+func _register_road_segment(a: Vector2, b: Vector2, width: float) -> void:
+    var clearance := Rect2(a.min(b), (a - b).abs()).grow(width * 0.5 + 0.5)
+    _index_clearance(_road_clearance_cells, clearance, _roads.size())
+    _roads.append([a, b, width])
+    _road_clearance.append(clearance)
+
+
+func _clearance_cell(point: Vector2) -> Vector2i:
+    return Vector2i((point / CLEARANCE_CELL_SIZE).floor())
+
+
+func _index_clearance(cells: Dictionary, bounds: Rect2, index: int) -> void:
+    var lo := _clearance_cell(bounds.position)
+    var hi := _clearance_cell(bounds.end)
+    for y in range(lo.y, hi.y + 1):
+        for x in range(lo.x, hi.x + 1):
+            var indices: Array = cells.get_or_add(Vector2i(x, y), [])
+            indices.append(index)
 
 
 func _entry_zone_conflict(p: Vector2, extra: float = 0.0) -> bool:
-    return _entrance_route_distance(p, extra) < 1.10 + extra
+    # Props with a larger footprint may intersect a route in a neighboring cell.
+    var margin := Vector2.ONE * maxf(extra, 0.0)
+    var lo := _clearance_cell(p - margin)
+    var hi := _clearance_cell(p + margin)
+    for y in range(lo.y, hi.y + 1):
+        for x in range(lo.x, hi.x + 1):
+            for i: int in _entrance_cells.get(Vector2i(x, y), []):
+                var route: Dictionary = _entrance_routes[i]
+                var bounds: Rect2 = route["bounds"]
+                if not bounds.grow(extra).has_point(p):
+                    continue
+                var closest := Geometry2D.get_closest_point_to_segment(
+                    p, route["start"], route["end"])
+                if p.distance_to(closest) < 1.10 + extra:
+                    return true
+    return false
 
 
 func _build_entrance_routes(features: Array) -> void:
     _entrance_routes.clear()
+    _entrance_cells.clear()
     for item in features:
         if not item is Dictionary or str(item.get("type", "")) != "house":
             continue
@@ -706,11 +730,7 @@ func _build_entrance_routes(features: Array) -> void:
         var road_dist := _nearest_road_distance(mid)
         var max_distance := clampf(road_dist + 1.0, 2.8, 24.0)
         var finish := mid + outward * max_distance
-        var lo := start.min(finish) - Vector2(1.6, 1.6)
-        var hi := start.max(finish) + Vector2(1.6, 1.6)
-        _entrance_routes.append({
-            "start": start, "end": finish, "bounds": Rect2(lo, hi - lo)
-        })
+        _reserve_segment(start, finish)
     print("VILLAGE_ENTRANCES_READY: reserved=", _entrance_routes.size(),
         " road_facing=", _fronts_facing_road)
 
@@ -1107,8 +1127,9 @@ func _place_studio_building(points: PackedVector2Array, category: String, featur
 
 
 func _reserve_segment(start: Vector2, finish: Vector2) -> void:
-    _entrance_routes.append({"start": start, "end": finish,
-        "bounds": Rect2(start.min(finish), (start - finish).abs()).grow(1.6)})
+    var bounds := Rect2(start.min(finish), (start - finish).abs()).grow(1.6)
+    _index_clearance(_entrance_cells, bounds, _entrance_routes.size())
+    _entrance_routes.append({"start": start, "end": finish, "bounds": bounds})
 
 
 func _passage_clear(start: Vector2, finish: Vector2) -> bool:

@@ -97,7 +97,16 @@ func _initialize() -> void:
 
     var art := Node3D.new()
     art.set_script(load("res://manual_art.gd"))
-    art.set("_roads", [[Vector2(-20.0, -10.0), Vector2(20.0, -10.0), 3.8]])
+    art.call("_register_road_segment", Vector2(-20.0, -10.0), Vector2(20.0, -10.0), 3.8)
+    if art.call("_fence_point_clear", Vector2(-15.99, -7.9)) \
+            or not art.call("_fence_point_clear", Vector2(-16.01, -7.85)):
+        _fail("indexed road clearance changed near a cell boundary")
+        return
+    art.call("_reserve_segment", Vector2(12.0, 17.5), Vector2(24.0, 17.5))
+    if not art.call("_entry_zone_conflict", Vector2(16.1, 14.0), 2.9) \
+            or art.call("_entry_zone_conflict", Vector2(16.1, 13.45), 2.9):
+        _fail("expanded entrance lookup misses a neighboring cell")
+        return
     var house := {
         "type": "house",
         "points": [[0.0, 0.0], [8.0, 0.0], [8.0, 6.0], [0.0, 6.0]]
