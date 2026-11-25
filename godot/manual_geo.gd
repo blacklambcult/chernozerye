@@ -958,8 +958,10 @@ func _add_forest_floor_cover() -> void:
     rng.seed = 11200531
     var batches := {}
     var count := 0
+    var anchors: Array[Vector2] = _forest_floor.trail_verge_anchors()
     for i in range(0, _forest_sites.size(), 3):
-        var anchor := _forest_sites[i]
+        anchors.append(_forest_sites[i])
+    for anchor in anchors:
         for n in 3:
             var angle := rng.randf_range(0.0, TAU)
             var point := anchor + Vector2.from_angle(angle) * rng.randf_range(0.8, 5.5)
@@ -972,7 +974,7 @@ func _add_forest_floor_cover() -> void:
             var verts: Array = batches.get_or_add(bank, [])
             var y: float = _forest_floor.sample_height(point) + 0.012
             var width := rng.randf_range(0.12, 0.32)
-            var height := rng.randf_range(0.19, 0.52)
+            var height := rng.randf_range(0.28, 0.62)
             for blade in 3:
                 var axis := Vector2.from_angle(angle + float(blade) * 1.9)
                 verts.append(_pos(point - axis * width, y))
@@ -980,7 +982,7 @@ func _add_forest_floor_cover() -> void:
                 verts.append(_pos(point + axis.orthogonal() * width * 0.6, y + height * (1.0 - blade * 0.16)))
             count += 1
     for vertices: Array in batches.values():
-        _create_triangle_mesh(PackedVector3Array(vertices), Color("#726650"), "Лесная подстилка / сухая трава",
+        _create_triangle_mesh(PackedVector3Array(vertices), Color("#8a775c"), "Лесная подстилка / сухая трава",
             false, &"ps1_jitter_foliage", &"perf_forest_vegetation")
     print("FOREST_FLOOR_COVER_READY: patches=", count, " batches=", batches.size())
 
