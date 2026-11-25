@@ -74,3 +74,8 @@
   .generator-workbench #hud{grid-template-columns:minmax(104px,30%) minmax(0,1fr)}
   .generator-workbench #hud .actions-grid{grid-template-columns:1fr}
 }
+
+/* Embedded object editor: the outer dialog already names the selected object. */
+.generator-workbench.gen-world #hud .header-titles{display:none}
+.generator-workbench.gen-world #hud .header-bar{justify-content:flex-start}
+.generator-workbench.gen-world #hud .library-actions{display:none!important}
