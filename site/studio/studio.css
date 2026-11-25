@@ -225,3 +225,35 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--hot);outline-offset
 
 /* Evidence-based roadmap progress */
 .roadmap-progress{margin:9px 0 10px}.roadmap-progress-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#9fb5b0;font:750 9px ui-monospace,monospace}.roadmap-progress-head strong{color:#a7d6ab;font:850 14px ui-monospace,monospace}.roadmap-progress progress{display:block;width:100%;height:7px;margin-top:6px;border:0;border-radius:4px;overflow:hidden;background:#304247;accent-color:#80ad86}.roadmap-progress progress::-webkit-progress-bar{background:#304247}.roadmap-progress progress::-webkit-progress-value{background:#80ad86}.roadmap-progress progress::-moz-progress-bar{background:#80ad86}.roadmap-criteria{margin-top:7px;font-size:10px;color:#b0c4be}.roadmap-criteria summary{cursor:pointer;color:#b5c9c1}.roadmap-criteria ul{list-style:none;margin:8px 0 0;padding:0}.roadmap-criteria li{margin:5px 0;line-height:1.5;overflow-wrap:anywhere}.roadmap-criteria small{display:block;color:#849d98;font-size:9px}.criterion-done{color:#a7d6ab}.criterion-pending{color:#a3b4b1}
+
+/* Workspace UI: one navigation source, focusable dashboard views, compact shell. */
+.rail{width:218px;overflow-y:auto;overflow-x:hidden}
+.rail-menu{min-height:min-content}
+.rail-separator{padding:15px 14px 5px;letter-spacing:1px}
+.navitem{min-height:48px;padding:7px 10px;gap:8px}
+.navcopy strong{font-size:11px}.navcopy small{font-size:10px;line-height:1.2}
+.nav-icon{width:24px;height:25px;font-size:20px}.navindex{align-self:center;margin:0;font-size:9px}
+.rail-spacer{min-height:8px}.rail-footer{padding:10px 14px}
+.studio.nav-collapsed .navitem{min-height:44px;padding:5px}
+.overview{background:#10191d;padding:18px 24px 26px}
+.release-hub{margin:0 auto;max-width:1200px}
+.dashboard-tabs{display:flex;flex-wrap:wrap;gap:5px;margin:18px 0 0;border-bottom:1px solid #3a5056}
+.dashboard-tab{border:1px solid transparent;border-bottom:2px solid transparent;padding:10px 14px;color:#b2c4bf;background:transparent;font-weight:700}
+.dashboard-tab:hover{background:#1c2c30}
+.dashboard-tab.active{border-bottom-color:var(--hot);color:#f4d1b1;background:#202a2b}
+.dashboard-panels{display:block;margin-top:10px}
+.dashboard-panels .release-list,.dashboard-panels .roadmap-list{height:auto;max-height:none;overflow:visible}
+.dashboard-panels .roadmap-card{padding:14px 18px}
+.dashboard-panels .roadmap-card strong,.dashboard-panels .release-item-title{font-size:13px}
+.dashboard-panels .roadmap-card p,.dashboard-panels .roadmap-output,.dashboard-panels .release-detail ul{font-size:12px}
+.dashboard-panels .roadmap-criteria{font-size:11px}
+.project-data-panel{border:1px solid #3a5056;background:#141e21}
+.workspace-data{padding:16px 18px;color:#b6c8c2;font-size:12px;line-height:1.65}
+.workspace-data p{margin:0 0 14px}.workspace-data h6{font-size:13px;color:#e0e8df;margin:24px 0 8px}
+.data-counts{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.data-counts div{display:flex;flex-direction:column;gap:6px;border:1px solid #3a5056;background:#152228;padding:12px}
+.data-counts b{font:700 22px ui-monospace,monospace;color:#e8b487}
+.data-actions{display:flex;flex-wrap:wrap;gap:8px}.data-actions button{font-size:11px}
+.workspace-flow{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.workspace-flow span{padding:8px 10px;border-left:2px solid #76928a;background:#1c2b2f;color:#d7e3dd}
+@media(max-width:760px){.rail{width:58px}.navitem{min-height:46px}.studio.nav-collapsed .rail{width:58px}.overview{padding:12px}.dashboard-tab{padding:8px 10px;font-size:11px}.dashboard-panels .roadmap-card{padding:12px}.topright .game-link{display:block;padding:7px;font-size:9px}.top .sigil{display:none}.brand h1{font-size:12px}}
