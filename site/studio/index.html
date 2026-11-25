@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1114">
   <meta name="description" content="Чернозёрье Studio — рабочее пространство, журнал обновлений и роадмап Geo Lab, Quest Lab, Model Lab и Hellish Forge.">
   <title>Чернозёрье / STUDIO — центр разработки</title>
-  <link rel="stylesheet" href="./studio.css?v=8">
+  <link rel="stylesheet" href="./studio.css?v=9">
 </head>
 <body>
 <div class="studio">
@@ -130,6 +130,7 @@
           <nav class="dashboard-tabs" aria-label="Разделы центра управления">
             <button type="button" data-dashboard="roadmap" aria-pressed="true" class="dashboard-tab active">Roadmap и задачи</button>
             <button type="button" data-dashboard="history" aria-pressed="false" class="dashboard-tab">История изменений</button>
+            <button type="button" data-dashboard="assets" aria-pressed="false" class="dashboard-tab">Библиотека ассетов</button>
             <button type="button" data-dashboard="data" aria-pressed="false" class="dashboard-tab">Данные проекта</button>
           </nav>
           <div class="release-columns dashboard-panels">
@@ -181,6 +182,25 @@
               </div>
               <div class="panel-foot">Прогресс по подтверждённым критериям, не по затраченному времени.</div>
             </aside>
+            <section class="project-data-panel asset-panel" data-dashboard-panel="assets" aria-labelledby="asset-title" hidden>
+              <div class="panel-topline"><div><span class="panel-index">ASSET LIBRARY / LOCAL</span><h5 id="asset-title">КАТАЛОГ МОДЕЛЕЙ</h5></div><button class="context-button" id="asset-refresh" type="button">↻ Обновить</button></div>
+              <div class="workspace-data">
+                <p>Общая библиотека текущего браузера: модели из редакторов и их экземпляры на карте. Каталог читает существующие данные, не создаёт копий и ничего не удаляет.</p>
+                <div class="data-counts asset-metrics">
+                  <div><span>Модели</span><b id="asset-model-count">—</b></div>
+                  <div><span>Размещения</span><b id="asset-placement-count">—</b></div>
+                  <div><span>Объём GLB</span><b id="asset-size">—</b></div>
+                </div>
+                <div class="asset-toolbar">
+                  <label>Поиск<input id="asset-search" type="search" placeholder="Название, ID, источник"></label>
+                  <label>Источник<select id="asset-source"><option value="">Все источники</option></select></label>
+                  <label>Использование<select id="asset-used"><option value="">Все модели</option><option value="yes">Размещены</option><option value="no">Не размещены</option></select></label>
+                </div>
+                <p id="asset-status" role="status">Открой вкладку, чтобы загрузить каталог.</p>
+                <div id="asset-list" class="asset-list"></div>
+                <button type="button" class="context-button" id="asset-more" hidden>Показать ещё 40</button>
+              </div>
+            </section>
             <section class="project-data-panel" data-dashboard-panel="data" aria-labelledby="data-title" hidden>
               <div class="panel-topline"><div><span class="panel-index">LOCAL WORKSPACE</span><h5 id="data-title">ДАННЫЕ И СНИМКИ ПРОЕКТА</h5></div></div>
               <div class="workspace-data">
@@ -222,6 +242,7 @@
 <script src="./release-core.js?v=3"></script>
 <script src="./studio-releases.js?v=3"></script>
 <script src="./commit-history.js?v=1"></script>
-<script src="./studio.js?v=11"></script>
+<script src="./studio.js?v=12"></script>
+<script src="./asset-catalog.js?v=1"></script>
 </body>
 </html>
