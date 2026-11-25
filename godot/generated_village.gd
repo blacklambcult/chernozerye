@@ -2,6 +2,8 @@ extends Node3D
 ## Batches Studio models across the surveyed plots without changing the map data.
 
 const WORLD_RENDER_LOD := preload("res://world_render_lod.gd")
+const FENCE_DETAIL_DISTANCE := 34.0
+const FENCE_DETAIL_MARGIN := 6.0
 const MODEL_DIR := "res://generated_village/"
 const DEFAULT_CHUNK_SIZE := 128.0
 const TEST_FENCE_CHUNK_SIZE := 96.0
@@ -226,10 +228,34 @@ func _queue(id: String, pose: Transform3D) -> void:
     cells[cell].append(pose)
 
 
+func _part_transform(part: MeshInstance3D, template: Node3D) -> Transform3D:
+    var relative := part.transform
+    var parent: Node3D = part.get_parent()
+    while parent != template:
+        relative = parent.transform * relative
+        parent = parent.get_parent()
+    return relative
+
+
+func _fence_lod_bounds(cells: Dictionary, detailed_parts: Array[Dictionary]) -> Dictionary:
+    var combined: AABB = detailed_parts[0].transform * detailed_parts[0].mesh.get_aabb()
+    for part in detailed_parts:
+        combined = combined.merge(part.transform * part.mesh.get_aabb())
+    var result := {}
+    for cell in cells:
+        var poses: Array = cells[cell]
+        var bounds: AABB = poses[0] * combined
+        for pose: Transform3D in poses:
+            bounds = bounds.merge(pose * combined)
+        result[cell] = bounds
+    return result
+
+
 func finish() -> void:
     var missing := 0
     var world_lod := WORLD_RENDER_LOD.enabled()
     var lod_batches := 0
+    var distant_fence_batches := 0
     for id in _transforms:
         var packed := load(MODEL_DIR + id + ".glb") as PackedScene
         if packed == null:
@@ -237,42 +263,66 @@ func finish() -> void:
             continue
         var template := packed.instantiate() as Node3D
         var cells: Dictionary = _transforms[id]
-        var render_group := &"perf_fences" if id.begins_with("fence_") else &"perf_buildings"
-        for part in template.find_children("*", "MeshInstance3D", true, false):
-            var relative: Transform3D = part.transform
-            var parent: Node3D = part.get_parent()
-            while parent != template:
-                relative = parent.transform * relative
-                parent = parent.get_parent()
-            var mesh := part.mesh as ArrayMesh
-            for i in mesh.get_surface_count():
-                var material := mesh.surface_get_material(i) as BaseMaterial3D
-                if material != null:
-                    material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
-                    # Godot's glTF import does not enable albedo vertex colors for these batches.
-                    if (mesh.surface_get_format(i) & Mesh.ARRAY_FORMAT_COLOR) != 0:
-                        material.vertex_color_use_as_albedo = true
-            for poses: Array in cells.values():
-                var multi := MultiMesh.new()
-                multi.transform_format = MultiMesh.TRANSFORM_3D
-                multi.mesh = mesh
-                multi.instance_count = poses.size()
-                for i in poses.size():
-                    multi.set_instance_transform(i, poses[i] * relative)
-                var batch := MultiMeshInstance3D.new()
-                batch.name = id
-                batch.add_to_group(render_group)
-                if render_group == &"perf_fences":
-                    batch.lod_bias = 0.6
-                elif world_lod:
-                    batch.lod_bias = WORLD_RENDER_LOD.BUILDING_BIAS
-                    lod_batches += 1
-                batch.multimesh = multi
-                batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-                add_child(batch, true)
+        var is_fence: bool = id.begins_with("fence_")
+        var render_group := &"perf_fences" if is_fence else &"perf_buildings"
+        var distant_root := template.find_child("DistantFence", true, false) if is_fence else null
+        var detailed_parts: Array[Dictionary] = []
+        var distant_parts: Array[Dictionary] = []
+        for node: MeshInstance3D in template.find_children("*", "MeshInstance3D", true, false):
+            var mesh := node.mesh as ArrayMesh
+            var entry := {"mesh": mesh, "transform": _part_transform(node, template)}
+            if distant_root != null and distant_root.is_ancestor_of(node):
+                distant_parts.append(entry)
+            else:
+                detailed_parts.append(entry)
+        var use_fence_lod := world_lod and not detailed_parts.is_empty() and not distant_parts.is_empty()
+        var lod_bounds := _fence_lod_bounds(cells, detailed_parts) if use_fence_lod else {}
+        for parts in [detailed_parts, distant_parts]:
+            var distant: bool = is_same(parts, distant_parts)
+            if distant and not use_fence_lod:
+                continue
+            for part in parts:
+                var mesh: ArrayMesh = part.mesh
+                for i in mesh.get_surface_count():
+                    var material := mesh.surface_get_material(i) as BaseMaterial3D
+                    if material != null:
+                        material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
+                        if (mesh.surface_get_format(i) & Mesh.ARRAY_FORMAT_COLOR) != 0:
+                            material.vertex_color_use_as_albedo = true
+                for cell in cells:
+                    var poses: Array = cells[cell]
+                    var multi := MultiMesh.new()
+                    multi.transform_format = MultiMesh.TRANSFORM_3D
+                    multi.mesh = mesh
+                    multi.instance_count = poses.size()
+                    for i in poses.size():
+                        multi.set_instance_transform(i, poses[i] * part.transform)
+                    var batch := MultiMeshInstance3D.new()
+                    batch.name = id + ("_distant" if distant else "")
+                    batch.add_to_group(render_group)
+                    if is_fence:
+                        batch.lod_bias = 0.6
+                    elif world_lod:
+                        batch.lod_bias = WORLD_RENDER_LOD.BUILDING_BIAS
+                        lod_batches += 1
+                    batch.multimesh = multi
+                    batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+                    if use_fence_lod:
+                        var bounds: AABB = lod_bounds[cell]
+                        multi.custom_aabb = bounds
+                        # All materials and both representations switch from one center.
+                        var transition := FENCE_DETAIL_DISTANCE + FENCE_DETAIL_MARGIN + bounds.size.length() * 0.5
+                        if distant:
+                            batch.visibility_range_begin = transition
+                            batch.visibility_range_begin_margin = FENCE_DETAIL_MARGIN
+                            distant_fence_batches += 1
+                        else:
+                            batch.visibility_range_end = transition
+                            batch.visibility_range_end_margin = FENCE_DETAIL_MARGIN
+                    add_child(batch, true)
         template.free()
     _transforms.clear()
-    print("VILLAGE_WORLD_LOD_READY: enabled=", world_lod, " batches=", lod_batches)
+    print("VILLAGE_WORLD_LOD_READY: enabled=", world_lod, " batches=", lod_batches, " distant_fences=", distant_fence_batches)
     print("STUDIO_CLEARANCE_READY: relocated=", _relocated, " no_safe_fit=", _tight_sites,
         " reduced=", _reduced, " average_scale=", _scale_sum / maxf(_placed, 1.0))
     print("STUDIO_VILLAGE_READY: buildings=", _placed, " fence_sections=", _fences,

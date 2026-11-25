@@ -32,6 +32,11 @@ async function bake(id, type, modules, conditions) {
       throw new Error(id + " has a floating annex");
   }
   const model = batchModel(source, { bakeTint: type !== "zabor", atlasTextures: type !== "zabor" });
+  if (type === "zabor") {
+    const distant = batchModel(source, { flattenFencePanels: true });
+    distant.name = "DistantFence";
+    model.add(distant);
+  }
   const bytes = await encodeModel(model);
   fs.writeFileSync(path.join(output, id + ".glb"), Buffer.from(bytes));
 }
