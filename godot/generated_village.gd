@@ -82,6 +82,7 @@ func prepare(features: Array) -> void:
 
 func _load_appearance_models(features: Array) -> void:
     _appearance_models.clear()
+    _custom_missing = 0
     var path := model_dir + "appearance_models.json"
     var manifest: Dictionary = {}
     if FileAccess.file_exists(path):
@@ -98,7 +99,7 @@ func _load_appearance_models(features: Array) -> void:
         var appearance: Dictionary = feature.appearance
         var parameters: Dictionary = appearance.get("parameters", {})
         var conditions: Dictionary = appearance.get("conditions", {})
-        if entry is Dictionary:
+        if entry is Dictionary and entry.get("appearance") == appearance:
             var model := str(entry.get("model", ""))
             var floors := int(parameters.get("floors", 1))
             var window := int(conditions.get("window", 0))
