@@ -39,14 +39,17 @@ var _roadside_sections := 0
 var _junctions: Array = []
 var _junction_mesh_count := 0
 var _base_buildings: Node3D
+var _profile_startup := false
 
 func _ready() -> void:
+    _profile_startup = "--startup-profile" in OS.get_cmdline_user_args()
     _forest_chunk_size = 96.0 if "--world-chunks-96" in OS.get_cmdline_user_args() else 145.0
     visible = false
     call_deferred("_build_manual")
 
 func _build_manual() -> void:
     await get_tree().process_frame
+    var phase_start := Time.get_ticks_usec()
     if not FileAccess.file_exists(SOURCE):
         push_warning("GeoLab manual layout absent")
         return
@@ -55,6 +58,7 @@ func _build_manual() -> void:
         push_error("GeoLab manual layout invalid")
         return
     var features: Array = data.get("features", [])
+    phase_start = _profile_phase("survey_read", phase_start)
     _base_buildings = Node3D.new()
     _base_buildings.name = "UnstyledBuildingBlockout"
     _base_buildings.visible = false
@@ -134,18 +138,22 @@ func _build_manual() -> void:
         road_body.add_child(road_collider)
         add_child(road_body)
         _soil_faces.clear()
+    phase_start = _profile_phase("survey_meshes_and_sites", phase_start)
     _forest_floor = FOREST_FLOOR.new()
     _forest_floor.name = "ForestFloor"
     add_child(_forest_floor)
     _forest_floor.prepare(features, manual_roads, _forest_sites)
     _forest_floor.build()
+    phase_start = _profile_phase("forest_terrain", phase_start)
     _build_forest_instances()
+    phase_start = _profile_phase("forest_instances_total", phase_start)
     # Separate, reversible decorative layer; manual survey coordinates remain untouched.
     var art := Node3D.new()
     art.name = "VillageArt22"
     art.set_script(preload("res://manual_art.gd"))
     add_child(art)
-    art.call("decorate", features)
+    art.call("decorate", features, _profile_startup)
+    _profile_phase("village_total", phase_start)
     var totem: Vector2 = art.get("cultist_totem_site")
     if totem.is_finite():
         _spawn_shrine(totem, 0.035, "crimson_totem", Color("#ff294e"))
@@ -156,6 +164,12 @@ func _build_manual() -> void:
         " junctions=", _junction_mesh_count)
     print("NOVEMBER_MUD_READY: patches=", _mud_patches,
         " shallow_puddles=", _puddle_patches)
+
+func _profile_phase(phase: String, start_usec: int) -> int:
+    var now := Time.get_ticks_usec()
+    if _profile_startup:
+        print("STARTUP_PROFILE: phase=%s ms=%.3f" % [phase, (now - start_usec) / 1000.0])
+    return now
 
 func _points(raw: Array) -> PackedVector2Array:
     var result := PackedVector2Array()
@@ -807,6 +821,7 @@ func _build_trunk_collision() -> void:
 
 
 func _build_forest_instances() -> void:
+    var phase_start := Time.get_ticks_usec()
     _place_forest_shrines()
     var batches := {}
     var undergrowth := 0
@@ -859,8 +874,11 @@ func _build_forest_instances() -> void:
             undergrowth += 1
     _add_forest_ponds(batches)
     _forest_floor.add_snow(snow)
+    phase_start = _profile_phase("forest_placement", phase_start)
     _render_forest_batches(batches)
+    phase_start = _profile_phase("forest_model_load_and_batches", phase_start)
     _build_trunk_collision()
+    _profile_phase("forest_trunk_collision", phase_start)
     print("MANUAL_FOREST_READY: trees=", tree_trunks.size(), " clearance=roads13/buildings6.5",
         " bushes=", undergrowth, " ground_details=", ground_details, " shrines=", _shrine_sites.size(), " snow=", snow.size())
 

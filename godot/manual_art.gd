@@ -117,7 +117,8 @@ var _placed_plots: Array[PackedVector2Array] = []
 var _fence_duplicates := 0
 var _approaches_blocked := 0
 
-func decorate(features: Array) -> void:
+func decorate(features: Array, profile_startup := false) -> void:
+    var phase_start := Time.get_ticks_usec()
     _studio_village = STUDIO_VILLAGE.new()
     _studio_village.name = "StudioVillage"
     add_child(_studio_village)
@@ -195,9 +196,17 @@ func decorate(features: Array) -> void:
     print("VILLAGE_ACCESS_READY: homes=", _house_approaches.size(), " segments=", _entrance_routes.size(),
         " blocked=", _approaches_blocked, " merged_fence_spans=", _fence_duplicates)
     _add_yard_vegetation()
+    var placement_end := Time.get_ticks_usec()
     _studio_village.finish()
+    var batches_end := Time.get_ticks_usec()
     _flush_details()
+    var collisions_start := Time.get_ticks_usec()
     _build_collision_bodies()
+    var collisions_end := Time.get_ticks_usec()
+    if profile_startup:
+        print("STARTUP_PROFILE: phase=village_placement ms=%.3f" % ((placement_end - phase_start) / 1000.0))
+        print("STARTUP_PROFILE: phase=village_model_load_and_batches ms=%.3f" % ((batches_end - placement_end) / 1000.0))
+        print("STARTUP_PROFILE: phase=village_collisions ms=%.3f" % ((collisions_end - collisions_start) / 1000.0))
     _create_solid_mesh(_yard_details, Color("#48443b"), "Старый деревенский быт / ящики и дрова")
     _create_solid_mesh(_road_ruts, RUT_COLOR, "Дорога / земляные колеи")
     _create_solid_mesh(_overhead_wires, Color("#242d2d"), "Старые кабели / провисшие линии")
@@ -613,7 +622,16 @@ func _plot_boundary_gap(p: Vector2) -> float:
 
 
 func _fence_point_clear(p: Vector2) -> bool:
-    return _road_surface_gap(p) >= 0.23 and _clear_of_buildings(p, 0.58)
+    # These bounds include the road half-width plus 0.5 m. A segment
+    # outside them cannot violate the fence's 0.23 m road clearance.
+    for i in _roads.size():
+        if not _road_clearance[i].has_point(p):
+            continue
+        var segment: Array = _roads[i]
+        var nearest := Geometry2D.get_closest_point_to_segment(p, segment[0], segment[1])
+        if p.distance_to(nearest) - float(segment[2]) * 0.5 < 0.23:
+            return false
+    return _clear_of_buildings(p, 0.58)
 
 
 func _fence_span_clear(a: Vector2, b: Vector2,
