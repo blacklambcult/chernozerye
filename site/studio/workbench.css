@@ -92,3 +92,8 @@ html.studio-embedded .wb-geo .wb-standalone-link{display:none}
  .wb-geo .geo-inspector,.wb-quest .panel-right{order:2;flex-shrink:0}
  .wb-quest .quest-workspace-bar{order:-1}
 }
+
+.wb-geo .geo-filter{display:grid;gap:5px;margin:9px 0}
+.wb-geo .geo-filter label,.wb-geo #geo-filter-count{font-size:11px;color:var(--wb-muted)}
+.wb-geo .geo-filter input,.wb-geo .geo-filter select{width:100%}
+.wb-geo .geo-list-more{width:100%;margin-top:7px}
