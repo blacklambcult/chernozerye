@@ -30,6 +30,7 @@
   let savedMessage = "";
   let localStorageAvailable = true;
   let objectLimit = 100;
+  let generatorContext = null;
 
   for (const [name, z] of [["game-survey", 520], ["manual-survey", 532], ["manual-handles", 660]]) {
     if (!map.getPane(name)) map.createPane(name);
@@ -150,10 +151,22 @@
       gameFeatures = core.importCollection(await response.json());
       gameLayer = L.geoJSON(null, {
         pane: "game-survey",
-        interactive: false,
+        interactive: true,
+        bubblingMouseEvents: false,
+        onEachFeature: (feature,layer)=>layer.on("click",event=>{
+          L.DomEvent.stopPropagation(event);
+          if(activeTool||editingVertices)return;
+          const existing=getRecord(feature.id);
+          if(existing){selectFeature(existing.id,true);return;}
+          if(!confirm("Добавить этот объект текущей игровой карты в редактируемую разметку? Остальные объекты не копируются."))return;
+          records.push(structuredClone(feature));
+          $("editor-visible").checked=true;
+          featureGroup.addTo(map);
+          redrawAll();selectFeature(feature.id,true);persist();
+        }),
         style: feature => styleFor(feature),
         pointToLayer: (feature, position) => L.circleMarker(position, {
-          ...styleFor(feature), pane: "game-survey", interactive: false, radius: 5
+          ...styleFor(feature), pane: "game-survey", interactive: true, bubblingMouseEvents:false, radius: 5
         })
       });
       refreshGameLayer();
@@ -318,6 +331,8 @@
     $("editor-name").value = feature.properties.name || "";
     $("editor-notes").value = feature.properties.notes || "";
     buildCategoryOptions(feature);
+    renderAppearance(feature);
+    for(const [id,value] of [["world-east",0],["world-north",0],["world-rotation",0],["world-scale",1]]) $(id).value=value;
     const shape = feature.geometry.type === "Point" ? "точка"
       : feature.geometry.type === "LineString" ? "линия" : "полигон";
     $("editor-shape-info").textContent = "Геометрия: " + shape + " · " + metric(feature) +
@@ -641,6 +656,10 @@
       message("Этот тип не подходит к форме выбранного объекта.", true);
       return;
     }
+    if(category!==feature.properties.category && feature.properties.appearance){
+      if(!confirm("Изменение типа сбросит индивидуальный внешний вид. Продолжить?"))return;
+      delete feature.properties.appearance;
+    }
     feature.geometry = geometry;
     feature.properties.category = category;
     feature.properties.name = $("editor-name").value.trim().slice(0, 120);
@@ -779,6 +798,85 @@
   $("geo-object-filter").addEventListener("input",()=>{objectLimit=100;renderList();});
   $("geo-category-filter").addEventListener("change",()=>{objectLimit=100;renderList();});
   $("geo-list-more").addEventListener("click",()=>{objectLimit+=100;renderList();});
+
+  function renderAppearance(feature){
+    const spec=core.appearanceType(feature.properties.category);
+    $("world-appearance").hidden=!spec;
+    if(!spec)return;
+    const custom=!!feature.properties.appearance;
+    $("world-reset-appearance").hidden=!custom;
+    const label=spec[1]==="tree"?"Лес: образец дерева":spec[1]==="water"?"Водоём: образец тайла":"Постройка";
+    $("world-appearance-status").textContent=label+" · "+(custom?"индивидуальный рецепт сохранён":"стандартный внешний вид");
+  }
+  function commitAppearance(feature,recipe){
+    const normalized=core.normalizeAppearance(recipe,feature.properties.category);
+    if(!normalized)return false;
+    feature.properties.appearance=normalized;
+    feature.properties.updated_at=new Date().toISOString();
+    persist();
+    renderSelected();
+    if(localStorageAvailable)message("Рецепт объекта сохранён в черновике GeoJSON.");
+    return true;
+  }
+  const generatorDialog=$("world-generator-dialog"),generatorFrame=$("world-generator-frame");
+  window.WorldEditorGetContext=function(source){
+    if(!generatorContext||source!==generatorFrame.contentWindow)return null;
+    return structuredClone(generatorContext);
+  };
+  function closeGenerator(){
+    if(generatorDialog.open)generatorDialog.close();
+    generatorContext=null;
+    generatorFrame.removeAttribute("src");
+    $("world-generator-apply").disabled=true;
+  }
+  $("world-open-generator").addEventListener("click",()=>{
+    const feature=getRecord(selectedId);
+    if(!feature)return;
+    const spec=core.appearanceType(feature.properties.category);
+    if(!spec)return;
+    generatorContext={id:feature.id,generator:spec[0],type:spec[1],recipe:feature.properties.appearance||null};
+    $("world-generator-title").textContent=feature.properties.name||core.TYPES[feature.properties.category].label;
+    $("world-generator-status").textContent="Загрузка генератора…";
+    $("world-generator-apply").disabled=true;
+    generatorDialog.showModal();
+    generatorFrame.src="../"+(spec[0]==="building"?"building-generator":"nature-generator")+"/?world=1&v=world-editor-1";
+  });
+  generatorFrame.addEventListener("load",()=>{
+    if(!generatorContext)return;
+    try{
+      const ready=typeof generatorFrame.contentWindow.WorldEditorRecipe==="function";
+      $("world-generator-apply").disabled=!ready;
+      $("world-generator-status").textContent=ready?"Настрой внешний вид и нажми «Применить к объекту».":"Генератор недоступен. Закрой окно и попробуй снова.";
+    }catch{
+      $("world-generator-status").textContent="Не удалось открыть генератор.";
+    }
+  });
+  $("world-generator-cancel").addEventListener("click",closeGenerator);
+  generatorDialog.addEventListener("cancel",event=>{event.preventDefault();closeGenerator();});
+  $("world-generator-apply").addEventListener("click",()=>{
+    const feature=generatorContext&&getRecord(generatorContext.id);
+    try{
+      if(!feature||!commitAppearance(feature,generatorFrame.contentWindow.WorldEditorRecipe()))throw Error("Рецепт не соответствует выбранному объекту");
+      closeGenerator();
+    }catch(error){$("world-generator-status").textContent=error.message||"Не удалось применить рецепт.";}
+  });
+  $("world-reset-appearance").addEventListener("click",()=>{
+    const feature=getRecord(selectedId);
+    if(!feature?.properties.appearance||!confirm("Сбросить индивидуальный внешний вид объекта?"))return;
+    delete feature.properties.appearance;
+    feature.properties.updated_at=new Date().toISOString();
+    persist();renderSelected();
+  });
+  $("world-transform-apply").addEventListener("click",()=>{
+    const feature=getRecord(selectedId);if(!feature)return;
+    const values={east:$("world-east").valueAsNumber,north:$("world-north").valueAsNumber,rotation:$("world-rotation").valueAsNumber,scale:$("world-scale").valueAsNumber};
+    const geometry=core.transformGeometry(feature.geometry,feature.properties.category,values);
+    if(!geometry){message("Недопустимое смещение, масштаб или координаты.",true);return;}
+    feature.geometry=geometry;
+    feature.properties.updated_at=new Date().toISOString();
+    selectFeature(feature.id,true);
+    persist();
+  });
 
   // Warm start without replacing read-only Overture/OSM layers.
   restore();
