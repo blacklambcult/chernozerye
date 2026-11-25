@@ -669,6 +669,7 @@ jobs:
           node --check site/studio/commit-history.js
           node --test tests/studio-commit-history.test.cjs
           node --test tests/studio-state.test.cjs
+          node --test tests/studio-shell.test.cjs
           node --test tests/studio-releases.test.cjs
           grep -q 'studio-state.js?v=6' site/studio/index.html
           grep -q 'release-core.js?v=3' site/studio/index.html
