@@ -1,6 +1,6 @@
-# Fearless Knights of the Cordon — путь к первой Alpha
+# Fearless Knights of the Cordon — архив планов до Roadmap 3.0
 
-Обновлено 19 ноября 2026 года.
+Действующий Roadmap 3.0 и очередь задач находятся в [Чернозёрье Studio](https://blacklambcult.github.io/chernozerye/studio/) и в [манифесте Studio](../site/studio/releases.json). Ниже сохранён исторический план.
 
 ## ROADMAP 2.0 · Foundation II — графика и производительность
 
