@@ -41,3 +41,18 @@ test("invalid or unrelated data cannot masquerade as editable map objects", () =
   assert.equal(layers.sourceCounts({type:"FeatureCollection",features:[{},{}]}),2);
   assert.throws(()=>layers.sourceCounts({type:"hello"}));
 });
+
+test("manual draft warnings survive background layer progress and recover independently",()=>{
+  const error="ошибка черновика";
+  for(let ready=0;ready<=layers.SOURCES.length;ready++){
+    const status=layers.overlayStatus({manualCount:7,ready,failed:0,manualError:error});
+    assert.equal(status.warning,true);
+    assert.ok(status.text.includes(error));
+    assert.ok(status.text.includes("7 МОИХ"));
+  }
+  const both=layers.overlayStatus({manualError:error,failed:1});
+  assert.ok(both.text.includes(error));
+  assert.ok(both.text.includes("часть базовых слоёв недоступна"));
+  assert.equal(layers.overlayStatus({ready:4,failed:0,manualError:""}).warning,false);
+  assert.equal(layers.overlayStatus({ready:3,failed:1,manualError:""}).warning,true);
+});
