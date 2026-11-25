@@ -68,7 +68,9 @@ var _road_count := 0
 var _feature_house_center := Vector2(INF, INF)
 var _feature_house_distance := INF
 var _building_polygons: Array[PackedVector2Array] = []
+const BUILDING_CELL_SIZE := 16.0
 var _building_bounds: Array[Rect2] = []
+var _building_cells: Dictionary = {}
 var _plot_props_count := 0
 var _flower_patches := 0
 var _front_walkways := 0
@@ -176,7 +178,9 @@ func decorate(features: Array, profile_startup := false) -> void:
         var category: String = str(item.get("type", ""))
         if category in ["house", "sauna", "shed"]:
             _place_studio_building(_local_points(item.get("points", [])), category, str(item.get("id", "")))
+    var buildings_end := Time.get_ticks_usec()
     _reserve_placed_entrances()
+    var entrances_end := Time.get_ticks_usec()
     for item in features:
         if not item is Dictionary:
             continue
@@ -187,6 +191,7 @@ func decorate(features: Array, profile_startup := false) -> void:
                 _decorate_fence(polygon)
             "road":
                 _decorate_road(polygon)
+    var fences_end := Time.get_ticks_usec()
     _choose_cultist_totem_site()
     var total_plots := _fence_count
     for i in _placed_plots.size():
@@ -204,6 +209,10 @@ func decorate(features: Array, profile_startup := false) -> void:
     _build_collision_bodies()
     var collisions_end := Time.get_ticks_usec()
     if profile_startup:
+        print("STARTUP_PROFILE: phase=village_buildings ms=%.3f" % ((buildings_end - phase_start) / 1000.0))
+        print("STARTUP_PROFILE: phase=village_entrances ms=%.3f" % ((entrances_end - buildings_end) / 1000.0))
+        print("STARTUP_PROFILE: phase=village_fences_and_roads ms=%.3f" % ((fences_end - entrances_end) / 1000.0))
+        print("STARTUP_PROFILE: phase=village_yards ms=%.3f" % ((placement_end - fences_end) / 1000.0))
         print("STARTUP_PROFILE: phase=village_placement ms=%.3f" % ((placement_end - phase_start) / 1000.0))
         print("STARTUP_PROFILE: phase=village_model_load_and_batches ms=%.3f" % ((batches_end - placement_end) / 1000.0))
         print("STARTUP_PROFILE: phase=village_collisions ms=%.3f" % ((collisions_end - collisions_start) / 1000.0))
@@ -1016,8 +1025,18 @@ func _polygon_bounds(points: PackedVector2Array) -> Rect2:
 
 
 func _track_building(points: PackedVector2Array) -> void:
+    var index := _building_polygons.size()
+    var bounds := _polygon_bounds(points)
     _building_polygons.append(points)
-    _building_bounds.append(_polygon_bounds(points))
+    _building_bounds.append(bounds)
+    var lo := Vector2i((bounds.position / BUILDING_CELL_SIZE).floor())
+    var hi := Vector2i((bounds.end / BUILDING_CELL_SIZE).floor())
+    for y in range(lo.y, hi.y + 1):
+        for x in range(lo.x, hi.x + 1):
+            var cell := Vector2i(x, y)
+            if not _building_cells.has(cell):
+                _building_cells[cell] = []
+            _building_cells[cell].append(index)
 
 
 func _segment_gap(a: Vector2, b: Vector2, c: Vector2, d: Vector2) -> float:
@@ -1780,21 +1799,25 @@ func _fence_edge(a: Vector2, b: Vector2, gate_center: bool,
 
 
 func _clear_of_buildings(p: Vector2, gap: float) -> bool:
-    for j in range(_building_polygons.size()):
-        var bb: Rect2 = _building_bounds[j]
-        # Cheap bounding rectangle avoids hundreds of polygon tests for far houses.
-        if p.x < bb.position.x - gap or p.x > bb.end.x + gap:
-            continue
-        if p.y < bb.position.y - gap or p.y > bb.end.y + gap:
-            continue
-        var footprint: PackedVector2Array = _building_polygons[j]
-        if Geometry2D.is_point_in_polygon(p, footprint):
-            return false
-        for i in range(footprint.size()):
-            var q := Geometry2D.get_closest_point_to_segment(p,
-                footprint[i], footprint[(i + 1) % footprint.size()])
-            if p.distance_to(q) < gap:
-                return false
+    var margin := Vector2.ONE * gap
+    var lo := Vector2i(((p - margin) / BUILDING_CELL_SIZE).floor())
+    var hi := Vector2i(((p + margin) / BUILDING_CELL_SIZE).floor())
+    for y in range(lo.y, hi.y + 1):
+        for x in range(lo.x, hi.x + 1):
+            for j: int in _building_cells.get(Vector2i(x, y), []):
+                var bb: Rect2 = _building_bounds[j]
+                if p.x < bb.position.x - gap or p.x > bb.end.x + gap:
+                    continue
+                if p.y < bb.position.y - gap or p.y > bb.end.y + gap:
+                    continue
+                var footprint: PackedVector2Array = _building_polygons[j]
+                if Geometry2D.is_point_in_polygon(p, footprint):
+                    return false
+                for i in range(footprint.size()):
+                    var q := Geometry2D.get_closest_point_to_segment(p,
+                        footprint[i], footprint[(i + 1) % footprint.size()])
+                    if p.distance_to(q) < gap:
+                        return false
     return true
 
 func _yard_box(key: String, center: Vector2, offset: Vector2,
