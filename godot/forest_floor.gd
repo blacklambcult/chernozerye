@@ -332,26 +332,36 @@ func add_water(pond: Dictionary, material: Material) -> void:
     _mesh(surface.commit(), material, false)
 
 
-func add_snow(points: Array[Vector2]) -> void:
-    var surface := SurfaceTool.new()
-    surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-    for index in points.size():
-        var center := points[index]
-        var radius := 0.48 + float(index % 13) * 0.12
-        for i in 8:
-            for j in [-1, i, i + 1]:
-                var point := center
-                if j >= 0:
-                    var angle := TAU * float(j) / 8.0
-                    point += Vector2.from_angle(angle) * radius * (0.78 + 0.22 * sin(angle * 3.0 + index))
-                var mounding := 0.10 if j == -1 else 0.026
-                surface.set_color(Color("#aab8bd") if j == -1 else Color("#77858a"))
-                surface.add_vertex(Vector3(point.x, sample_height(point) + mounding, -point.y))
+func add_snow(points: Array[Vector2], chunk_size: float) -> void:
     if points.is_empty():
         return
-    surface.generate_normals()
+    var chunks := {}
+    for index in points.size():
+        var center := points[index]
+        var cell := Vector2i((center / chunk_size).floor())
+        if not chunks.has(cell):
+            var new_surface := SurfaceTool.new()
+            new_surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+            chunks[cell] = new_surface
+        var surface: SurfaceTool = chunks[cell]
+        var radius := 0.48 + float(index % 13) * 0.12
+        var crest := Vector3(center.x, sample_height(center) + 0.10, -center.y)
+        var rim := PackedVector3Array()
+        for j in 9:
+            var angle := TAU * float(j) / 8.0
+            var point := center + Vector2.from_angle(angle) * radius * (0.78 + 0.22 * sin(angle * 3.0 + index))
+            rim.append(Vector3(point.x, sample_height(point) + 0.026, -point.y))
+        for i in 8:
+            surface.set_color(Color("#aab8bd"))
+            surface.add_vertex(crest)
+            surface.set_color(Color("#77858a"))
+            surface.add_vertex(rim[i])
+            surface.add_vertex(rim[i + 1])
     var material := StandardMaterial3D.new()
     material.vertex_color_use_as_albedo = true
     material.cull_mode = BaseMaterial3D.CULL_DISABLED
     material.roughness = 1.0
-    _mesh(surface.commit(), material, false)
+    for surface: SurfaceTool in chunks.values():
+        surface.generate_normals()
+        _mesh(surface.commit(), material, false)
+    print("FOREST_SNOW_BATCHES_READY: patches=", points.size(), " chunks=", chunks.size())
