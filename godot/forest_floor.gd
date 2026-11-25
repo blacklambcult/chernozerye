@@ -112,6 +112,16 @@ func benchmark_view() -> Transform3D:
         Vector3(point.x, sample_height(point) + 0.22, -point.y))
 
 
+func trail_verge_anchors() -> Array[Vector2]:
+    var anchors: Array[Vector2] = []
+    for trail in _trails:
+        for i in range(0, trail.size() - 1, 2):
+            var side := (trail[i + 1] - trail[i]).normalized().orthogonal()
+            anchors.append(trail[i] + side * 2.4)
+            anchors.append(trail[i] - side * 2.4)
+    return anchors
+
+
 func is_on_trail(point: Vector2) -> bool:
     for trail in _trails:
         if point.distance_squared_to(trail[0]) > 21.0 ** 2:

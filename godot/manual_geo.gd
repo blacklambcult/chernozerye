@@ -944,6 +944,7 @@ func _build_forest_instances() -> Dictionary:
                 Transform3D(basis, _pos(companion, _forest_floor.sample_height(companion) + 0.015)))
             undergrowth += 1
     _add_forest_ponds(batches)
+    _add_forest_floor_cover()
     _forest_floor.add_snow(snow, _forest_chunk_size)
     phase_start = _profile_phase("forest_placement", phase_start)
     _build_trunk_collision()
@@ -951,6 +952,44 @@ func _build_forest_instances() -> Dictionary:
     print("MANUAL_FOREST_READY: trees=", tree_trunks.size(), " clearance=roads13/buildings6.5",
         " bushes=", undergrowth, " ground_details=", ground_details, " shrines=", _shrine_sites.size(), " snow=", snow.size())
     return batches
+
+func _add_forest_floor_cover() -> void:
+    var rng := RandomNumberGenerator.new()
+    rng.seed = 11200531
+    var batches := {}
+    var count := 0
+    var anchors: Array[Vector2] = _forest_floor.trail_verge_anchors()
+    for i in range(0, _forest_sites.size(), 3):
+        anchors.append(_forest_sites[i])
+    for anchor in anchors:
+        for n in 3:
+            var angle := rng.randf_range(0.0, TAU)
+            var point := anchor + Vector2.from_angle(angle) * rng.randf_range(0.8, 5.5)
+            if not _forest_floor._inside(point, 1.0) or _forest_floor.is_wet(point) \
+                    or _forest_floor.is_on_trail(point) or _near_building(point, 1.2):
+                continue
+            if _shrine_sites.any(func(site): return point.distance_squared_to(site) < 25.0):
+                continue
+            var bank := Vector2i((point / _forest_chunk_size).floor())
+            var verts: Array = batches.get_or_add(bank, [])
+            var y: float = _forest_floor.sample_height(point) + 0.012
+            var width := rng.randf_range(0.12, 0.32)
+            var height := rng.randf_range(0.28, 0.62)
+            for blade in 5:
+                var axis := Vector2.from_angle(angle + float(blade) * 2.4)
+                var offset := axis * width * (0.22 + blade * 0.17)
+                var base := point + offset
+                var edge := axis.orthogonal() * width * 0.14
+                var tip := base + axis * width * 0.72
+                verts.append(_pos(base - edge, y))
+                verts.append(_pos(base + edge, y))
+                verts.append(_pos(tip, y + height * (1.0 - blade * 0.12)))
+            count += 1
+    for vertices: Array in batches.values():
+        _create_triangle_mesh(PackedVector3Array(vertices), Color("#806e4c"), "Лесная подстилка / сухая трава",
+            false, &"ps1_jitter_foliage", &"perf_forest_vegetation")
+    print("FOREST_FLOOR_COVER_READY: patches=", count, " batches=", batches.size())
+
 
 func _add_forest_ponds(batches: Dictionary) -> void:
     var count := 0
