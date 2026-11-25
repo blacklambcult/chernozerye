@@ -40,7 +40,7 @@
   let selectedCharacterId = null;
   let selectedStepId = null;
   let selectedWorldItemId = null;
-  let mode = "spawn";
+  let mode = "browse";
   let map = null;
   let markers = null;
   let streetTiles = null;
@@ -50,6 +50,7 @@
   let geoEnabled = true;
   let manualLayer = null;
   let manualRaw = undefined;
+  let manualError = "";
   let geoReadyCount = 0;
   let geoSourceFailures = 0;
   let manualCount = 0;
@@ -78,6 +79,15 @@
   }
   function worldItem() {
     return project.worldItems.find((item) => item.id === selectedWorldItemId) || null;
+  }
+  function mapContext() {
+    return {library, quest:quest(), step:step(), worldItem:worldItem(),
+      geoAvailable: !manualError && manualIndex.size > 0};
+  }
+  function activeGeoItem() {
+    if (library === "quest") return step();
+    if (library === "note" || library === "item") return worldItem();
+    return null;
   }
   function displayStatus(message, warning = false) {
     $("save-state").textContent = message;
@@ -213,6 +223,7 @@
   function selectWorldItem(id) {
     const item=project.worldItems.find(x=>x.id===id);
     if(!item)return;
+    if(pendingPlacement)cancelPlacement();
     library = item.type;
     selectedWorldItemId=id;
     selectedStepId=null;
@@ -221,7 +232,7 @@
     renderWorldItemInspector();
     renderStepInspector();
     renderMapPins();
-    setMode("world_place");
+    setMode("browse");
     if(item.target&&map)map.setView([item.target.lat,item.target.lon],Math.max(map.getZoom(),17),{animate:false});
   }
   function renderObjectState() {
@@ -344,6 +355,7 @@
   }
   function cancelPlacement() {
     pendingPlacement = null;
+    if(mode==="browse")$("map-hint").textContent="Просмотр карты · координаты не меняются.";
     syncPlacementSelection();
     draftMarker?.remove();
     draftMarker = null;
@@ -400,6 +412,7 @@
     cancelPlacement();
     setMode("browse");
     pendingPlacement = { ...item };
+    $("map-hint").textContent = "Размещение модели · клик задаёт черновую точку. Сохранить или отменить в панели модели.";
     syncPlacementSelection();
     $("local-placement-edit").hidden = false;
     const model = localModels.find(entry => entry.id === item.modelId);
@@ -513,7 +526,7 @@
     project.selectedId = q.id;
     selectedStepId = null;
     selectedWorldItemId = null;
-    mode = "spawn";
+    mode = "browse";
     persist();
     renderAll(true);
     $("quest-title").focus();
@@ -537,6 +550,9 @@
     project.selectedId = id;
     selectedStepId = null;
     selectedWorldItemId = null;
+    library = "quest";
+    if (pendingPlacement) cancelPlacement();
+    setMode("browse");
     persist();
     renderAll(true);
   }
@@ -545,6 +561,11 @@
     if (!q || !q.steps.some((s) => s.id === id)) return;
     selectedStepId = id;
     selectedWorldItemId = null;
+    library = "quest";
+    if (pendingPlacement) cancelPlacement();
+    setMode("browse");
+    renderLibrary();
+    renderQuestInspector();
     renderWorldItemList();
     renderWorldItemInspector();
     renderSteps();
@@ -552,27 +573,20 @@
     renderMap();
   }
   function setMode(next) {
+    const error = C.mapModeError(next, mapContext());
+    if (error) { displayStatus(error, true); return false; }
     if (next !== "browse" && pendingPlacement) cancelPlacement();
-    if (["step","object"].includes(next) && !worldItem() && (!step() || step().type === "message")) {
-      displayStatus("Выбери задачу с географической целью, а не сообщение.", true);
-      return;
-    }
-    if (["step", "object"].includes(next) && !worldItem() && step()?.noteId) {
-      displayStatus("Точка задаётся в разделе «Записки».", true);
-      return;
-    }
-    if (next === "world_place" && !worldItem()) {
-      displayStatus("Сначала создай или выбери находку.",true);
-      return;
-    }
-    if (next === "object" && !manualIndex.size) {
-      displayStatus("В Geo Lab пока нет доступной ручной разметки. Сначала нарисуй объекты на карте.", true);
-      return;
-    }
+    const changed = mode !== next;
     if(next === "object" && !geoEnabled) toggleGeoLayers();
     mode = next;
     for (const button of document.querySelectorAll("[data-mode]")) {
-      const active = button.dataset.mode === next;
+      const tool = button.dataset.mode;
+      const active = tool === next;
+      const inFinds = library === "note" || library === "item";
+      button.hidden = (["spawn","step"].includes(tool)&&library!=="quest") || (tool==="world_place"&&!inFinds) || (tool==="object"&&library==="character");
+      const unavailable = C.mapModeError(tool,mapContext());
+      button.disabled = !!unavailable;
+      button.title = unavailable || "";
       button.classList.toggle("active", active);
       button.setAttribute("aria-pressed", String(active));
     }
@@ -580,12 +594,15 @@
       "Кликни на карту, чтобы установить стартовую позицию игрока." :
       mode === "object" ? "Кликни на геообъект Geo Lab. Привязка сохранит ID для выбранной находки или шага." :
       mode === "world_place" ? "Кликни на карту, чтобы разместить постоянную находку. Её можно передвигать за маркер." :
-      mode === "step" ? "Кликни на карту, чтобы привязать выбранный шаг к местности." : "Просмотр карты";
+      mode === "step" ? "Кликни на карту, чтобы привязать выбранный шаг к местности." : pendingPlacement ? "Размещение модели · клик задаёт черновую точку." : "Просмотр карты · координаты не меняются. Выбери режим редактирования для изменений.";
     $("map-hint").classList.toggle("picking", mode==="object");
     $("quest-map").classList.toggle("is-object-picking", mode==="object");
     $("quest-map").classList.toggle("is-placement",mode!=="object" && mode!=="browse");
     updatePickVisibility();
-    $("pick-geo-object").classList.toggle("active", mode==="object");
+    $("pick-geo-object").classList.toggle("active", mode==="object" && library==="quest");
+    $("world-bind-geo").classList.toggle("active", mode==="object" && library!=="quest");
+    if (changed) renderMapPins();
+    return true;
   }
   function makePin(kind) {
     return window.L.divIcon({
@@ -595,7 +612,7 @@
     });
   }
   function updatePoint(location, destination = mode) {
-    if (destination === "browse") return;
+    if (destination !== mode || destination === "browse" || destination === "object" || C.mapModeError(destination, mapContext())) return;
     const p = C.point({ lat: location.lat, lon: location.lng });
     if(destination==="world_place"){
       const item=worldItem();
@@ -635,7 +652,7 @@
   function renderObjectHighlight() {
     if(!map || !window.L)return;
     if(objectHighlight){map.removeLayer(objectHighlight);objectHighlight=null;}
-    const item=worldItem()||step();
+    const item=activeGeoItem();
     const status=item&&Geo?Geo.resolveBinding(item,manualIndex,C):null;
     if(!status?.entry||!status.point||!geoEnabled)return;
     const center=[status.point.lat,status.point.lon];
@@ -645,10 +662,11 @@
     }).addTo(map);
   }
   function bindGeoObject(objectId) {
-    const item=worldItem()||step();
-    if(!item||item.type==="message"){displayStatus("Сначала выбери географическую задачу или находку.",true);return;}
+    const item=activeGeoItem();
+    const error = C.mapModeError("object", mapContext());
+    if(error||!item){displayStatus(error || "Выбери географическую цель.",true);return;}
     try {
-      if(worldItem()){
+      if(library!=="quest"){
         const entry=manualIndex.get(objectId);
         if(!entry)throw Error("Объект Geo Lab не найден");
         item.objectId=entry.id;
@@ -667,13 +685,15 @@
       renderObjectSearch();
       const entry=manualIndex.get(objectId);
       displayStatus("Объект привязан к задаче: "+Geo.objectLabel(entry));
+      setMode("browse");
       console.info("QUEST_GEO_OBJECT_LINKED: "+objectId);
     }catch(error){displayStatus(error.message,true);}
   }
   function focusGeoObject() {
-    const item=worldItem()||step();
+    const item=activeGeoItem();
     const match=item&&Geo?Geo.resolveBinding(item,manualIndex,C):null;
     if(!match?.entry||!map)return;
+    setMode("browse");
     map.setView([match.point.lat,match.point.lon],Math.max(map.getZoom(),18),{animate:false});
     renderObjectHighlight();
   }
@@ -741,13 +761,13 @@
       if(!item.target)continue;
       const selected=selectedWorldItemId===item.id;
       const marker=window.L.marker([item.target.lat,item.target.lon],{
-        icon:makePin(selected?"world-active":"world"),draggable:selected
+        icon:makePin(selected?"world-active":"world"),draggable:selected&&mode==="world_place"&&item.type===library
       }).addTo(markers).bindTooltip("✦ "+item.title);
       marker.on("click",()=>selectWorldItem(item.id));
-      if(selected)marker.on("dragend",evt=>updatePoint(evt.target.getLatLng(),"world_place"));
+      if(selected&&mode==="world_place"&&item.type===library)marker.on("dragend",evt=>updatePoint(evt.target.getLatLng(),"world_place"));
     }
     if (!q) return;
-    const spawnPin = window.L.marker([q.spawn.lat, q.spawn.lon], { icon: makePin("spawn"), draggable: true })
+    const spawnPin = window.L.marker([q.spawn.lat, q.spawn.lon], { icon: makePin("spawn"), draggable: mode==="spawn"&&library==="quest" })
       .addTo(markers).bindTooltip("Старт игрока");
     spawnPin.on("dragend", (evt) => updatePoint(evt.target.getLatLng(), "spawn"));
     for (let i = 0; i < q.steps.length; i++) {
@@ -756,16 +776,15 @@
       if (!item.target) continue;
       const active = selectedStepId === item.id;
       const marker = window.L.marker([item.target.lat, item.target.lon], {
-        icon: makePin(active ? "target" : "secondary"), draggable: active
+        icon: makePin(active ? "target" : "secondary"), draggable: active&&mode==="step"&&library==="quest"
       }).addTo(markers).bindTooltip((i + 1) + " · " + item.title);
       marker.on("click", () => selectStep(item.id));
-      if (active) marker.on("dragend", (evt) => updatePoint(evt.target.getLatLng(), "step"));
+      if (active&&mode==="step"&&library==="quest") marker.on("dragend", (evt) => updatePoint(evt.target.getLatLng(), "step"));
     }
   }
   function renderMap() {
     renderMapPins();
-    setMode(["step","object"].includes(mode) && !worldItem() &&
-      (!step() || step().type === "message") ? "spawn" : mode);
+    setMode(C.mapModeError(mode,mapContext()) ? "browse" : mode);
   }
   function updateGeoStatus() {
     if (!Geo || !GeoEditor) {
@@ -773,10 +792,9 @@
       $("geo-layer-status").classList.add("warning");
       return;
     }
-    const suffix = geoSourceFailures ? " · часть слоёв недоступна" : "";
-    $("geo-layer-status").textContent = "GEO LAB / " + manualCount +
-      " МОИХ · " + geoReadyCount + "/" + Geo.SOURCES.length + " БАЗОВЫХ" + suffix;
-    $("geo-layer-status").classList.toggle("warning", geoSourceFailures > 0);
+    const status = Geo.overlayStatus({manualCount,ready:geoReadyCount,failed:geoSourceFailures,manualError});
+    $("geo-layer-status").textContent = status.text;
+    $("geo-layer-status").classList.toggle("warning", status.warning);
   }
 
   function makeGeoLayer(features, styleFn) {
@@ -797,11 +815,15 @@
     let raw;
     try { raw = window.localStorage.getItem(Geo.STORAGE_KEY); }
     catch {
-      $("geo-layer-status").textContent = "GEO LAB / НЕТ ДОСТУПА К ХРАНИЛИЩУ";
-      $("geo-layer-status").classList.add("warning");
+      manualError = "нет доступа к черновику";
+      setMode(mode==="object"?"browse":mode);
+      updateGeoStatus();
       return;
     }
-    if (!force && raw === manualRaw) return;
+    if (!force && raw === manualRaw) {
+      if(manualError){manualError="";setMode(mode);}
+      updateGeoStatus();return;
+    }
     // Preserve previously drawn overlay if storage unexpectedly becomes corrupted.
     try {
       const features = Geo.readManual(raw, GeoEditor);
@@ -815,6 +837,8 @@
       manualIndex=nextIndex;
       pickLayer=nextPick;
       manualRaw=raw;
+      manualError="";
+      setMode(C.mapModeError(mode,mapContext())?"browse":mode);
       if(geoEnabled&&manualLayer)manualLayer.addTo(map);
       manualCount=features.length;
       updatePickVisibility();
@@ -825,8 +849,9 @@
       updateGeoStatus();
     } catch (error) {
       console.warn("QUEST_GEO_MANUAL_INVALID", error);
-      $("geo-layer-status").textContent = "GEO LAB / ПРОВЕРЬ ЧЕРНОВИК";
-      $("geo-layer-status").classList.add("warning");
+      manualError = "ошибка черновика; сохранён предыдущий слой";
+      setMode(mode==="object"?"browse":mode);
+      updateGeoStatus();
     }
   }
   async function loadGeoPublished() {
@@ -932,7 +957,7 @@
       if (library === "item") void refreshLocalObjects();
       selectedWorldItemId = null;
       renderAll();
-      setMode(library === "quest" ? "spawn" : "browse");
+      setMode("browse");
     });
   }
   $("character-list").addEventListener("click", event => {
@@ -1015,7 +1040,7 @@
     const item=worldItem();if(!item)return;
     const id=evt.target.value.trim();
     if(!id){item.objectId="";persist();renderWorldItemInspector();renderMapPins();return;}
-    if(manualIndex.has(id)){bindGeoObject(id);setMode("world_place");return;}
+    if(manualIndex.has(id)&&!manualError){bindGeoObject(id);return;}
     displayStatus("ID не найден в открытой разметке Geo Lab. Не сохранено.",true);
     renderWorldItemInspector();
   });
@@ -1023,6 +1048,7 @@
   $("world-bind-geo").addEventListener("click",()=>setMode("object"));
   $("world-go-to").addEventListener("click",()=>{
     const item=worldItem();if(item?.target&&map){
+      setMode("browse");
       map.setView([item.target.lat,item.target.lon],Math.max(map.getZoom(),18),{animate:false});
     }
   });
@@ -1035,7 +1061,7 @@
     if(!item||!window.confirm("Удалить находку «"+item.title+"»?"))return;
     project.worldItems=project.worldItems.filter(x=>x.id!==item.id);
     selectedWorldItemId=null;
-    persist();renderAll();setMode("spawn");
+    persist();renderAll();setMode("browse");
   });
   $("add-main").addEventListener("click", () => addQuest("main"));
   $("add-side").addEventListener("click", () => addQuest("side"));
@@ -1079,7 +1105,7 @@
   }
   $("show-spawn").addEventListener("click", () => {
     const q = quest(); if (q && map) map.setView([q.spawn.lat, q.spawn.lon], 17);
-    setMode("spawn");
+    setMode("browse");
   });
   $("duplicate-quest").addEventListener("click", () => {
     const q = quest(); if (!q) return;
@@ -1154,15 +1180,13 @@
     item.document.body = evt.target.value;
     persist();
   });
-  $("step-object").addEventListener("input", evt => {
-    const item=step();if(!item)return;
-    item.objectId=evt.target.value.trim();
-    if(manualIndex.has(item.objectId)){
-      bindGeoObject(item.objectId);
-    }else{
-      persist();
-      renderObjectState();
-    }
+  $("step-object").addEventListener("change", evt => {
+    const item=step(); if(!item)return;
+    const id=evt.target.value.trim();
+    if(!id){item.objectId="";persist();renderObjectState();return;}
+    if(!manualError&&manualIndex.has(id)){bindGeoObject(id);return;}
+    displayStatus("ID не найден в актуальном черновике Geo Lab. Прежняя привязка сохранена.",true);
+    $("step-object").value=item.objectId;
   });
   $("geo-object-search").addEventListener("input",renderObjectSearch);
   $("geo-object-results").addEventListener("click",evt=>{
@@ -1179,7 +1203,10 @@
     persist(); renderSteps(); renderStepInspector(); renderMapPins();
   });
   for (const button of document.querySelectorAll("[data-mode]")) {
-    button.addEventListener("click", () => setMode(button.dataset.mode));
+    button.addEventListener("click", () => {
+      if(button.dataset.mode==="browse"&&pendingPlacement)cancelPlacement();
+      setMode(button.dataset.mode);
+    });
   }
 
   $("export-json").addEventListener("click", () => {
@@ -1210,7 +1237,7 @@
       project = imported;
       selectedStepId = null;
       selectedWorldItemId = null;
-      mode="spawn";
+      mode="browse";
       persist();
       renderAll(true);
       displayStatus("Импорт завершён · " + project.quests.length + " квестов");

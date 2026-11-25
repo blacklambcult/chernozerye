@@ -571,9 +571,9 @@ jobs:
           node --check site/quest/geo-overlay-core.js
           node --test tests/quest-geo-overlay.test.cjs
           node --test tests/quest-geo-link.test.cjs
-          grep -q 'quest.js?v=12' site/quest/index.html
-          grep -q 'geo-overlay-core.js?v=2' site/quest/index.html
-          grep -q 'quest-core.js?v=3' site/quest/index.html
+          grep -q 'quest.js?v=13' site/quest/index.html
+          grep -q 'geo-overlay-core.js?v=3' site/quest/index.html
+          grep -q 'quest-core.js?v=4' site/quest/index.html
           grep -q 'id="step-document-fields"' site/quest/index.html
           grep -q 'id="world-item-fields"' site/quest/index.html
           grep -q 'id="tool-world-place"' site/quest/index.html

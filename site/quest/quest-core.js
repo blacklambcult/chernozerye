@@ -185,8 +185,25 @@
     normalized.steps.splice(to, 0, item);
     return normalized;
   }
+  // UI context only; never changes saved Quest Lab v1 data.
+  function mapModeError(mode, context = {}) {
+    const { library, quest, step, worldItem, geoAvailable } = context;
+    const inQuest = library === "quest";
+    const inWorld = library === "note" || library === "item";
+    const validStep = inQuest && step && step.type !== "message" && !step.noteId;
+    const validWorld = inWorld && worldItem && worldItem.type === library;
+    if (mode === "browse") return "";
+    if (mode === "spawn") return inQuest && quest ? "" : "Выбери квест, чтобы изменить стартовую точку.";
+    if (mode === "step") return validStep ? "" : "Выбери шаг с собственной географической целью.";
+    if (mode === "world_place") return validWorld ? "" : "Выбери находку в текущем разделе.";
+    if (mode === "object") {
+      if (!validStep && !validWorld) return "Выбери шаг или находку для привязки.";
+      return geoAvailable ? "" : "Нет доступной актуальной разметки Geo Lab.";
+    }
+    return "Неизвестный режим карты.";
+  }
   return Object.freeze({
-    FORMAT, VERSION, STEP_TYPES, QUEST_TYPES, WORLD_ITEM_TYPES, MAX_WORLD_ITEMS, DEFAULT_SPAWN,
+    mapModeError, FORMAT, VERSION, STEP_TYPES, QUEST_TYPES, WORLD_ITEM_TYPES, MAX_WORLD_ITEMS, DEFAULT_SPAWN,
     makeId, point, spawn, createStep, normalizeStep, createQuest, normalizeQuest,
     createWorldItem, normalizeWorldItem, makeProject, normalizeProject, moveStep
   });

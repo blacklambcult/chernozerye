@@ -152,7 +152,8 @@
           <h2 id="map-quest-title">Выбери квест</h2>
         </div>
         <div class="map-actions" role="group" aria-label="Режим карты">
-          <button id="tool-spawn" type="button" class="map-tool active" data-mode="spawn" aria-pressed="true">⌖ Спавн</button>
+          <button id="tool-browse" type="button" class="map-tool active" data-mode="browse" aria-pressed="true">◎ Просмотр</button>
+          <button id="tool-spawn" type="button" class="map-tool" data-mode="spawn" aria-pressed="false">⌖ Старт</button>
           <button id="tool-step" type="button" class="map-tool" data-mode="step" aria-pressed="false">◆ Точка шага</button>
           <button id="tool-object" type="button" class="map-tool pick-object" data-mode="object" aria-pressed="false">▣ Выбрать объект</button>
           <button id="tool-world-place" type="button" class="map-tool world-tool" data-mode="world_place" aria-pressed="false">✦ Разместить находку</button>
@@ -163,7 +164,7 @@
       <div class="map-frame">
         <div id="quest-map" aria-label="Интерактивная карта стартовой точки и задач"></div>
         <div class="map-head"><span class="live-dot"></span> CHERNOZERYE / MISSION PLANNER</div>
-        <div id="map-hint" class="map-hint" role="status">Создай или выбери квест, затем нажми на карту для размещения точки спавна.</div>
+        <div id="map-hint" class="map-hint" role="status">Просмотр карты · выбери режим редактирования для изменения координат.</div>
         <div class="map-coords">УКАЗАТЕЛЬ <span id="pointer-coords">54.672897, 55.852815</span></div>
         <div id="map-error" class="map-error" role="alert" hidden>Картографический модуль не загрузился. Проверь соединение с интернетом.</div>
         <noscript>Для редактора квестов нужен JavaScript.</noscript>
@@ -269,11 +270,11 @@
   <footer class="statusbar"><span><span class="live-dot"></span> QUEST LAB / LOCAL EDITOR</span><span id="status-detail">Готов к работе</span><span>СОХРАНЕНИЕ В БРАУЗЕРЕ · WGS84</span></footer>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="./quest-core.js?v=3"></script>
+<script src="./quest-core.js?v=4"></script>
 <script src="../map/editor-core.js?v=20"></script>
-<script src="./geo-overlay-core.js?v=2"></script>
+<script src="./geo-overlay-core.js?v=3"></script>
 <script src="../object-library/library.js?v=3"></script>
-<script src="./quest.js?v=12"></script>
+<script src="./quest.js?v=13"></script>
 <script type="module" src="./placement-preview.mjs?v=2"></script>
 </body>
 </html>
