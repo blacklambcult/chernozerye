@@ -212,3 +212,13 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--hot);outline-offset
  .module-card{min-height:150px}
 }
 @media(prefers-reduced-motion:reduce){.release-caret{transition:none}}
+
+/* Git micro-version history */
+#micro-history[hidden],#release-archive[hidden],#micro-more[hidden]{display:none!important}
+.micro-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 15px;border-bottom:1px solid #304247;color:#a7bdb8;font-size:10px}
+.micro-controls input{flex:1;min-width:100px;background:#101c20;color:#dbe5df;border:1px solid #4f6663;padding:7px 9px;font:inherit}
+.micro-controls input:focus-visible,.micro-more:focus-visible{outline:2px solid #e7ad7f;outline-offset:2px}
+.micro-more{margin:9px 15px;width:calc(100% - 30px)}
+.micro-body{white-space:pre-wrap;overflow-wrap:anywhere;color:#b6cac5;font-size:11px;line-height:1.6;margin:0}
+#micro-list .release-item-title{overflow-wrap:anywhere}
+#micro-history .release-main-info{flex-wrap:wrap;gap:6px}
