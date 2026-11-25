@@ -17,6 +17,7 @@
   });
   const COLLAPSE_KEY = "chernozerye.studio.rail-collapsed.v1";
   const cached = new Map();
+  const embeddedDocuments = new WeakSet();
   let railCollapsed = false;
   function notifyEditorResize() {
     const current = cached.get(active);
@@ -24,7 +25,6 @@
     requestAnimationFrame(() => {
       try {
         current.frame.contentWindow.dispatchEvent(new Event("resize"));
-        current.frame.contentWindow.QuestGeoOverlayRefresh?.();
       } catch (err) { console.warn("STUDIO_RESIZE_FAILED",err); }
     });
   }
@@ -45,26 +45,28 @@
 
   let active = null;
   const refreshStats = () => {
-    const stats = State.snapshot(localStorage);
+    let storage;
+    try { storage = window.localStorage; } catch { storage = null; }
+    const stats = State.snapshot(storage);
     for (const name of ["geo", "quest", "model", "forge"]) {
       $(name + "-count").textContent = stats[name] === null ? "!" : String(stats[name]);
       $(name + "-count").title = stats[name] === null ?
         "Локальный файл не удалось прочитать; скачайте резервную копию из редактора." : "Локальные записи";
     }
-    $("last-status").textContent = "СЕССИЯ / АВТОСОХРАНЕНИЕ В БРАУЗЕРЕ";
+    $("last-status").textContent = Object.values(stats).some(v=>v===null) ? "ЛОКАЛЬНЫЕ ДАННЫЕ / ПРОВЕРЬТЕ ХРАНИЛИЩЕ" : "ЛОКАЛЬНЫЕ ДАННЫЕ / ТЕКУЩИЙ БРАУЗЕР";
   };
 
   function injectEmbeddedStyle(frame, mode) {
     try {
       const doc = frame.contentDocument;
-      if (!doc?.head || frame.dataset.embeddedReady === "1") return;
+      if (!doc?.head || embeddedDocuments.has(doc)) return;
       const styles = doc.createElement("style");
       styles.dataset.chernozeryeStudio = "embedded";
       styles.textContent = mode === "geo" ?
         "html,body{height:100%!important;}body{overflow:hidden!important}.workspace{height:100vh!important;min-height:0!important}.sidebar{max-height:100vh!important}" :
         ".topbar{display:none!important}.statusbar,.footer{display:none!important}.studio,.app{height:100vh!important;min-height:0!important}.workspace{min-height:0!important}";
       doc.head.appendChild(styles);
-      frame.dataset.embeddedReady = "1";
+      embeddedDocuments.add(doc);
       // Route links between editors to the Studio navigation rather than
       // replacing the contents of this one iframe.
       doc.addEventListener("click", (event) => {
@@ -74,15 +76,16 @@
         let url;
         try { url = new URL(link.href, frame.contentWindow.location.href); } catch { return; }
         if (url.origin !== window.location.origin) return;
-        const match = url.pathname.match(/\/chernozerye\/(map|quest|model|forge|weapon-generator|building-generator|nature-generator|arms|npc|studio)\/?$/);
-        if (!match) return;
+        const next = State.routeForUrl(url.href, window.location.href);
+        if (!next) return;
         event.preventDefault();
-        show(match[1] === "map" ? "geo" : match[1] === "studio" ? "home" :
-          match[1] === "weapon-generator" ? "weapon" : match[1] === "building-generator" ? "buildings" : match[1] === "nature-generator" ? "nature" : match[1], true, url);
+        show(next, true, url);
       }, {capture: true});
       doc.addEventListener("keydown", (event) => {
-        if (!event.altKey || event.ctrlKey || event.metaKey) return;
-        const next = { Digit0:"home", Digit1:"geo", Digit2:"quest", Digit3:"model", Digit4:"forge", Digit5:"weapon", Digit6:"arms", Digit7:"buildings", Digit8:"nature", Digit9:"npc" }[event.code];
+        if ((event.ctrlKey || event.metaKey) && !event.altKey && event.code === "KeyB") {
+          event.preventDefault(); event.stopImmediatePropagation(); setRailCollapsed(!railCollapsed); return;
+        }
+        const next = State.shortcut(event);
         if (next) { event.preventDefault(); event.stopImmediatePropagation(); show(next); }
       }, {capture: true});
     } catch (error) {
@@ -112,15 +115,13 @@
     frame.loading = "eager";
     frame.referrerPolicy = "strict-origin-when-cross-origin";
     frame.dataset.tool = id;
-    frame.src = config.file;
-    $("editors").appendChild(frame);
     const entry = { frame, ready:false };
     cached.set(id, entry);
     frame.addEventListener("load", () => {
       entry.ready = true;
       injectEmbeddedStyle(frame, id);
       if (id === active) {
-        $("frame-status").textContent = id.toUpperCase() + " LAB / ГОТОВ";
+        $("frame-status").textContent = id.toUpperCase() + " / ОТКРЫТ";
         focusFrame(id);
       }
       refreshStats();
@@ -128,19 +129,18 @@
     frame.addEventListener("error", () => {
       if (id === active) $("frame-status").textContent = "ОШИБКА ЗАГРУЗКИ · ОТКРОЙТЕ ОТДЕЛЬНО";
     });
+    frame.src = config.file;
+    $("editors").appendChild(frame);
     return entry;
   }
   function show(next, setHash = true, editorUrl = null) {
     const id = State.toolId(next);
+    if (active === id && !editorUrl) return;
     active = id;
     const config = MODES[id];
     $("section-kicker").textContent = config.kicker;
     $("section-title").textContent = config.name;
-    $("rail-toggle").addEventListener("click", () => setRailCollapsed(!railCollapsed));
-  document.querySelector(".rail").addEventListener("transitionend", (event) => {
-    if (event.propertyName === "width") notifyEditorResize();
-  });
-  for (const b of document.querySelectorAll("[data-target]")) {
+    for (const b of document.querySelectorAll("[data-target]")) {
       const selected = b.dataset.target === id;
       b.classList.toggle("active", selected);
       b.setAttribute("aria-current", selected ? "page" : "false");
@@ -150,7 +150,7 @@
     $("editors").hidden = isHome;
     $("reload-editor").hidden = isHome;
     $("external-editor").hidden = isHome;
-    $("frame-status").textContent = isHome ? "ВСЁ ГОТОВО" : id.toUpperCase() + " LAB / ЗАГРУЗКА";
+    $("frame-status").textContent = isHome ? "ЦЕНТР УПРАВЛЕНИЯ" : id.toUpperCase() + " / ЗАГРУЗКА";
     if (!isHome) $("external-editor").href = config.url;
     for (const [key, value] of cached.entries()) value.frame.hidden = key !== id;
     if (!isHome) {
@@ -160,12 +160,11 @@
         editorUrl.searchParams.set("studio", "1");
         if (entry.frame.src !== editorUrl.href) {
           entry.ready = false;
-          entry.frame.dataset.embeddedReady = "0";
           entry.frame.src = editorUrl.href;
         }
       }
       if (entry.ready) {
-        $("frame-status").textContent = id.toUpperCase() + " LAB / ГОТОВ";
+        $("frame-status").textContent = id.toUpperCase() + " / ОТКРЫТ";
         focusFrame(id);
       }
     }
@@ -175,18 +174,32 @@
     refreshStats();
   }
   for (const b of document.querySelectorAll("[data-target]")) {
-    b.addEventListener("click", () => show(b.dataset.target));
+    b.addEventListener("click", (event) => { event.preventDefault(); show(b.dataset.target); });
   }
-  for (const b of document.querySelectorAll("[data-open]")) {
-    b.addEventListener("click", () => show(b.dataset.open));
+  $("rail-toggle").addEventListener("click", () => setRailCollapsed(!railCollapsed));
+  document.querySelector(".rail").addEventListener("transitionend", (event) => {
+    if (event.propertyName === "width") notifyEditorResize();
+  });
+  const dashboardTabs = [...document.querySelectorAll("[data-dashboard]")];
+  const dashboardPanels = [...document.querySelectorAll("[data-dashboard-panel]")];
+  for (const button of dashboardTabs) {
+    button.addEventListener("click", () => {
+      const id = button.dataset.dashboard;
+      for (const tab of dashboardTabs) {
+        const selected = tab.dataset.dashboard === id;
+        tab.classList.toggle("active", selected);
+        tab.setAttribute("aria-pressed", String(selected));
+      }
+      for (const panel of dashboardPanels) panel.hidden = panel.dataset.dashboardPanel !== id;
+      if (id === "data") refreshStats();
+    });
   }
   $("reload-editor").addEventListener("click", () => {
     if (!active || active === "home") return;
     const entry = cached.get(active);
     if (!entry) return;
-    $("frame-status").textContent = active.toUpperCase() + " LAB / ПЕРЕЗАГРУЗКА";
+    $("frame-status").textContent = active.toUpperCase() + " / ПЕРЕЗАГРУЗКА";
     entry.ready = false;
-    entry.frame.dataset.embeddedReady = "0";
     entry.frame.contentWindow.location.reload();
   });
   window.addEventListener("hashchange", () => show(State.toolId(location.hash), false));
@@ -201,12 +214,10 @@
       setRailCollapsed(!railCollapsed);
       return;
     }
-    if (!evt.altKey || evt.ctrlKey || evt.metaKey) return;
-    const id = {Digit0:"home",Digit1:"geo",Digit2:"quest",Digit3:"model",Digit4:"forge",Digit5:"weapon", Digit6:"arms", Digit7:"buildings", Digit8:"nature", Digit9:"npc"}[evt.code];
+    const id = State.shortcut(evt);
     if (id) { evt.preventDefault(); show(id); }
   });
   setRailCollapsed(railCollapsed);
-  refreshStats();
   show(State.toolId(location.hash), false);
-  console.info("CHERNOZERYE_STUDIO_READY: geo=true quest=true model=true forge=true weapon=true workspace=local");
+  console.info("CHERNOZERYE_STUDIO_READY: workspace=local navigation="+State.TOOLS.length);
 })();
