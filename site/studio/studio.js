@@ -10,10 +10,10 @@
     model: {kicker:"ASSET WORKSPACE / 03", name:"MODEL LAB · 3D-КОНСТРУКТОР", url:"../model/", file:"../model/?studio=1"},
     forge: {kicker:"ARMORY ASSET WORKSPACE / 04", name:"HELLISH FORGE · ИГРОВЫЕ МОДЕЛИ", url:"../forge/", file:"../forge/?studio=1"},
     npc: {kicker:"CHARACTER WORKSPACE / 09", name:"NPC LAB · РЕДАКТОР ПЕРСОНАЖЕЙ", url:"../npc/", file:"../npc/?studio=1"},
-    nature: {kicker:"ENVIRONMENT / 08", name:"ГЕНЕРАТОР ПРИРОДЫ", url:"../nature-generator/", file:"../nature-generator/?studio=1"},
-    buildings: {kicker:"ARCHITECTURE / 07", name:"ГЕНЕРАТОР ПОСТРОЕК", url:"../building-generator/?v=3", file:"../building-generator/?studio=1&v=3"},
-    arms: {kicker:"FIRST PERSON / 06", name:"РУКИ ОТ ПЕРВОГО ЛИЦА", url:"../arms/", file:"../arms/?studio=1"},
-    weapon: {kicker:"PROCEDURAL ARMORY / 05", name:"ГЕНЕРАТОР ОРУЖИЯ · 8 КЛАССОВ", url:"../weapon-generator/", file:"../weapon-generator/?studio=1"}
+    nature: {kicker:"ENVIRONMENT / 08", name:"ГЕНЕРАТОР ПРИРОДЫ", url:"../nature-generator/?layout=1", file:"../nature-generator/?studio=1&layout=1"},
+    buildings: {kicker:"ARCHITECTURE / 07", name:"ГЕНЕРАТОР ПОСТРОЕК", url:"../building-generator/?v=4", file:"../building-generator/?studio=1&v=4"},
+    arms: {kicker:"FIRST PERSON / 06", name:"РУКИ ОТ ПЕРВОГО ЛИЦА", url:"../arms/?layout=1", file:"../arms/?studio=1&layout=1"},
+    weapon: {kicker:"PROCEDURAL ARMORY / 05", name:"ГЕНЕРАТОР ОРУЖИЯ · 8 КЛАССОВ", url:"../weapon-generator/?layout=1", file:"../weapon-generator/?studio=1&layout=1"}
   });
   const COLLAPSE_KEY = "chernozerye.studio.rail-collapsed.v1";
   const cached = new Map();
