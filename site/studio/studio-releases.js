@@ -49,9 +49,15 @@
       const items=Core.backlogByPhase(documentData,phase);
       if(!items.length)return "";
       const rows=items.map(item=>{
+        const progress=Core.roadmapProgress(item);
+        const criteria=item.criteria.map(c=>'<li class="'+(c.done?'criterion-done':'criterion-pending')+'">'+
+          (c.done?'✓ ':'○ ')+escaped(c.title)+(c.done?' <small>Источник: '+escaped(c.evidence)+'</small>':'')+'</li>').join("");
+        const progressHtml='<div class="roadmap-progress"><div class="roadmap-progress-head"><span>ПОДТВЕРЖДЕНО '+progress.done+'/'+progress.total+'</span><strong>'+progress.percent+'%</strong></div>'+
+          '<progress aria-label="Подтверждённая готовность" max="100" value="'+progress.percent+'">'+progress.percent+'%</progress>'+
+          '<details class="roadmap-criteria"><summary>Критерии готовности</summary><ul>'+criteria+'</ul></details></div>';
         return '<article class="roadmap-card" data-roadmap-id="'+escaped(item.id)+'">'+
           '<div class="roadmap-card-title"><strong>'+escaped(item.title)+'</strong></div>'+
-          '<p>'+escaped(item.description)+'</p>'+
+          progressHtml+'<p>'+escaped(item.description)+'</p>'+
           '<div class="roadmap-meta"><span>'+escaped(Core.AREAS[item.area])+'</span>'+
           '<span>ПРИОРИТЕТ / '+escaped(Core.PRIORITIES[item.priority])+'</span></div>'+
           '<div class="roadmap-output">РЕЗУЛЬТАТ: '+escaped(item.deliverable)+'</div>'+
