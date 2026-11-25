@@ -25,7 +25,7 @@ test("workbenches retain stable DOM IDs and opt in to common CSS",()=>{
     const html=read(htmlPath),ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
     assert.equal(new Set(ids).size,ids.length);
     for(const src of scripts)for(const m of read(src).matchAll(/\$\("([^"]+)"\)/g))assert.ok(ids.includes(m[1]),src+":"+m[1]);
-    if(!htmlPath.includes("/studio/"))assert.ok(html.includes("../studio/workbench.css?v=2"));
+    if(!htmlPath.includes("/studio/"))assert.ok(html.includes("../studio/workbench.css?v=3"));
   }
   const map=read("site/map/index.html");
   assert.ok(map.indexOf("geo-outline")<map.indexOf('id="editor-objects"'));
