@@ -664,9 +664,9 @@ jobs:
           node --test tests/studio-state.test.cjs
           node --test tests/studio-releases.test.cjs
           grep -q 'studio-state.js?v=5' site/studio/index.html
-          grep -q 'release-core.js?v=1' site/studio/index.html
-          grep -q 'studio-releases.js?v=1' site/studio/index.html
-          grep -q 'studio.css?v=4' site/studio/index.html
+          grep -q 'release-core.js?v=2' site/studio/index.html
+          grep -q 'studio-releases.js?v=2' site/studio/index.html
+          grep -q 'studio.css?v=5' site/studio/index.html
           grep -q 'studio.js?v=10' site/studio/index.html
           grep -q 'id="release-list"' site/studio/index.html
           grep -q 'id="roadmap-list"' site/studio/index.html
