@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1114">
   <meta name="description" content="Чернозёрье Studio — рабочее пространство, журнал обновлений и роадмап Geo Lab, Quest Lab, Model Lab и Hellish Forge.">
-  <title>Чернозёрье / STUDIO 0.6 — генератор оружия</title>
-  <link rel="stylesheet" href="./studio.css?v=7">
+  <title>Чернозёрье / STUDIO — центр разработки</title>
+  <link rel="stylesheet" href="./studio.css?v=8">
 </head>
 <body>
 <div class="studio">
@@ -20,8 +20,8 @@
       <span class="version" id="studio-version-top">STUDIO 0.6.2</span>
     </div>
     <div class="topright">
-      <span class="connection"><span class="light"></span> LOCAL WORKSPACE</span>
-      <a id="launch-game" class="game-link" href="../" target="_blank" rel="noopener">↗ ЗАПУСТИТЬ ИГРУ</a>
+      <span class="connection"><span class="light"></span> ДАННЫЕ В БРАУЗЕРЕ</span>
+      <a id="launch-game" class="game-link" href="../" target="_blank" rel="noopener">↗ ПУБЛИЧНАЯ ИГРА</a>
     </div>
   </header>
 
@@ -32,63 +32,49 @@
         <span class="rail-toggle-text">СВЕРНУТЬ МЕНЮ</span>
       </button>
       <div id="rail-menu" class="rail-menu">
-      <div class="rail-label">WORKSPACE / 01</div>
+      <div class="rail-separator">ПРОЕКТ</div>
       <button class="navitem" data-target="home" type="button" aria-label="Центр управления" title="Центр управления">
         <span class="navindex">00</span><span class="nav-icon">▤</span>
         <span class="navcopy"><strong>Центр управления</strong><small>Обзор инструментов</small></span>
       </button>
-      <div class="rail-separator">ПРОГРАММЫ</div>
+      <div class="rail-separator">МИР И СЦЕНАРИИ</div>
       <button class="navitem" data-target="geo" type="button" aria-label="Geo Lab" title="Geo Lab">
         <span class="navindex">01</span><span class="nav-icon">⌗</span>
         <span class="navcopy"><strong>GEO LAB</strong><small>География и мир</small></span>
-        <span class="nav-arrow">↗</span>
       </button>
       <button class="navitem" data-target="quest" type="button" aria-label="Quest Lab" title="Quest Lab">
         <span class="navindex">02</span><span class="nav-icon">◇</span>
         <span class="navcopy"><strong>QUEST LAB</strong><small>Квесты и события</small></span>
-        <span class="nav-arrow">↗</span>
       </button>
-      <button class="navitem" data-target="model" type="button" aria-label="Model Lab" title="Model Lab">
-        <span class="navindex">03</span><span class="nav-icon">⬡</span>
-        <span class="navcopy"><strong>MODEL LAB</strong><small>3D-модели и пропсы</small></span>
-        <span class="nav-arrow">↗</span>
-      </button>
-      <button class="navitem" data-target="forge" type="button" aria-label="Hellish Forge" title="Hellish Forge">
-        <span class="navindex">04</span><span class="nav-icon forge-nav-icon">♜</span>
-        <span class="navcopy"><strong>HELLISH FORGE</strong><small>Игровые модели и маркеры</small></span>
-        <span class="nav-arrow">↗</span>
-      </button>
-      <button class="navitem" data-target="weapon" type="button" aria-label="Генератор оружия" title="Генератор оружия">
-        <span class="navindex">05</span><span class="nav-icon">⌁</span>
-        <span class="navcopy"><strong>WEAPON GENERATOR</strong><small>8 классов и анимации</small></span>
-        <span class="nav-arrow">↗</span>
-      </button>
-      <button class="navitem" data-target="arms" type="button" aria-label="Руки от первого лица" title="Руки от первого лица">
-        <span class="navindex">06</span><span class="nav-icon">◈</span>
-        <span class="navcopy"><strong>РУКИ</strong><small>Хват и вид от первого лица</small></span>
-        <span class="nav-arrow">↗</span>
-      </button>
+      <div class="rail-separator">КОНТЕНТ</div>
       <button class="navitem" data-target="buildings" type="button" aria-label="Генератор построек" title="Генератор построек">
         <span class="navindex">07</span><span class="nav-icon">⌂</span>
         <span class="navcopy"><strong>ПОСТРОЙКИ</strong><small>Избы, бани, сараи и заборы</small></span>
-        <span class="nav-arrow">↗</span>
       </button>
       <button class="navitem" data-target="nature" type="button" aria-label="Генератор природы" title="Генератор природы">
         <span class="navindex">08</span><span class="nav-icon">♧</span>
         <span class="navcopy"><strong>ПРИРОДА</strong><small>Деревья, водоёмы и алтари</small></span>
-        <span class="nav-arrow">↗</span>
       </button>
-      <a class="navitem" data-target="npc" href="../npc/index.html" style="text-decoration:none;color:inherit" title="NPC Lab"><span class="navindex">09</span><span class="nav-icon">◇</span><span class="navcopy"><strong>NPC LAB</strong><small>Персонажи и анимации</small></span><span class="nav-arrow">↗</span></a>
+      <button class="navitem" data-target="model" type="button" aria-label="Model Lab" title="Model Lab">
+        <span class="navindex">03</span><span class="nav-icon">⬡</span>
+        <span class="navcopy"><strong>MODEL LAB</strong><small>3D-модели и пропсы</small></span>
+      </button>
+      <button class="navitem" data-target="npc" type="button" aria-label="NPC Lab" title="NPC Lab"><span class="navindex">09</span><span class="nav-icon">♙</span><span class="navcopy"><strong>NPC LAB</strong><small>Предпросмотр персонажей</small></span></button>
+      <div class="rail-separator">ДОП. ИНСТРУМЕНТЫ</div>
+      <button class="navitem" data-target="forge" type="button" aria-label="Hellish Forge" title="Hellish Forge">
+        <span class="navindex">04</span><span class="nav-icon forge-nav-icon">♜</span>
+        <span class="navcopy"><strong>HELLISH FORGE</strong><small>Игровые модели и маркеры</small></span>
+      </button>
+      <button class="navitem" data-target="weapon" type="button" aria-label="Генератор оружия" title="Генератор оружия">
+        <span class="navindex">05</span><span class="nav-icon">⌁</span>
+        <span class="navcopy"><strong>WEAPON GENERATOR</strong><small>8 классов и анимации</small></span>
+      </button>
+      <button class="navitem" data-target="arms" type="button" aria-label="Руки от первого лица" title="Руки от первого лица">
+        <span class="navindex">06</span><span class="nav-icon">◈</span>
+        <span class="navcopy"><strong>РУКИ</strong><small>Хват и вид от первого лица</small></span>
+      </button>
       <div class="rail-spacer"></div>
-      <div class="library">
-        <div class="rail-label">ЛОКАЛЬНАЯ БИБЛИОТЕКА</div>
-        <div class="library-line"><span>Геообъекты</span><b id="geo-count">—</b></div>
-        <div class="library-line"><span>Квесты</span><b id="quest-count">—</b></div>
-        <div class="library-line"><span>Детали модели</span><b id="model-count">—</b></div>
-        <div class="library-line"><span>Детали Forge</span><b id="forge-count">—</b></div>
-        <p>Счётчики отражают данные браузера. Перед сменой устройства скачивай проекты в файлы.</p>
-      </div>
-      <div class="rail-footer">◈ DATA IS LOCAL <span>/</span> CHERNOZERYE</div>
+      <div class="rail-footer">ЧЕРНОЗЁРЬЕ / LOCAL</div>
       </div>
     </nav>
 
@@ -99,28 +85,21 @@
           <h2 id="section-title">ЦЕНТР УПРАВЛЕНИЯ</h2>
         </div>
         <div class="context-actions">
-          <span class="working-status"><span class="working-led"></span><span id="frame-status">ВСЁ ГОТОВО</span></span>
-          <button class="context-button" type="button" id="reload-editor" hidden title="Перезагрузить открытый редактор">↻ ОБНОВИТЬ</button>
+          <span class="working-status"><span class="working-led"></span><span id="frame-status">ЦЕНТР УПРАВЛЕНИЯ</span></span>
+          <button class="context-button" type="button" id="reload-editor" hidden title="Перезагрузить открытый редактор">↻ ПЕРЕЗАГРУЗИТЬ РЕДАКТОР</button>
           <a class="context-button" id="external-editor" href="../map/" target="_blank" rel="noopener" hidden>↗ ОТКРЫТЬ ОТДЕЛЬНО</a>
         </div>
       </div>
 
       <section class="overview" id="overview">
-        <div class="intro">
-          <div class="intro-index">5 МОДУЛЕЙ · 1 РАБОЧЕЕ ПРОСТРАНСТВО</div>
-          <h3>ПЯТЬ МАСТЕРСКИХ.<br><em>ОДИН МИР.</em></h3>
-          <p>Создавай географию, сценарии, пропсы и игровые модели в одной студии. Переключайся между редакторами — они сохраняют открытые сцены и черновики в браузере.</p>
-          <span class="intro-footnote">PRE-ALPHA / EDITOR SUITE 0.6.2 · РАЗРАБОТКА ВЕДЁТСЯ ОТКРЫТО</span>
-        </div>
         <section class="release-hub" aria-label="Беклог, актуальная версия и история изменений">
           <div class="release-headline">
             <div>
               <span class="section-kicker">DEVELOPMENT DESK / 00</span>
-              <h4>ЖУРНАЛ РАЗРАБОТКИ <span>/ BACKLOG</span></h4>
+              <h4>СОСТОЯНИЕ ПРОЕКТА</h4>
             </div>
             <div class="release-headline-tools">
               <span class="release-headline-caption">ВЕРСИИ · ИЗМЕНЕНИЯ · РОАДМАП</span>
-              <a href="https://github.com/blacklambcult/chernozerye/commits/main/" target="_blank" rel="noopener noreferrer">ИСТОРИЯ GIT ↗</a>
             </div>
           </div>
           <div class="current-build" aria-label="Текущая версия Studio">
@@ -143,13 +122,18 @@
                 <a href="https://github.com/blacklambcult/chernozerye/commits/main/" id="release-build-sha" target="_blank" rel="noopener noreferrer">ЗАГРУЗКА… ↗</a>
               </div>
               <div class="current-metric">
-                <span>ОБНОВЛЕНО</span>
+                <span>ДАТА РЕЛИЗА</span>
                 <strong id="release-current-date">20.11.2026</strong>
               </div>
             </div>
           </div>
-          <div class="release-columns">
-            <section class="changelog-panel" aria-labelledby="changelog-title">
+          <nav class="dashboard-tabs" aria-label="Разделы центра управления">
+            <button type="button" data-dashboard="roadmap" aria-pressed="true" class="dashboard-tab active">Roadmap и задачи</button>
+            <button type="button" data-dashboard="history" aria-pressed="false" class="dashboard-tab">История изменений</button>
+            <button type="button" data-dashboard="data" aria-pressed="false" class="dashboard-tab">Данные проекта</button>
+          </nav>
+          <div class="release-columns dashboard-panels">
+            <section class="changelog-panel" data-dashboard-panel="history" aria-labelledby="changelog-title" hidden>
               <div class="panel-topline">
                 <div>
                   <span class="panel-index">01 / VERSION HISTORY</span>
@@ -183,7 +167,7 @@
               </div>
               <div class="panel-foot">Мини-версия = один Git-коммит этой сборки. Время МСК. <a href="https://github.com/blacklambcult/chernozerye/commits/main/" target="_blank" rel="noopener noreferrer">ИСТОРИЯ GIT ↗</a></div>
             </section>
-            <aside class="roadmap-panel" aria-labelledby="roadmap-title">
+            <aside class="roadmap-panel" data-dashboard-panel="roadmap" aria-labelledby="roadmap-title">
               <div class="panel-topline">
                 <div>
                   <span class="panel-index">ROADMAP 3.0</span>
@@ -195,60 +179,33 @@
               <div id="roadmap-list" class="roadmap-list" aria-live="polite">
                 <p class="release-loading">Подготовка роадмапа…</p>
               </div>
-              <div class="panel-foot">NEXT → PLANNED → IDEAS / БЕЗ ОБЕЩАННЫХ СРОКОВ</div>
+              <div class="panel-foot">Прогресс по подтверждённым критериям, не по затраченному времени.</div>
             </aside>
+            <section class="project-data-panel" data-dashboard-panel="data" aria-labelledby="data-title" hidden>
+              <div class="panel-topline"><div><span class="panel-index">LOCAL WORKSPACE</span><h5 id="data-title">ДАННЫЕ И СНИМКИ ПРОЕКТА</h5></div></div>
+              <div class="workspace-data">
+                <p>Это черновики текущего браузера, а не содержимое публичной сборки. Скачайте снимок перед сменой устройства.</p>
+                <div class="data-counts">
+                  <div><span>Геообъекты</span><b id="geo-count">—</b></div>
+                  <div><span>Квесты</span><b id="quest-count">—</b></div>
+                  <div><span>Детали Model Lab</span><b id="model-count">—</b></div>
+                  <div><span>Детали Forge</span><b id="forge-count">—</b></div>
+                </div>
+                <h6>Перенос и проверка</h6>
+                <p>Снимок v1 включает черновики, библиотеку моделей и размещения. Проверка квеста из файла не восстанавливает весь проект и не публикует игру; предел файла — 2,5 МБ.</p>
+                <div class="data-actions">
+                  <button id="export-studio-project" class="context-button" type="button">Скачать снимок проекта</button>
+                  <button class="context-button" id="load-studio-project" type="button">Проверить квест из снимка</button>
+                  <input type="file" id="play-studio-project" accept=".json,application/json" hidden>
+                </div>
+                <p id="studio-project-status" role="status"></p>
+                <h6>Как связаны редакторы</h6>
+                <div class="workspace-flow"><span>Geo Lab: география и ID</span><span>Quest Lab: цели и размещение</span><span>Снимок / экспорт данных</span><span>Проверенный импорт в Godot</span></div>
+                <p>Модели окружения поступают в общую библиотеку; размещение — в Quest Lab. Редактирование черновика не изменяет опубликованный мир автоматически.</p>
+              </div>
+            </section>
           </div>
         </section>
-        <div class="module-section-title"><span class="section-kicker">EDITOR SUITE / 05</span><h4>РАБОЧИЕ ИНСТРУМЕНТЫ</h4></div>
-        <div class="module-grid">
-          <button type="button" data-open="geo" class="module-card">
-            <span class="card-top"><span class="card-number">/ 01</span><span class="card-icon">⌗</span></span>
-            <span class="card-content"><strong>GEO LAB</strong><small>Карта / Планировка / Объекты</small><span class="card-desc">Дороги, здания, участки и пространственная разметка территории Чернозёрья.</span></span>
-            <span class="card-bottom">ОТКРЫТЬ РЕДАКТОР <span>↗</span></span>
-          </button>
-          <button type="button" data-open="quest" class="module-card">
-            <span class="card-top"><span class="card-number">/ 02</span><span class="card-icon">◇</span></span>
-            <span class="card-content"><strong>QUEST LAB</strong><small>Сценарии / Задачи / Триггеры</small><span class="card-desc">Главные и побочные квесты, точки появления, сообщения и последовательность целей.</span></span>
-            <span class="card-bottom">ОТКРЫТЬ РЕДАКТОР <span>↗</span></span>
-          </button>
-          <button type="button" data-open="model" class="module-card">
-            <span class="card-top"><span class="card-number">/ 03</span><span class="card-icon">⬡</span></span>
-            <span class="card-content"><strong>MODEL LAB</strong><small>Геометрия / Материалы / GLB</small><span class="card-desc">Low-poly объекты из примитивов, 3D-просмотр, материалы и экспорт моделей в Godot.</span></span>
-            <span class="card-bottom">ОТКРЫТЬ РЕДАКТОР <span>↗</span></span>
-          </button>
-          <button type="button" data-open="forge" class="module-card forge-card">
-            <span class="card-top"><span class="card-number">/ 04</span><span class="card-icon">♜</span></span>
-            <span class="card-content"><strong>HELLISH FORGE</strong><small>Игровые предметы / Роли / Маркеры</small><span class="card-desc">Отдельная кузница игровых моделей: категории, габариты, отметки деталей и точки для интеграции в Godot.</span></span>
-            <span class="card-bottom">ОТКРЫТЬ КУЗНИЦУ <span>↗</span></span>
-          </button>
-          <button type="button" data-open="weapon" class="module-card forge-card">
-            <span class="card-top"><span class="card-number">/ 05</span><span class="card-icon">⌁</span></span>
-            <span class="card-content"><strong>WEAPON GENERATOR</strong><small>8 классов / Варианты / Анимации</small><span class="card-desc">Процедурная сборка оружия, состояния износа, заговоры, сокеты и запечённые клипы Godot.</span></span>
-            <span class="card-bottom">ОТКРЫТЬ ГЕНЕРАТОР <span>↗</span></span>
-          </button>
-          <button type="button" data-open="buildings" class="module-card">
-            <span class="card-top"><span class="card-number">/ 07</span><span class="card-icon">⌂</span></span>
-            <span class="card-content"><strong>ГЕНЕРАТОР ПОСТРОЕК</strong><small>Избы / Бани / Сараи / Заборы</small><span class="card-desc">Собери вариант постройки и сохрани модель для размещения на карте.</span></span>
-            <span class="card-bottom">ОТКРЫТЬ ГЕНЕРАТОР <span>↗</span></span>
-          </button>
-          <button type="button" data-open="nature" class="module-card">
-            <span class="card-top"><span class="card-number">/ 08</span><span class="card-icon">♧</span></span>
-            <span class="card-content"><strong>ГЕНЕРАТОР ПРИРОДЫ</strong><small>Растительность / Камни / Вода / Алтари</small><span class="card-desc">Собирай объекты окружения и сохраняй их в библиотеку моделей.</span></span>
-            <span class="card-bottom">ОТКРЫТЬ ГЕНЕРАТОР <span>↗</span></span>
-          </button>
-          <a href="../npc/index.html" data-open="npc" class="module-card" style="text-decoration:none;color:inherit"><span class="card-top"><span class="card-number">/ 09</span><span class="card-icon">◇</span></span><span class="card-content"><strong>NPC LAB</strong><small>Персонажи / Анимации / Профили</small><span class="card-desc">Просмотр модели, ходьба, масштаб, освещение и экспорт настроек.</span></span><span class="card-bottom">ОТКРЫТЬ РЕДАКТОР <span>↗</span></span></a>
-        </div>
-        <div class="bottom-notes">
-          <div><span class="little">01 / СОХРАНЕНИЕ</span><p>Редакторы хранят данные раздельно в одном браузере. Существующие черновики остаются на месте.</p></div>
-          <div><span class="little">02 / ФОРМАТЫ</span><p>GEO LAB — GeoJSON · QUEST LAB — JSON · MODEL LAB — JSON/GLB · FORGE — FORGE.JSON/GLB.</p></div>
-          <div><span class="little">СНИМОК ПРОЕКТА</span>
-            <p>Карта, квесты, модели и размещения из этого браузера в одном файле.</p>
-            <button id="export-studio-project" class="context-button" type="button">Скачать снимок проекта</button>
-            <button class="context-button" id="load-studio-project" type="button">Проверить квест из снимка</button>
-            <input type="file" id="play-studio-project" accept=".json,application/json" hidden>
-            <p id="studio-project-status" role="status"></p>
-          </div>
-        </div>
       </section>
       <div id="editors" class="editors" hidden aria-label="Встроенные редакторы"></div>
     </main>
@@ -256,15 +213,15 @@
   <footer class="statusbar">
     <span><i class="pulse"></i> CHERNOZERYE STUDIO / READY</span>
     <span id="last-status">СЕССИЯ / ВАШ БРАУЗЕР</span>
-    <span>ALT+1 / GEO · ALT+2 / QUEST · ALT+3 / MODEL · ALT+4 / FORGE · ALT+5 / WEAPON · ALT+6 / РУКИ · ALT+7 / ПОСТРОЙКИ · ALT+8 / ПРИРОДА</span>
+    <span>ALT+0–9 · РАЗДЕЛЫ / CTRL+B · МЕНЮ</span>
   </footer>
 </div>
-<script src="./studio-state.js?v=5"></script>
+<script src="./studio-state.js?v=6"></script>
 <script src="../object-library/library.js?v=4"></script>
 <script src="./project-snapshot.js?v=6"></script>
 <script src="./release-core.js?v=3"></script>
 <script src="./studio-releases.js?v=3"></script>
 <script src="./commit-history.js?v=1"></script>
-<script src="./studio.js?v=10"></script>
+<script src="./studio.js?v=11"></script>
 </body>
 </html>
