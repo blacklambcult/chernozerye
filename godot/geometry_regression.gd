@@ -72,19 +72,19 @@ func _initialize() -> void:
         Vector2(-14.0, 0.0), Vector2(14.0, 0.0)
     ])
     geo.call("_add_road_wear", line, 0.145)
-    var ruts: MeshInstance3D = null
+    geo.call("_flush_road_meshes")
+    var has_ruts := false
     for child in geo.get_children():
         if child is MeshInstance3D and str(child.name).contains("прерывистые колеи"):
-            ruts = child
-            break
-    if ruts == null or ruts.mesh == null:
+            has_ruts = true
+            var vertices: PackedVector3Array = child.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+            for p in vertices:
+                if Vector2(p.x, -p.z).length() < main_radius + 1.2:
+                    _fail("wheel-mark geometry crosses the protected junction")
+                    return
+    if not has_ruts:
         _fail("no road wheel marks generated for the regression segment")
         return
-    var vertices: PackedVector3Array = ruts.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
-    for p in vertices:
-        if Vector2(p.x, -p.z).length() < main_radius + 1.2:
-            _fail("wheel-mark geometry crosses the protected junction")
-            return
     # Almost touching endpoints should form a small T-junction cover.
     geo.set("manual_roads", [
         [Vector2(-12, 0), Vector2(12, 0), 0],
