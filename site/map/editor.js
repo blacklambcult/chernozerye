@@ -715,7 +715,7 @@
     const blob = new Blob([content], { type: "application/geo+json;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
-    anchor.download = "chernozerye-sector-" + (api.getView() === "a-street" ? "a-quarter" : "survey") +
+    anchor.download = (full===true?"chernozerye-world-complete":"chernozerye-sector-" + (api.getView() === "a-street" ? "a-quarter" : "survey")) +
       "-" + new Date().toISOString().slice(0, 10) + ".geojson";
     anchor.href = url;
     document.body.appendChild(anchor);
