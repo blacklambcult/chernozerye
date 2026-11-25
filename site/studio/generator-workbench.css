@@ -1,0 +1,76 @@
+/* Shared presentation layout. No changes to model geometry or generator data. */
+.generator-workbench{
+  --gen-left:clamp(168px,18vw,240px);
+  --gen-right:clamp(300px,29vw,390px);
+  --gen-bottom:0px;
+  --gen-left-inset:var(--gen-left);
+  --gen-right-inset:var(--gen-right);
+  background:#101315;
+}
+.generator-workbench.ui-hidden{--gen-left-inset:0px;--gen-right-inset:0px;--gen-bottom:0px}
+.generator-workbench #viewport,.generator-workbench #vhs-overlay{
+  inset:0 var(--gen-right-inset) var(--gen-bottom) var(--gen-left-inset);
+  width:auto;height:auto;
+}
+.generator-workbench #hud{inset:0;width:auto;height:auto;padding:0;display:block;pointer-events:none}
+.generator-workbench.ui-hidden #hud{display:none}
+.generator-workbench #hud .top-stack,.generator-workbench #hud .bottom-stack{
+  position:absolute;top:0;bottom:0;max-width:none;margin:0;padding:8px;
+  display:flex;flex-direction:column;gap:8px;min-height:0;overflow:auto;
+  background:#181d20;pointer-events:auto;scrollbar-width:thin;
+  scrollbar-color:#526162 #181d20;
+}
+.generator-workbench #hud .top-stack{left:0;width:var(--gen-left);border-right:1px solid #384247}
+.generator-workbench #hud .bottom-stack{right:0;width:var(--gen-right);border-left:1px solid #384247}
+.generator-workbench #hud .panel{background:#20272a;border-color:#384247;border-radius:5px;box-shadow:none;backdrop-filter:none}
+.generator-workbench #hud .header-bar{padding:9px;flex-wrap:wrap}
+.generator-workbench #hud .header-titles{min-width:0;flex:1 1 100%;overflow-wrap:anywhere}
+.generator-workbench #hud .game-title{white-space:normal;line-height:1.35;font-size:12px}
+.generator-workbench #hud .building-selector,.generator-workbench #hud .cat-grid,.generator-workbench #hud .weapon-selector,.generator-workbench #hud .grip-selector{
+  grid-template-columns:minmax(0,1fr);
+}
+.generator-workbench #hud .cat-grid button{grid-column:auto}
+.generator-workbench #hud .weapon-selector button,.generator-workbench #hud .grip-selector button{white-space:normal}
+.generator-workbench #hud .drawer{flex:0 0 auto;min-width:0;overflow:visible}
+.generator-workbench #hud .drawer-bar{flex-wrap:wrap;align-items:flex-start}
+.generator-workbench #hud .drawer-bar-left,.generator-workbench #hud .drawer-bar-right{flex-wrap:wrap;min-width:0;max-width:100%}
+.generator-workbench #hud .drawer-body{max-height:none;overflow:visible;min-width:0}
+.generator-workbench #hud .drawer.collapsed .drawer-body{display:none}
+.generator-workbench #hud .mod-row{flex-wrap:wrap;min-width:0;gap:6px}
+.generator-workbench #hud .mod-row>*{min-width:0;max-width:100%;overflow-wrap:anywhere}
+.generator-workbench #hud .tabs-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+.generator-workbench #hud .tabs-row button{white-space:normal}
+.generator-workbench #hud .library-actions input{flex-basis:100%;max-width:100%}
+.generator-workbench #hud .library-actions button{flex:1 1 auto;white-space:normal}
+.generator-workbench #hud .actions-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.generator-workbench #hud .actions-grid button{white-space:normal;min-width:0}
+.generator-workbench #hud .lifecycle-bar,.generator-workbench #hud .anim-bar{flex-wrap:wrap;min-width:0}
+.generator-workbench #toast,.generator-workbench #webgl-error,.generator-workbench #engine-banner{
+  left:calc((100% + var(--gen-left-inset) - var(--gen-right-inset))/2);
+  max-width:calc(100% - var(--gen-left-inset) - var(--gen-right-inset) - 16px);
+}
+.generator-workbench #webgl-error,.generator-workbench #engine-banner{top:calc((100% - var(--gen-bottom))/2)}
+/* The hands preview already has a separate left-hand workspace. Keep it
+   untouched and stack the generic inspector panels on the right. */
+.generator-workbench.gen-with-library{--gen-left:clamp(240px,24vw,350px);--fit-width:var(--gen-left-inset);--preview-bottom:var(--gen-bottom)}
+.generator-workbench.gen-with-library #hud .top-stack,
+.generator-workbench.gen-with-library #hud .bottom-stack{position:static;width:100%;border:0;overflow:visible}
+.generator-workbench.gen-with-library #hud{left:auto;right:0;width:var(--gen-right);overflow:auto;background:#181d20;pointer-events:auto;border-left:1px solid #384247}
+.generator-workbench.gen-with-library #hud .grip-selector{grid-template-columns:repeat(3,minmax(0,1fr))}
+.generator-workbench.gen-with-library #fps-crosshair{left:calc((100% + var(--gen-left-inset) - var(--gen-right-inset))/2);top:calc((100% - var(--gen-bottom))/2)}
+/* Narrow windows still reserve separate preview and controls regions. */
+@media(max-width:820px){
+  .generator-workbench{--gen-left-inset:0px;--gen-right-inset:0px;--gen-bottom:49%}
+  .generator-workbench #hud{top:51%;bottom:0;display:grid;grid-template-columns:minmax(125px,34%) minmax(0,1fr);gap:1px;background:#384247}
+  .generator-workbench #hud .top-stack,.generator-workbench #hud .bottom-stack{position:static;width:auto;height:auto;overflow:auto;border:0;padding:6px}
+  .generator-workbench.gen-with-library #library-workspace{inset:51% auto 0 0;width:38%;height:auto;overflow:auto}
+  .generator-workbench.gen-with-library #hud{inset:51% 0 0 38%;width:auto;display:block}
+  .generator-workbench.gen-with-library #hud .top-stack,.generator-workbench.gen-with-library #hud .bottom-stack{overflow:visible}
+  .generator-workbench.gen-with-library{--fit-width:0px;--preview-bottom:49%}
+  .generator-workbench.ui-hidden{--gen-bottom:0px}
+  .generator-workbench.ui-hidden #hud{display:none}
+}
+@media(max-width:440px){
+  .generator-workbench #hud{grid-template-columns:minmax(104px,30%) minmax(0,1fr)}
+  .generator-workbench #hud .actions-grid{grid-template-columns:1fr}
+}
