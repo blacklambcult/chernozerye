@@ -186,12 +186,13 @@ func _ready() -> void:
     add_child(pause_overlay)
 
 func _toggle_model_inspection() -> void:
-    if _modeled_character == null or not bool(_modeled_character.get("model_loaded")):
+    if _modeled_character == null:
         return
     if not _inspect_enabled and controls_locked:
         return
+    if not _modeled_character.call("set_inspection_mode", not _inspect_enabled):
+        return
     _inspect_enabled = not _inspect_enabled
-    _modeled_character.call("set_inspection_mode", _inspect_enabled)
     _inspection_camera.current = _inspect_enabled
     camera.current = not _inspect_enabled
     _inspection_light.visible = _inspect_enabled

@@ -11,6 +11,7 @@ var actor: CharacterBody3D
 var full_body: Node3D
 var first_person_body: Node3D = null
 var model_loaded := false
+var _load_attempted := false
 var inspection_mode := false
 
 var full_left_hip: Node3D
@@ -59,14 +60,21 @@ func _ready() -> void:
     if legacy != null:
         legacy.visible = false
         legacy.set_process(false)
+    print("MODELED_CHARACTER_DEFERRED: full_body=f4_only")
+
+
+func _load_full_body() -> bool:
+    if _load_attempted:
+        return model_loaded
+    _load_attempted = true
     var source := load(FULL_ASSET_PATH)
     if not (source is PackedScene):
         push_warning("MODELED_CHARACTER_F4_UNAVAILABLE: full GLB import failed")
-        return
+        return false
     full_body = (source as PackedScene).instantiate() as Node3D
     if full_body == null:
         push_warning("MODELED_CHARACTER_F4_UNAVAILABLE: no full GLB scene")
-        return
+        return false
     full_body.name = "FullCharacter"
     add_child(full_body)
     full_left_hip = _part("LeftLegPivot")
@@ -76,11 +84,11 @@ func _ready() -> void:
     if full_left_hip == null or full_right_hip == null or full_left_knee == null or full_right_knee == null:
         full_body.visible = false
         push_warning("MODELED_CHARACTER_F4_UNAVAILABLE: missing full-body pivots")
-        return
+        return false
     if _part("WinterCoat") == null or _part("Head") == null:
         full_body.visible = false
         push_warning("MODELED_CHARACTER_F4_UNAVAILABLE: incomplete full body")
-        return
+        return false
     for n in full_body.find_children("*", "MeshInstance3D", true, false):
         var mesh := n as MeshInstance3D
         var material := StandardMaterial3D.new()
@@ -92,12 +100,16 @@ func _ready() -> void:
     full_body.visible = false
     model_loaded = true
     print("MODELED_CHARACTER_READY: fps_body=disabled full_body=f4_only fps_arms=independent")
+    return true
 
 
-func set_inspection_mode(enabled: bool) -> void:
-    inspection_mode = enabled and model_loaded
+func set_inspection_mode(enabled: bool) -> bool:
+    if enabled and not _load_full_body():
+        return false
+    inspection_mode = enabled
     if full_body != null:
         full_body.visible = inspection_mode
+    return true
 
 
 func _process(delta: float) -> void:
