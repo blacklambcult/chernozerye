@@ -31,7 +31,12 @@ var _quest_shrines: Array[Node3D] = []
 var tree_trunks: Array[Transform3D] = []
 var _tree_collision_total := 0
 var manual_roads: Array = []
+const SURVEY_CELL_SIZE := 32.0
+const FOREST_ROAD_CLEARANCE := 13.0
+const FOREST_BUILDING_CLEARANCE := 6.5
 var building_footprints: Array[PackedVector2Array] = []
+var _survey_road_cells: Dictionary = {}
+var _survey_building_cells: Dictionary = {}
 var _roadside_tufts := 0
 var _mud_patches := 0
 var _puddle_patches := 0
@@ -74,12 +79,21 @@ func _build_manual() -> void:
             for i in range(polyline.size() - 1):
                 if polyline[i].distance_squared_to(polyline[i + 1]) < 0.0004:
                     continue
-                manual_roads.append([polyline[i], polyline[i + 1], this_road_id])
+                var a := polyline[i]
+                var b := polyline[i + 1]
+                var bounds := Rect2(a.min(b), (a - b).abs()).grow(FOREST_ROAD_CLEARANCE)
+                _index_survey_clearance(_survey_road_cells, bounds, manual_roads.size())
+                manual_roads.append([a, b, this_road_id])
             if kind == "road":
                 surveyed_road_id += 1
         elif kind in ["house", "sauna", "shed"]:
             var footprint := _points(f.get("points", []))
             if footprint.size() >= 3:
+                var bounds := Rect2(footprint[0], Vector2.ZERO)
+                for point in footprint:
+                    bounds = bounds.expand(point)
+                _index_survey_clearance(_survey_building_cells,
+                    bounds.grow(FOREST_BUILDING_CLEARANCE), building_footprints.size())
                 building_footprints.append(footprint)
     # Find crossings before generating wheel marks and gravel. Otherwise
     # long dark ruts are drawn underneath a small circular junction patch
@@ -624,23 +638,40 @@ func _add_car(point: Array, _feature: Dictionary) -> void:
     body.add_child(collider)
     add_child(body)
 
-func _nearest_road(point: Vector2) -> float:
-    var best := INF
-    for segment in manual_roads:
-        var close := Geometry2D.get_closest_point_to_segment(point, segment[0], segment[1])
-        best = minf(best, point.distance_to(close))
-    return best
+func _survey_cell(point: Vector2) -> Vector2i:
+    return Vector2i((point / SURVEY_CELL_SIZE).floor())
 
-func _near_building(point: Vector2, clearance: float) -> bool:
-    for polygon in building_footprints:
+
+func _index_survey_clearance(cells: Dictionary, bounds: Rect2, index: int) -> void:
+    var lo := _survey_cell(bounds.position)
+    var hi := _survey_cell(bounds.end)
+    for y in range(lo.y, hi.y + 1):
+        for x in range(lo.x, hi.x + 1):
+            var entries: Array = cells.get_or_add(Vector2i(x, y), [])
+            entries.append(index)
+
+
+func _near_survey_road(point: Vector2) -> bool:
+    for i: int in _survey_road_cells.get(_survey_cell(point), []):
+        var segment: Array = manual_roads[i]
+        var close := Geometry2D.get_closest_point_to_segment(point, segment[0], segment[1])
+        if point.distance_to(close) < FOREST_ROAD_CLEARANCE:
+            return true
+    return false
+
+
+func _near_building(point: Vector2, clearance := FOREST_BUILDING_CLEARANCE) -> bool:
+    for index: int in _survey_building_cells.get(_survey_cell(point), []):
+        var polygon := building_footprints[index]
         if Geometry2D.is_point_in_polygon(point, polygon):
             return true
-        for i in range(polygon.size()):
+        for i in polygon.size():
             var closest := Geometry2D.get_closest_point_to_segment(point,
                 polygon[i], polygon[(i + 1) % polygon.size()])
             if point.distance_to(closest) < clearance:
                 return true
     return false
+
 
 func _scatter_forest(points: PackedVector2Array) -> void:
     var min_p := Vector2(INF, INF)
@@ -664,7 +695,7 @@ func _scatter_forest(points: PackedVector2Array) -> void:
         var p := Vector2(rng.randf_range(min_p.x, max_p.x), rng.randf_range(min_p.y, max_p.y))
         if not Geometry2D.is_point_in_polygon(p, points):
             continue
-        if _nearest_road(p) < 13.0 or _near_building(p, 6.5):
+        if _near_survey_road(p) or _near_building(p):
             continue
         var cell := Vector2i((p / 4.0).floor())
         var nearby := false
@@ -851,7 +882,7 @@ func _build_forest_instances() -> void:
         if i % 2 != 0:
             continue
         var detail := p + Vector2.from_angle(float(i) * 2.39996) * 1.8
-        if _nearest_road(detail) < 13.0 or _near_building(detail, 6.5) or _forest_floor.is_wet(detail) \
+        if _near_survey_road(detail) or _near_building(detail) or _forest_floor.is_wet(detail) \
                 or _forest_floor.is_on_trail(detail):
             continue
         var kind := "ground" if i % 4 == 0 else "understory"
@@ -862,8 +893,8 @@ func _build_forest_instances() -> void:
         if kind == "understory" and i % 12 == 2:
             # Break the single-bush pattern without increasing tree density.
             var companion := detail + Vector2.from_angle(float(i) * 1.618) * 1.35
-            if not _forest_floor._inside(companion, 2.0) or _nearest_road(companion) < 13.0 \
-                    or _near_building(companion, 6.5) or _forest_floor.is_wet(companion) \
+            if not _forest_floor._inside(companion, 2.0) or _near_survey_road(companion) \
+                    or _near_building(companion) or _forest_floor.is_wet(companion) \
                     or _forest_floor.is_on_trail(companion):
                 continue
             if _shrine_sites.any(func(site): return companion.distance_squared_to(site) < 5.5 ** 2):
