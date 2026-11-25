@@ -204,7 +204,9 @@
         </section>
         <details class="wb-details" open><summary>Файлы проекта</summary><div class="group wb-section">          <h3 class="editor-export-title">Сохранение проекта</h3>
           <div class="editor-file-actions">
-            <button id="editor-export" type="button" class="editor-action primary">↓ Скачать GeoJSON</button>
+            <button id="editor-export" type="button" class="editor-action primary">↓ Скачать GeoJSON черновика</button>
+            <button id="world-export-all" type="button" class="editor-action primary" disabled>↓ Экспорт всей карты</button>
+            <p class="helper">Вся карта: опубликованные объекты + изменения черновика по ID. Удаление из черновика возвращает исходный объект.</p>
             <label class="editor-action editor-import" for="editor-import-file">↑ Загрузить GeoJSON
               <input id="editor-import-file" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden>
             </label>
