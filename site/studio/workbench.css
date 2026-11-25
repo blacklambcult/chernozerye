@@ -112,3 +112,5 @@ html.studio-embedded .wb-geo .wb-standalone-link{display:none}
 .wb-geo .world-dialog-actions{display:flex;gap:6px;flex-wrap:wrap}
 .wb-geo #world-generator-status{margin:0;padding:8px 16px;background:#222a2c}
 .wb-geo #world-generator-frame{flex:1;min-height:0;width:100%;border:0;background:#101315}
+
+.wb-geo .world-section[hidden],.wb-geo #world-reset-appearance[hidden]{display:none!important}
