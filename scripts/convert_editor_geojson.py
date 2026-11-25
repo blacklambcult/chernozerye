@@ -38,6 +38,54 @@ SUPPORTED = {
     "car": "Point/Polygon",
 }
 
+def validate_appearance(value, category):
+    """Preserve only supported, bounded generator recipe fields; no GLB or paths."""
+    specs = {
+        "house": ("building", "izba", {"floors": (1, 2), "walls": (0, 4), "roof": (0, 4), "window": (0, 4), "door": (0, 4)}),
+        "shed": ("building", "saray", {"walls": (0, 2), "roof": (0, 2), "door": (0, 2)}),
+        "sauna": ("building", "banya", {"walls": (0, 2), "roof": (0, 2), "door": (0, 1)}),
+        "forest": ("nature", "tree", {"species": (0, 8), "height": (0, 2), "canopy": (0, 2), "seed": (0, 4)}),
+        "water": ("nature", "water", {"tile": (0, 10), "rot": (0, 3), "depth": (0, 2), "seed": (0, 4)}),
+    }
+    spec = specs.get(category)
+    if not spec or not isinstance(value, dict):
+        raise ValueError("Unsupported appearance")
+    generator, kind, ranges = spec
+    if type(value.get("version")) is not int or value["version"] != 1 or value.get("generator") != generator or value.get("type") != kind:
+        raise ValueError("Invalid appearance type/version")
+    p = value.get("parameters")
+    if not isinstance(p, dict):
+        raise ValueError("Invalid appearance parameters")
+    clean = {}
+    for key, (lo, hi) in ranges.items():
+        number = p.get(key)
+        if type(number) is not int or not lo <= number <= hi:
+            raise ValueError(f"Invalid appearance parameter {key}")
+        clean[key] = number
+    result = {"version": 1, "generator": generator, "type": kind, "parameters": clean}
+    if generator == "building":
+        conditions = value.get("conditions")
+        if not isinstance(conditions, dict):
+            raise ValueError("Invalid building conditions")
+        normalized = {}
+        for key in ("walls", "roof", "door", "fence"):
+            condition = conditions.get(key)
+            if condition not in ("normal", "ruined", "cultist"):
+                raise ValueError(f"Invalid condition {key}")
+            normalized[key] = condition
+        window = conditions.get("window")
+        if type(window) is not int or not 0 <= window <= 4:
+            raise ValueError("Invalid window condition")
+        normalized["window"] = window
+        result["conditions"] = normalized
+    else:
+        env = value.get("environment")
+        if env not in ("n", "d", "c"):
+            raise ValueError("Invalid nature environment")
+        result["environment"] = env
+    return result
+
+
 def ensure_location(point: object) -> tuple[float, float]:
     if not isinstance(point, list) or len(point) != 2:
         raise ValueError("Each coordinate must be [longitude, latitude].")
@@ -113,6 +161,11 @@ def main():
             "points": world_points,
             "source": "user_manual_geo_lab_2"
         })
+        if properties.get("appearance") is not None:
+            try:
+                processed[-1]["appearance"] = validate_appearance(properties["appearance"], category)
+            except ValueError as error:
+                raise SystemExit(f"Invalid appearance for {ident}: {error}") from error
 
     out = {
         "metadata": {
