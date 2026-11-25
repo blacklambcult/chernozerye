@@ -31,7 +31,7 @@ async function bake(id, type, modules, conditions) {
     if (!annex || Math.abs(new THREE.Box3().setFromObject(annex).min.y) > 0.00001)
       throw new Error(id + " has a floating annex");
   }
-  const model = batchModel(source, { bakeTint: type !== "zabor" });
+  const model = batchModel(source, { bakeTint: type !== "zabor", atlasTextures: type !== "zabor" });
   const bytes = await encodeModel(model);
   fs.writeFileSync(path.join(output, id + ".glb"), Buffer.from(bytes));
 }
