@@ -114,3 +114,23 @@ test("catalog note links and character records survive project roundtrip", () =>
   assert.deepEqual(result.characters, input.characters);
   assert.throws(() => core.normalizeProject({ ...input, worldItems: [] }), /отсутствует/);
 });
+
+test("map edit modes require the visible context, not a hidden selected record",()=>{
+  const step=core.createStep("reach","test-step");
+  const worldItem=core.createWorldItem("note","test-note");
+  const quest=core.createQuest("main","test-quest");
+  const ctx={library:"quest",quest,step,worldItem,geoAvailable:true};
+  for(const mode of ["browse","spawn","step","object"])assert.equal(core.mapModeError(mode,ctx),"");
+  assert.notEqual(core.mapModeError("world_place",ctx),"");
+  const noteContext={...ctx,library:"note"};
+  for(const mode of ["browse","world_place","object"])assert.equal(core.mapModeError(mode,noteContext),"");
+  assert.notEqual(core.mapModeError("spawn",noteContext),"");
+  assert.notEqual(core.mapModeError("step",noteContext),"");
+  assert.notEqual(core.mapModeError("world_place",{...noteContext,library:"item"}),"");
+  assert.notEqual(core.mapModeError("object",{...ctx,geoAvailable:false}),"");
+  assert.notEqual(core.mapModeError("step",{...ctx,step:{...step,noteId:"note-id"}}),"");
+  assert.notEqual(core.mapModeError("object",{...ctx,step:{...step,type:"message"}}),"");
+  for(const mode of ["spawn","step","object","world_place"])assert.notEqual(core.mapModeError(mode,{...ctx,library:"character"}),"");
+  assert.equal(core.mapModeError("browse",{}),"");
+  assert.notEqual(core.mapModeError("unknown",ctx),"");
+});
