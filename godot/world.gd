@@ -828,13 +828,8 @@ func _toggle_manual_preview() -> void:
     # Hold direct references so toggling scenes always changes the actual light and sky.
     if _night_environment != null:
         if manual_mode and _night_environment.sky == null:
-            var dusk := ProceduralSkyMaterial.new()
-            dusk.sky_top_color = Color("#080d18")
-            dusk.sky_horizon_color = Color("#4a5060")
-            dusk.ground_horizon_color = dusk.sky_horizon_color
-            dusk.ground_bottom_color = Color("#1b222c")
-            dusk.sky_curve = 0.20
-            dusk.sun_angle_max = 0.0
+            var dusk := ShaderMaterial.new()
+            dusk.shader = preload("res://overcast_sky.gdshader")
             var sky := Sky.new()
             sky.sky_material = dusk
             _night_environment.sky = sky
@@ -849,9 +844,9 @@ func _toggle_manual_preview() -> void:
         _night_environment.tonemap_exposure = 1.01 if manual_mode else 1.0
         _night_environment.fog_enabled = true
         _night_environment.fog_mode = Environment.FOG_MODE_DEPTH if manual_mode else Environment.FOG_MODE_EXPONENTIAL
-        _night_environment.fog_light_color = Color("#465062") if manual_mode else Color("#676976")
+        _night_environment.fog_light_color = Color("#4a4e63") if manual_mode else Color("#676976")
         _night_environment.fog_light_energy = 0.59 if manual_mode else 1.0
-        _night_environment.fog_sky_affect = 0.25 if manual_mode else 1.0
+        _night_environment.fog_sky_affect = 0.10 if manual_mode else 1.0
         _night_environment.fog_sun_scatter = 0.0
         _night_environment.fog_aerial_perspective = 0.0
         _night_environment.fog_density = 0.88 if manual_mode else 0.0018
@@ -861,9 +856,10 @@ func _toggle_manual_preview() -> void:
         _night_environment.fog_height = 0.8 if manual_mode else 0.0
         _night_environment.fog_height_density = 0.010 if manual_mode else 0.0
     if _sun_light != null:
+        _sun_light.rotation_degrees = Vector3(-14, -70, 0) if manual_mode else Vector3(-12, -35, 0)
         _sun_light.light_energy = 0.58 if manual_mode else 1.05
         _sun_light.light_specular = 0.0
-        _sun_light.light_color = Color("#a0b2d2") if manual_mode else Color("#f0b69a")
+        _sun_light.light_color = Color("#c2b9c4") if manual_mode else Color("#f0b69a")
         # The shadow map produced hard triangular streaks across the road and low-poly trees.
         _sun_light.shadow_enabled = not manual_mode
     if manual_mode:
