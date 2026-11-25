@@ -155,7 +155,8 @@
         bubblingMouseEvents: false,
         onEachFeature: (feature,layer)=>layer.on("click",event=>{
           L.DomEvent.stopPropagation(event);
-          if(activeTool||editingVertices)return;
+          if(activeTool||insertingVertex){onMapClick(event);return;}
+          if(editingVertices)return;
           const existing=getRecord(feature.id);
           if(existing){selectFeature(existing.id,true);return;}
           if(!confirm("Добавить этот объект текущей игровой карты в редактируемую разметку? Остальные объекты не копируются."))return;
@@ -173,6 +174,7 @@
       if ($("game-map-visible").checked) gameLayer.addTo(map);
       $("game-map-status").textContent = countLabel(gameFeatures.length) + " из текущей сборки";
       $("game-map-focus").disabled = $("game-map-copy").disabled = false;
+      $("world-export-all").disabled=false;
     } catch (error) {
       $("game-map-status").textContent = "Игровая разметка недоступна. Обнови страницу.";
       console.warn("Geo Lab game map", error);
@@ -697,14 +699,15 @@
     }
   });
 
-  function downloadFile() {
-    if (!records.length) {
+  function downloadFile(full = false) {
+    const features=full===true?core.mergeWorldFeatures(gameFeatures,records):records;
+    if (!features.length) {
       message("Сначала разметь хотя бы один объект.", true);
       return;
     }
     let content;
     try {
-      content = JSON.stringify(core.collectionFromFeatures(records), null, 2) + "\n";
+      content = JSON.stringify(core.collectionFromFeatures(features), null, 2) + "\n";
     } catch (error) {
       message("Проверь геометрию: " + error.message, true);
       return;
@@ -719,9 +722,10 @@
     anchor.click();
     anchor.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    message("Файл GeoJSON подготовлен к скачиванию · " + countLabel(records.length) + ". Прикрепи его в чат.");
+    message("Файл GeoJSON подготовлен к скачиванию · " + countLabel(features.length) + ".");
   }
-  $("editor-export").addEventListener("click", downloadFile);
+  $("editor-export").addEventListener("click",()=>downloadFile(false));
+  $("world-export-all").addEventListener("click",()=>downloadFile(true));
 
   $("editor-import-file").addEventListener("change", async (event) => {
     const input = event.target;
