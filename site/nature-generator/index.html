@@ -1351,6 +1351,7 @@
                 if (!btn) return;
 
                 if (btn.dataset.cat) {
+                    if(world)return;
                     const next = btn.dataset.cat;
                     if (state.cat !== next) {
                         state.cat = next;
