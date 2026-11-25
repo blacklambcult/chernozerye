@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configure Python for manual map import
         uses: actions/setup-python@v5
@@ -664,12 +666,16 @@ jobs:
           node --check site/studio/studio.js
           node --check site/studio/release-core.js
           node --check site/studio/studio-releases.js
+          node --check site/studio/commit-history.js
+          node --test tests/studio-commit-history.test.cjs
           node --test tests/studio-state.test.cjs
           node --test tests/studio-releases.test.cjs
           grep -q 'studio-state.js?v=5' site/studio/index.html
           grep -q 'release-core.js?v=2' site/studio/index.html
           grep -q 'studio-releases.js?v=2' site/studio/index.html
-          grep -q 'studio.css?v=5' site/studio/index.html
+          grep -q 'studio.css?v=6' site/studio/index.html
+          grep -Fq 'commit-history.js?v=1' site/studio/index.html
+          grep -Fq 'id="micro-list"' site/studio/index.html
           grep -q 'studio.js?v=10' site/studio/index.html
           grep -q 'id="release-list"' site/studio/index.html
           grep -q 'id="roadmap-list"' site/studio/index.html
@@ -680,6 +686,8 @@ jobs:
           grep -q 'href="../studio/"' site/model/index.html
           mkdir -p build/web/studio
           cp -a site/studio/. build/web/studio/
+          python scripts/build_studio_history.py build/web/studio/commit-history.json
+          node -e 'const H=require("./site/studio/commit-history.js"); const d=H.normalize(require("./build/web/studio/commit-history.json")); if(d.head!==process.env.GITHUB_SHA)process.exit(1);'
           mkdir -p build/web/npc
           cp -a site/npc/. build/web/npc/
           cp godot/assets/npc/cultist_modular.glb build/web/npc/cultist_v09.glb
@@ -809,7 +817,9 @@ jobs:
               && curl -fsSL --max-time 20 "${SITE_URL}studio/releases.json" -o /tmp/pages-studio-releases.json \
               && grep -q '"studio": "0.6.2"' /tmp/pages-studio-releases.json \
               && curl -fsSL --max-time 20 "${SITE_URL}studio/build-meta.json" -o /tmp/pages-studio-build-meta.json \
-              && grep -q "${GITHUB_SHA}" /tmp/pages-studio-build-meta.json; then
+              && grep -q "${GITHUB_SHA}" /tmp/pages-studio-build-meta.json \
+              && curl -fsSL --max-time 20 "${SITE_URL}studio/commit-history.json" -o /tmp/pages-studio-history.json \
+              && python -c 'import json, os; d=json.load(open("/tmp/pages-studio-history.json")); assert d["head"]==os.environ["GITHUB_SHA"] and len(d["entries"])>0'; then
               echo "LIVE_PAGES_OK: ${SITE_URL}, ${SITE_URL}${RELEASE_DIR}/, geo/, quest/, model/, forge/, weapon-generator/, studio/"
               exit 0
             fi
