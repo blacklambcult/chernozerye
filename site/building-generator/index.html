@@ -903,7 +903,7 @@
 
             // Embedded world editing: same generator and live preview, no duplicate model export.
             let world=null;
-            if(new URLSearchParams(location.search).get("world")==="1"&&window.parent!==window){
+            if(typeof URLSearchParams==="function" && typeof location!=="undefined" && typeof window!=="undefined" && window.parent && window.parent!==window && new URLSearchParams(location.search).get("world")==="1"){
                 try{const ctx=window.parent.WorldEditorGetContext?.(window);if(ctx?.generator==="building"&&['izba','saray','banya'].includes(ctx.type))world=ctx;}catch{}
             }
             if(world){
