@@ -1,0 +1,127 @@
+{
+  "features": [
+    {
+      "id": "test-house-a",
+      "type": "house",
+      "appearance": {
+        "version": 1,
+        "generator": "building",
+        "type": "izba",
+        "parameters": {
+          "floors": 2,
+          "walls": 1,
+          "roof": 2,
+          "window": 1,
+          "door": 1
+        },
+        "conditions": {
+          "walls": "normal",
+          "roof": "normal",
+          "door": "normal",
+          "fence": "normal",
+          "window": 1
+        }
+      },
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5,
+          0
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          0,
+          5
+        ]
+      ]
+    },
+    {
+      "id": "test-house-b",
+      "type": "house",
+      "appearance": {
+        "version": 1,
+        "generator": "building",
+        "type": "izba",
+        "parameters": {
+          "floors": 2,
+          "walls": 1,
+          "roof": 2,
+          "window": 1,
+          "door": 1
+        },
+        "conditions": {
+          "walls": "normal",
+          "roof": "normal",
+          "door": "normal",
+          "fence": "normal",
+          "window": 1
+        }
+      },
+      "points": [
+        [
+          20,
+          0
+        ],
+        [
+          25,
+          0
+        ],
+        [
+          25,
+          5
+        ],
+        [
+          20,
+          5
+        ]
+      ]
+    },
+    {
+      "id": "test-house-c",
+      "type": "house",
+      "appearance": {
+        "version": 1,
+        "generator": "building",
+        "type": "izba",
+        "parameters": {
+          "floors": 1,
+          "walls": 2,
+          "roof": 1,
+          "window": 1,
+          "door": 1
+        },
+        "conditions": {
+          "walls": "normal",
+          "roof": "normal",
+          "door": "normal",
+          "fence": "normal",
+          "window": 0
+        }
+      },
+      "points": [
+        [
+          40,
+          0
+        ],
+        [
+          45,
+          0
+        ],
+        [
+          45,
+          5
+        ],
+        [
+          40,
+          5
+        ]
+      ]
+    }
+  ]
+}

@@ -807,6 +807,7 @@
     const spec=core.appearanceType(feature.properties.category);
     $("world-appearance").hidden=!spec;
     if(!spec)return;
+    $("world-appearance-note").textContent=spec[0]==="building"?"Для изменения игры экспортируй всю карту и передай GeoJSON в сборку. Локальный черновик не меняет опубликованную игру.":"Рецепт сохраняется в GeoJSON. Игровая сборка пока не применяет настройки природы.";
     const custom=!!feature.properties.appearance;
     $("world-reset-appearance").hidden=!custom;
     const label=spec[1]==="tree"?"Лес: образец дерева":spec[1]==="water"?"Водоём: образец тайла":"Постройка";

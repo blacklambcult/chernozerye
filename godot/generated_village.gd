@@ -11,6 +11,10 @@ var _fence_chunk_size := DEFAULT_CHUNK_SIZE
 var _building_chunk_size := DEFAULT_CHUNK_SIZE
 var _plots: Array[Dictionary] = []
 var _models: Dictionary = {}
+var model_dir := MODEL_DIR
+var _appearance_models: Dictionary = {}
+var _custom_placed := 0
+var _custom_missing := 0
 var _transforms: Dictionary = {}
 var _model_bounds: Dictionary = {}
 var _relocated := 0
@@ -24,6 +28,7 @@ var _cultist_point := Vector2.ZERO
 
 
 func prepare(features: Array) -> void:
+    _load_appearance_models(features)
     _building_chunk_size = 96.0 if "--world-chunks-96" in OS.get_cmdline_user_args() else DEFAULT_CHUNK_SIZE
     if OS.has_feature("web") and JavaScriptBridge.eval(
         "new URLSearchParams(window.location.search).get('fence_chunks') === '96'", true
@@ -73,6 +78,40 @@ func prepare(features: Array) -> void:
             eligible[i].profile = 4
     for plot in _plots:
         _counts[maxi(0, int(plot.profile) - 3)] += 1
+
+
+func _load_appearance_models(features: Array) -> void:
+    _appearance_models.clear()
+    _custom_missing = 0
+    var path := model_dir + "appearance_models.json"
+    var manifest: Dictionary = {}
+    if FileAccess.file_exists(path):
+        var parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
+        if parsed is Dictionary and int(parsed.get("version", 0)) == 1 and parsed.get("features") is Dictionary:
+            manifest = parsed.features
+    for feature in features:
+        if not feature is Dictionary or feature.get("type") not in ["house", "sauna", "shed"]:
+            continue
+        if not feature.get("appearance") is Dictionary:
+            continue
+        var key := str(feature.get("id", ""))
+        var entry = manifest.get(key)
+        var appearance: Dictionary = feature.appearance
+        var parameters: Dictionary = appearance.get("parameters", {})
+        var conditions: Dictionary = appearance.get("conditions", {})
+        if entry is Dictionary and entry.get("appearance") == appearance:
+            var model := str(entry.get("model", ""))
+            var floors := int(parameters.get("floors", 1))
+            var window := int(conditions.get("window", 0))
+            if model.begins_with("recipe_") and model.length() == 31 and model.substr(7).is_valid_hex_number(false) and int(entry.get("floors", 0)) == floors and int(entry.get("window", -1)) == window and ResourceLoader.exists(model_dir + model + ".glb"):
+                _appearance_models[key] = {"model": model, "floors": floors, "window": window}
+                continue
+        _custom_missing += 1
+        push_warning("Missing baked appearance for feature " + key + "; using baseline building")
+
+
+func appearance_for(feature_id: String) -> Dictionary:
+    return _appearance_models.get(feature_id, {})
 
 
 func _points(feature: Dictionary) -> PackedVector2Array:
@@ -129,6 +168,9 @@ func add_building(points: PackedVector2Array, category: String, front: int,
     var prefix: String = {"house": "izba%d" % floors, "sauna": "banya", "shed": "saray"}[category]
     var basis := Basis(Vector3.UP, atan2(outward.x, -outward.y))
     var id := prefix + "_" + str(profile)
+    var custom := appearance_for(feature_id)
+    if not custom.is_empty():
+        id = str(custom.model)
     var bounds := _bounds_for_model(id, size)
     var desired_scale := 1.08 + float(posmod(hash(feature_id), 101)) * 0.0014
     var scale_factor := 1.0 if not fits.is_valid() else desired_scale
@@ -161,18 +203,22 @@ func add_building(points: PackedVector2Array, category: String, front: int,
             return {}
     _queue(id, Transform3D(basis.scaled(Vector3.ONE * scale_factor),
         Vector3(center.x, 0.0, -center.y)))
-    if category == "house" and profile >= 4:
+    var window_state := int(custom.get("window", 0))
+    var add_light := (profile >= 4) if custom.is_empty() else (window_state in [1, 2])
+    if category == "house" and add_light:
         var light := OmniLight3D.new()
         var anchor := center + outward * (size.y * scale_factor * 0.5 + 0.6)
         light.position = Vector3(anchor.x, 1.9, -anchor.y)
-        light.light_color = Color("#ffb46b") if profile == 4 else Color("#63ebaf")
+        light.light_color = Color("#ffb46b") if (profile == 4 if custom.is_empty() else window_state == 1) else Color("#63ebaf")
         light.light_energy = 0.32
         light.omni_range = 5.0
         add_child(light)
     _placed += 1
+    if not custom.is_empty():
+        _custom_placed += 1
     _scale_sum += scale_factor
     var foundation := _rectangle(center, right, outward, scale_factor, Rect2(-size * 0.5, size))
-    return {"foundation": foundation, "envelope": envelope, "reserved": reserved, "scale": scale_factor,
+    return {"model_id": id, "foundation": foundation, "envelope": envelope, "reserved": reserved, "scale": scale_factor,
         "door": center + outward * size.y * scale_factor * 0.5,
         "front": center + outward * bounds.end.y * scale_factor, "outward": outward}
 
@@ -190,8 +236,8 @@ func _bounds_for_model(id: String, size: Vector2) -> Rect2:
     if _model_bounds.has(id):
         return _model_bounds[id]
     var result := Rect2(-size * 0.5, size)
-    if ResourceLoader.exists(MODEL_DIR + id + ".glb"):
-        var packed := load(MODEL_DIR + id + ".glb") as PackedScene
+    if ResourceLoader.exists(model_dir + id + ".glb"):
+        var packed := load(model_dir + id + ".glb") as PackedScene
         var template := packed.instantiate() as Node3D
         # Studio's bake stores all parts directly under the model root.
         for part: MeshInstance3D in template.find_children("*", "MeshInstance3D", true, false):
@@ -228,7 +274,7 @@ func _queue(id: String, pose: Transform3D) -> void:
 func finish() -> void:
     var missing := 0
     for id in _transforms:
-        var packed := load(MODEL_DIR + id + ".glb") as PackedScene
+        var packed := load(model_dir + id + ".glb") as PackedScene
         if packed == null:
             missing += 1
             continue
@@ -266,6 +312,7 @@ func finish() -> void:
                 add_child(batch, true)
         template.free()
     _transforms.clear()
+    print("STUDIO_APPEARANCE_READY: custom_placed=", _custom_placed, " missing=", _custom_missing)
     print("STUDIO_CLEARANCE_READY: relocated=", _relocated, " no_safe_fit=", _tight_sites,
         " reduced=", _reduced, " average_scale=", _scale_sum / maxf(_placed, 1.0))
     print("STUDIO_VILLAGE_READY: buildings=", _placed, " fence_sections=", _fences,

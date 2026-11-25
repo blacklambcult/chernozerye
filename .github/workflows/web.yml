@@ -180,10 +180,37 @@ jobs:
           NODE_PATH=/tmp/studio-village/node_modules node scripts/build_village_models.cjs
           NODE_PATH=/tmp/studio-village/node_modules node scripts/build_forest_models.cjs
           test "$(find godot/generated_forest -name '*.glb' | wc -l)" -eq 28
-          test "$(find godot/generated_village -name '*.glb' | wc -l)" -eq 37
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const dir = "godot/generated_village";
+          const manifest = JSON.parse(fs.readFileSync(dir + "/appearance_models.json"));
+          const layout = JSON.parse(fs.readFileSync("godot/manual_layout.json"));
+          const expected = layout.features.filter(f => ["house","sauna","shed"].includes(f.type) && f.appearance);
+          const models = new Set(Object.values(manifest.features).map(f => f.model));
+          const count = fs.readdirSync(dir).filter(f => f.endsWith(".glb")).length;
+          if (count !== 37 + models.size || expected.length !== Object.keys(manifest.features).length)
+            throw Error("Unexpected custom building resource count");
+          for (const f of expected) {
+            const entry = manifest.features[f.id];
+            if (!entry || !fs.existsSync(dir + "/" + entry.model + ".glb"))
+              throw Error("Missing baked appearance " + f.id);
+          }
+          NODE
+          mkdir -p godot/generated_village_test
+          cp tests/world-building-recipes.json godot/generated_village_test/layout.json
+          NODE_PATH=/tmp/studio-village/node_modules node scripts/build_village_models.cjs --recipes-only --layout tests/world-building-recipes.json --output godot/generated_village_test
+          test "$(find godot/generated_village_test -name '*.glb' | wc -l)" -eq 2
 
       - name: Import project
         run: godot --headless --path godot --editor --quit
+
+      - name: Verify individual building recipes and shared mesh instances
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 30s godot --headless --path godot --script res://building_appearance_regression.gd 2>&1 | tee /tmp/building-appearance.log
+          grep -q 'BUILDING_APPEARANCE_OK: features=3 unique=2' /tmp/building-appearance.log
+          rm -rf godot/generated_village_test
 
       - name: Verify active and destroyed forest shrines
         run: |
@@ -730,7 +757,7 @@ jobs:
           test -s build/web/studio/build-meta.json
           grep -q 'QuestGeoOverlayRefresh' build/web/studio/studio.js
           grep -q 'data-target="forge"' site/studio/index.html
-          grep -q 'editor.js?v=24' site/map/index.html
+          grep -q 'editor.js?v=25' site/map/index.html
           grep -q 'editor-core.js?v=21' site/map/index.html
           mkdir -p build/web/map
           cp -a site/map/. build/web/map/

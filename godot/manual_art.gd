@@ -1102,7 +1102,8 @@ func _place_studio_building(points: PackedVector2Array, category: String, featur
     _building_count += 1
     var front := _building_front_edge(points)
     var recipe: Dictionary = IZBA_VARIANTS.recipe(points) if category == "house" else {}
-    var floors := int(recipe.get("floor_count", 1))
+    var custom: Dictionary = _studio_village.appearance_for(feature_id)
+    var floors := int(custom.get("floors", recipe.get("floor_count", 1)))
     var height := (5.09 if floors == 2 else 2.84) if category == "house" else (2.29 if category == "sauna" else 2.27)
     var center := _polygon_bounds(points).get_center()
     var plot := PackedVector2Array()
