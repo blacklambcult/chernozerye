@@ -564,6 +564,8 @@ jobs:
           node --check site/map/editor-core.js
           node --check site/map/editor.js
           node --test tests/editor-core.test.cjs
+          node --test tests/world-editor.test.cjs
+          python -m unittest discover -s tests -p test_world_appearance.py
           # Quest Lab is deployed separately and must remain a working editor.
           node --check site/quest/quest-core.js
           node --check site/quest/quest.js
@@ -579,7 +581,7 @@ jobs:
           grep -q 'id="tool-world-place"' site/quest/index.html
           grep -q 'id="tool-object"' site/quest/index.html
           grep -q 'id="geo-object-search"' site/quest/index.html
-          grep -q '../map/editor-core.js?v=20' site/quest/index.html
+          grep -q '../map/editor-core.js?v=21' site/quest/index.html
           grep -q 'href="../quest/"' site/map/index.html
           mkdir -p build/web/quest
           cp -a site/quest/. build/web/quest/
@@ -681,8 +683,8 @@ jobs:
           grep -Fq 'id="micro-list"' site/studio/index.html
           grep -q 'studio.js?v=12' site/studio/index.html
           grep -Fq 'asset-catalog.js?v=1' site/studio/index.html
-          grep -Fq '../studio/workbench.css?v=1' site/map/index.html
-          grep -Fq '../studio/workbench.css?v=1' site/quest/index.html
+          grep -Fq '../studio/workbench.css?v=2' site/map/index.html
+          grep -Fq '../studio/workbench.css?v=2' site/quest/index.html
           grep -q 'id="release-list"' site/studio/index.html
           grep -q 'id="roadmap-list"' site/studio/index.html
           grep -q 'id="rail-toggle"' site/studio/index.html
@@ -727,8 +729,8 @@ jobs:
           test -s build/web/studio/build-meta.json
           grep -q 'QuestGeoOverlayRefresh' build/web/studio/studio.js
           grep -q 'data-target="forge"' site/studio/index.html
-          grep -q 'editor.js?v=22' site/map/index.html
-          grep -q 'editor-core.js?v=20' site/map/index.html
+          grep -q 'editor.js?v=23' site/map/index.html
+          grep -q 'editor-core.js?v=21' site/map/index.html
           mkdir -p build/web/map
           cp -a site/map/. build/web/map/
           python scripts/build_geo_viewer.py

@@ -901,6 +901,20 @@
                 }
             };
 
+            // Embedded world editing: same generator and live preview, no duplicate model export.
+            let world=null;
+            if(typeof URLSearchParams==="function" && typeof location!=="undefined" && typeof window!=="undefined" && window.parent && window.parent!==window && new URLSearchParams(location.search).get("world")==="1"){
+                try{const ctx=window.parent.WorldEditorGetContext?.(window);if(ctx?.generator==="building"&&['izba','saray','banya'].includes(ctx.type))world=ctx;}catch{}
+            }
+            if(world){
+                state.buildingType=world.type;
+                const recipe=world.recipe;
+                if(recipe){Object.assign(state[world.type],recipe.parameters);Object.assign(state.conditions,recipe.conditions);}
+                for(const button of document.querySelectorAll("[data-building]"))button.disabled=true;
+                for(const id of ["btn-save-building","place-building"]){const el=document.getElementById(id);if(el)el.style.display="none";}
+                window.WorldEditorRecipe=()=>({version:1,generator:"building",type:state.buildingType,parameters:{...state[state.buildingType]},conditions:{...state.conditions}});
+            }
+
             const META = {
                 condShort: { normal: 'N', ruined: 'D', cultist: 'C' },
                 winShort: ['n', 'l', 'e', 'b', 'k'],
@@ -1154,6 +1168,7 @@
                 // Building type switcher
                 document.querySelectorAll('[data-building]').forEach(btn => {
                     btn.addEventListener('click', () => {
+                        if(world)return;
                         const next = btn.dataset.building;
                         if (state.buildingType === next) return;
                         state.buildingType = next;

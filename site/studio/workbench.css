@@ -97,3 +97,20 @@ html.studio-embedded .wb-geo .wb-standalone-link{display:none}
 .wb-geo .geo-filter label,.wb-geo #geo-filter-count{font-size:11px;color:var(--wb-muted)}
 .wb-geo .geo-filter input,.wb-geo .geo-filter select{width:100%}
 .wb-geo .geo-list-more{width:100%;margin-top:7px}
+
+/* World Editor: per-object transform and generator dialog */
+.wb-geo .world-section{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--wb-border);margin-top:8px}
+.wb-geo .world-section h3{margin:0}
+.wb-geo .world-transform{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.wb-geo .world-transform label{display:grid;gap:5px;font-size:10px;color:var(--wb-muted);min-width:0}
+.wb-geo .world-transform input{width:100%}
+.wb-geo .world-generator-dialog{width:min(1080px,96vw);height:min(850px,96vh);max-width:none;max-height:none;background:var(--wb-panel);color:var(--wb-ink);border:1px solid var(--wb-border);border-radius:8px;padding:0;overflow:hidden}
+.wb-geo .world-generator-dialog[open]{display:flex;flex-direction:column}
+.wb-geo .world-generator-dialog::backdrop{background:#080b0de8}
+.wb-geo .world-generator-dialog header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--wb-border)}
+.wb-geo .world-generator-dialog h2{font-size:15px;margin:4px 0}
+.wb-geo .world-dialog-actions{display:flex;gap:6px;flex-wrap:wrap}
+.wb-geo #world-generator-status{margin:0;padding:8px 16px;background:#222a2c}
+.wb-geo #world-generator-frame{flex:1;min-height:0;width:100%;border:0;background:#101315}
+
+.wb-geo .world-section[hidden],.wb-geo #world-reset-appearance[hidden]{display:none!important}

@@ -67,6 +67,53 @@
     return null;
   }
 
+  // One validated per-feature recipe, stored with the existing permanent GeoJSON ID.
+  const APPEARANCE_TYPES=Object.freeze({house:["building","izba"],shed:["building","saray"],sauna:["building","banya"],forest:["nature","tree"],water:["nature","water"]});
+  function appearanceType(category){return APPEARANCE_TYPES[category]||null;}
+  function normalizeAppearance(value,category){
+    const spec=appearanceType(category);
+    if(!spec||!value||value.version!==1||value.generator!==spec[0]||value.type!==spec[1])return null;
+    const p=value.parameters;
+    if(!p||typeof p!=="object"||Array.isArray(p))return null;
+    const ranges=spec[1]==="izba"?{floors:[1,2],walls:[0,4],roof:[0,4],window:[0,4],door:[0,4]}:
+      spec[1]==="saray"?{walls:[0,2],roof:[0,2],door:[0,2]}:
+      spec[1]==="banya"?{walls:[0,2],roof:[0,2],door:[0,1]}:
+      spec[1]==="tree"?{species:[0,8],height:[0,2],canopy:[0,2],seed:[0,4]}:
+      {tile:[0,10],rot:[0,3],depth:[0,2],seed:[0,4]};
+    const parameters={};
+    for(const [key,[min,max]] of Object.entries(ranges)){
+      if(!Number.isInteger(p[key])||p[key]<min||p[key]>max)return null;
+      parameters[key]=p[key];
+    }
+    const result={version:1,generator:spec[0],type:spec[1],parameters};
+    if(spec[0]==="building"){
+      const conditions={};
+      for(const key of ["walls","roof","door","fence"]){
+        const condition=value.conditions?.[key];
+        if(!["normal","ruined","cultist"].includes(condition))return null;
+        conditions[key]=condition;
+      }
+      if(!Number.isInteger(value.conditions?.window)||value.conditions.window<0||value.conditions.window>4)return null;
+      conditions.window=value.conditions.window;result.conditions=conditions;
+    }else{
+      if(!["n","d","c"].includes(value.environment))return null;
+      result.environment=value.environment;
+    }
+    return result;
+  }
+  // Delta transform of source geometry around its vertex centroid, clockwise degrees.
+  // Local tangent-plane approximation for the small world; normalization bounds still apply.
+  function transformGeometry(geometry,category,{east=0,north=0,rotation=0,scale=1}={}){
+    if(![east,north,rotation,scale].every(Number.isFinite)||Math.abs(east)>2000||Math.abs(north)>2000||Math.abs(rotation)>360||scale<0.1||scale>10)return null;
+    const original=normalizeGeometry(geometry,category);if(!original)return null;
+    const pts=original.type==="Point"?[original.coordinates]:original.type==="Polygon"?original.coordinates[0].slice(0,-1):original.coordinates;
+    const lon=pts.reduce((sum,p)=>sum+p[0],0)/pts.length,lat=pts.reduce((sum,p)=>sum+p[1],0)/pts.length;
+    const kx=111320*Math.cos(lat*Math.PI/180),ky=111132,a=rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+    const transformed=pts.map(p=>{const x=(p[0]-lon)*kx*scale,y=(p[1]-lat)*ky*scale;
+      return [Number((lon+(x*c+y*s+east)/kx).toFixed(9)),Number((lat+(-x*s+y*c+north)/ky).toFixed(9))];});
+    return normalizeGeometry({type:original.type,coordinates:original.type==="Point"?transformed[0]:original.type==="Polygon"?[transformed]:transformed},category);
+  }
+
   function normalizeFeature(feature) {
     if (!feature || feature.type !== "Feature") return null;
     const properties = feature.properties || {};
@@ -75,6 +122,8 @@
     if (!geometry) return null;
     const id = String(properties.id || feature.id || "").slice(0, 128);
     if (!id) return null;
+    const appearance=properties.appearance==null?null:normalizeAppearance(properties.appearance,category);
+    if(properties.appearance!=null&&!appearance)return null;
     return {
       type: "Feature",
       id,
@@ -84,6 +133,7 @@
         name: String(properties.name || "").slice(0, 120),
         notes: String(properties.notes || "").slice(0, 600),
         source: "user_manual",
+        ...(appearance?{appearance}:{}),
         created_at: typeof properties.created_at === "string" ? properties.created_at.slice(0, 50) : "",
         updated_at: typeof properties.updated_at === "string" ? properties.updated_at.slice(0, 50) : ""
       },
@@ -118,6 +168,15 @@
       result.push(feature);
     }
     return result;
+  }
+
+  function mergeWorldFeatures(base,draft){
+    const items=new Map();
+    for(const feature of [...base,...draft]){
+      const valid=normalizeFeature(feature);if(!valid)throw Error("Некорректный объект мира");
+      items.set(valid.id,valid);
+    }
+    return [...items.values()];
   }
 
   function collectionFromFeatures(features) {
@@ -171,5 +230,5 @@
   }
 
   return Object.freeze({ TYPES, LIMITS, normalizeGeometry, normalizeFeature, makeFeature,
-    importCollection, collectionFromFeatures, measure });
+    importCollection, collectionFromFeatures, measure, appearanceType, normalizeAppearance, transformGeometry, mergeWorldFeatures });
 });
