@@ -961,6 +961,20 @@
                 }
             };
 
+            // Embedded world editing: same generator and live preview, no duplicate model export.
+            let world=null;
+            if(new URLSearchParams(location.search).get("world")==="1"&&window.parent!==window){
+                try{const ctx=window.parent.WorldEditorGetContext?.(window);if(ctx?.generator==="nature"&&['tree','water'].includes(ctx.type))world=ctx;}catch{}
+            }
+            if(world){
+                state.cat=world.type;
+                const recipe=world.recipe;
+                if(recipe){Object.assign(state[world.type],recipe.parameters);state.envState=recipe.environment;}state.drawerCollapsed=false;
+                for(const button of document.querySelectorAll("[data-cat]"))button.disabled=true;
+                for(const id of ["btn-save-nature","btn-place-nature"]){const el=document.getElementById(id);if(el)el.style.display="none";}
+                window.WorldEditorRecipe=()=>({version:1,generator:"nature",type:state.cat,parameters:{...state[state.cat]},environment:state.envState});
+            }
+
             const META = {
                 tree: {
                     title: 'ДЕРЕВЬЯ',
