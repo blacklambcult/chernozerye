@@ -257,3 +257,29 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--hot);outline-offset
 .workspace-flow{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .workspace-flow span{padding:8px 10px;border-left:2px solid #76928a;background:#1c2b2f;color:#d7e3dd}
 @media(max-width:760px){.rail{width:58px}.navitem{min-height:46px}.studio.nav-collapsed .rail{width:58px}.overview{padding:12px}.dashboard-tab{padding:8px 10px;font-size:11px}.dashboard-panels .roadmap-card{padding:12px}.topright .game-link{display:block;padding:7px;font-size:9px}.top .sigil{display:none}.brand h1{font-size:12px}}
+
+/* Workbench visual refresh: darker neutral panels, warm active states, clear hierarchy. */
+:root{--bg:#101315;--panel:#181d20;--deep:#111719;--line:#384247;--dim:#a2b0ad;--ink:#e7ebe7;--hot:#edac77}
+.top,.context,.statusbar{background:#151a1c;border-color:#384247}
+.rail{background:#181d20;border-color:#384247}
+.rail-separator{color:#9ba9a6}
+.navitem.active{background:#352a23;border-left-color:var(--hot)}
+.navitem:hover{background:#242d30}
+.overview{background:#101315}
+.dashboard-tabs{position:sticky;top:0;z-index:4;background:#101315;padding:6px 0;border-color:#384247}
+.dashboard-tab{border-radius:5px 5px 0 0;font-size:12px}
+.asset-toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:16px 0 12px}
+.asset-toolbar label{display:flex;flex-direction:column;gap:5px;color:#a2b0ad;font-size:11px;flex:1;min-width:150px}
+.asset-toolbar label:first-child{flex:2}
+.asset-toolbar input,.asset-toolbar select{border:1px solid #465559;background:#101719;color:#e7ebe7;padding:9px 10px;border-radius:5px;font:inherit;min-width:0}
+.asset-toolbar :focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+.asset-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:8px}
+.asset-card{background:#181d20;border:1px solid #384247;border-radius:5px;padding:13px;display:flex;flex-direction:column;gap:6px;overflow-wrap:anywhere}
+.asset-card h6{font-size:14px;margin:0;color:#e7ebe7;line-height:1.35}
+.asset-card small{color:#a2b0ad;line-height:1.45;font-size:11px}
+.asset-card code{color:#c1b09d;font-size:10px}
+.asset-card .asset-usage{margin-top:auto;padding-top:7px;border-top:1px solid #384247;color:#c5d5cd;font-size:11px}
+.asset-panel #asset-more{margin-top:12px}
+.asset-panel #asset-status{font-size:11px;color:#a2b0ad}
+.asset-metrics div{background:#20272a;border-color:#384247;border-radius:5px}
+.asset-panel .workspace-data{padding:16px}
