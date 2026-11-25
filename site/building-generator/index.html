@@ -908,6 +908,7 @@
                 try{const ctx=window.parent.WorldEditorGetContext?.(window);if(ctx?.generator==="building"&&['izba','saray','banya'].includes(ctx.type))world=ctx;}catch{}
             }
             if(world){
+                document.body.classList.add("gen-world");
                 state.buildingType=world.type;
                 const recipe=world.recipe;
                 if(recipe){Object.assign(state[world.type],recipe.parameters);Object.assign(state.conditions,recipe.conditions);}
