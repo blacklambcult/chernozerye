@@ -37,7 +37,8 @@ func _process(_delta: float) -> void:
         set_process(false)
 
 func _ready() -> void:
-    if OS.has_feature("web") and "--startup-profile" in OS.get_cmdline_user_args():
+    var profile_web_startup := OS.has_feature("web") and "--startup-profile" in OS.get_cmdline_user_args()
+    if profile_web_startup:
         JavaScriptBridge.eval("if (window.chernozeryeStartupProfile) window.chernozeryeStartupProfile.worldStart = performance.now();", true)
     _fog_distance_test = OS.has_feature("web") or "--fog-distance-145" in OS.get_cmdline_user_args()
     _create_ground()
@@ -103,6 +104,8 @@ func _ready() -> void:
         runtime.authored_quest = quest
         add_child(runtime)
         _create_world_document(preload("res://studio_snapshot.gd").convert_world_items(snapshot, library))
+    if profile_web_startup:
+        JavaScriptBridge.eval("if (window.chernozeryeStartupProfile) window.chernozeryeStartupProfile.worldReady = performance.now();", true)
 
 func _create_note_archive() -> void:
     var notes := Node.new()
@@ -190,7 +193,6 @@ func _material(color: Color) -> StandardMaterial3D:
     var m := StandardMaterial3D.new()
     m.albedo_color = color
     m.roughness = 1.0
-    m.specular = 0.0
     m.metallic = 0.0
     m.clearcoat_enabled = false
     m.rim_enabled = false

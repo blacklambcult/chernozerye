@@ -348,7 +348,6 @@ func _material(color: Color, texture: Texture2D = null) -> StandardMaterial3D:
     mat.albedo_color = color
     mat.roughness = 1.0
     mat.metallic = 0.0
-    mat.specular = 0.0
     # Explicit matte defaults: no reflective highlights, rim/clearcoat or emitted wall light.
     mat.rim_enabled = false
     mat.clearcoat_enabled = false
