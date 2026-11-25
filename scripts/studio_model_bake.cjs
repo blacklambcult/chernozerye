@@ -89,16 +89,46 @@ function buildingAtlas(model) {
   return { texture, tiles };
 }
 
-function batchModel(model, { bakeTint = false, atlasTextures = false } = {}) {
+function reverseFaces(geometry) {
+  const back = geometry.clone();
+  for (const attribute of Object.values(back.attributes)) {
+    const { array, itemSize } = attribute;
+    for (let i = 0; i < array.length; i += itemSize * 3) {
+      for (let j = 0; j < itemSize; j++) {
+        const second = i + itemSize + j;
+        const third = i + 2 * itemSize + j;
+        [array[second], array[third]] = [array[third], array[second]];
+      }
+    }
+  }
+  const normals = back.getAttribute("normal").array;
+  for (let i = 0; i < normals.length; i++) normals[i] *= -1;
+  return back;
+}
+
+function batchModel(model, { bakeTint = false, atlasTextures = false, flattenFencePanels = false } = {}) {
   model.updateMatrixWorld(true);
   const groups = new Map();
   const atlas = atlasTextures ? buildingAtlas(model) : null;
   model.traverse(mesh => {
     if (!mesh.isMesh) return;
     const material = mesh.material;
+    // Preserve double-sided roof trim explicitly so opaque masonry and trim
+    // with the same lighting settings can share one front-face draw.
+    const explicitBackfaces = atlas && material.side === THREE.DoubleSide;
+    const side = explicitBackfaces ? THREE.FrontSide : material.side;
     const key = JSON.stringify([bakeTint ? null : material.color.getHex(), atlas ? null : material.map?.uuid, material.roughness,
-      material.metalness, material.side, material.emissive.getHex(), material.emissiveIntensity]);
-    const geometry = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+      material.metalness, side, material.emissive.getHex(), material.emissiveIntensity]);
+    let source = mesh.geometry;
+    const depth = source.parameters?.depth;
+    if (flattenFencePanels && source.type === "BoxGeometry" && [0.03, 0.035].includes(depth)) {
+      source = source.clone();
+      const faces = source.groups.filter(group => group.materialIndex === 4 || group.materialIndex === 5);
+      source.setIndex(faces.flatMap(group =>
+        Array.from(source.index.array.slice(group.start, group.start + group.count))));
+      source.clearGroups();
+    }
+    const geometry = source.index ? source.toNonIndexed() : source.clone();
     if (!geometry.getAttribute("normal")) geometry.computeVertexNormals();
     if (!geometry.getAttribute("uv"))
       geometry.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(geometry.getAttribute("position").count * 2), 2));
@@ -131,14 +161,19 @@ function batchModel(model, { bakeTint = false, atlasTextures = false } = {}) {
     }
     if (!groups.has(key)) {
       const batchMaterial = bakeTint || atlas ? material.clone() : material;
-      if (atlas) batchMaterial.map = atlas.texture;
+      if (atlas) {
+        batchMaterial.map = atlas.texture;
+        batchMaterial.side = side;
+      }
       if (bakeTint) {
         batchMaterial.color.setRGB(1, 1, 1);
         batchMaterial.vertexColors = true;
       }
       groups.set(key, { material: batchMaterial, geometries: [] });
     }
-    groups.get(key).geometries.push(geometry);
+    const group = groups.get(key);
+    group.geometries.push(geometry);
+    if (explicitBackfaces) group.geometries.push(reverseFaces(geometry));
   });
   const result = new THREE.Group();
   for (const { material, geometries } of groups.values()) {
