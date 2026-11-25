@@ -968,6 +968,7 @@
                 try{const ctx=window.parent.WorldEditorGetContext?.(window);if(ctx?.generator==="nature"&&['tree','water'].includes(ctx.type))world=ctx;}catch{}
             }
             if(world){
+                document.body.classList.add("gen-world");
                 state.cat=world.type;
                 const recipe=world.recipe;
                 if(recipe){Object.assign(state[world.type],recipe.parameters);state.envState=recipe.environment;}state.drawerCollapsed=false;
