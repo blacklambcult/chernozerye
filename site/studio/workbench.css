@@ -114,3 +114,7 @@ html.studio-embedded .wb-geo .wb-standalone-link{display:none}
 .wb-geo #world-generator-frame{flex:1;min-height:0;width:100%;border:0;background:#101315}
 
 .wb-geo .world-section[hidden],.wb-geo #world-reset-appearance[hidden]{display:none!important}
+
+.wb-geo .world-generator-dialog{position:fixed;inset:0;margin:auto;width:min(1500px,calc(100vw - 24px));height:calc(100vh - 24px);max-height:calc(100vh - 24px)}
+.wb-geo .world-generator-dialog>header,.wb-geo #world-generator-status{flex-shrink:0}
+@media(max-height:500px){.wb-geo .world-generator-dialog{height:calc(100vh - 12px)}.wb-geo .world-generator-dialog>header{padding:5px 10px}}

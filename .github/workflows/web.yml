@@ -674,6 +674,7 @@ jobs:
           node --test tests/studio-state.test.cjs
           node --test tests/studio-shell.test.cjs
           node --test tests/studio-workbench.test.cjs
+          node --test tests/generator-layout.test.cjs
           node --test tests/studio-releases.test.cjs
           grep -q 'studio-state.js?v=6' site/studio/index.html
           grep -q 'release-core.js?v=3' site/studio/index.html
@@ -681,10 +682,10 @@ jobs:
           grep -q 'studio.css?v=9' site/studio/index.html
           grep -Fq 'commit-history.js?v=1' site/studio/index.html
           grep -Fq 'id="micro-list"' site/studio/index.html
-          grep -q 'studio.js?v=12' site/studio/index.html
+          grep -q 'studio.js?v=13' site/studio/index.html
           grep -Fq 'asset-catalog.js?v=1' site/studio/index.html
-          grep -Fq '../studio/workbench.css?v=2' site/map/index.html
-          grep -Fq '../studio/workbench.css?v=2' site/quest/index.html
+          grep -Fq '../studio/workbench.css?v=3' site/map/index.html
+          grep -Fq '../studio/workbench.css?v=3' site/quest/index.html
           grep -q 'id="release-list"' site/studio/index.html
           grep -q 'id="roadmap-list"' site/studio/index.html
           grep -q 'id="rail-toggle"' site/studio/index.html
@@ -729,7 +730,7 @@ jobs:
           test -s build/web/studio/build-meta.json
           grep -q 'QuestGeoOverlayRefresh' build/web/studio/studio.js
           grep -q 'data-target="forge"' site/studio/index.html
-          grep -q 'editor.js?v=23' site/map/index.html
+          grep -q 'editor.js?v=24' site/map/index.html
           grep -q 'editor-core.js?v=21' site/map/index.html
           mkdir -p build/web/map
           cp -a site/map/. build/web/map/

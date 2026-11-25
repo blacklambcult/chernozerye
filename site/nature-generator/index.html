@@ -745,8 +745,9 @@
         .library-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; }
         .library-actions input { flex: 1 1 180px; min-width: 0; color: #eee; background: #171b1c; border: 1px solid #746453; padding: 8px; }
     </style>
+    <link rel="stylesheet" href="../studio/generator-workbench.css?v=1">
 </head>
-<body>
+<body class="generator-workbench">
     <!-- Fullscreen 3D Viewport -->
     <div id="viewport">
         <canvas id="gl-canvas"></canvas>
@@ -967,6 +968,7 @@
                 try{const ctx=window.parent.WorldEditorGetContext?.(window);if(ctx?.generator==="nature"&&['tree','water'].includes(ctx.type))world=ctx;}catch{}
             }
             if(world){
+                document.body.classList.add("gen-world");
                 state.cat=world.type;
                 const recipe=world.recipe;
                 if(recipe){Object.assign(state[world.type],recipe.parameters);state.envState=recipe.environment;}state.drawerCollapsed=false;
@@ -3891,8 +3893,8 @@
                    --------------------------------------------------------- */
                 function handleResize() {
                     if (!renderer) return;
-                    const w = Math.max(1, window.innerWidth);
-                    const h = Math.max(1, window.innerHeight);
+                    const w = Math.max(1, canvas.clientWidth || window.innerWidth);
+                    const h = Math.max(1, canvas.clientHeight || window.innerHeight);
                     camera.aspect = w / h;
                     camera.updateProjectionMatrix();
 
@@ -4067,7 +4069,7 @@
                         const dt = Math.min(clock.getDelta(), 0.08);
                         const elapsed = clock.getElapsedTime();
 
-                        const cw = window.innerWidth, ch = window.innerHeight;
+                        const cw = canvas.clientWidth, ch = canvas.clientHeight;
                         if (cw > 0 && ch > 0 && (cw !== lastW || ch !== lastH)) {
                             lastW = cw;
                             lastH = ch;

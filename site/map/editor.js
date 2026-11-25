@@ -843,7 +843,7 @@
     $("world-generator-status").textContent="Загрузка генератора…";
     $("world-generator-apply").disabled=true;
     generatorDialog.showModal();
-    generatorFrame.src="../"+(spec[0]==="building"?"building-generator":"nature-generator")+"/?world=1&v=world-editor-1";
+    generatorFrame.src="../"+(spec[0]==="building"?"building-generator":"nature-generator")+"/?world=1&v=world-editor-2";
   });
   generatorFrame.addEventListener("load",()=>{
     if(!generatorContext)return;
