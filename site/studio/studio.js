@@ -192,6 +192,7 @@
       }
       for (const panel of dashboardPanels) panel.hidden = panel.dataset.dashboardPanel !== id;
       if (id === "data") refreshStats();
+      if (id === "assets") void window.ChernoAssetCatalogRefresh?.();
     });
   }
   $("reload-editor").addEventListener("click", () => {
