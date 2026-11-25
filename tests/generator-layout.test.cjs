@@ -44,9 +44,10 @@ test("actual generator DOM reserves a non-overlapping preview at desktop and nar
         for(const e of [hud.querySelector(".top-stack"),hud.querySelector(".bottom-stack"),library].filter(Boolean)){
           const r=rect(e);
           if(r.width<50||r.height<20||!disjoint(v,r))throw Error("panel overlaps preview: "+e.className);
-          if(r.left< -1||r.right>innerWidth+1||r.top< -1||r.bottom>innerHeight+1)throw Error("panel outside window");
+          if(r.left< -1||r.right>innerWidth+1||r.top< -1||r.bottom>innerHeight+1)throw Error("panel outside window: "+(e.id||e.className)+" "+[r.left,r.top,r.right,r.bottom].join(",")+" / "+innerWidth+"x"+innerHeight);
         }
         body.classList.add("ui-hidden");
+        if(getComputedStyle(hud).display!=="none")throw Error("UI remains visible in fullscreen");
         const full=rect(viewport);
         if(Math.abs(full.width-innerWidth)>1||Math.abs(full.height-innerHeight)>1)throw Error("hidden UI does not restore viewport");
         body.dataset.layoutCheck="ok";
