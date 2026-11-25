@@ -571,7 +571,7 @@ jobs:
           node --check site/quest/geo-overlay-core.js
           node --test tests/quest-geo-overlay.test.cjs
           node --test tests/quest-geo-link.test.cjs
-          grep -q 'quest.js?v=13' site/quest/index.html
+          grep -q 'quest.js?v=14' site/quest/index.html
           grep -q 'geo-overlay-core.js?v=3' site/quest/index.html
           grep -q 'quest-core.js?v=4' site/quest/index.html
           grep -q 'id="step-document-fields"' site/quest/index.html
@@ -667,17 +667,22 @@ jobs:
           node --check site/studio/release-core.js
           node --check site/studio/studio-releases.js
           node --check site/studio/commit-history.js
+          node --check site/studio/asset-catalog.js
           node --test tests/studio-commit-history.test.cjs
           node --test tests/studio-state.test.cjs
           node --test tests/studio-shell.test.cjs
+          node --test tests/studio-workbench.test.cjs
           node --test tests/studio-releases.test.cjs
           grep -q 'studio-state.js?v=6' site/studio/index.html
           grep -q 'release-core.js?v=3' site/studio/index.html
           grep -q 'studio-releases.js?v=3' site/studio/index.html
-          grep -q 'studio.css?v=8' site/studio/index.html
+          grep -q 'studio.css?v=9' site/studio/index.html
           grep -Fq 'commit-history.js?v=1' site/studio/index.html
           grep -Fq 'id="micro-list"' site/studio/index.html
-          grep -q 'studio.js?v=11' site/studio/index.html
+          grep -q 'studio.js?v=12' site/studio/index.html
+          grep -Fq 'asset-catalog.js?v=1' site/studio/index.html
+          grep -Fq '../studio/workbench.css?v=1' site/map/index.html
+          grep -Fq '../studio/workbench.css?v=1' site/quest/index.html
           grep -q 'id="release-list"' site/studio/index.html
           grep -q 'id="roadmap-list"' site/studio/index.html
           grep -q 'id="rail-toggle"' site/studio/index.html
