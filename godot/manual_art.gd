@@ -2289,9 +2289,9 @@ func _decorate_utility_poles(points: PackedVector2Array) -> void:
                     lantern.name = "Жёлтый деревенский фонарь"
                     lantern.position = lamp_end + Vector3.DOWN * 0.43
                     lantern.light_color = Color("#f3c77b")
-                    lantern.light_energy = 0.27
+                    lantern.light_energy = 0.37
                     lantern.light_specular = 0.0
-                    lantern.omni_range = 6.0
+                    lantern.omni_range = 7.5
                     lantern.shadow_enabled = false
                     add_child(lantern)
                     _street_lights += 1
