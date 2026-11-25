@@ -757,7 +757,7 @@ jobs:
           test -s build/web/studio/build-meta.json
           grep -q 'QuestGeoOverlayRefresh' build/web/studio/studio.js
           grep -q 'data-target="forge"' site/studio/index.html
-          grep -q 'editor.js?v=24' site/map/index.html
+          grep -q 'editor.js?v=25' site/map/index.html
           grep -q 'editor-core.js?v=21' site/map/index.html
           mkdir -p build/web/map
           cp -a site/map/. build/web/map/
