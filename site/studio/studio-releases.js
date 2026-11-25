@@ -45,15 +45,12 @@
   function paintRoadmap() {
     if(!documentData)return;
     $("roadmap-count").textContent=documentData.roadmap.length+" ЗАДАЧ";
-    let serial=0;
     $("roadmap-list").innerHTML=Object.entries(Core.PHASES).map(([phase,label])=>{
       const items=Core.backlogByPhase(documentData,phase);
       if(!items.length)return "";
       const rows=items.map(item=>{
-        serial++;
         return '<article class="roadmap-card" data-roadmap-id="'+escaped(item.id)+'">'+
-          '<div class="roadmap-card-title"><span class="roadmap-marker">'+
-          String(serial).padStart(2,"0")+'</span><strong>'+escaped(item.title)+'</strong></div>'+
+          '<div class="roadmap-card-title"><strong>'+escaped(item.title)+'</strong></div>'+
           '<p>'+escaped(item.description)+'</p>'+
           '<div class="roadmap-meta"><span>'+escaped(Core.AREAS[item.area])+'</span>'+
           '<span>ПРИОРИТЕТ / '+escaped(Core.PRIORITIES[item.priority])+'</span></div>'+

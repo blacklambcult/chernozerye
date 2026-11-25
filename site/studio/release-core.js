@@ -8,7 +8,7 @@
   const SCHEMA = "chernozerye.studio.release-notes";
   const AREAS = Object.freeze({all:"Все",studio:"STUDIO",game:"ИГРА",geo:"GEO LAB",quest:"QUEST LAB",model:"MODEL LAB",forge:"HELLISH FORGE"});
   const PHASES = Object.freeze({next:"СЛЕДУЮЩИЕ",planned:"В ПЛАНЕ",ideas:"ИДЕИ"});
-  const PRIORITIES = Object.freeze({high:"ВЫСОКИЙ",medium:"СРЕДНИЙ",low:"НИЗКИЙ"});
+  const PRIORITIES = Object.freeze({high:"ВЫСОКИЙ",medium:"СРЕДНИЙ",low:"НИЗКИЙ",p0:"P0",p1:"P1",p2:"P2"});
   const SHA_PATTERN = /^[a-f0-9]{8}([a-f0-9]{32})?$/;
   const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
   function nonEmpty(value,label,max=500) {
