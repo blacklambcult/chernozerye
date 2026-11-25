@@ -170,6 +170,15 @@
     return result;
   }
 
+  function mergeWorldFeatures(base,draft){
+    const items=new Map();
+    for(const feature of [...base,...draft]){
+      const valid=normalizeFeature(feature);if(!valid)throw Error("Некорректный объект мира");
+      items.set(valid.id,valid);
+    }
+    return [...items.values()];
+  }
+
   function collectionFromFeatures(features) {
     return {
       type: "FeatureCollection",
@@ -221,5 +230,5 @@
   }
 
   return Object.freeze({ TYPES, LIMITS, normalizeGeometry, normalizeFeature, makeFeature,
-    importCollection, collectionFromFeatures, measure, appearanceType, normalizeAppearance, transformGeometry });
+    importCollection, collectionFromFeatures, measure, appearanceType, normalizeAppearance, transformGeometry, mergeWorldFeatures });
 });
