@@ -161,7 +161,12 @@
     return questCore.normalizeStep(updated);
   }
 
-  return Object.freeze({ STORAGE_KEY, SOURCES, MANUAL_STYLES,
+  function overlayStatus({manualCount=0, ready=0, failed=0, manualError=""} = {}) {
+    const suffix = [manualError, failed ? "часть базовых слоёв недоступна" : ""].filter(Boolean);
+    return { text: "GEO LAB / " + manualCount + " МОИХ · " + ready + "/" + SOURCES.length + " БАЗОВЫХ" +
+      (suffix.length ? " · " + suffix.join(" · ") : ""), warning: suffix.length > 0 };
+  }
+  return Object.freeze({ overlayStatus, STORAGE_KEY, SOURCES, MANUAL_STYLES,
     readManual, sourceCounts, sourceStyle, manualStyle,
     featurePoint, objectIndex, objectLabel, searchObjects, resolveBinding, bindStep });
 });
