@@ -54,8 +54,10 @@
    untouched and stack the generic inspector panels on the right. */
 .generator-workbench.gen-with-library{--gen-left:clamp(240px,24vw,350px);--fit-width:var(--gen-left-inset);--preview-bottom:var(--gen-bottom)}
 .generator-workbench.gen-with-library #hud .top-stack,
-.generator-workbench.gen-with-library #hud .bottom-stack{position:static;width:100%;border:0;overflow:visible}
-.generator-workbench.gen-with-library #hud{left:auto;right:0;width:var(--gen-right);overflow:auto;background:#181d20;pointer-events:auto;border-left:1px solid #384247}
+.generator-workbench.gen-with-library #hud .bottom-stack{position:static;width:100%;min-height:0;border:0;overflow:auto}
+.generator-workbench.gen-with-library #hud .top-stack{flex:0 1 auto;max-height:40%}
+.generator-workbench.gen-with-library #hud .bottom-stack{flex:1 1 0}
+.generator-workbench.gen-with-library #hud{left:auto;right:0;width:var(--gen-right);display:flex;flex-direction:column;gap:1px;overflow:hidden;background:#181d20;pointer-events:auto;border-left:1px solid #384247}
 .generator-workbench.gen-with-library #hud .grip-selector{grid-template-columns:repeat(3,minmax(0,1fr))}
 .generator-workbench.gen-with-library #fps-crosshair{left:calc((100% + var(--gen-left-inset) - var(--gen-right-inset))/2);top:calc((100% - var(--gen-bottom))/2)}
 /* Narrow windows still reserve separate preview and controls regions. */
@@ -64,8 +66,8 @@
   .generator-workbench #hud{top:51%;bottom:0;display:grid;grid-template-columns:minmax(125px,34%) minmax(0,1fr);gap:1px;background:#384247}
   .generator-workbench #hud .top-stack,.generator-workbench #hud .bottom-stack{position:static;width:auto;height:auto;overflow:auto;border:0;padding:6px}
   .generator-workbench.gen-with-library #library-workspace{inset:51% auto 0 0;width:38%;height:auto;overflow:auto}
-  .generator-workbench.gen-with-library #hud{inset:51% 0 0 38%;width:auto;display:block}
-  .generator-workbench.gen-with-library #hud .top-stack,.generator-workbench.gen-with-library #hud .bottom-stack{overflow:visible}
+  .generator-workbench.gen-with-library #hud{inset:51% 0 0 38%;width:auto;display:flex}
+  .generator-workbench.gen-with-library #hud .top-stack,.generator-workbench.gen-with-library #hud .bottom-stack{overflow:auto}
   .generator-workbench.gen-with-library{--fit-width:0px;--preview-bottom:49%}
   .generator-workbench.ui-hidden{--gen-bottom:0px}
   .generator-workbench.ui-hidden #hud{display:none}
@@ -79,3 +81,6 @@
 .generator-workbench.gen-world #hud .header-titles{display:none}
 .generator-workbench.gen-world #hud .header-bar{justify-content:flex-start}
 .generator-workbench.gen-world #hud .library-actions{display:none!important}
+
+/* Hide both bounded inspector regions when fullscreen preview is selected. */
+.generator-workbench.gen-with-library.ui-hidden #hud{display:none}
