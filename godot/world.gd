@@ -837,15 +837,15 @@ func _toggle_manual_preview() -> void:
         # Godot Compatibility Web: artistic depth fog, not unsupported volumetric fog.
         _night_environment.background_color = Color("#303441") if manual_mode else Color("#575b69")
         _night_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-        _night_environment.ambient_light_color = Color("#a9adb6") if manual_mode else Color("#b0a9a4")
+        _night_environment.ambient_light_color = Color("#7e91ac") if manual_mode else Color("#b0a9a4")
         _night_environment.ambient_light_energy = 0.57 if manual_mode else 0.82
         _night_environment.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED if manual_mode else Environment.REFLECTION_SOURCE_BG
         _night_environment.glow_enabled = false
         _night_environment.tonemap_exposure = 1.01 if manual_mode else 1.0
         _night_environment.fog_enabled = true
         _night_environment.fog_mode = Environment.FOG_MODE_DEPTH if manual_mode else Environment.FOG_MODE_EXPONENTIAL
-        _night_environment.fog_light_color = Color("#4a4e63") if manual_mode else Color("#676976")
-        _night_environment.fog_light_energy = 0.59 if manual_mode else 1.0
+        _night_environment.fog_light_color = Color("#344058") if manual_mode else Color("#676976")
+        _night_environment.fog_light_energy = 0.50 if manual_mode else 1.0
         _night_environment.fog_sky_affect = 0.10 if manual_mode else 1.0
         _night_environment.fog_sun_scatter = 0.0
         _night_environment.fog_aerial_perspective = 0.0
@@ -857,13 +857,13 @@ func _toggle_manual_preview() -> void:
         _night_environment.fog_height_density = 0.010 if manual_mode else 0.0
     if _sun_light != null:
         _sun_light.rotation_degrees = Vector3(-14, -70, 0) if manual_mode else Vector3(-12, -35, 0)
-        _sun_light.light_energy = 0.58 if manual_mode else 1.05
+        _sun_light.light_energy = 0.34 if manual_mode else 1.05
         _sun_light.light_specular = 0.0
-        _sun_light.light_color = Color("#c2b9c4") if manual_mode else Color("#f0b69a")
+        _sun_light.light_color = Color("#97add0") if manual_mode else Color("#f0b69a")
         # The shadow map produced hard triangular streaks across the road and low-poly trees.
         _sun_light.shadow_enabled = not manual_mode
     if manual_mode:
-        print("MANUAL_NO_GLARE_READY: ambient=0.57, moon=0.58, fog_light=0.59, exposure=1.01")
+        print("MANUAL_NO_GLARE_READY: ambient=0.57, moon=0.34, fog_light=0.50, exposure=1.01")
     print("MANUAL_NIGHT_READY: ", manual_mode,
         " fog=", _night_environment.fog_mode if _night_environment != null else "MISSING_ENV",
         " glow=", _night_environment.glow_enabled if _night_environment != null else "MISSING_ENV",

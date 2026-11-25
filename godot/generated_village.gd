@@ -108,7 +108,7 @@ func plot_profile(points: PackedVector2Array) -> int:
 
 
 func add_building(points: PackedVector2Array, category: String, front: int,
-        floors: int, ordinal: int, fits: Callable = Callable(), feature_id := "") -> Dictionary:
+        floors: int, ordinal: int, fits: Callable = Callable(), feature_id := "", showcase_light := false) -> Dictionary:
     var center := _center(points)
     var a := points[front]
     var b := points[(front + 1) % points.size()]
@@ -131,6 +131,8 @@ func add_building(points: PackedVector2Array, category: String, front: int,
         profile = ordinal % 4
     var prefix: String = {"house": "izba%d" % floors, "sauna": "banya", "shed": "saray"}[category]
     var basis := Basis(Vector3.UP, atan2(outward.x, -outward.y))
+    if showcase_light and profile < 4:
+        profile = 4
     var id := prefix + "_" + str(profile)
     var bounds := _bounds_for_model(id, size)
     var desired_scale := 1.08 + float(posmod(hash(feature_id), 101)) * 0.0014
@@ -169,8 +171,10 @@ func add_building(points: PackedVector2Array, category: String, front: int,
         var anchor := center + outward * (size.y * scale_factor * 0.5 + 0.6)
         light.position = Vector3(anchor.x, 1.9, -anchor.y)
         light.light_color = Color("#ffb46b") if profile == 4 else Color("#63ebaf")
-        light.light_energy = 0.32
-        light.omni_range = 5.0
+        light.light_energy = 0.85 if profile == 4 else 0.32
+        light.omni_range = 7.2 if profile == 4 else 5.0
+        light.light_specular = 0.0
+        light.shadow_enabled = false
         add_child(light)
     _placed += 1
     _scale_sum += scale_factor

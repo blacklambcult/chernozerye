@@ -60,6 +60,9 @@ var _anomalous_houses := 0
 var _anomaly_lamps: Array[OmniLight3D] = []
 var _anomaly_clock := 0.0
 var _street_lights := 0
+var _street_lamp_positions: Array[Vector3] = []
+var _showcase_placement: Dictionary = {}
+var _showcase_plot := PackedVector2Array()
 var _street_lamp_heads := 0
 var _balcony_count := 0
 var _yard_details: PackedVector3Array = PackedVector3Array()
@@ -202,6 +205,7 @@ func decorate(features: Array, vegetation_batches: Dictionary, profile_startup :
                 _decorate_fence(polygon)
             "road":
                 _decorate_road(polygon)
+    _light_street_lamps()
     var fences_end := Time.get_ticks_usec()
     _choose_cultist_totem_site()
     var total_plots := _fence_count
@@ -211,6 +215,7 @@ func decorate(features: Array, vegetation_batches: Dictionary, profile_startup :
     _fence_count = total_plots
     print("VILLAGE_ACCESS_READY: homes=", _house_approaches.size(), " segments=", _entrance_routes.size(),
         " blocked=", _approaches_blocked, " merged_fence_spans=", _fence_duplicates)
+    _add_showcase_ember_bowl()
     _add_yard_vegetation(vegetation_batches)
     var placement_end := Time.get_ticks_usec()
     _studio_village.finish()
@@ -1161,8 +1166,9 @@ func _place_studio_building(points: PackedVector2Array, category: String, featur
         if Geometry2D.is_point_in_polygon(center, candidate):
             plot = candidate
             break
+    var showcase := category == "house" and center.distance_to(_feature_house_center) < 2.0
     var placement: Dictionary = _studio_village.add_building(points, category, front, floors,
-        _building_count, _clear_building_site.bind(plot), feature_id)
+        _building_count, _clear_building_site.bind(plot), feature_id, showcase)
     if placement.is_empty():
         return
     _track_building(placement.envelope)
@@ -1173,8 +1179,9 @@ func _place_studio_building(points: PackedVector2Array, category: String, featur
         _index_clearance(_reserved_building_cells, reserved_bounds, _reserved_building_space.size())
         _reserved_building_space.append(placement.reserved)
         _reserved_building_bounds.append(reserved_bounds)
-        if center.distance_to(_feature_house_center) < 2.0:
-            # Retain the start-area landmark without adding props in the new corridor.
+        if showcase:
+            _showcase_placement = placement
+            _showcase_plot = plot
             print("MANUAL_SHOWCASE_YARD_READY: ", placement.door)
 
 
@@ -2239,6 +2246,73 @@ func _wire_segment(a: Vector3, b: Vector3) -> void:
     _push_tri(_overhead_wires, a - thickness, a + thickness, b + thickness)
     _push_tri(_overhead_wires, a - thickness, b + thickness, b - thickness)
 
+func _light_street_lamps() -> void:
+    var spawn := Vector3(-789.7, 5.0, -268.6)
+    var focus := spawn + Vector3(0.93, 0.0, -0.36) * 22.0
+    _street_lamp_positions.sort_custom(func(a: Vector3, b: Vector3) -> bool:
+        return a.distance_squared_to(focus) < b.distance_squared_to(focus))
+    for i in _street_lamp_positions.size():
+        var position := _street_lamp_positions[i]
+        var live := i < 2
+        _batch_box("lamp_glass" if live else "lamp_glass_off", position, Vector3(0.35, 0.25, 0.35))
+        if live:
+            _add_warm_light(position, Color("#ffc177"), 1.8, 12.0)
+            _street_lights += 1
+    print("DUSK_LAMPS_READY: active=", _street_lights)
+
+
+func _add_warm_light(at: Vector3, tint: Color, energy: float, reach: float) -> void:
+    var source := OmniLight3D.new()
+    source.position = at
+    source.light_color = tint
+    source.light_energy = energy
+    source.light_specular = 0.0
+    source.omni_range = reach
+    source.shadow_enabled = false
+    add_child(source)
+
+
+func _add_showcase_ember_bowl() -> void:
+    if _showcase_plot.is_empty():
+        return
+    var front: Vector2 = _showcase_placement.front
+    var outward: Vector2 = _showcase_placement.outward
+    var side := outward.orthogonal()
+    for offset in [2.7, -2.7, 3.3, -3.3]:
+        var point := front + outward * 1.4 + side * float(offset)
+        if not Geometry2D.is_point_in_polygon(point, _showcase_plot) \
+                or _road_within(point, 0.8) or _plot_edge_within(point, 0.6) \
+                or _entry_zone_conflict(point, 0.5) or not _clear_of_buildings(point, 0.65) \
+                or _distance_to_fence(point, 0.7) < 0.7:
+            continue
+        var at := _pt(point, 0.07)
+        var stand := CylinderMesh.new()
+        stand.top_radius = 0.23
+        stand.bottom_radius = 0.17
+        stand.height = 0.32
+        stand.radial_segments = 8
+        stand.rings = 0
+        stand.material = _material(Color("#393331"))
+        var bowl := MeshInstance3D.new()
+        bowl.mesh = stand
+        bowl.position = at + Vector3.UP * 0.16
+        bowl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        add_child(bowl)
+        var flame := QuadMesh.new()
+        flame.size = Vector2(0.45, 0.56)
+        var mat := ShaderMaterial.new()
+        mat.shader = preload("res://yard_flame.gdshader")
+        flame.material = mat
+        var visual := MeshInstance3D.new()
+        visual.mesh = flame
+        visual.position = at + Vector3.UP * 0.56
+        visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        add_child(visual)
+        _add_warm_light(at + Vector3.UP * 0.58, Color("#ffa256"), 1.05, 4.5)
+        print("DUSK_FIRE_READY: ", point)
+        return
+
+
 func _decorate_utility_poles(points: PackedVector2Array) -> void:
     # Props follow surveyed road coordinates; they are not new map objects.
     # Hard cap for fast Godot Web export and a sparsely electrified 1990s village.
@@ -2278,23 +2352,7 @@ func _decorate_utility_poles(points: PackedVector2Array) -> void:
                 _batch_box("lamp_shade", lamp_end + Vector3.DOWN * 0.25,
                     Vector3(0.56, 0.18, 0.48))
                 _street_lamp_heads += 1
-                # Unpowered Soviet street lamps: only two scattered survivors
-                # emit dim light; the other glass housings remain black.
-                var live_lamp := _street_lights < 2 and _street_lamp_heads % 7 == 4
-                _batch_box("lamp_glass" if live_lamp else "lamp_glass_off",
-                    lamp_end + Vector3.DOWN * 0.43,
-                    Vector3(0.35, 0.25, 0.35))
-                if live_lamp:
-                    var lantern := OmniLight3D.new()
-                    lantern.name = "Жёлтый деревенский фонарь"
-                    lantern.position = lamp_end + Vector3.DOWN * 0.43
-                    lantern.light_color = Color("#f3c77b")
-                    lantern.light_energy = 0.66
-                    lantern.light_specular = 0.0
-                    lantern.omni_range = 10.0
-                    lantern.shadow_enabled = false
-                    add_child(lantern)
-                    _street_lights += 1
+                _street_lamp_positions.append(lamp_end + Vector3.DOWN * 0.43)
             if previous != Vector2(INF, INF):
                 var horizontal := Vector3(perpendicular.x, 0.0, -perpendicular.y)
                 for offset in [-0.42, 0.42]:
