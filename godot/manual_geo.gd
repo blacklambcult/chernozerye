@@ -17,6 +17,9 @@ const COLORS := {
 }
 var _soil_faces := PackedVector3Array()
 var object_count: int = 0
+const STATIC_GRID := preload("res://static_triangle_grid.gd")
+const ROAD_RENDER_CELL_SIZE := 256.0
+var _road_mesh_batches: Dictionary = {}
 const WORLD_RENDER_LOD := preload("res://world_render_lod.gd")
 const FOREST_MODELS := "res://generated_forest/"
 const FOREST_FLOOR := preload("res://forest_floor.gd")
@@ -140,6 +143,7 @@ func _build_manual() -> void:
     # Surveyed centre lines remain untouched. No visible round junction caps:
     # crossings are handled by small elevation separation + track clearance.
     _build_road_intersections()
+    _flush_road_meshes()
     _render_cars()
     if not _soil_faces.is_empty():
         var road_body := StaticBody3D.new()
@@ -161,15 +165,17 @@ func _build_manual() -> void:
     _forest_floor.prepare(features, manual_roads, _forest_sites)
     _forest_floor.build()
     phase_start = _profile_phase("forest_terrain", phase_start)
-    _build_forest_instances()
+    var vegetation_batches := _build_forest_instances()
     phase_start = _profile_phase("forest_instances_total", phase_start)
     # Separate, reversible decorative layer; manual survey coordinates remain untouched.
     var art := Node3D.new()
     art.name = "VillageArt22"
     art.set_script(preload("res://manual_art.gd"))
     add_child(art)
-    art.call("decorate", features, _profile_startup)
-    _profile_phase("village_total", phase_start)
+    art.call("decorate", features, vegetation_batches, _profile_startup)
+    phase_start = _profile_phase("village_total", phase_start)
+    _render_forest_batches(vegetation_batches)
+    _profile_phase("forest_and_yard_render_batches", phase_start)
     var totem: Vector2 = art.get("cultist_totem_site")
     if totem.is_finite():
         _spawn_shrine(totem, 0.035, "crimson_totem", Color("#ff294e"))
@@ -216,12 +222,39 @@ func _mesh_from_triangles(vertices: PackedVector3Array, color: Color, label: Str
         render_group: StringName = &"") -> void:
     if vertices.is_empty():
         return
+    if soil:
+        _soil_faces.append_array(vertices)
+    if jitter_group == &"ps1_jitter_road" or render_group == &"perf_roadside":
+        var key := [label, color, soil, jitter_group, render_group]
+        var cells: Dictionary = _road_mesh_batches.get_or_add(key, {})
+        for i in range(0, vertices.size(), 3):
+            var cell := STATIC_GRID.cell_for_triangle(vertices[i], vertices[i + 1], vertices[i + 2],
+                ROAD_RENDER_CELL_SIZE)
+            var chunk: Array = cells.get_or_add(cell, [])
+            chunk.append(vertices[i])
+            chunk.append(vertices[i + 1])
+            chunk.append(vertices[i + 2])
+        return
+    _create_triangle_mesh(vertices, color, label, soil, jitter_group, render_group)
+
+
+func _flush_road_meshes() -> void:
+    var count := 0
+    for key: Array in _road_mesh_batches:
+        for vertices: Array in _road_mesh_batches[key].values():
+            _create_triangle_mesh(PackedVector3Array(vertices), key[1], key[0], key[2], key[3], key[4])
+            count += 1
+    _road_mesh_batches.clear()
+    print("ROAD_RENDER_BATCHES_READY: ", count)
+
+
+func _create_triangle_mesh(vertices: PackedVector3Array, color: Color, label: String,
+        soil: bool, jitter_group: StringName, render_group: StringName) -> void:
     var arrays := []
     arrays.resize(Mesh.ARRAY_MAX)
     arrays[Mesh.ARRAY_VERTEX] = vertices
     var material := _mat(color)
     if soil:
-        _soil_faces.append_array(vertices)
         var uvs := PackedVector2Array()
         uvs.resize(vertices.size())
         for i in vertices.size():
@@ -858,7 +891,7 @@ func _build_trunk_collision() -> void:
     print("FOREST_COLLISION_READY: trunks=", _tree_collision_total)
 
 
-func _build_forest_instances() -> void:
+func _build_forest_instances() -> Dictionary:
     var phase_start := Time.get_ticks_usec()
     _place_forest_shrines()
     var batches := {}
@@ -913,12 +946,11 @@ func _build_forest_instances() -> void:
     _add_forest_ponds(batches)
     _forest_floor.add_snow(snow)
     phase_start = _profile_phase("forest_placement", phase_start)
-    _render_forest_batches(batches)
-    phase_start = _profile_phase("forest_model_load_and_batches", phase_start)
     _build_trunk_collision()
     _profile_phase("forest_trunk_collision", phase_start)
     print("MANUAL_FOREST_READY: trees=", tree_trunks.size(), " clearance=roads13/buildings6.5",
         " bushes=", undergrowth, " ground_details=", ground_details, " shrines=", _shrine_sites.size(), " snow=", snow.size())
+    return batches
 
 func _add_forest_ponds(batches: Dictionary) -> void:
     var count := 0

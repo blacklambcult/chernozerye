@@ -106,6 +106,8 @@ func _process(delta: float) -> void:
             lamp.light_energy = 0.39 + wave * 0.08
 
 
+const STATIC_GRID := preload("res://static_triangle_grid.gd")
+const YARD_RENDER_CELL_SIZE := 256.0
 const STUDIO_VILLAGE := preload("res://generated_village.gd")
 var cultist_totem_site := Vector2.INF
 var _studio_village: Node3D
@@ -123,7 +125,7 @@ var _placed_plots: Array[PackedVector2Array] = []
 var _fence_duplicates := 0
 var _approaches_blocked := 0
 
-func decorate(features: Array, profile_startup := false) -> void:
+func decorate(features: Array, vegetation_batches: Dictionary, profile_startup := false) -> void:
     var phase_start := Time.get_ticks_usec()
     _studio_village = STUDIO_VILLAGE.new()
     _studio_village.name = "StudioVillage"
@@ -204,7 +206,7 @@ func decorate(features: Array, profile_startup := false) -> void:
     _fence_count = total_plots
     print("VILLAGE_ACCESS_READY: homes=", _house_approaches.size(), " segments=", _entrance_routes.size(),
         " blocked=", _approaches_blocked, " merged_fence_spans=", _fence_duplicates)
-    _add_yard_vegetation()
+    _add_yard_vegetation(vegetation_batches)
     var placement_end := Time.get_ticks_usec()
     _studio_village.finish()
     var batches_end := Time.get_ticks_usec()
@@ -580,26 +582,52 @@ func _flush_details() -> void:
         "gable_planks": Color("#3b4748"),
         "corner_timber": Color("#393a36")
     }
-    for key in _detail_batches.keys():
+    if _detail_batches.is_empty():
+        return
+    var palette := Image.create(_detail_batches.size(), 1, false, Image.FORMAT_RGB8)
+    var shaded := {}
+    var unshaded := {}
+    var slot := 0
+    for key: String in _detail_batches:
         var verts: PackedVector3Array = _detail_batches[key]
-        if key in ["window_lit", "window_eerie_blue", "window_eerie_green", "lamp_glass"]:
-            var tint: Color = colors[key] if colors.has(key) else Color("#ffcf79")
-            var lit_mat := _material(tint)
-            lit_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-            var arrays := []
-            arrays.resize(Mesh.ARRAY_MAX)
-            arrays[Mesh.ARRAY_VERTEX] = verts
-            var mesh := ArrayMesh.new()
-            mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-            var lit_node := MeshInstance3D.new()
-            lit_node.name = "Вечерний свет окон и уличных фонарей"
-            lit_node.mesh = mesh
-            lit_node.material_override = lit_mat
-            lit_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-            add_child(lit_node)
-        else:
-            _create_solid_mesh(verts, colors.get(key, Color.WHITE), "Детали фасада / " + str(key),
-                str(key).begins_with("log_"))
+        var tint: Color = colors.get(key, Color.WHITE)
+        if key.begins_with("log_"):
+            _create_solid_mesh(verts, tint, "Детали фасада / " + key, true)
+            continue
+        var lit := key in ["window_lit", "window_eerie_blue", "window_eerie_green", "lamp_glass"]
+        palette.set_pixel(slot, 0, tint)
+        var batches: Dictionary = unshaded if lit else shaded
+        var uv := Vector2((float(slot) + 0.5) / palette.get_width(), 0.5)
+        for i in range(0, verts.size(), 3):
+            var a := verts[i]
+            var b := verts[i + 1]
+            var c := verts[i + 2]
+            var cell := STATIC_GRID.cell_for_triangle(a, b, c, YARD_RENDER_CELL_SIZE)
+            var batch: Dictionary = batches.get_or_add(cell, {"vertices": [], "uvs": []})
+            batch.vertices.append(a)
+            batch.vertices.append(b)
+            batch.vertices.append(c)
+            batch.uvs.append(uv)
+            batch.uvs.append(uv)
+            batch.uvs.append(uv)
+        slot += 1
+    var texture := ImageTexture.create_from_image(palette)
+    var matte := _material(Color.WHITE, texture)
+    var lights := _material(Color.WHITE, texture)
+    lights.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    matte.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+    lights.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+    _flush_yard_meshes(shaded, matte, "Детали дворов")
+    _flush_yard_meshes(unshaded, lights, "Вечерний свет окон и уличных фонарей")
+    _detail_batches.clear()
+    print("YARD_RENDER_BATCHES_READY: shaded=", shaded.size(), " lit=", unshaded.size())
+
+
+func _flush_yard_meshes(batches: Dictionary, material: Material, label: String) -> void:
+    for batch: Dictionary in batches.values():
+        _make_textured_mesh(PackedVector3Array(batch.vertices), PackedVector2Array(batch.uvs),
+            material, label)
+
 
 func _signed_area(points: PackedVector2Array) -> float:
     var area := 0.0
@@ -2121,9 +2149,8 @@ func _choose_cultist_totem_site() -> void:
                     return
 
 
-func _add_yard_vegetation() -> void:
+func _add_yard_vegetation(batches: Dictionary) -> void:
     var geo := get_parent()
-    var batches := {}
     var rng := RandomNumberGenerator.new()
     rng.seed = 481056
     var count := 0
@@ -2146,7 +2173,6 @@ func _add_yard_vegetation() -> void:
             _yard_objects.append({"center": point, "radius": 2.0})
             placed += 1
             count += 1
-    geo.call("_render_forest_batches", batches)
     print("YARD_VEGETATION_READY: clusters=", count)
 
 
