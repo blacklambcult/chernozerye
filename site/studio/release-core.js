@@ -62,6 +62,15 @@
       nonEmpty(item.title,"roadmap.title",180);
       nonEmpty(item.description,"roadmap.description",500);
       nonEmpty(item.deliverable,"roadmap.deliverable",300);
+      if(!Array.isArray(item.criteria)||!item.criteria.length||item.criteria.length>50)throw Error("Нет критериев прогресса");
+      const titles=new Set();
+      for(const c of item.criteria){
+        if(!c||typeof c!=="object"||typeof c.done!=="boolean")throw Error("Некорректный критерий");
+        const title=nonEmpty(c.title,"criterion.title",220);
+        if(titles.has(title))throw Error("Повторный критерий");
+        titles.add(title);
+        if(c.done)nonEmpty(c.evidence,"criterion.evidence",300);
+      }
     }
     return doc;
   }
@@ -74,8 +83,13 @@
   function backlogByPhase(doc,phase) {
     return doc.roadmap.filter(item=>item.phase===phase);
   }
+  function roadmapProgress(item) {
+    const total=item.criteria.length;
+    const done=item.criteria.filter(c=>c.done).length;
+    return {done,total,percent:Math.floor(100*done/total)};
+  }
   function shortSha(value) {
     return typeof value==="string"&&SHA_PATTERN.test(value)?value.slice(0,8):null;
   }
-  return Object.freeze({SCHEMA,AREAS,PHASES,PRIORITIES,normalize,filteredReleases,backlogByPhase,shortSha});
+  return Object.freeze({SCHEMA,AREAS,PHASES,PRIORITIES,normalize,filteredReleases,backlogByPhase,roadmapProgress,shortSha});
 });

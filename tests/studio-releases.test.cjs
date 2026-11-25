@@ -53,3 +53,13 @@ test("schema refuses duplicated releases, bad links and fake roadmap statuses",(
   assert.throws(()=>R.normalize(changedVersion),/Первая запись/);
   assert.equal(R.shortSha("<script>"),null);
 });
+
+test("all roadmap packages expose validated progress with evidence",()=>{
+  assert.equal(doc.roadmap.length,18);
+  for(const item of doc.roadmap){const p=R.roadmapProgress(item);assert.equal(p.percent,Math.floor(100*p.done/p.total));assert.ok(p.percent>=0&&p.percent<=100);assert.ok(item.criteria.filter(c=>c.done).every(c=>c.evidence));}
+  const item={criteria:[{done:true},{done:false},{done:false}]};assert.equal(R.roadmapProgress(item).percent,33);
+  item.criteria.forEach(c=>c.done=true);assert.equal(R.roadmapProgress(item).percent,100);
+  const missing=structuredClone(doc);delete missing.roadmap[0].criteria;assert.throws(()=>R.normalize(missing),/критериев/);
+  const unsupported=structuredClone(doc);delete unsupported.roadmap[0].criteria[0].evidence;assert.throws(()=>R.normalize(unsupported),/evidence/);
+  const duplicate=structuredClone(doc);duplicate.roadmap[0].criteria.push(duplicate.roadmap[0].criteria[0]);assert.throws(()=>R.normalize(duplicate),/Повторный критерий/);
+});
