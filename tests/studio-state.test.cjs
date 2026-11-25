@@ -41,3 +41,21 @@ test("storage API failure is displayed as unavailable without erasing other coun
   const s = state.snapshot({getItem(key) {if(key===state.KEYS.geo)throw Error("disabled");return null;}});
   assert.deepEqual(s, {geo:null,quest:0,model:0,forge:0});
 });
+
+test("iframe routes work at a project prefix, root and explicit index.html",()=>{
+  for(const studio of ["https://example.test/chernozerye/studio/","https://example.test/studio/index.html"]){
+    assert.equal(state.routeForUrl("../quest/?model=demo",studio),"quest");
+    assert.equal(state.routeForUrl("../npc/index.html",studio),"npc");
+    assert.equal(state.routeForUrl("../map",studio),"geo");
+    assert.equal(state.routeForUrl("../studio/#home",studio),"home");
+    assert.equal(state.routeForUrl("../",studio),null);
+    assert.equal(state.routeForUrl("../quest/unknown.html",studio),null);
+    assert.equal(state.routeForUrl("https://other.test/quest/",studio),null);
+  }
+});
+test("keyboard mappings are identical in shell and editor frames",()=>{
+  state.TOOLS.forEach((id,i)=>assert.equal(state.shortcut({altKey:true,code:"Digit"+i}),id));
+  assert.equal(state.shortcut({altKey:true,ctrlKey:true,code:"Digit1"}),null);
+  assert.equal(state.shortcut({altKey:true,shiftKey:true,code:"Digit1"}),null);
+  assert.equal(state.shortcut({altKey:false,code:"Digit1"}),null);
+});

@@ -16,6 +16,23 @@
     const id = typeof hash === "string" ? hash.replace(/^#/, "").toLowerCase() : "";
     return TOOLS.includes(id) ? id : "home";
   }
+  const ROUTES = Object.freeze({home:"studio",geo:"map",quest:"quest",model:"model",forge:"forge",weapon:"weapon-generator",arms:"arms",buildings:"building-generator",nature:"nature-generator",npc:"npc"});
+  function routeForUrl(candidate, studioHref) {
+    try {
+      const studio = new URL(studioHref);
+      const base = new URL("../", studio);
+      const url = new URL(candidate, studio);
+      if (url.origin !== studio.origin) return null;
+      const canonical = path => path.replace(/\/index\.html$/, "/").replace(/\/$/, "");
+      for (const [id, dir] of Object.entries(ROUTES))
+        if (canonical(url.pathname) === canonical(new URL(dir+"/",base).pathname)) return id;
+      return null;
+    } catch { return null; }
+  }
+  function shortcut(event) {
+    return event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && /^Digit[0-9]$/.test(event.code)
+      ? TOOLS[Number(event.code.slice(-1))] || null : null;
+  }
   function countFor(key, raw) {
     if (!raw || typeof raw !== "string") return 0;
     let data;
@@ -39,5 +56,5 @@
     }
     return result;
   }
-  return Object.freeze({ KEYS, TOOLS, toolId, countFor, snapshot });
+  return Object.freeze({ KEYS, TOOLS, toolId, routeForUrl, shortcut, countFor, snapshot });
 });
