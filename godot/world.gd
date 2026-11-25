@@ -81,7 +81,7 @@ func _ready() -> void:
     _create_landmarks()
     _create_player()
     _create_brand_watermark()
-    _create_overview_map()
+    _create_overview_layer()
     _create_gameplay_hud()
     var performance_overlay := preload("res://performance_overlay.gd").new()
     performance_overlay.name = "PerformanceOverlay"
@@ -692,12 +692,15 @@ var osm_button: Button
 var overture_button: Button
 var sector_a_visit_button: Button
 
-func _create_overview_map() -> void:
+func _create_overview_layer() -> void:
     overview_layer = CanvasLayer.new()
     overview_layer.name = "MapOverlay"
     overview_layer.layer = 15
     overview_layer.visible = false
     add_child(overview_layer)
+
+
+func _create_overview_map() -> void:
     var map_root := Control.new()
     map_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     overview_layer.add_child(map_root)
@@ -715,6 +718,13 @@ func _create_overview_map() -> void:
         if extra is Dictionary:
             overture_shapes = extra.get("buildings", [])
     map_panel.initialize(self, get_node("GeographyBlockoutV07"), get_node("Player"), features, overture_shapes)
+    map_panel.set("show_manual", manual_mode)
+    map_panel.set_process(false)
+    overview_layer.visibility_changed.connect(func() -> void:
+        map_panel.set_process(overview_layer.visible)
+        if overview_layer.visible:
+            map_panel.queue_redraw()
+    )
     print("OVERTURE_LOADED: ", overture_shapes.size())
     houses_button = Button.new()
     houses_button.text = "ДОМА: ПОКАЗАТЬ"
@@ -766,6 +776,8 @@ func _create_overview_map() -> void:
     sector_a_visit_button.offset_top = 343.0
     sector_a_visit_button.offset_bottom = 391.0
     sector_a_visit_button.pressed.connect(_visit_sector_a)
+    for control in [houses_button, sector_button, osm_button, overture_button, sector_a_visit_button]:
+        control.visible = not manual_mode
 
 func _create_quick_navigation() -> void:
     # A second, always-visible entry point avoids hunting for a map-only control.
@@ -977,6 +989,8 @@ func _input(event: InputEvent) -> void:
             var prologue := get_node_or_null("StoryPrologue")
             if prologue != null and (bool(prologue.get("inside_home")) or bool(prologue.get("journal_open"))):
                 return
+            if map_panel == null:
+                _create_overview_map()
             overview_layer.visible = not overview_layer.visible
             if overview_layer.visible:
                 Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
