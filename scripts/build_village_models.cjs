@@ -65,7 +65,7 @@ function buildingRecipes(features) {
     const id = "recipe_" + crypto.createHash("sha256").update(JSON.stringify(recipe)).digest("hex").slice(0,24);
     recipes.set(id, recipe);
     if (Object.hasOwn(byFeature,feature.id)) throw Error("Duplicate feature: "+feature.id);
-    byFeature[feature.id] = {model:id,floors:modules.floors ?? 1,window:conditions.window};
+    byFeature[feature.id] = {model:id,floors:modules.floors ?? 1,window:conditions.window,appearance:a};
   }
   if (recipes.size > MAX_CUSTOM_MODELS)
     throw Error("Unique custom building recipes: "+recipes.size+"; budget "+MAX_CUSTOM_MODELS+". Reuse recipes before building.");
