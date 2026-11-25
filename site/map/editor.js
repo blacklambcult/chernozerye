@@ -29,6 +29,7 @@
   let selectedVertex = null;
   let savedMessage = "";
   let localStorageAvailable = true;
+  let objectLimit = 100;
 
   for (const [name, z] of [["game-survey", 520], ["manual-survey", 532], ["manual-handles", 660]]) {
     if (!map.getPane(name)) map.createPane(name);
@@ -255,15 +256,20 @@
   function renderList() {
     const node = $("editor-objects");
     node.replaceChildren();
-    if (!records.length) {
+    const query = $("geo-object-filter").value.trim().toLocaleLowerCase("ru");
+    const category = $("geo-category-filter").value;
+    const filtered = records.filter(feature => (!category || feature.properties.category === category) && (!query || [feature.id,feature.properties.name,core.TYPES[feature.properties.category].label].join(" ").toLocaleLowerCase("ru").includes(query)));
+    $("geo-filter-count").textContent = "Найдено "+filtered.length+" из "+records.length;
+    $("geo-list-more").hidden = filtered.length <= objectLimit;
+    if (!filtered.length) {
       const paragraph = document.createElement("p");
       paragraph.className = "editor-empty";
-      paragraph.textContent = "Объектов пока нет. Выбери инструмент и отметь первый.";
+      paragraph.textContent = records.length ? "Нет объектов по текущему фильтру." : "Объектов пока нет. Выбери инструмент и отметь первый.";
       node.appendChild(paragraph);
       return;
     }
     // Show the last created first; preserve underlying data order for stable export.
-    for (const feature of [...records].reverse()) {
+    for (const feature of filtered.reverse().slice(0,objectLimit)) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "editor-list-item" + (selectedId === feature.id ? " is-selected" : "");
@@ -766,6 +772,13 @@
       undoPoint();
     }
   });
+
+  for(const [category,spec] of Object.entries(core.TYPES)){
+    const option=document.createElement("option");option.value=category;option.textContent=spec.label;$("geo-category-filter").appendChild(option);
+  }
+  $("geo-object-filter").addEventListener("input",()=>{objectLimit=100;renderList();});
+  $("geo-category-filter").addEventListener("change",()=>{objectLimit=100;renderList();});
+  $("geo-list-more").addEventListener("click",()=>{objectLimit+=100;renderList();});
 
   // Warm start without replacing read-only Overture/OSM layers.
   restore();
