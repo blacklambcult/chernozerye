@@ -1168,6 +1168,7 @@
                 // Building type switcher
                 document.querySelectorAll('[data-building]').forEach(btn => {
                     btn.addEventListener('click', () => {
+                        if(world)return;
                         const next = btn.dataset.building;
                         if (state.buildingType === next) return;
                         state.buildingType = next;
