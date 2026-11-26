@@ -232,17 +232,21 @@ func _build_interior() -> void:
     flame.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
     var glow := OmniLight3D.new()
     glow.position = Vector3(-2.74,1.13,-0.89)
-    glow.omni_range = 4.0
+    glow.omni_range = 3.4
     glow.light_color = Color("#ffa653")
-    glow.light_energy = 3.1
+    glow.light_energy = 2.4
     glow.shadow_enabled = true
     interior.add_child(glow)
-    var daylight := OmniLight3D.new()
+    var daylight := SpotLight3D.new()
+    daylight.name = "Сумерки из окна"
     daylight.position = Vector3(-3.85, 1.88, -0.55)
-    daylight.light_color = Color("#96b2db")
-    daylight.light_energy = 1.25
-    daylight.omni_range = 4.6
+    daylight.light_color = Color("#8da6c3")
+    daylight.light_energy = 0.75
+    daylight.spot_range = 5.2
+    daylight.spot_angle = 52.0
     interior.add_child(daylight)
+    # Aim the window wash down into the room, away from the exterior wall.
+    daylight.look_at(interior.to_global(Vector3(-0.7, 0.55, -0.55)))
     for i in range(3):
         _solid_box("Выцветшие строки", Vector3(-2.16, 0.766, -0.64 + i * 0.068),
             Vector3(0.29 - i * 0.035, 0.004, 0.018), Color("#574f45"), false)
@@ -259,7 +263,7 @@ func _build_interior() -> void:
     light.name = "Остывшая комната"
     light.position = Vector3(0, 3.1, 0.3)
     light.light_color = Color("#a3a9af")
-    light.light_energy = 0.45
+    light.light_energy = 0.26
     light.omni_range = 10.0
     light.shadow_enabled = false
     interior.add_child(light)
@@ -531,6 +535,14 @@ func _update_focus() -> void:
 func _process(_delta: float) -> void:
     _update_approach()
     _update_focus()
+
+func visit_interior_benchmark() -> bool:
+    if player == null or interior == null or inside_home or journal_open:
+        return false
+    if note_archive != null and note_archive.call("is_open"):
+        return false
+    _enter_home()
+    return true
 
 func _enter_home() -> void:
     if player == null:

@@ -978,6 +978,10 @@ func _input(event: InputEvent) -> void:
         elif manual_mode and event.shift_pressed and (event.physical_keycode == KEY_B or event.keycode == KEY_B):
             _visit_forest_benchmark()
             get_viewport().set_input_as_handled()
+        elif manual_mode and event.shift_pressed and (event.physical_keycode == KEY_I or event.keycode == KEY_I):
+            var story := get_node_or_null("StoryPrologue")
+            if story != null and story.call("visit_interior_benchmark"):
+                get_viewport().set_input_as_handled()
         elif event.physical_keycode == KEY_M or event.keycode == KEY_M or (event.unicode != 0 and char(event.unicode).to_lower() == "ь"):
             var prologue := get_node_or_null("StoryPrologue")
             if prologue != null and (bool(prologue.get("inside_home")) or bool(prologue.get("journal_open"))):
