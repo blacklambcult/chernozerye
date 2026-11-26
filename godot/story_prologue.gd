@@ -634,7 +634,7 @@ func _unhandled_input(event: InputEvent) -> void:
     if not event is InputEventKey:
         return
     var key := event as InputEventKey
-    if not key.pressed or key.echo:
+    if not key.pressed or key.echo or interior == null:
         return
     var code := key.physical_keycode
     var text_key := char(key.unicode).to_lower() if key.unicode != 0 else ""

@@ -92,6 +92,7 @@ func _ready() -> void:
     _create_first_cultist()
     _create_november_snow()
     _create_note_archive()
+    _create_story_prologue()
     var library := preload("res://local_object_library.gd").new()
     var snapshot := preload("res://studio_snapshot.gd").read()
     library.snapshot = snapshot
